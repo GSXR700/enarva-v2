@@ -10,8 +10,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, CheckSquare, User, Calendar } from 'lucide-react'
+import { ArrowLeft, CheckSquare, User, Calendar, MapPin } from 'lucide-react'
 import { Quote, User as TeamMember, Lead } from '@prisma/client'
+import { toast } from 'sonner'
 
 type QuoteWithLead = Quote & { lead: Lead };
 
@@ -19,57 +20,77 @@ export default function NewMissionForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [quotes, setQuotes] = useState<QuoteWithLead[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]); // To store leads for technical visits
   const [teamLeaders, setTeamLeaders] = useState<TeamMember[]>([]);
+
+  // Get mission type from URL, default to 'SERVICE'
+  const missionType = searchParams.get('type') as 'TECHNICAL_VISIT' | 'SERVICE' || 'SERVICE';
 
   const [formData, setFormData] = useState({
     quoteId: searchParams.get('quoteId') || '',
+    leadId: searchParams.get('leadId') || '',
     leadName: '',
     address: '',
     scheduledDate: '',
-    estimatedDuration: '',
+    estimatedDuration: missionType === 'TECHNICAL_VISIT' ? '1' : '', // Default to 1 hour for visits
     teamLeaderId: '',
     accessNotes: '',
+    type: missionType,
   });
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Fetch accepted quotes and team leaders to populate the form
     const fetchData = async () => {
       try {
-        const [quotesRes, usersRes] = await Promise.all([
+        const [quotesRes, usersRes, leadsRes] = await Promise.all([
           fetch('/api/quotes?status=ACCEPTED'),
-          fetch('/api/users?role=TEAM_LEADER')
+          fetch('/api/users?role=TEAM_LEADER'),
+          fetch('/api/leads') // Fetch all leads to find the one for the visit
         ]);
 
-        if (!quotesRes.ok || !usersRes.ok) {
+        if (!quotesRes.ok || !usersRes.ok || !leadsRes.ok) {
           throw new Error('Failed to fetch initial data.');
         }
 
         const quotesData = await quotesRes.json();
         const usersData = await usersRes.json();
+        const leadsData = await leadsRes.json();
 
         setQuotes(quotesData);
         setTeamLeaders(usersData);
+        setLeads(leadsData);
 
-        // Pre-fill form if quoteId is in URL
         const quoteId = searchParams.get('quoteId');
-        if (quoteId) {
+        const leadId = searchParams.get('leadId');
+
+        if (missionType === 'TECHNICAL_VISIT' && leadId) {
+            const selectedLead = leadsData.find((l: Lead) => l.id === leadId);
+            if (selectedLead) {
+                setFormData(prev => ({
+                    ...prev,
+                    leadName: `${selectedLead.firstName} ${selectedLead.lastName}`,
+                    address: selectedLead.address || ''
+                }));
+            }
+        } else if (quoteId) {
             const selectedQuote = quotesData.find((q: QuoteWithLead) => q.id === quoteId);
             if(selectedQuote) {
                 setFormData(prev => ({
                     ...prev,
                     leadName: `${selectedQuote.lead.firstName} ${selectedQuote.lead.lastName}`,
+                    address: selectedQuote.lead.address || ''
                 }));
             }
         }
       } catch (err: any) {
         setError(err.message);
+        toast.error(err.message);
       }
     };
     fetchData();
-  }, [searchParams]);
+  }, [searchParams, missionType]);
 
   const handleSelectChange = (id: keyof typeof formData, value: string) => {
     setFormData(prev => ({ ...prev, [id]: value }));
@@ -79,7 +100,9 @@ export default function NewMissionForm() {
         setFormData(prev => ({
           ...prev,
           quoteId: value,
+          leadId: selectedQuote.leadId, // Store the leadId from the quote
           leadName: `${selectedQuote.lead.firstName} ${selectedQuote.lead.lastName}`,
+          address: selectedQuote.lead.address || ''
         }));
       }
     }
@@ -94,11 +117,37 @@ export default function NewMissionForm() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    // ... submit logic will be added here
-    console.log("Form Data:", formData);
-    // After successful submission:
-    // router.push('/missions');
-    setIsLoading(false);
+
+    if (!formData.leadId) {
+        toast.error("Client non identifié. Impossible de créer la mission.");
+        setIsLoading(false);
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/missions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ...formData,
+                quoteId: formData.quoteId || undefined, // Send quoteId only if it exists
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.text();
+            throw new Error(errorData || "Échec de la création de la mission.");
+        }
+        
+        toast.success(`Mission de type "${formData.type}" planifiée avec succès !`);
+        router.push('/missions');
+
+    } catch (err: any) {
+        setError(err.message);
+        toast.error(err.message);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   return (
@@ -108,8 +157,12 @@ export default function NewMissionForm() {
           <Button variant="outline" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
         </Link>
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Planifier une Nouvelle Mission</h1>
-          <p className="text-muted-foreground mt-1">Sélectionnez un devis accepté et assignez une équipe.</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            {missionType === 'TECHNICAL_VISIT' ? "Planifier une Visite Technique" : "Planifier une Nouvelle Mission"}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {missionType === 'TECHNICAL_VISIT' ? "Assignez un chef d'équipe pour une évaluation sur site." : "Sélectionnez un devis accepté et assignez une équipe."}
+          </p>
         </div>
       </div>
 
@@ -120,27 +173,32 @@ export default function NewMissionForm() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <Label htmlFor="quoteId">Devis Accepté</Label>
-                <Select value={formData.quoteId} onValueChange={(value) => handleSelectChange('quoteId', value)} required>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner un devis..." /></SelectTrigger>
-                  <SelectContent>
-                    {quotes.map(quote => (
-                      <SelectItem key={quote.id} value={quote.id}>
-                        {quote.quoteNumber} - {quote.lead.firstName} {quote.lead.lastName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {missionType === 'SERVICE' && (
+                <div>
+                  <Label htmlFor="quoteId">Devis Accepté</Label>
+                  <Select value={formData.quoteId} onValueChange={(value) => handleSelectChange('quoteId', value)} required>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner un devis..." /></SelectTrigger>
+                    <SelectContent>
+                      {quotes.map(quote => (
+                        <SelectItem key={quote.id} value={quote.id}>
+                          {quote.quoteNumber} - {quote.lead.firstName} {quote.lead.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
               <div>
                 <Label>Client</Label>
-                <Input value={formData.leadName} disabled />
+                <Input value={formData.leadName} disabled placeholder="Sélectionnez un devis ou venez d'un lead..." />
               </div>
-              <div>
+
+              <div className={missionType === 'TECHNICAL_VISIT' ? 'md:col-span-2' : ''}>
                 <Label htmlFor="address">Adresse d'intervention</Label>
                 <Input id="address" value={formData.address} onChange={handleChange} required />
               </div>
+
               <div>
                 <Label htmlFor="scheduledDate">Date et Heure Planifiées</Label>
                 <Input id="scheduledDate" type="datetime-local" value={formData.scheduledDate} onChange={handleChange} required />
@@ -166,9 +224,11 @@ export default function NewMissionForm() {
               </div>
             </div>
 
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+
             <div className="flex justify-end mt-6">
               <Button type="submit" className="bg-enarva-gradient rounded-lg px-8" disabled={isLoading}>
-                {isLoading ? 'Planification en cours...' : 'Planifier la Mission'}
+                {isLoading ? 'Planification...' : (missionType === 'TECHNICAL_VISIT' ? 'Planifier la Visite' : 'Planifier la Mission')}
               </Button>
             </div>
           </CardContent>

@@ -262,6 +262,12 @@ export default function LeadsPage() {
                 <div className="space-y-4 mt-4">
                     <div className="flex flex-col sm:flex-row gap-2">
                         <Link href={`/quotes/new?leadId=${selectedLead.id}`} className="flex-1"><Button className="w-full gap-2 bg-enarva-gradient"><Plus className="w-4 h-4"/>Créer un Devis</Button></Link>
+                        <Link href={`/missions/new?leadId=${selectedLead.id}&type=TECHNICAL_VISIT`}   className="flex-1">
+      <Button variant="outline" className="w-full gap-2">
+        <MapPin className="w-4 h-4" />
+        Planifier Visite Technique
+      </Button>
+    </Link>
                         <Link href={`/leads/${selectedLead.id}/edit`} className="flex-1"><Button variant="outline" className="w-full gap-2"><Edit/>Modifier</Button></Link>
                         <Button variant="destructive" className="flex-1 gap-2" onClick={() => handleDeleteOne(selectedLead.id)}><Trash2/>Supprimer</Button>
                     </div>

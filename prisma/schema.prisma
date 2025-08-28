@@ -167,6 +167,8 @@ model Mission {
   missionNumber   String        @unique
   status          MissionStatus @default(SCHEDULED)
   priority        Priority      @default(NORMAL)
+  type            MissionType   @default(SERVICE)
+  technicalVisitReport Json?
   scheduledDate   DateTime
   estimatedDuration Int
   actualStartTime DateTime?
@@ -412,6 +414,13 @@ enum ContractType {
   INTERVENTION_UNIQUE
   MAINTENANCE
   ABONNEMENT
+}
+
+enum MissionType {
+  SERVICE
+  TECHNICAL_VISIT
+  DELIVERY
+  INTERNAL
 }
 
 enum ProviderType {
