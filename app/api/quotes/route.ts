@@ -25,7 +25,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     // --- CORRECTION CLÉ ---
-    // On destructure `leadName` pour l'exclure du reste des données du devis (`quoteDetails`)
+    // On destructure `leadName` pour l'exclure du reste des données (`quoteDetails`)
+    // qui seront envoyées à Prisma.
     const { leadId, quoteNumber, leadName, ...quoteDetails } = body
 
     if (!leadId || !quoteNumber || !quoteDetails.surface) {
