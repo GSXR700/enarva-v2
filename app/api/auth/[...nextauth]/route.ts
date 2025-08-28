@@ -1,5 +1,5 @@
 // app/api/auth/[...nextauth]/route.ts
-import NextAuth, { NextAuthOptions, User as NextAuthUser } from 'next-auth'
+import NextAuth, { NextAuthOptions } from 'next-auth'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { PrismaClient, UserRole } from '@prisma/client'
 import CredentialsProvider from 'next-auth/providers/credentials'
@@ -9,7 +9,10 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-export const authOptions: NextAuthOptions = {
+// --- CORRECTION CLÉ ---
+// Le mot-clé "export" a été retiré de la ligne suivante.
+// Cette constante est maintenant locale à ce fichier uniquement.
+const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
@@ -82,4 +85,5 @@ export const authOptions: NextAuthOptions = {
 
 const handler = NextAuth(authOptions);
 
+// Ces exportations sont correctes et doivent rester
 export { handler as GET, handler as POST };
