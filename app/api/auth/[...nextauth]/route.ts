@@ -9,9 +9,8 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-// --- CORRECTION CLÉ ---
-// Le mot-clé "export" a été retiré de la ligne suivante.
-// Cette constante est maintenant locale à ce fichier uniquement.
+// La configuration `authOptions` est définie localement sans être exportée
+// pour être compatible avec les builds Vercel.
 const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -58,7 +57,7 @@ const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: '/login',
-    error: '/login', // Redirect to login page on error
+    error: '/login', // Redirige vers la page de connexion en cas d'erreur
   },
   callbacks: {
     async session({ session, token }) {
@@ -85,5 +84,5 @@ const authOptions: NextAuthOptions = {
 
 const handler = NextAuth(authOptions);
 
-// Ces exportations sont correctes et doivent rester
+// Seuls les gestionnaires GET et POST sont exportés, comme l'exige Next.js
 export { handler as GET, handler as POST };
