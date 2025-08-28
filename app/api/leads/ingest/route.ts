@@ -1,11 +1,22 @@
 // app/api/leads/ingest/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import io from 'socket.io-client';
+import Pusher from 'pusher';
 
 const prisma = new PrismaClient();
 
+// Initialize Pusher with your server credentials
+const pusher = new Pusher({
+  appId: process.env.PUSHER_APP_ID!,
+  key: process.env.PUSHER_KEY!,
+  secret: process.env.PUSHER_SECRET!,
+  cluster: process.env.PUSHER_CLUSTER!,
+  useTLS: true
+});
+
+
 const splitFullName = (fullName: string) => {
+    // ... (your existing splitFullName function)
     const parts = fullName.trim().split(' ');
     if (parts.length === 1) {
         return { firstName: parts[0], lastName: '(non spécifié)' };
@@ -30,8 +41,7 @@ export async function POST(request: Request) {
     }
 
     const { firstName, lastName } = splitFullName(nom_complet);
-    
-    // Message enrichi avec toutes les données du formulaire
+
     let message = `Nouveau lead depuis le site web.\n\n` +
                   `Service demandé : ${service || 'Non spécifié'}\n` +
                   `Date de prestation souhaitée : ${date_prestation || 'Non spécifiée'}\n` +
@@ -44,31 +54,15 @@ export async function POST(request: Request) {
         phone: telephone,
         email: email || null,
         originalMessage: message,
-        // --- CORRECTION CLÉ ---
-        // Utilisation de la nouvelle valeur d'enum correcte
-        channel: 'SITE_WEB', 
+        channel: 'SITE_WEB',
         status: 'NEW',
-        // Les autres champs obligatoires de votre nouveau schéma sont couverts par @default
-        // ou sont optionnels.
       },
     });
 
-    // --- NOTIFICATION TEMPS RÉEL (AVEC AVERTISSEMENT) ---
-    // AVERTISSEMENT : L'émission d'un événement socket depuis une API Route serverless
-    // peut être peu fiable. La fonction peut se terminer avant que la connexion
-    // et l'émission ne soient complètes.
-    try {
-        // Assurez-vous que l'URL pointe vers votre serveur Next.js en cours d'exécution
-        const socket = io(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'); 
-        socket.emit('broadcast', {
-            event: 'new_lead',
-            payload: newLead
-        });
-        // On ne déconnecte pas manuellement pour donner une chance à l'événement de partir.
-    } catch (socketError) {
-        console.error("Socket emission failed:", socketError);
-    }
-    // --- FIN DE LA NOTIFICATION ---
+    // --- REAL-TIME NOTIFICATION WITH PUSHER ---
+    // Trigger an event on the 'leads' channel named 'new-lead'
+    await pusher.trigger('leads-channel', 'new-lead', newLead);
+    // --- END OF NOTIFICATION ---
 
     return NextResponse.json(newLead, { status: 201 });
 

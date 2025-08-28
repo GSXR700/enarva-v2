@@ -19,8 +19,9 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { Lead, Mission, User } from '@prisma/client'
 import ClientOnly from '@/components/providers/ClientOnly'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
-import io from 'socket.io-client'
+import Pusher from 'pusher-js';
 import { toast } from "sonner"
+
 
 type DashboardStats = {
   totalLeads: number;
@@ -59,22 +60,19 @@ export default function Dashboard() {
     };
     fetchDashboardData();
 
-    const socket = io();
-
-    socket.on('connect', () => {
-      console.log('Dashboard connecté au serveur socket.');
+     // --- PUSHER REAL-TIME LOGIC ---
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
     });
 
-    socket.on('new_lead', (newLead: Lead) => {
+    const channel = pusher.subscribe('leads-channel');
+
+    channel.bind('new-lead', (newLead: Lead) => {
       toast.success(`Nouveau lead reçu de ${newLead.firstName} ${newLead.lastName}!`);
-      
-      // --- CORRECTION TEMPS RÉEL ---
-      // Utiliser la mise à jour fonctionnelle pour garantir l'accès à l'état le plus récent
+
       setDashboardData(prevData => {
         if (!prevData) return null;
-        
         const updatedLeads = [newLead, ...prevData.recentLeads].slice(0, 3);
-        
         return {
           ...prevData,
           stats: {
@@ -86,10 +84,13 @@ export default function Dashboard() {
       });
     });
 
+    // Cleanup on component unmount
     return () => {
-      socket.disconnect();
+      pusher.unsubscribe('leads-channel');
+      pusher.disconnect();
     };
   }, []);
+
 
   const getChannelIcon = (channel: string) => {
     switch (channel) {

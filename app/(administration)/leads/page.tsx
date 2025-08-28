@@ -30,7 +30,7 @@ import {
 import { formatDate, translate, translations } from '@/lib/utils'
 import { Lead, LeadStatus, LeadCanal, UrgencyLevel, User, PropertyType, LeadType } from '@prisma/client'
 import { CardGridSkeleton } from '@/components/skeletons/CardGridSkeleton'
-import io from 'socket.io-client'
+import Pusher from 'pusher-js' // 1. IMPORT PUSHER-JS
 import { toast } from 'sonner'
 
 // Type étendu pour inclure l'utilisateur assigné, correspondant à la requête API
@@ -88,6 +88,7 @@ export default function LeadsPage() {
     }
   }, []);
 
+  // --- MODIFIED useEffect TO USE PUSHER ---
   useEffect(() => {
     const initialFetch = async () => {
         setIsLoading(true);
@@ -96,14 +97,27 @@ export default function LeadsPage() {
     }
     initialFetch();
 
-    const socket = io();
-    socket.on('new_lead', (newLead: LeadWithAssignee) => {
+    // 2. Initialize Pusher with your PUBLIC keys
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    });
+
+    // 3. Subscribe to the channel you defined in the backend
+    const channel = pusher.subscribe('leads-channel');
+
+    // 4. Bind to the event and define the callback function
+    channel.bind('new-lead', (newLead: LeadWithAssignee) => {
       toast.info(`Nouveau lead reçu : ${newLead.firstName}`);
+      // Prepend the new lead to the list without needing a full refresh
       setAllLeads(prev => [newLead, ...prev]);
     });
 
-    return () => { socket.disconnect() };
-  }, [fetchLeads])
+    // 5. Cleanup function: Unsubscribe and disconnect when the component is unmounted
+    return () => {
+      pusher.unsubscribe('leads-channel');
+      pusher.disconnect();
+    };
+  }, [fetchLeads]); // The dependency array ensures this runs only once on mount
 
   useEffect(() => {
     let leads = [...allLeads]
