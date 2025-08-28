@@ -20,10 +20,9 @@ export default function NewMissionForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [quotes, setQuotes] = useState<QuoteWithLead[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]); // To store leads for technical visits
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [teamLeaders, setTeamLeaders] = useState<TeamMember[]>([]);
 
-  // Get mission type from URL, default to 'SERVICE'
   const missionType = searchParams.get('type') as 'TECHNICAL_VISIT' | 'SERVICE' || 'SERVICE';
 
   const [formData, setFormData] = useState({
@@ -32,7 +31,7 @@ export default function NewMissionForm() {
     leadName: '',
     address: '',
     scheduledDate: '',
-    estimatedDuration: missionType === 'TECHNICAL_VISIT' ? '1' : '', // Default to 1 hour for visits
+    estimatedDuration: missionType === 'TECHNICAL_VISIT' ? '1' : '',
     teamLeaderId: '',
     accessNotes: '',
     type: missionType,
@@ -47,7 +46,7 @@ export default function NewMissionForm() {
         const [quotesRes, usersRes, leadsRes] = await Promise.all([
           fetch('/api/quotes?status=ACCEPTED'),
           fetch('/api/users?role=TEAM_LEADER'),
-          fetch('/api/leads') // Fetch all leads to find the one for the visit
+          fetch('/api/leads')
         ]);
 
         if (!quotesRes.ok || !usersRes.ok || !leadsRes.ok) {
@@ -79,6 +78,7 @@ export default function NewMissionForm() {
             if(selectedQuote) {
                 setFormData(prev => ({
                     ...prev,
+                    leadId: selectedQuote.leadId,
                     leadName: `${selectedQuote.lead.firstName} ${selectedQuote.lead.lastName}`,
                     address: selectedQuote.lead.address || ''
                 }));
@@ -100,7 +100,7 @@ export default function NewMissionForm() {
         setFormData(prev => ({
           ...prev,
           quoteId: value,
-          leadId: selectedQuote.leadId, // Store the leadId from the quote
+          leadId: selectedQuote.leadId,
           leadName: `${selectedQuote.lead.firstName} ${selectedQuote.lead.lastName}`,
           address: selectedQuote.lead.address || ''
         }));
@@ -113,6 +113,7 @@ export default function NewMissionForm() {
     setFormData(prev => ({ ...prev, [id]: value }));
   };
 
+  // --- THIS IS THE FULLY IMPLEMENTED SUBMIT FUNCTION ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -130,7 +131,7 @@ export default function NewMissionForm() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 ...formData,
-                quoteId: formData.quoteId || undefined, // Send quoteId only if it exists
+                quoteId: formData.quoteId || undefined,
             }),
         });
 
@@ -141,6 +142,7 @@ export default function NewMissionForm() {
         
         toast.success(`Mission de type "${formData.type}" planifiée avec succès !`);
         router.push('/missions');
+        router.refresh();
 
     } catch (err: any) {
         setError(err.message);
@@ -191,7 +193,7 @@ export default function NewMissionForm() {
               
               <div>
                 <Label>Client</Label>
-                <Input value={formData.leadName} disabled placeholder="Sélectionnez un devis ou venez d'un lead..." />
+                <Input value={formData.leadName} disabled placeholder="Généré automatiquement..." />
               </div>
 
               <div className={missionType === 'TECHNICAL_VISIT' ? 'md:col-span-2' : ''}>
