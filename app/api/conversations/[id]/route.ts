@@ -22,7 +22,7 @@ export async function GET(
         participants: true,
         messages: {
           orderBy: { createdAt: 'desc' },
-          take: 1, // Pour afficher le dernier message
+          take: 1,
         },
       },
     })
@@ -34,53 +34,6 @@ export async function GET(
     return NextResponse.json(conversation)
   } catch (error) {
     console.error(`Failed to fetch conversation ${params.id}:`, error)
-    return new NextResponse('Internal Server Error', { status: 500 })
-  }
-}
-
-// PATCH /api/conversations/[id] - Met à jour une conversation
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const conversationId = params.id
-    const body = await request.json()
-
-    const updatedConversation = await prisma.conversation.update({
-      where: { id: conversationId },
-      data: body,
-      include: {
-        participants: true,
-        messages: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-        },
-      },
-    })
-    
-    return NextResponse.json(updatedConversation)
-  } catch (error) {
-    console.error(`Failed to update conversation ${params.id}:`, error)
-    return new NextResponse('Internal Server Error', { status: 500 })
-  }
-}
-
-// DELETE /api/conversations/[id] - Supprime une conversation
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const conversationId = params.id
-
-    await prisma.conversation.delete({
-      where: { id: conversationId },
-    })
-    
-    return new NextResponse(null, { status: 204 })
-  } catch (error) {
-    console.error(`Failed to delete conversation ${params.id}:`, error)
     return new NextResponse('Internal Server Error', { status: 500 })
   }
 }
