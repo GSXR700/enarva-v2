@@ -9,9 +9,10 @@ const prisma = new PrismaClient();
  * GET /api/quotes/[id]
  * Fetches a single quote by its ID, including the related lead.
  */
-export async function GET(request: Request, { params }: { params: { id: string } }) {
-    const { id } = params;
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params; // Await params for Next.js 15
+        
         const quote = await prisma.quote.findUnique({ 
             where: { id },
             include: { lead: true }
@@ -22,7 +23,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
         }
         return NextResponse.json(quote);
     } catch (error) {
-        console.error(`Failed to fetch quote ${id}:`, error);
+        console.error(`Failed to fetch quote:`, error);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }
@@ -31,9 +32,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
  * PATCH /api/quotes/[id]
  * Updates a specific quote.
  */
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-    const { id } = params;
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params; // Await params for Next.js 15
         const body = await request.json();
         
         // Prepare data for Prisma, ensuring correct types and handling nulls
@@ -53,14 +54,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         delete updateData.updatedAt;
         delete updateData.lead;
 
-
         const updatedQuote = await prisma.quote.update({
             where: { id },
             data: updateData,
         });
         return NextResponse.json(updatedQuote);
     } catch (error) {
-        console.error(`Failed to update quote ${id}:`, error);
+        console.error(`Failed to update quote:`, error);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }
@@ -69,15 +69,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
  * DELETE /api/quotes/[id]
  * Deletes a specific quote.
  */
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-    const { id } = params;
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params; // Await params for Next.js 15
+        
         await prisma.quote.delete({
             where: { id },
         });
         return new NextResponse(null, { status: 204 });
     } catch (error) {
-        console.error(`Failed to delete quote ${id}:`, error);
+        console.error(`Failed to delete quote:`, error);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }

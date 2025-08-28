@@ -5,12 +5,14 @@ import { Decimal } from '@prisma/client/runtime/library';
 
 const prisma = new PrismaClient();
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params; // Await params for Next.js 15
         const body = await request.json();
         const { amount, ...data } = body;
+        
         const updatedExpense = await prisma.expense.update({
-            where: { id: params.id },
+            where: { id },
             data: {
                 ...data,
                 amount: amount ? new Decimal(amount) : undefined,
@@ -24,10 +26,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params; // Await params for Next.js 15
+        
         await prisma.expense.delete({
-            where: { id: params.id },
+            where: { id },
         });
         return new NextResponse(null, { status: 204 });
     } catch (error) {

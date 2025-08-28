@@ -8,9 +8,10 @@ const prisma = new PrismaClient();
  * GET /api/leads/[id]
  * Fetches a single lead by its ID.
  */
-export async function GET(request: Request, { params }: { params: { id: string } }) {
-    const { id } = params; // Déclarer l'id ici pour qu'il soit accessible partout
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params; // Await params for Next.js 15
+        
         const lead = await prisma.lead.findUnique({ 
             where: { id },
             include: { assignedTo: true }
@@ -21,7 +22,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
         }
         return NextResponse.json(lead);
     } catch (error) {
-        console.error(`Failed to fetch lead ${id}:`, error);
+        console.error(`Failed to fetch lead:`, error);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }
@@ -30,9 +31,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
  * PATCH /api/leads/[id]
  * Updates a specific lead with new data.
  */
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-    const { id } = params; // Déclarer l'id ici
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params; // Await params for Next.js 15
         const body = await request.json();
         
         const updateData = {
@@ -61,7 +62,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         });
         return NextResponse.json(updatedLead);
     } catch (error) {
-        console.error(`Failed to update lead ${id}:`, error);
+        console.error(`Failed to update lead:`, error);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }
@@ -70,15 +71,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
  * DELETE /api/leads/[id]
  * Deletes a specific lead.
  */
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-    const { id } = params; // Déclarer l'id ici
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params; // Await params for Next.js 15
+        
         await prisma.lead.delete({
             where: { id },
         });
         return new NextResponse(null, { status: 204 }); // No Content
     } catch (error) {
-        console.error(`Failed to delete lead ${id}:`, error);
+        console.error(`Failed to delete lead:`, error);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }
