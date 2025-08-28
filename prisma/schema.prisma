@@ -1,0 +1,629 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- MODÈLE UTILISATEUR (INCHANGÉ) ---
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(TECHNICIAN)
+  
+  onlineStatus    String         @default("OFFLINE")
+  lastSeen        DateTime?
+
+  accounts      Account[]
+  sessions      Session[]
+  
+  leads           Lead[]
+  missions        Mission[]      @relation("AssignedTo")
+  teamMember      TeamMember?
+  activities      Activity[]
+  messages        Message[]
+  conversations   Conversation[] @relation("ConversationParticipants")
+  expenses        Expense[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("users")
+}
+
+// --- MODÈLES NEXT-AUTH (INCHANGÉS) ---
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
+
+// --- MODÈLE LEAD (ENTIÈREMENT MIS À JOUR) ---
+model Lead {
+  id              String     @id @default(cuid())
+  
+  // 1. Informations Générales
+  firstName       String
+  lastName        String
+  phone           String
+  email           String?
+  address         String?
+  gpsLocation     String?
+  status          LeadStatus @default(NEW)
+  score           Int?       @default(0)
+
+  // 2. Détails Professionnels
+  leadType        LeadType   @default(PARTICULIER)
+  company         String?
+  iceNumber       String?
+  activitySector  String?
+  contactPosition String?
+  department      String?
+
+  // 3. Détails de la Demande
+  propertyType    PropertyType?
+  estimatedSurface Int?
+  accessibility   AccessibilityLevel? @default(EASY)
+  materials       Json? // Stockera les sélections de matériaux
+  urgencyLevel    UrgencyLevel?
+  budgetRange     String?
+  frequency       Frequency? @default(PONCTUEL)
+  contractType    ContractType? @default(INTERVENTION_UNIQUE)
+
+  // 4. Produits & Équipements
+  needsProducts   Boolean? @default(false)
+  needsEquipment  Boolean? @default(false)
+  providedBy      ProviderType? @default(ENARVA)
+
+  // 5. Origine du Lead
+  channel         LeadCanal
+  source          String? // Source précise
+  hasReferrer     Boolean? @default(false)
+  referrerContact String?
+  enarvaRole      EnarvaRole? @default(PRESTATAIRE_PRINCIPAL)
+
+  // 6. Suivi et Planification (Champs existants)
+  originalMessage String
+  assignedToId    String?
+  assignedTo      User?      @relation(fields: [assignedToId], references: [id])
+  
+  // Relations
+  quotes          Quote[]
+  missions        Mission[]
+  activities      Activity[]
+  subscription    Subscription?
+  expenses        Expense[]
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  
+  @@map("leads")
+}
+
+// ... (Le reste de vos modèles reste identique)
+
+model Quote {
+  id              String      @id @default(cuid())
+  quoteNumber     String      @unique
+  type            QuoteType   @default(STANDARD)
+  status          QuoteStatus @default(DRAFT)
+  surface         Int
+  propertyType    PropertyType
+  levels          Int         @default(1)
+  materials       MaterialType
+  distance        Int         @default(0)
+  accessibility   AccessibilityLevel @default(EASY)
+  urgency         UrgencyLevel @default(NORMAL)
+  basePrice       Decimal
+  coefficients    Json
+  adjustments     Json?
+  finalPrice      Decimal
+  requiresVisit   Boolean     @default(true)
+  visitScheduled  DateTime?
+  visitCompleted  Boolean     @default(false)
+  visitReport     Json?
+  leadId          String
+  lead            Lead     @relation(fields: [leadId], references: [id])
+  missions        Mission[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  expiresAt       DateTime
+  @@map("quotes")
+}
+
+model Mission {
+  id              String        @id @default(cuid())
+  missionNumber   String        @unique
+  status          MissionStatus @default(SCHEDULED)
+  priority        Priority      @default(NORMAL)
+  scheduledDate   DateTime
+  estimatedDuration Int
+  actualStartTime DateTime?
+  actualEndTime   DateTime?
+  address         String
+  coordinates     String?
+  accessNotes     String?
+  teamLeaderId    String?
+  teamLeader      User?         @relation("AssignedTo", fields: [teamLeaderId], references: [id])
+  teamMembers     TeamMember[]  @relation("MissionToTeamMember")
+  leadId          String
+  lead            Lead          @relation(fields: [leadId], references: [id])
+  quoteId         String
+  quote           Quote         @relation(fields: [quoteId], references: [id])
+  tasks           Task[]
+  qualityChecks   QualityCheck[]
+  inventoryUsed   InventoryUsage[]
+  expenses        Expense[]
+  clientValidated Boolean       @default(false)
+  clientFeedback  String?
+  clientRating    Int?
+  invoiceGenerated Boolean      @default(false)
+  invoiceId       String?
+  conversation    Conversation?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  @@map("missions")
+}
+
+model Expense {
+  id              String         @id @default(cuid())
+  date            DateTime
+  amount          Decimal
+  category        ExpenseCategory
+  subCategory     String
+  paymentMethod   PaymentMethod
+  vendor          String?
+  description     String?
+  proofUrl        String?
+  rentalStartDate DateTime?
+  rentalEndDate   DateTime?
+  missionId       String?
+  mission         Mission? @relation(fields: [missionId], references: [id])
+  leadId          String?
+  lead            Lead?    @relation(fields: [leadId], references: [id])
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@map("expenses")
+}
+
+model Task {
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  type          TaskType
+  status        TaskStatus @default(ASSIGNED)
+  estimatedTime Int
+  actualTime    Int?
+  assignedToId  String?
+  assignedTo    TeamMember? @relation(fields: [assignedToId], references: [id])
+  missionId     String
+  mission       Mission    @relation(fields: [missionId], references: [id])
+  startedAt     DateTime?
+  completedAt   DateTime?
+  validatedBy   String?
+  validatedAt   DateTime?
+  beforePhotos  Json?
+  afterPhotos   Json?
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  @@map("tasks")
+}
+
+model TeamMember {
+  id           String           @id @default(cuid())
+  firstName    String
+  lastName     String
+  phone        String
+  email        String?
+  specialties  TeamSpecialty[]
+  experienceLevel ExperienceLevel @default(JUNIOR)
+  availability TeamAvailability @default(AVAILABLE)
+  completedTasks Int           @default(0)
+  averageRating  Decimal?       @default(0)
+  efficiency     Decimal?       @default(100)
+  userId       String           @unique
+  user         User             @relation(fields: [userId], references: [id])
+  missions     Mission[]        @relation("MissionToTeamMember")
+  tasks        Task[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  @@map("team_members")
+}
+
+model Conversation {
+  id              String    @id @default(cuid())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  participants    User[]    @relation("ConversationParticipants")
+  messages        Message[]
+  missionId       String?   @unique
+  mission         Mission?  @relation(fields: [missionId], references: [id])
+  @@map("conversations")
+}
+
+model Message {
+  id              String    @id @default(cuid())
+  createdAt       DateTime  @default(now())
+  content         String
+  type            String    @default("TEXT")
+  senderId        String
+  sender          User      @relation(fields: [senderId], references: [id])
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id])
+  readByIds       String[]  @default([])
+  @@map("messages")
+}
+
+model QualityCheck {
+  id          String            @id @default(cuid())
+  type        QualityCheckType
+  status      QualityStatus     @default(PENDING)
+  score       Int?
+  notes       String?
+  photos      Json?
+  issues      Json?
+  corrections Json?
+  missionId   String
+  mission     Mission           @relation(fields: [missionId], references: [id])
+  checkedBy   String
+  checkedAt   DateTime          @default(now())
+  validatedBy String?
+  validatedAt DateTime?
+  @@map("quality_checks")
+}
+
+model Inventory {
+  id              String            @id @default(cuid())
+  name            String
+  category        ProductCategory
+  unit            String
+  currentStock    Decimal
+  minimumStock    Decimal
+  unitPrice       Decimal
+  supplier        String
+  usages          InventoryUsage[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  @@map("inventory")
+}
+
+model InventoryUsage {
+  id          String    @id @default(cuid())
+  quantity    Decimal
+  notes       String?
+  inventoryId String
+  inventory   Inventory @relation(fields: [inventoryId], references: [id])
+  missionId   String
+  mission     Mission   @relation(fields: [missionId], references: [id])
+  usedAt      DateTime  @default(now())
+  @@map("inventory_usage")
+}
+
+model Subscription {
+  id              String             @id @default(cuid())
+  type            SubscriptionType
+  status          SubscriptionStatus @default(ACTIVE)
+  monthlyPrice    Decimal
+  discount        Decimal            @default(0)
+  nextBilling     DateTime
+  includedServices Int
+  usedServices    Int                @default(0)
+  leadId          String             @unique
+  lead            Lead               @relation(fields: [leadId], references: [id])
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  @@map("subscriptions")
+}
+
+model Activity {
+  id          String       @id @default(cuid())
+  type        ActivityType
+  title       String
+  description String
+  metadata    Json?
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+  leadId      String?
+  lead        Lead?        @relation(fields: [leadId], references: [id])
+  createdAt   DateTime     @default(now())
+  @@map("activities")
+}
+
+// --- ENUMS ---
+
+// NOUVEAUX ENUMS POUR LES LEADS
+enum LeadCanal {
+  WHATSAPP
+  FACEBOOK
+  INSTAGRAM
+  LINKEDIN
+  GOOGLE_MAPS
+  GOOGLE_SEARCH
+  SITE_WEB
+  FORMULAIRE_SITE
+  MARKETPLACE
+  YOUTUBE
+  EMAIL
+  APPORTEUR_AFFAIRES
+  COMMERCIAL_TERRAIN
+  SALON_PROFESSIONNEL
+  PARTENARIAT
+  RECOMMANDATION_CLIENT
+  VISITE_BUREAU
+  EMPLOYE_ENARVA
+  APPEL_TELEPHONIQUE
+  SMS
+  NUMERO_SUR_PUB
+  AFFICHE
+  FLYER
+  ENSEIGNE
+  VOITURE_SIGLEE
+  RADIO
+  ANNONCE_PRESSE
+  TELE
+  MANUEL
+  SOURCING_INTERNE
+  PORTE_A_PORTE
+  CHANTIER_EN_COURS
+}
+
+enum Frequency {
+  PONCTUEL
+  MENSUEL
+  ANNUEL
+  CONTRAT_CADRE
+}
+
+enum ContractType {
+  INTERVENTION_UNIQUE
+  MAINTENANCE
+  ABONNEMENT
+}
+
+enum ProviderType {
+  ENARVA
+  CLIENT
+}
+
+enum EnarvaRole {
+  PRESTATAIRE_PRINCIPAL
+  SOUS_TRAITANT
+}
+
+// ENUMS EXISTANTS
+enum ExpenseCategory {
+  OPERATIONS
+  REVENTE_NEGOCE
+  RESSOURCES_HUMAINES
+  ADMINISTRATIF_FINANCIER
+  MARKETING_COMMERCIAL
+  LOGISTIQUE_MOBILITE
+  INFRASTRUCTURES_LOCAUX
+  LOCATIONS
+  EXCEPTIONNELLES_DIVERSES
+}
+
+enum PaymentMethod {
+  CASH
+  VIREMENT
+  CARTE
+  CHEQUE
+  MOBILE
+  AUTRE
+}
+
+enum LeadType {
+  PARTICULIER
+  PROFESSIONNEL
+  PUBLIC // Ajouté
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  AGENT
+  TEAM_LEADER
+  TECHNICIAN
+}
+
+enum LeadStatus {
+  NEW
+  QUALIFIED
+  QUOTE_SENT
+  QUOTE_ACCEPTED
+  MISSION_SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PropertyType {
+  APARTMENT_SMALL
+  APARTMENT_MEDIUM
+  APARTMENT_MULTI
+  VILLA_LARGE
+  COMMERCIAL
+  HOTEL_STANDARD
+  HOTEL_LUXURY
+  OFFICE
+  RESIDENCE_B2B
+  RESTAURANT // Ajouté
+}
+
+enum MaterialType {
+  STANDARD
+  MARBLE
+  PARQUET
+  LUXURY
+  MIXED
+}
+
+enum AccessibilityLevel {
+  EASY
+  MEDIUM
+  DIFFICULT
+  VERY_DIFFICULT
+}
+
+enum UrgencyLevel {
+  NORMAL
+  URGENT
+  HIGH_URGENT
+  IMMEDIATE
+}
+
+enum QuoteType {
+  EXPRESS
+  STANDARD
+  PREMIUM
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum MissionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  QUALITY_CHECK
+  CLIENT_VALIDATION
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum TaskType {
+  BATHROOM_CLEANING
+  WINDOW_CLEANING
+  FLOOR_CLEANING
+  SURFACE_CLEANING
+  DETAIL_FINISHING
+  SETUP
+  CLEANUP
+}
+
+enum TaskStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  VALIDATED
+  REJECTED
+}
+
+enum TeamSpecialty {
+  GENERAL_CLEANING
+  WINDOW_SPECIALIST
+  FLOOR_SPECIALIST
+  LUXURY_SURFACES
+  EQUIPMENT_HANDLING
+  TEAM_MANAGEMENT
+  QUALITY_CONTROL
+  DETAIL_FINISHING
+}
+
+enum ExperienceLevel {
+  JUNIOR
+  INTERMEDIATE
+  SENIOR
+  EXPERT
+}
+
+enum TeamAvailability {
+  AVAILABLE
+  BUSY
+  OFF_DUTY
+  VACATION
+}
+
+enum QualityCheckType {
+  TEAM_LEADER_CHECK
+  FINAL_INSPECTION
+  CLIENT_WALKTHROUGH
+}
+
+enum QualityStatus {
+  PENDING
+  PASSED
+  FAILED
+  NEEDS_CORRECTION
+}
+
+enum ProductCategory {
+  CLEANING_PRODUCTS
+  EQUIPMENT
+  CONSUMABLES
+  PROTECTIVE_GEAR
+}
+
+enum SubscriptionType {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  EXPIRED
+}
+
+enum ActivityType {
+  LEAD_CREATED
+  LEAD_QUALIFIED
+  QUOTE_GENERATED
+  QUOTE_SENT
+  MISSION_SCHEDULED
+  MISSION_STARTED
+  MISSION_COMPLETED
+  PAYMENT_RECEIVED
+  SUBSCRIPTION_CREATED
+  QUALITY_ISSUE
+  CLIENT_FEEDBACK
+}

@@ -1,0 +1,79 @@
+/* app/planning/calendar.css */
+
+/* --- General Theme --- */
+.fc {
+    border: none !important;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Header Toolbar */
+.fc .fc-toolbar.fc-header-toolbar {
+    margin-bottom: 1.5rem;
+    display: none; /* We will create our own custom header */
+}
+
+/* Table Header */
+.fc .fc-col-header-cell {
+    border: none;
+    padding: 0.75rem 0;
+    font-weight: 500;
+    color: #6b7280; /* text-gray-500 */
+}
+
+/* Day Cells */
+.fc .fc-daygrid-day {
+    border: 1px solid hsl(var(--border));
+    padding: 4px;
+}
+.fc .fc-daygrid-day:first-child {
+    border-left: none;
+}
+.fc .fc-daygrid-day:last-child {
+    border-right: none;
+}
+
+/* Today's Date */
+.fc .fc-daygrid-day.fc-day-today {
+    background-color: transparent !important;
+}
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+    background-color: hsl(var(--primary));
+    color: white;
+    border-radius: 9999px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Events */
+.fc-event {
+    background-color: hsl(var(--primary)) !important;
+    border: 1px solid hsl(var(--primary)) !important;
+    color: white !important;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.fc-event:hover {
+    background-color: var(--enarva-end) !important;
+}
+
+.fc-event .fc-event-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* List View */
+.fc-list-event-title a {
+    color: hsl(var(--foreground));
+    text-decoration: none;
+}
+.fc-list-event-dot {
+    border-color: hsl(var(--primary)) !important;
+}
