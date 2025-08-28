@@ -1,12 +1,12 @@
 // app/api/conversations/[id]/messages/route.ts
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server' // Correction : Import de NextRequest
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
 // GET /api/conversations/[id]/messages - Récupère les messages d'une conversation
 export async function GET(
-  request: Request,
+  request: NextRequest, // Correction : Utilisation du type NextRequest
   { params }: { params: { id: string } }
 ) {
   try {
