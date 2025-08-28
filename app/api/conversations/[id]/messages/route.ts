@@ -1,8 +1,8 @@
 // app/api/conversations/[id]/messages/route.ts
-import { NextResponse, NextRequest } from 'next/server' // Correction : Import de NextRequest
-import { PrismaClient } from '@prisma/client'
+import { NextResponse, NextRequest } from 'next/server'; // Correction : Import de NextRequest
+import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 // GET /api/conversations/[id]/messages - Récupère les messages d'une conversation
 export async function GET(
@@ -26,10 +26,10 @@ export async function GET(
       orderBy: {
         createdAt: 'asc',
       },
-    })
-    return NextResponse.json(messages)
+    });
+    return NextResponse.json(messages);
   } catch (error) {
-    console.error(`Failed to fetch messages for conversation ${params.id}:`, error)
-    return new NextResponse('Internal Server Error', { status: 500 })
+    console.error(`Failed to fetch messages for conversation ${params.id}:`, error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
