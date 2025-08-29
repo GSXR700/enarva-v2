@@ -82,7 +82,7 @@ export default function TaskTemplatesPage() {
             const response = await fetch(`/api/task-templates/${templateId}`, { method: 'DELETE' });
             if (response.status !== 204) throw new Error("Failed to delete template");
             toast.success("Modèle supprimé avec succès !");
-            fetchTemplates(); // Refresh the list
+            await fetchTemplates(); // Refresh the list
         } catch (error: any) {
             toast.error(error.message);
         }
