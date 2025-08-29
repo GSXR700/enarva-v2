@@ -94,4 +94,32 @@
     background-color: hsl(var(--muted));
     border-radius: 20px;
   }
+
+  /* Shining loading effect for buttons */
+  .animate-shine {
+    position: relative;
+    overflow: hidden;
+  }
+  .animate-shine::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.5) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    transform: translateX(-100%);
+    animation: shine 1.5s infinite;
+  }
+
+  @keyframes shine {
+    to {
+      transform: translateX(100%);
+    }
+  }
 }
