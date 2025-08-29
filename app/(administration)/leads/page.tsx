@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   Phone, Mail, MessageSquare, Plus, Edit, Trash2, Building, Ruler,
-  AlertTriangle, Clock, Star, Users, Briefcase, Tag, MapPin, Eye, CheckCircle
+  AlertTriangle, Clock, Star, Users, Briefcase, Tag, MapPin, Eye, CheckCircle, Calendar, ListChecks
 } from 'lucide-react'
 import { formatDate, translate, translations } from '@/lib/utils'
 import { Lead, LeadStatus, LeadCanal, UrgencyLevel, User, PropertyType, LeadType } from '@prisma/client'
@@ -272,9 +272,24 @@ export default function LeadsPage() {
                     </DialogHeader>
                     <div className="space-y-4 mt-4">
                         <div className="flex flex-col sm:flex-row gap-2">
-                            <Link href={`/quotes/new?leadId=${selectedLead.id}`} className="flex-1"><Button className="w-full gap-2 bg-enarva-gradient"><Plus className="w-4 h-4"/>Créer un Devis</Button></Link>
-                            <Link href={`/leads/${selectedLead.id}/edit`} className="flex-1"><Button variant="outline" className="w-full gap-2"><Edit/>Modifier</Button></Link>
-                            <Button variant="destructive" className="flex-1 gap-2" onClick={() => handleDeleteOne(selectedLead.id)}><Trash2/>Supprimer</Button>
+                            <Link href={`/missions/new?type=TECHNICAL_VISIT&leadId=${selectedLead.id}`} className="flex-1">
+                                <Button className="w-full gap-2 bg-orange-500 hover:bg-orange-600 text-white">
+                                    <ListChecks className="w-4 h-4"/>Planifier Visite
+                                </Button>
+                            </Link>
+                            <Link href={`/quotes/new?leadId=${selectedLead.id}`} className="flex-1">
+                                <Button className="w-full gap-2 bg-enarva-gradient">
+                                    <Plus className="w-4 h-4"/>Créer un Devis
+                                </Button>
+                            </Link>
+                            <Link href={`/leads/${selectedLead.id}/edit`} className="flex-1">
+                                <Button variant="outline" className="w-full gap-2">
+                                    <Edit/>Modifier
+                                </Button>
+                            </Link>
+                            <Button variant="destructive" className="flex-1 gap-2" onClick={() => handleDeleteOne(selectedLead.id)}>
+                                <Trash2/>Supprimer
+                            </Button>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
