@@ -2,8 +2,15 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { pusherServer } from '@/lib/pusher';
+import webpush from 'web-push';
 
 const prisma = new PrismaClient();
+
+webpush.setVapidDetails(
+  'mailto:contact@enarva.com',
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+  process.env.VAPID_PRIVATE_KEY!
+);
 
 export async function POST(request: Request) {
   try {
@@ -14,24 +21,49 @@ export async function POST(request: Request) {
       return new NextResponse('Missing required fields', { status: 400 });
     }
 
-    const newMessage = await prisma.message.create({
-      data: {
-        content,
-        senderId,
-        conversationId,
-        readByIds: [senderId], // The sender has "read" their own message
-      },
-      include: {
-        sender: true,
-      },
-    });
+    const [newMessage, conversation] = await prisma.$transaction([
+      prisma.message.create({
+        data: {
+          content,
+          senderId,
+          conversationId,
+          readByIds: [senderId],
+        },
+        include: {
+          sender: true,
+        },
+      }),
+      prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: { participants: true },
+      }),
+    ]);
     
-    // Trigger a Pusher event on the conversation channel
     await pusherServer.trigger(
       `conversation-${conversationId}`,
       'new-message',
       newMessage
     );
+
+    // Send push notification to other participants
+    const recipients = conversation?.participants.filter(p => p.id !== senderId);
+    if (recipients) {
+      const notificationPayload = JSON.stringify({
+        title: `Nouveau message de ${newMessage.sender.name}`,
+        body: content,
+      });
+
+      for (const recipient of recipients) {
+        if (recipient.pushSubscription) {
+          try {
+            await webpush.sendNotification(recipient.pushSubscription as any, notificationPayload);
+          } catch (error) {
+            console.error(`Failed to send push notification to ${recipient.id}`, error);
+            // Optionnel : nettoyer les abonnements invalides
+          }
+        }
+      }
+    }
     
     return NextResponse.json(newMessage, { status: 201 });
 

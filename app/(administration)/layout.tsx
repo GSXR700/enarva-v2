@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { TopBar } from '@/components/layout/TopBar'
 import { Toaster } from '@/components/ui/sonner'
-import { SplashScreen } from '@/components/layout/SplashScreen'
+import { usePushNotifications } from '@/hooks/usePushNotifications'
 
 export default function AdministrationLayout({
   children,
@@ -13,10 +13,12 @@ export default function AdministrationLayout({
   children: React.ReactNode
 }) {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  
+  // Initialize push notification logic
+  usePushNotifications();
 
   return (
     <div className="flex h-screen bg-background">
-      <SplashScreen />
       <Sidebar isOpen={isSidebarOpen} setOpen={setSidebarOpen} />
       
       <div className="flex-1 flex flex-col overflow-hidden">

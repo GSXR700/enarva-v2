@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
-import { Bell, Search, Menu, MessageSquare, User, Settings, LogOut, X, CheckCircle } from 'lucide-react'
+import { Bell, Search, Menu, MessageSquare, User, Settings, LogOut, X, CheckCircle, BellRing } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -19,7 +19,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Activity, User as PrismaUser } from '@prisma/client'
+import { Activity } from '@prisma/client'
 import { getRelativeTime } from '@/lib/utils'
 
 interface TopBarProps {
@@ -27,6 +27,12 @@ interface TopBarProps {
 }
 
 type ActivityWithUser = Activity & { user: { name: string | null; image: string | null }};
+
+const handleEnableNotifications = () => {
+    if (typeof window !== 'undefined' && (window as any).enablePushNotifications) {
+        (window as any).enablePushNotifications();
+    }
+};
 
 export function TopBar({ onMenuClick }: TopBarProps) {
   const { data: session } = useSession();
@@ -116,6 +122,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                     <DropdownMenuSeparator />
                     <Link href="/profile" passHref><DropdownMenuItem><User className="mr-2 h-4 w-4" /><span>Profil</span></DropdownMenuItem></Link>
                     <Link href="/settings" passHref><DropdownMenuItem><Settings className="mr-2 h-4 w-4" /><span>Réglages</span></DropdownMenuItem></Link>
+                    <DropdownMenuItem onClick={handleEnableNotifications}><BellRing className="mr-2 h-4 w-4" /><span>Activer les notifications</span></DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-red-500" onClick={() => signOut({ callbackUrl: '/login' })}>
                         <LogOut className="mr-2 h-4 w-4" />
