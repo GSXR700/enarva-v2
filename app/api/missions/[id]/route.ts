@@ -1,4 +1,4 @@
-// app/api/missions/[id]/route.ts - COMPLETE FIXED VERSION
+// app/api/missions/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
@@ -10,12 +10,25 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = await params; // ✅ Await params for Next.js 15
+        const { id } = await params;
         
         const mission = await prisma.mission.findUnique({
             where: { id },
             include: { 
-                lead: true // Include lead details for display
+                lead: true,
+                tasks: {
+                    include: {
+                        assignedTo: {
+                            select: {
+                                firstName: true,
+                                lastName: true
+                            }
+                        }
+                    },
+                    orderBy: {
+                        createdAt: 'asc'
+                    }
+                }
             }
         });
 
@@ -35,7 +48,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = await params; // ✅ Await params for Next.js 15
+        const { id } = await params;
         const body = await request.json();
 
         // Ensure that if scheduledDate is passed, it's a valid Date
@@ -47,7 +60,17 @@ export async function PATCH(
             where: { id },
             data: body,
             include: {
-                lead: true // Include the related lead object in the response
+                lead: true,
+                tasks: {
+                    include: {
+                        assignedTo: {
+                            select: {
+                                firstName: true,
+                                lastName: true
+                            }
+                        }
+                    }
+                }
             }
         });
 

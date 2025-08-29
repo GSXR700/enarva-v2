@@ -4,19 +4,28 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEdgeStore } from '@/lib/edgestore';
-import { Mission, Lead } from '@prisma/client';
+import { Mission, Lead, Task, TaskStatus } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { ArrowLeft, Camera, CheckCircle, Play, Upload, MapPin, Clock, User } from 'lucide-react';
+import { ArrowLeft, Camera, CheckCircle, Play, Upload, MapPin, Clock, User, ListChecks } from 'lucide-react';
 import Link from 'next/link';
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
 import { formatDate, formatTime } from '@/lib/utils';
 
-type MissionWithLead = Mission & { lead: Lead };
+type TaskWithDetails = Task & {
+    assignedTo?: { firstName: string; lastName: string } | null;
+};
+
+type MissionWithDetails = Mission & { 
+    lead: Lead; 
+    tasks: TaskWithDetails[];
+};
 
 export default function MissionReportPage() {
     const params = useParams();
@@ -24,7 +33,7 @@ export default function MissionReportPage() {
     const missionId = params.id as string;
     const { edgestore } = useEdgeStore();
 
-    const [mission, setMission] = useState<MissionWithLead | null>(null);
+    const [mission, setMission] = useState<MissionWithDetails | null>(null);
     const [notes, setNotes] = useState('');
     const [files, setFiles] = useState<File[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,7 +48,6 @@ export default function MissionReportPage() {
                 })
                 .then(data => {
                     setMission(data);
-                    // Pre-fill notes if a report already exists
                     if (data.technicalVisitReport?.notes) {
                         setNotes(data.technicalVisitReport.notes);
                     }
@@ -61,8 +69,34 @@ export default function MissionReportPage() {
             });
             if (!response.ok) throw new Error('Failed to update status');
             const updatedMission = await response.json();
-            setMission(updatedMission); // Update local state with new status
+            setMission(updatedMission);
             toast.success(`Mission marquée comme "${status === 'IN_PROGRESS' ? 'Démarrée' : 'Terminée'}"`);
+        } catch (error: any) {
+            toast.error(error.message);
+        }
+    };
+
+    const handleTaskStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+        try {
+            const response = await fetch(`/api/tasks/${taskId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            if (!response.ok) throw new Error('Failed to update task');
+            
+            // Update local state
+            setMission(prev => {
+                if (!prev) return null;
+                return {
+                    ...prev,
+                    tasks: prev.tasks.map(task => 
+                        task.id === taskId ? { ...task, status: newStatus } : task
+                    )
+                };
+            });
+            
+            toast.success('Tâche mise à jour');
         } catch (error: any) {
             toast.error(error.message);
         }
@@ -73,6 +107,18 @@ export default function MissionReportPage() {
             toast.error("Veuillez ajouter des notes ou des photos.");
             return;
         }
+
+        // Check if all tasks are completed for technical visits
+        if (mission?.type === 'TECHNICAL_VISIT') {
+            const incompleteTasks = mission.tasks.filter(task => 
+                task.status !== 'COMPLETED' && task.status !== 'VALIDATED'
+            );
+            if (incompleteTasks.length > 0) {
+                toast.error(`${incompleteTasks.length} tâche(s) non terminée(s). Veuillez compléter toutes les tâches avant de soumettre le rapport.`);
+                return;
+            }
+        }
+
         setIsSubmitting(true);
 
         try {
@@ -111,11 +157,31 @@ export default function MissionReportPage() {
         }
     };
 
+    const getTaskStatusColor = (status: TaskStatus) => {
+        switch (status) {
+            case 'ASSIGNED': return 'bg-gray-100 text-gray-800';
+            case 'IN_PROGRESS': return 'bg-blue-100 text-blue-800';
+            case 'COMPLETED': return 'bg-green-100 text-green-800';
+            case 'VALIDATED': return 'bg-green-600 text-white';
+            case 'REJECTED': return 'bg-red-100 text-red-800';
+            default: return 'bg-gray-100 text-gray-800';
+        }
+    };
+
+    const getTaskProgress = () => {
+        if (!mission?.tasks.length) return 0;
+        const completedTasks = mission.tasks.filter(t => 
+            t.status === 'COMPLETED' || t.status === 'VALIDATED'
+        ).length;
+        return Math.round((completedTasks / mission.tasks.length) * 100);
+    };
+
     if (isLoading || !mission) {
         return <TableSkeleton title="Chargement de la Mission..." />;
     }
 
     const isVisit = mission.type === 'TECHNICAL_VISIT';
+    const progress = getTaskProgress();
 
     return (
         <div className="main-content space-y-4">
@@ -126,7 +192,10 @@ export default function MissionReportPage() {
 
             <Card className="thread-card">
                 <CardHeader>
-                    <CardTitle>{isVisit ? 'Rapport de Visite Technique' : 'Détails de la Mission'}</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                        {isVisit ? <ListChecks className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+                        {isVisit ? 'Rapport de Visite Technique' : 'Détails de la Mission'}
+                    </CardTitle>
                     <p className="text-muted-foreground">{mission.lead.firstName} {mission.lead.lastName}</p>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -143,10 +212,56 @@ export default function MissionReportPage() {
                 </CardContent>
             </Card>
 
+            {/* Tasks Checklist for Technical Visits */}
+            {isVisit && mission.tasks.length > 0 && (
+                <Card className="thread-card">
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <ListChecks className="w-5 h-5" />
+                                Checklist des Tâches
+                            </CardTitle>
+                            <div className="text-sm text-muted-foreground">
+                                {progress}% terminé
+                            </div>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2">
+                            <div className="bg-enarva-start h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {mission.tasks.map((task, index) => (
+                            <div key={task.id} className="flex items-start gap-3 p-3 rounded-lg border">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <Checkbox 
+                                        checked={task.status === 'COMPLETED' || task.status === 'VALIDATED'}
+                                        onCheckedChange={(checked) => {
+                                            handleTaskStatusChange(
+                                                task.id, 
+                                                checked ? 'COMPLETED' : 'ASSIGNED'
+                                            );
+                                        }}
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <p className={`text-sm font-medium ${task.status === 'COMPLETED' || task.status === 'VALIDATED' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                                            {task.title}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">{task.category.replace(/_/g, ' ')}</p>
+                                    </div>
+                                </div>
+                                <Badge className={`text-xs ${getTaskStatusColor(task.status)}`}>
+                                    {task.status}
+                                </Badge>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            )}
+
             {isVisit && (
                  <Card className="thread-card">
                     <CardHeader>
-                        <CardTitle className="text-base">Compte-Rendu</CardTitle>
+                        <CardTitle className="text-base">Compte-Rendu de Visite</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div>
@@ -155,8 +270,8 @@ export default function MissionReportPage() {
                                 id="notes" 
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
-                                placeholder="Détaillez ici les matériaux, les mesures, les difficultés d'accès, etc."
-                                rows={6}
+                                placeholder="Détaillez ici les matériaux, les mesures, les difficultés d'accès, l'état des surfaces, etc."
+                                rows={8}
                             />
                         </div>
 
@@ -166,15 +281,31 @@ export default function MissionReportPage() {
                                 id="photos" 
                                 type="file" 
                                 multiple 
+                                accept="image/*"
                                 onChange={(e) => setFiles(Array.from(e.target.files || []))}
                                 className="h-auto"
                             />
+                            {files.length > 0 && (
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    {files.length} fichier(s) sélectionné(s)
+                                </p>
+                            )}
                         </div>
                         
-                        <Button onClick={handleSubmitReport} disabled={isSubmitting} className="w-full bg-enarva-gradient">
+                        <Button 
+                            onClick={handleSubmitReport} 
+                            disabled={isSubmitting || (mission.tasks.length > 0 && progress < 100)} 
+                            className="w-full bg-enarva-gradient"
+                        >
                             <Upload className="w-4 h-4 mr-2" />
                             {isSubmitting ? 'Envoi en cours...' : 'Soumettre le Rapport'}
                         </Button>
+                        
+                        {mission.tasks.length > 0 && progress < 100 && (
+                            <p className="text-sm text-orange-600 text-center">
+                                Complétez toutes les tâches avant de soumettre le rapport
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
             )}
