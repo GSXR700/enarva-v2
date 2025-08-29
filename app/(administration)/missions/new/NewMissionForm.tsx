@@ -10,23 +10,24 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, CheckSquare, User, Calendar, MapPin } from 'lucide-react'
+import { ArrowLeft, ListChecks } from 'lucide-react'
 import { Quote, User as TeamMember, Lead } from '@prisma/client'
 import { toast } from 'sonner'
 
 type QuoteWithLead = Quote & { lead: Lead };
+type TaskTemplate = { id: string; name: string; };
 
 export default function NewMissionForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [quotes, setQuotes] = useState<QuoteWithLead[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [teamLeaders, setTeamLeaders] = useState<TeamMember[]>([]);
+  const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
 
-  // Get parameters from URL
   const missionType = searchParams.get('type') as 'TECHNICAL_VISIT' | 'SERVICE' || 'SERVICE';
   const quoteIdFromParams = searchParams.get('quoteId');
   const leadIdFromParams = searchParams.get('leadId');
-
-  const [quotes, setQuotes] = useState<QuoteWithLead[]>([]);
-  const [teamLeaders, setTeamLeaders] = useState<TeamMember[]>([]);
 
   const [formData, setFormData] = useState({
     quoteId: quoteIdFromParams || '',
@@ -38,6 +39,7 @@ export default function NewMissionForm() {
     teamLeaderId: '',
     accessNotes: '',
     type: missionType,
+    taskTemplateId: '', // Field for the selected checklist
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -46,37 +48,46 @@ export default function NewMissionForm() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [quotesRes, usersRes] = await Promise.all([
+        const [quotesRes, usersRes, leadsRes, templatesRes] = await Promise.all([
           fetch('/api/quotes?status=ACCEPTED'),
-          fetch('/api/users?role=TEAM_LEADER')
+          fetch('/api/users?role=TEAM_LEADER'),
+          fetch('/api/leads'),
+          fetch('/api/task-templates')
         ]);
-        if (!quotesRes.ok || !usersRes.ok) throw new Error('Failed to fetch initial data.');
+
+        if (!quotesRes.ok || !usersRes.ok || !leadsRes.ok || !templatesRes.ok) {
+          throw new Error('Failed to fetch initial data.');
+        }
 
         const quotesData = await quotesRes.json();
         const usersData = await usersRes.json();
+        const leadsData = await leadsRes.json();
+        const templatesData = await templatesRes.json();
+
         setQuotes(quotesData);
         setTeamLeaders(usersData);
+        setLeads(leadsData);
+        setTaskTemplates(templatesData);
 
-        // If it's a TECHNICAL_VISIT, we need to fetch the lead's info
         if (missionType === 'TECHNICAL_VISIT' && leadIdFromParams) {
-          const leadRes = await fetch(`/api/leads/${leadIdFromParams}`);
-          if (!leadRes.ok) throw new Error('Could not find the specified lead.');
-          const leadData = await leadRes.json();
-          setFormData(prev => ({
-              ...prev,
-              leadName: `${leadData.firstName} ${leadData.lastName}`,
-              address: leadData.address || ''
-          }));
+            const selectedLead = leadsData.find((l: Lead) => l.id === leadIdFromParams);
+            if (selectedLead) {
+                setFormData(prev => ({
+                    ...prev,
+                    leadName: `${selectedLead.firstName} ${selectedLead.lastName}`,
+                    address: selectedLead.address || ''
+                }));
+            }
         } else if (quoteIdFromParams) {
-          const selectedQuote = quotesData.find((q: QuoteWithLead) => q.id === quoteIdFromParams);
-          if (selectedQuote) {
-            setFormData(prev => ({
-              ...prev,
-              leadId: selectedQuote.leadId,
-              leadName: `${selectedQuote.lead.firstName} ${selectedQuote.lead.lastName}`,
-              address: selectedQuote.lead.address || ''
-            }));
-          }
+            const selectedQuote = quotesData.find((q: QuoteWithLead) => q.id === quoteIdFromParams);
+            if(selectedQuote) {
+                setFormData(prev => ({
+                    ...prev,
+                    leadId: selectedQuote.leadId,
+                    leadName: `${selectedQuote.lead.firstName} ${selectedQuote.lead.lastName}`,
+                    address: selectedQuote.lead.address || ''
+                }));
+            }
         }
       } catch (err: any) {
         setError(err.message);
@@ -87,7 +98,10 @@ export default function NewMissionForm() {
   }, [searchParams, missionType, leadIdFromParams, quoteIdFromParams]);
 
   const handleSelectChange = (id: keyof typeof formData, value: string) => {
-    setFormData(prev => ({ ...prev, [id]: value }));
+    // If the "none" value is selected, treat it as an empty string for the state
+    const finalValue = value === 'none' ? '' : value;
+    setFormData(prev => ({ ...prev, [id]: finalValue }));
+
     if (id === 'quoteId') {
       const selectedQuote = quotes.find(q => q.id === value);
       if (selectedQuote) {
@@ -112,7 +126,6 @@ export default function NewMissionForm() {
     setIsLoading(true);
     setError(null);
 
-    // Final check before sending data
     if (!formData.leadId) {
         toast.error("Client non identifié. Impossible de créer la mission.");
         setIsLoading(false);
@@ -214,6 +227,21 @@ export default function NewMissionForm() {
                   </SelectContent>
                 </Select>
               </div>
+              
+              <div>
+                <Label htmlFor="taskTemplateId">Modèle de Checklist</Label>
+                <Select value={formData.taskTemplateId || 'none'} onValueChange={(value) => handleSelectChange('taskTemplateId', value)}>
+                    <SelectTrigger><SelectValue placeholder="Choisir une checklist..." /></SelectTrigger>
+                    <SelectContent>
+                        {/* --- THE FIX IS HERE --- */}
+                        <SelectItem value="none">Aucune (Tâches manuelles)</SelectItem>
+                        {taskTemplates.map(template => (
+                            <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+              </div>
+
               <div className="md:col-span-2">
                 <Label htmlFor="accessNotes">Notes d'accès (optionnel)</Label>
                 <Textarea id="accessNotes" value={formData.accessNotes} onChange={handleChange} placeholder="Code d'entrée, contact sur place, etc." />

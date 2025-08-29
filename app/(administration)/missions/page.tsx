@@ -1,19 +1,21 @@
 // app/(administration)/missions/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select'
 import {
   Dialog,
@@ -27,16 +29,68 @@ import {
 import { formatCurrency, formatDate, formatTime, getRelativeTime } from '@/lib/utils'
 import { Mission, Lead, User, Quote, Task, TeamMember } from '@prisma/client'
 import { CardGridSkeleton } from '@/components/skeletons/CardGridSkeleton'
+import { useSession } from 'next-auth/react' // Import useSession
+import { toast } from 'sonner'
 
+// Type étendu pour inclure l'utilisateur assigné, correspondant à la requête API
 type MissionWithDetails = Mission & {
   lead: Lead;
-  quote: Quote | null; // --- MODIFICATION 1: Allow quote to be null ---
+  quote: Quote | null;
   teamLeader: User | null;
   teamMembers: TeamMember[];
   tasks: Task[];
 };
 
+// Logique des couleurs de statut
+const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'SCHEDULED': return 'bg-blue-100 text-blue-800';
+      case 'IN_PROGRESS': return 'bg-orange-100 text-orange-800';
+      case 'QUALITY_CHECK': return 'bg-yellow-100 text-yellow-800';
+      case 'CLIENT_VALIDATION': return 'bg-purple-100 text-purple-800';
+      case 'COMPLETED': return 'bg-green-100 text-green-800';
+      case 'CANCELLED': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+};
+
+const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'SCHEDULED': return <Calendar className="w-4 h-4" />;
+      case 'IN_PROGRESS': return <Play className="w-4 h-4" />;
+      case 'QUALITY_CHECK': return <CheckSquare className="w-4 h-4" />;
+      case 'CLIENT_VALIDATION': return <Star className="w-4 h-4" />;
+      case 'COMPLETED': return <CheckCircle className="w-4 h-4" />;
+      case 'CANCELLED': return <AlertTriangle className="w-4 h-4" />;
+      default: return <Clock className="w-4 h-4" />;
+    }
+};
+
+const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'LOW': return 'bg-green-100 text-green-800';
+      case 'NORMAL': return 'bg-blue-100 text-blue-800';
+      case 'HIGH': return 'bg-orange-100 text-orange-800';
+      case 'CRITICAL': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+};
+
+const getTaskStatusColor = (status: string) => {
+    switch (status) {
+      case 'ASSIGNED': return 'bg-gray-100 text-gray-800';
+      case 'IN_PROGRESS': return 'bg-blue-100 text-blue-800';
+      case 'COMPLETED': return 'bg-green-100 text-green-800';
+      case 'VALIDATED': return 'bg-green-600 text-white';
+      case 'REJECTED': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+};
+
 export default function MissionsPage() {
+  const { data: session } = useSession();
+  const userRole = session?.user?.role;
+
   const [allMissions, setAllMissions] = useState<MissionWithDetails[]>([]);
   const [filteredMissions, setFilteredMissions] = useState<MissionWithDetails[]>([]);
   const [selectedMission, setSelectedMission] = useState<MissionWithDetails | null>(null)
@@ -83,58 +137,7 @@ export default function MissionsPage() {
     }
     setFilteredMissions(missions);
   }, [searchQuery, statusFilter, priorityFilter, allMissions]);
-
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'SCHEDULED': return 'bg-blue-100 text-blue-800';
-      case 'IN_PROGRESS': return 'bg-orange-100 text-orange-800';
-      case 'QUALITY_CHECK': return 'bg-yellow-100 text-yellow-800';
-      case 'CLIENT_VALIDATION': return 'bg-purple-100 text-purple-800';
-      case 'COMPLETED': return 'bg-green-100 text-green-800';
-      case 'CANCELLED': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'SCHEDULED': return <Calendar className="w-4 h-4" />;
-      case 'IN_PROGRESS': return <Play className="w-4 h-4" />;
-      case 'QUALITY_CHECK': return <CheckSquare className="w-4 h-4" />;
-      case 'CLIENT_VALIDATION': return <Star className="w-4 h-4" />;
-      case 'COMPLETED': return <CheckCircle className="w-4 h-4" />;
-      case 'CANCELLED': return <AlertTriangle className="w-4 h-4" />;
-      default: return <Clock className="w-4 h-4" />;
-    }
-  };
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'LOW': return 'bg-green-100 text-green-800';
-      case 'NORMAL': return 'bg-blue-100 text-blue-800';
-      case 'HIGH': return 'bg-orange-100 text-orange-800';
-      case 'CRITICAL': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-  const getTaskStatusColor = (status: string) => {
-    switch (status) {
-      case 'ASSIGNED': return 'bg-gray-100 text-gray-800';
-      case 'IN_PROGRESS': return 'bg-blue-100 text-blue-800';
-      case 'COMPLETED': return 'bg-green-100 text-green-800';
-      case 'VALIDATED': return 'bg-green-600 text-white';
-      case 'REJECTED': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
   
-  if (isLoading) {
-    return <CardGridSkeleton title="Gestion des Missions" description="Chargement des missions..." />;
-  }
-
-  if (error) {
-    return <div className="main-content text-center p-10 text-red-500">Erreur: {error}</div>;
-  }
-
   const getTasksSummary = (tasks: Task[]) => {
       const completed = tasks.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length;
       const inProgress = tasks.filter(t => t.status === 'IN_PROGRESS').length;
@@ -148,6 +151,14 @@ export default function MissionsPage() {
       return Math.round((completedTasks / tasks.length) * 100);
   };
 
+  if (isLoading) {
+    return <CardGridSkeleton title="Gestion des Missions" description="Chargement des missions..." />;
+  }
+
+  if (error) {
+    return <div className="main-content text-center p-10 text-red-500">Erreur: {error}</div>;
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -157,12 +168,15 @@ export default function MissionsPage() {
             {allMissions.length} missions • {allMissions.filter(m => m.status === 'IN_PROGRESS').length} en cours • {allMissions.filter(m => m.status === 'COMPLETED').length} terminées
           </p>
         </div>
-        <Link href="/missions/new">
-            <Button className="gap-2 bg-enarva-gradient rounded-lg">
-                <Plus className="w-4 h-4" />
-                Nouvelle Mission
-            </Button>
-        </Link>
+        
+        {(userRole === 'ADMIN' || userRole === 'TEAM_LEADER') && (
+            <Link href="/missions/new">
+                <Button className="gap-2 bg-enarva-gradient rounded-lg">
+                    <Plus className="w-4 h-4" />
+                    Nouvelle Mission
+                </Button>
+            </Link>
+        )}
       </div>
 
       <Card className="thread-card">
@@ -224,7 +238,6 @@ export default function MissionsPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      {/* --- MODIFICATION 2: Conditionally render the price --- */}
                       <div className="text-lg font-bold text-enarva-start">
                         {mission.quote ? formatCurrency(Number(mission.quote.finalPrice)) : 'N/A'}
                       </div>
@@ -278,7 +291,7 @@ export default function MissionsPage() {
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-6 mt-6">
-              {/* Le reste de votre modale détaillée reste ici */}
+              {/* The detailed modal content remains here */}
             </div>
           </DialogContent>
         </Dialog>

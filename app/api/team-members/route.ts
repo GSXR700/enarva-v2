@@ -1,6 +1,7 @@
 // app/api/team-members/route.ts
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
@@ -28,17 +29,29 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { email, name, role, firstName, lastName, phone, specialties, experienceLevel } = body;
+        const { email, password, name, role, firstName, lastName, phone, specialties, experienceLevel } = body;
 
-        if (!email || !name || !role || !firstName || !lastName || !phone) {
+        // Add validation for the password and other required fields
+        if (!email || !password || !name || !role || !firstName || !lastName || !phone) {
             return new NextResponse('Missing required fields', { status: 400 });
         }
+        
+        // Check if user already exists
+        const existingUser = await prisma.user.findUnique({ where: { email } });
+        if (existingUser) {
+            return new NextResponse('A user with this email already exists.', { status: 409 });
+        }
 
-        // Create a User record first, then create a TeamMember linked to it
+        // Hash the password before saving
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create the User with the hashed password, and in the same transaction,
+        // create the linked TeamMember profile.
         const newUser = await prisma.user.create({
             data: {
                 email,
                 name,
+                password: hashedPassword, // Use the hashed password
                 role,
                 teamMember: {
                     create: {
@@ -59,9 +72,6 @@ export async function POST(request: Request) {
         return NextResponse.json(newUser.teamMember, { status: 201 });
 
     } catch (error: any) {
-        if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
-             return new NextResponse('A user with this email already exists.', { status: 409 });
-        }
         console.error('Failed to create team member:', error);
         return new NextResponse('Internal Server Error', { status: 500 });
     }

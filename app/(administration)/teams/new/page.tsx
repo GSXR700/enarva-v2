@@ -1,4 +1,4 @@
-// app/teams/new/page.tsx
+// app/(administration)/teams/new/page.tsx
 'use client'
 
 import { useState } from 'react'
@@ -10,13 +10,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, UserPlus, Shield, User } from 'lucide-react'
+import { toast } from 'sonner' // Import toast
 
 export default function NewTeamMemberPage() {
   const router = useRouter()
+  
+  // --- MODIFICATION 1: Add password to the form state ---
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
+    password: '', // <-- ADDED
     phone: '',
     role: 'TECHNICIAN',
     experienceLevel: 'JUNIOR',
@@ -39,13 +43,19 @@ export default function NewTeamMemberPage() {
     setIsLoading(true)
     setError(null)
 
+    if (!formData.password) {
+        toast.error("Le mot de passe est obligatoire.");
+        setIsLoading(false);
+        return;
+    }
+
     try {
       const response = await fetch('/api/team-members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             ...formData,
-            name: `${formData.firstName} ${formData.lastName}`, // Construct full name for User model
+            name: `${formData.firstName} ${formData.lastName}`,
         }),
       })
 
@@ -54,10 +64,12 @@ export default function NewTeamMemberPage() {
         throw new Error(errorData || 'Une erreur est survenue.')
       }
       
+      toast.success("Nouveau membre ajouté avec succès !");
       router.push('/teams')
       router.refresh()
     } catch (err: any) {
       setError(err.message)
+      toast.error(err.message);
     } finally {
       setIsLoading(false)
     }
@@ -94,6 +106,11 @@ export default function NewTeamMemberPage() {
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" value={formData.email} onChange={handleChange} required />
               </div>
+               {/* --- MODIFICATION 2: Add password input field --- */}
+              <div>
+                <Label htmlFor="password">Mot de passe</Label>
+                <Input id="password" type="password" value={formData.password} onChange={handleChange} required />
+              </div>
               <div>
                 <Label htmlFor="phone">Téléphone</Label>
                 <Input id="phone" type="tel" value={formData.phone} onChange={handleChange} required />
@@ -108,7 +125,7 @@ export default function NewTeamMemberPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
+              <div className="md:col-span-2">
                 <Label htmlFor="experienceLevel">Niveau d'expérience</Label>
                 <Select value={formData.experienceLevel} onValueChange={(value) => handleSelectChange('experienceLevel', value)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
