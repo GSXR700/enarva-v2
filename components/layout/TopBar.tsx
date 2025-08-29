@@ -1,11 +1,11 @@
 // components/layout/TopBar.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
-import { Bell, Search, MoreHorizontal, Menu, MessageSquare, User, Settings, LogOut, X } from 'lucide-react'
+import { Bell, Search, Menu, MessageSquare, User, Settings, LogOut, X, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -19,67 +19,90 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { AnimatePresence, motion } from 'framer-motion'
+import { Activity, User as PrismaUser } from '@prisma/client'
+import { getRelativeTime } from '@/lib/utils'
 
 interface TopBarProps {
   onMenuClick: () => void;
 }
 
+type ActivityWithUser = Activity & { user: { name: string | null; image: string | null }};
+
 export function TopBar({ onMenuClick }: TopBarProps) {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const [isMobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [activities, setActivities] = useState<ActivityWithUser[]>([]);
+  const [showNotificationDot, setShowNotificationDot] = useState(true);
+
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        const response = await fetch('/api/activities');
+        if (response.ok) {
+          setActivities(await response.json());
+        }
+      } catch (error) {
+        console.error("Failed to fetch activities", error);
+      }
+    };
+    fetchActivities();
+  }, []);
 
   return (
     <header className="h-16 border-b border-border bg-card px-4 md:px-6 flex items-center justify-between sticky top-0 z-20">
-      {/* --- Section Gauche (Mobile: Menu / Desktop: Logo + Recherche) --- */}
+      {/* --- Section Gauche --- */}
       <div className="flex items-center gap-4">
-        {/* Logo et Menu Burger pour Mobile */}
         <div className="lg:hidden flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={onMenuClick}>
               <Menu className="w-6 h-6" />
             </Button>
             <Image src="/images/light-mobile.PNG" alt="Enarva" width={32} height={32} />
         </div>
-
-        {/* Barre de Recherche pour Desktop */}
         <div className="hidden lg:block relative max-w-lg w-full">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input
-            placeholder="Rechercher leads, missions, clients..."
-            className="pl-11 bg-secondary border-none rounded-full h-10" // Style mis à jour
-          />
+          <Input placeholder="Rechercher leads, missions, clients..." className="pl-11 bg-secondary border-none rounded-full h-10"/>
         </div>
       </div>
 
-      {/* --- Section Droite (Icônes et Menu Utilisateur) --- */}
+      {/* --- Section Droite --- */}
       <div className="flex items-center gap-1 md:gap-2">
-        {/* Icône de recherche pour Mobile */}
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileSearchOpen(true)}>
             <Search className="w-5 h-5" />
         </Button>
+        <Link href="/chat"><Button variant="ghost" size="icon"><MessageSquare className="w-5 h-5" /></Button></Link>
         
-        <Link href="/chat">
+        <DropdownMenu onOpenChange={(open) => !open && setShowNotificationDot(false)}>
+          <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
-                <MessageSquare className="w-5 h-5" />
+              <Bell className="w-5 h-5" />
+              {showNotificationDot && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />}
             </Button>
-        </Link>
-        
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="w-5 h-5" />
-          <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
-        </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-80" align="end">
+            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {activities.length > 0 ? activities.map(activity => (
+              <DropdownMenuItem key={activity.id} className="flex items-start gap-3">
+                 <CheckCircle className="w-5 h-5 mt-1 text-green-500"/>
+                 <div className='flex-1'>
+                    <p className="text-sm font-medium">{activity.title}</p>
+                    <p className="text-xs text-muted-foreground">{activity.description}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{getRelativeTime(activity.createdAt)}</p>
+                 </div>
+              </DropdownMenuItem>
+            )) : <p className="p-4 text-sm text-muted-foreground text-center">Aucune nouvelle notification.</p>}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <div className="h-6 w-px bg-border mx-2 hidden sm:block" />
 
-        {status === 'authenticated' && session.user ? (
+        {session?.user && (
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    {/* Avatar avec bordure dégradée */}
                     <div className="p-0.5 rounded-full bg-enarva-gradient cursor-pointer">
                          <Avatar className="h-9 w-9">
                             <AvatarImage src={session.user.image || ''} alt={session.user.name || 'Utilisateur'} />
-                            <AvatarFallback>
-                                {session.user.name ? session.user.name.split(' ').map(n => n[0]).join('') : <User />}
-                            </AvatarFallback>
+                            <AvatarFallback>{session.user.name ? session.user.name.split(' ').map(n => n[0]).join('') : <User />}</AvatarFallback>
                         </Avatar>
                     </div>
                 </DropdownMenuTrigger>
@@ -100,14 +123,9 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
-        ) : (
-             <Link href="/login">
-                <Button variant="outline">Se connecter</Button>
-             </Link>
         )}
       </div>
 
-      {/* --- Barre de Recherche Animée pour Mobile --- */}
       <AnimatePresence>
         {isMobileSearchOpen && (
             <motion.div 
@@ -118,14 +136,8 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                 className="absolute top-0 left-0 w-full h-full bg-card px-4 flex items-center gap-2 z-30"
             >
                 <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                <Input
-                    placeholder="Rechercher dans Enarva..."
-                    className="h-full bg-transparent border-none text-base focus-visible:ring-0 focus-visible:ring-offset-0"
-                    autoFocus
-                />
-                <Button variant="ghost" size="icon" onClick={() => setMobileSearchOpen(false)}>
-                    <X className="w-5 h-5" />
-                </Button>
+                <Input placeholder="Rechercher dans Enarva..." className="h-full bg-transparent border-none text-base focus-visible:ring-0 focus-visible:ring-offset-0" autoFocus />
+                <Button variant="ghost" size="icon" onClick={() => setMobileSearchOpen(false)}><X className="w-5 h-5" /></Button>
             </motion.div>
         )}
       </AnimatePresence>

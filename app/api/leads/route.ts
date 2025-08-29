@@ -1,6 +1,8 @@
 // app/api/leads/route.ts
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 const prisma = new PrismaClient()
 
@@ -32,9 +34,13 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+    
     const body = await request.json()
     
-    // --- Validation based on your detailed requirements ---
     if (!body.firstName || !body.lastName || !body.phone || !body.channel) {
       return new NextResponse('Les champs Prénom, Nom, Téléphone et Canal sont obligatoires.', { status: 400 })
     }
@@ -45,22 +51,14 @@ export async function POST(request: Request) {
         return new NextResponse("La dénomination officielle est obligatoire pour les organismes publics.", { status: 400 });
     }
 
-    // --- Data preparation for Prisma ---
     const leadData = {
       ...body,
-      // Convert numeric fields from string to number, ensuring null if empty
       estimatedSurface: body.estimatedSurface ? parseInt(body.estimatedSurface, 10) : null,
       score: body.score ? parseInt(body.score, 10) : 0,
-      
-      // Convert boolean fields
       needsProducts: body.needsProducts ? Boolean(body.needsProducts) : false,
       needsEquipment: body.needsEquipment ? Boolean(body.needsEquipment) : false,
       hasReferrer: body.hasReferrer ? Boolean(body.hasReferrer) : false,
-      
-      // Ensure optional relations are set to null if not provided
       assignedToId: body.assignedToId || null,
-
-      // Handle JSON data for product requests
       materials: body.materials || null,
     };
 
@@ -68,8 +66,16 @@ export async function POST(request: Request) {
       data: leadData,
     });
 
-    // The real-time notification is now handled client-side in the main leads page
-    // upon successful creation, ensuring a more robust flow.
+    // Create a corresponding activity
+    await prisma.activity.create({
+      data: {
+        type: 'LEAD_CREATED',
+        title: `Nouveau lead: ${newLead.firstName} ${newLead.lastName}`,
+        description: `Un nouveau lead a été créé via le canal ${newLead.channel}.`,
+        userId: session.user.id,
+        leadId: newLead.id,
+      }
+    });
 
     return NextResponse.json(newLead, { status: 201 })
   } catch (error) {

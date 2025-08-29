@@ -105,6 +105,7 @@ export default function ChatPage() {
                         conversations={conversations}
                         onSelect={setSelectedConversation}
                         onNewConversation={handleSelectConversation}
+                        onlineMembers={onlineMembers}
                     />
                 ) : (
                     <ChatWindow 
@@ -122,6 +123,7 @@ export default function ChatPage() {
                     selectedConversationId={selectedConversation?.id}
                     onSelect={setSelectedConversation}
                     onNewConversation={handleSelectConversation}
+                    onlineMembers={onlineMembers}
                 />
                 {selectedConversation ? (
                     <ChatWindow 

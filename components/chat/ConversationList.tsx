@@ -14,9 +14,10 @@ interface ConversationListProps {
     selectedConversationId?: string;
     onSelect: (conversation: PopulatedConversation) => void;
     onNewConversation: (conversation: PopulatedConversation) => void;
+    onlineMembers: string[];
 }
 
-export function ConversationList({ currentUserId, conversations, selectedConversationId, onSelect, onNewConversation }: ConversationListProps) {
+export function ConversationList({ currentUserId, conversations, selectedConversationId, onSelect, onNewConversation, onlineMembers }: ConversationListProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const handleSelectUser = async (user: User) => {
@@ -52,6 +53,7 @@ export function ConversationList({ currentUserId, conversations, selectedConvers
                     {conversations.map((convo) => {
                         const otherParticipant = convo.participants.find(p => p.id !== currentUserId);
                         const lastMessage = convo.messages[0];
+                        const isOnline = otherParticipant ? onlineMembers.includes(otherParticipant.id) : false;
 
                         return (
                             <div 
@@ -65,7 +67,7 @@ export function ConversationList({ currentUserId, conversations, selectedConvers
                                 <Avatar className="h-12 w-12 relative">
                                     <AvatarImage src={otherParticipant?.image || undefined} />
                                     <AvatarFallback>{otherParticipant?.name?.substring(0, 2) || '??'}</AvatarFallback>
-                                    {otherParticipant?.onlineStatus === 'ONLINE' && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-card" />}
+                                    {isOnline && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-card" />}
                                 </Avatar>
                                 <div className="flex-1 truncate">
                                     <p className="font-semibold truncate">{otherParticipant?.name || 'Groupe'}</p>
