@@ -13,36 +13,6 @@ const pusher = new Pusher({
 
 const prisma = new PrismaClient();
 
-// Hardcoded templates for simplicity, mirroring the new API endpoint
-const templates = [
-    {
-        id: 'tech-visit-villa',
-        name: 'Visite Technique - Villa / Grand Ménage',
-        tasks: [
-            { category: 'EXTERIOR_FACADE', title: 'État général des façades (pierre, crépi, etc.)' },
-            { category: 'EXTERIOR_FACADE', title: 'Présence de taches de peinture, ciment, poussière' },
-            { category: 'WINDOWS_JOINERY', title: 'État des vitres extérieures et cadres' },
-            { category: 'FLOORS', title: 'Inspection du Marbre (rayures, taches)' },
-            { category: 'FLOORS', title: 'Inspection du Parquet (humidité, traces)' },
-            { category: 'BATHROOM_SANITARY', title: 'Vérification des joints et traces de calcaire' },
-            { category: 'LOGISTICS_ACCESS', title: 'Noter les points d\'accès à l\'eau et électricité' },
-        ]
-    },
-    {
-        id: 'end-of-construction-clean',
-        name: 'Nettoyage Fin de Chantier - Appartement',
-        tasks: [
-            { category: 'WALLS_BASEBOARDS', title: 'Dépoussiérer et nettoyer les murs et plinthes' },
-            { category: 'FLOORS', title: 'Laver et aspirer tous les sols' },
-            { category: 'FLOORS', title: 'Retirer le voile de ciment du carrelage' },
-            { category: 'WINDOWS_JOINERY', title: 'Nettoyer les vitres int/ext et les rails' },
-            { category: 'KITCHEN', title: 'Dégraisser les éléments de cuisine' },
-            { category: 'BATHROOM_SANITARY', title: 'Désinfecter et détartrer les sanitaires' },
-            { category: 'LOGISTICS_ACCESS', title: 'Évacuation des déchets de chantier restants' },
-        ]
-    }
-];
-
 export async function GET() {
   try {
     const missions = await prisma.mission.findMany({
@@ -124,15 +94,19 @@ export async function POST(request: Request) {
 
         const scheduledDateAsDate = new Date(missionData.scheduledDate);
 
-        let tasksToCreate: { title: string; category: string; }[] = [];
+        let tasksToCreate: { title: string; category: any; }[] = [];
         if (taskTemplateId && taskTemplateId !== 'none') {
-            const selectedTemplate = templates.find(t => t.id === taskTemplateId);
-            if (selectedTemplate) {
-                tasksToCreate = selectedTemplate.tasks.map(task => ({
-                    title: task.title,
-                    category: task.category,
+            const selectedTemplate = await prisma.taskTemplate.findUnique({
+                where: { id: taskTemplateId },
+                include: { items: true },
+            });
+            
+            if (selectedTemplate && selectedTemplate.items) {
+                tasksToCreate = selectedTemplate.items.map(item => ({
+                    title: item.title,
+                    category: item.category,
                 }));
-                console.log('✅ Tasks prepared from template:', tasksToCreate.length, 'tasks');
+                console.log('✅ Tasks prepared from DB template:', tasksToCreate.length, 'tasks');
             }
         }
 
