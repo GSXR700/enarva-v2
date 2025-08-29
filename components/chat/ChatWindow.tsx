@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { PopulatedConversation } from '@/types/chat';
 import { Message, User } from '@prisma/client';
 import { ArrowLeft, Check, CheckCheck } from 'lucide-react';
-import { useSocket } from '@/hooks/useSocket';
 import { AnimatePresence, motion } from 'framer-motion';
+import Pusher from 'pusher-js';
 
 type PopulatedMessage = Message & { sender: User };
 
@@ -20,7 +20,6 @@ interface ChatWindowProps {
 export function ChatWindow({ currentUserId, conversation, onBack }: ChatWindowProps) {
     const [messages, setMessages] = useState<PopulatedMessage[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const socket = useSocket(conversation.id);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -45,18 +44,30 @@ export function ChatWindow({ currentUserId, conversation, onBack }: ChatWindowPr
     }, [messages]);
 
     useEffect(() => {
-        if (!socket) return;
-        socket.on('newMessage', (message: PopulatedMessage) => {
-            setMessages((prev) => [...prev, message]);
+        if (!conversation.id) return;
+
+        const pusherClient = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+            cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
         });
-        return () => {
-            socket.off('newMessage');
+
+        const channel = pusherClient.subscribe(`conversation-${conversation.id}`);
+
+        const handleNewMessage = (message: PopulatedMessage) => {
+            if (message.senderId !== currentUserId) {
+                setMessages((prev) => [...prev, message]);
+            }
         };
-    }, [socket]);
+
+        channel.bind('new-message', handleNewMessage);
+
+        return () => {
+            channel.unbind('new-message', handleNewMessage);
+            pusherClient.unsubscribe(`conversation-${conversation.id}`);
+        };
+    }, [conversation.id, currentUserId]);
+
 
     const handleSendMessage = async (content: string) => {
-        if (!socket) return;
-        
         const tempId = Date.now().toString();
         const newMessage: PopulatedMessage = {
             id: tempId,
@@ -82,8 +93,6 @@ export function ChatWindow({ currentUserId, conversation, onBack }: ChatWindowPr
         
         // Replace temp message with saved message from DB
         setMessages(prev => prev.map(m => m.id === tempId ? savedMessage : m));
-        
-        socket.emit('sendMessage', savedMessage);
     };
 
     const otherParticipant = conversation.participants.find(p => p.id !== currentUserId);

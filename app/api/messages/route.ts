@@ -1,6 +1,7 @@
 // app/api/messages/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { pusherServer } from '@/lib/pusher';
 
 const prisma = new PrismaClient();
 
@@ -25,7 +26,12 @@ export async function POST(request: Request) {
       },
     });
     
-    // The real-time emission will be handled by the client via the socket server
+    // Trigger a Pusher event on the conversation channel
+    await pusherServer.trigger(
+      `conversation-${conversationId}`,
+      'new-message',
+      newMessage
+    );
     
     return NextResponse.json(newMessage, { status: 201 });
 
