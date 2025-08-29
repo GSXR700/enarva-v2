@@ -30,7 +30,7 @@ import { CardGridSkeleton } from '@/components/skeletons/CardGridSkeleton'
 
 type MissionWithDetails = Mission & {
   lead: Lead;
-  quote: Quote;
+  quote: Quote | null; // --- MODIFICATION 1: Allow quote to be null ---
   teamLeader: User | null;
   teamMembers: TeamMember[];
   tasks: Task[];
@@ -224,7 +224,10 @@ export default function MissionsPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-bold text-enarva-start">{formatCurrency(Number(mission.quote.finalPrice))}</div>
+                      {/* --- MODIFICATION 2: Conditionally render the price --- */}
+                      <div className="text-lg font-bold text-enarva-start">
+                        {mission.quote ? formatCurrency(Number(mission.quote.finalPrice)) : 'N/A'}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">

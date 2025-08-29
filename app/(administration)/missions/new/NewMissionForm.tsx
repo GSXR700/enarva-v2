@@ -19,15 +19,18 @@ type QuoteWithLead = Quote & { lead: Lead };
 export default function NewMissionForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Get parameters from URL
+  const missionType = searchParams.get('type') as 'TECHNICAL_VISIT' | 'SERVICE' || 'SERVICE';
+  const quoteIdFromParams = searchParams.get('quoteId');
+  const leadIdFromParams = searchParams.get('leadId');
+
   const [quotes, setQuotes] = useState<QuoteWithLead[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
   const [teamLeaders, setTeamLeaders] = useState<TeamMember[]>([]);
 
-  const missionType = searchParams.get('type') as 'TECHNICAL_VISIT' | 'SERVICE' || 'SERVICE';
-
   const [formData, setFormData] = useState({
-    quoteId: searchParams.get('quoteId') || '',
-    leadId: searchParams.get('leadId') || '',
+    quoteId: quoteIdFromParams || '',
+    leadId: leadIdFromParams || '',
     leadName: '',
     address: '',
     scheduledDate: '',
@@ -43,46 +46,37 @@ export default function NewMissionForm() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [quotesRes, usersRes, leadsRes] = await Promise.all([
+        const [quotesRes, usersRes] = await Promise.all([
           fetch('/api/quotes?status=ACCEPTED'),
-          fetch('/api/users?role=TEAM_LEADER'),
-          fetch('/api/leads')
+          fetch('/api/users?role=TEAM_LEADER')
         ]);
-
-        if (!quotesRes.ok || !usersRes.ok || !leadsRes.ok) {
-          throw new Error('Failed to fetch initial data.');
-        }
+        if (!quotesRes.ok || !usersRes.ok) throw new Error('Failed to fetch initial data.');
 
         const quotesData = await quotesRes.json();
         const usersData = await usersRes.json();
-        const leadsData = await leadsRes.json();
-
         setQuotes(quotesData);
         setTeamLeaders(usersData);
-        setLeads(leadsData);
 
-        const quoteId = searchParams.get('quoteId');
-        const leadId = searchParams.get('leadId');
-
-        if (missionType === 'TECHNICAL_VISIT' && leadId) {
-            const selectedLead = leadsData.find((l: Lead) => l.id === leadId);
-            if (selectedLead) {
-                setFormData(prev => ({
-                    ...prev,
-                    leadName: `${selectedLead.firstName} ${selectedLead.lastName}`,
-                    address: selectedLead.address || ''
-                }));
-            }
-        } else if (quoteId) {
-            const selectedQuote = quotesData.find((q: QuoteWithLead) => q.id === quoteId);
-            if(selectedQuote) {
-                setFormData(prev => ({
-                    ...prev,
-                    leadId: selectedQuote.leadId,
-                    leadName: `${selectedQuote.lead.firstName} ${selectedQuote.lead.lastName}`,
-                    address: selectedQuote.lead.address || ''
-                }));
-            }
+        // If it's a TECHNICAL_VISIT, we need to fetch the lead's info
+        if (missionType === 'TECHNICAL_VISIT' && leadIdFromParams) {
+          const leadRes = await fetch(`/api/leads/${leadIdFromParams}`);
+          if (!leadRes.ok) throw new Error('Could not find the specified lead.');
+          const leadData = await leadRes.json();
+          setFormData(prev => ({
+              ...prev,
+              leadName: `${leadData.firstName} ${leadData.lastName}`,
+              address: leadData.address || ''
+          }));
+        } else if (quoteIdFromParams) {
+          const selectedQuote = quotesData.find((q: QuoteWithLead) => q.id === quoteIdFromParams);
+          if (selectedQuote) {
+            setFormData(prev => ({
+              ...prev,
+              leadId: selectedQuote.leadId,
+              leadName: `${selectedQuote.lead.firstName} ${selectedQuote.lead.lastName}`,
+              address: selectedQuote.lead.address || ''
+            }));
+          }
         }
       } catch (err: any) {
         setError(err.message);
@@ -90,7 +84,7 @@ export default function NewMissionForm() {
       }
     };
     fetchData();
-  }, [searchParams, missionType]);
+  }, [searchParams, missionType, leadIdFromParams, quoteIdFromParams]);
 
   const handleSelectChange = (id: keyof typeof formData, value: string) => {
     setFormData(prev => ({ ...prev, [id]: value }));
@@ -113,12 +107,12 @@ export default function NewMissionForm() {
     setFormData(prev => ({ ...prev, [id]: value }));
   };
 
-  // --- THIS IS THE FULLY IMPLEMENTED SUBMIT FUNCTION ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
+    // Final check before sending data
     if (!formData.leadId) {
         toast.error("Client non identifié. Impossible de créer la mission.");
         setIsLoading(false);
@@ -136,8 +130,8 @@ export default function NewMissionForm() {
         });
 
         if (!response.ok) {
-            const errorData = await response.text();
-            throw new Error(errorData || "Échec de la création de la mission.");
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Échec de la création de la mission.");
         }
         
         toast.success(`Mission de type "${formData.type}" planifiée avec succès !`);

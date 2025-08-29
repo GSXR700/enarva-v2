@@ -181,8 +181,8 @@ model Mission {
   teamMembers     TeamMember[]  @relation("MissionToTeamMember")
   leadId          String
   lead            Lead          @relation(fields: [leadId], references: [id])
-  quoteId         String
-  quote           Quote         @relation(fields: [quoteId], references: [id])
+  quoteId         String? // <-- ADD QUESTION MARK HERE
+  quote           Quote?        @relation(fields: [quoteId], references: [id])
   tasks           Task[]
   qualityChecks   QualityCheck[]
   inventoryUsed   InventoryUsage[]
