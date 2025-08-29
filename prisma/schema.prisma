@@ -20,7 +20,6 @@ model User {
   
   onlineStatus    String         @default("OFFLINE")
   lastSeen        DateTime?
-
   accounts      Account[]
   sessions      Session[]
   
@@ -90,12 +89,11 @@ model Lead {
   activitySector  String?
   contactPosition String?
   department      String?
-
   // 3. Détails de la Demande
   propertyType    PropertyType?
   estimatedSurface Int?
   accessibility   AccessibilityLevel? @default(EASY)
-  materials       Json? // Stockera les sélections de matériaux
+  materials       Json?      // Stockera les sélections de matériaux
   urgencyLevel    UrgencyLevel?
   budgetRange     String?
   frequency       Frequency? @default(PONCTUEL)
@@ -108,7 +106,7 @@ model Lead {
 
   // 5. Origine du Lead
   channel         LeadCanal
-  source          String? // Source précise
+  source          String?    // Source précise
   hasReferrer     Boolean? @default(false)
   referrerContact String?
   enarvaRole      EnarvaRole? @default(PRESTATAIRE_PRINCIPAL)
@@ -136,7 +134,7 @@ model Lead {
 model Quote {
   id              String      @id @default(cuid())
   quoteNumber     String      @unique
-  type            QuoteType   @default(STANDARD)
+  type            QuoteType    @default(STANDARD)
   status          QuoteStatus @default(DRAFT)
   surface         Int
   propertyType    PropertyType
@@ -145,6 +143,7 @@ model Quote {
   distance        Int         @default(0)
   accessibility   AccessibilityLevel @default(EASY)
   urgency         UrgencyLevel @default(NORMAL)
+  
   basePrice       Decimal
   coefficients    Json
   adjustments     Json?
@@ -181,7 +180,7 @@ model Mission {
   teamMembers     TeamMember[]  @relation("MissionToTeamMember")
   leadId          String
   lead            Lead          @relation(fields: [leadId], references: [id])
-  quoteId         String? // <-- ADD QUESTION MARK HERE
+  quoteId         String?       // <-- ADD QUESTION MARK HERE
   quote           Quote?        @relation(fields: [quoteId], references: [id])
   tasks           Task[]
   qualityChecks   QualityCheck[]
@@ -211,9 +210,9 @@ model Expense {
   rentalStartDate DateTime?
   rentalEndDate   DateTime?
   missionId       String?
-  mission         Mission? @relation(fields: [missionId], references: [id])
+  mission         Mission?       @relation(fields: [missionId], references: [id])
   leadId          String?
-  lead            Lead?    @relation(fields: [leadId], references: [id])
+  lead            Lead?          @relation(fields: [leadId], references: [id])
   userId          String
   user            User     @relation(fields: [userId], references: [id])
   createdAt       DateTime @default(now())
@@ -495,6 +494,9 @@ enum LeadStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+  VISIT_PLANNED
+  ON_VISIT
+  VISIT_DONE
 }
 
 enum PropertyType {

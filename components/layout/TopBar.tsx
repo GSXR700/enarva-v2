@@ -37,7 +37,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
             <Button variant="ghost" size="icon" onClick={onMenuClick}>
               <Menu className="w-6 h-6" />
             </Button>
-            <Image src="/images/light-mobile.png" alt="Enarva" width={32} height={32} />
+            <Image src="/images/light-mobile.PNG" alt="Enarva" width={32} height={32} />
         </div>
 
         {/* Barre de Recherche pour Desktop */}

@@ -1,6 +1,6 @@
 // app/api/missions/route.ts - COMPLETE FIXED VERSION
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, LeadStatus } from '@prisma/client'
 import Pusher from 'pusher';
 
 const pusher = new Pusher({
@@ -58,7 +58,6 @@ export async function POST(request: Request) {
             }, { status: 400 });
         }
 
-        // For service missions, quote is required
         if (type === 'SERVICE' && !quoteId) {
             console.error('❌ Missing quoteId for SERVICE mission');
             return NextResponse.json({ message: 'Quote ID is required for service missions.' }, { status: 400 });
@@ -66,7 +65,6 @@ export async function POST(request: Request) {
 
         console.log('✅ Basic validation passed');
 
-        // Validate that the lead exists
         const lead = await prisma.lead.findUnique({ where: { id: leadId } });
         if (!lead) {
             console.error('❌ Lead not found:', leadId);
@@ -74,7 +72,6 @@ export async function POST(request: Request) {
         }
         console.log('✅ Lead found:', lead.firstName, lead.lastName);
 
-        // Validate that the team leader exists
         const teamLeader = await prisma.user.findUnique({ where: { id: teamLeaderId } });
         if (!teamLeader) {
             console.error('❌ Team leader not found:', teamLeaderId);
@@ -82,7 +79,6 @@ export async function POST(request: Request) {
         }
         console.log('✅ Team leader found:', teamLeader.name);
 
-        // If it's a service mission, validate quote exists
         if (type === 'SERVICE' && quoteId) {
             const quote = await prisma.quote.findUnique({ where: { id: quoteId } });
             if (!quote) {
@@ -112,26 +108,33 @@ export async function POST(request: Request) {
 
         console.log('🔧 Creating mission...');
 
-        const newMission = await prisma.mission.create({
-            data: {
-                ...missionData,
-                missionNumber: `MS-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
-                estimatedDuration: parseInt(missionData.estimatedDuration),
-                scheduledDate: scheduledDateAsDate,
-                type: type,
-                lead: { connect: { id: leadId } },
-                teamLeader: { connect: { id: teamLeaderId } },
-                ...(quoteId && { quote: { connect: { id: quoteId } } }),
-                tasks: {
-                    create: tasksToCreate,
+        const [newMission] = await prisma.$transaction([
+            prisma.mission.create({
+                data: {
+                    ...missionData,
+                    missionNumber: `MS-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
+                    estimatedDuration: parseInt(missionData.estimatedDuration),
+                    scheduledDate: scheduledDateAsDate,
+                    type: type,
+                    lead: { connect: { id: leadId } },
+                    teamLeader: { connect: { id: teamLeaderId } },
+                    ...(quoteId && { quote: { connect: { id: quoteId } } }),
+                    tasks: {
+                        create: tasksToCreate,
+                    },
                 },
-            },
-            include: { lead: true }
-        });
+                include: { lead: true }
+            }),
+            ...(type === 'TECHNICAL_VISIT' ? [
+                prisma.lead.update({
+                    where: { id: leadId },
+                    data: { status: 'VISIT_PLANNED' }
+                })
+            ] : [])
+        ]);
 
         console.log('✅ Mission created successfully:', newMission.id);
         
-        // Send real-time notification
         if (teamLeaderId) {
             const channelName = `user-${teamLeaderId}`;
             await pusher.trigger(channelName, 'mission-new', newMission);

@@ -71,7 +71,19 @@ export function getRelativeTime(date: string | Date) {
 
 // --- SECTION DE TRADUCTION CENTRALISÉE ---
 export const translations = {
-  LeadStatus: { NEW: "Nouveau", QUALIFIED: "Qualifié", QUOTE_SENT: "Devis envoyé", QUOTE_ACCEPTED: "Devis accepté", MISSION_SCHEDULED: "Mission planifiée", IN_PROGRESS: "En cours", COMPLETED: "Terminé", CANCELLED: "Annulé" },
+  LeadStatus: {
+    NEW: "Nouveau",
+    QUALIFIED: "Qualifié",
+    QUOTE_SENT: "Devis envoyé",
+    QUOTE_ACCEPTED: "Devis accepté",
+    MISSION_SCHEDULED: "Mission planifiée",
+    IN_PROGRESS: "En cours",
+    COMPLETED: "Terminé",
+    CANCELLED: "Annulé",
+    VISIT_PLANNED: "Visite planifiée",
+    ON_VISIT: "Visite en cours",
+    VISIT_DONE: "Visite terminée"
+  },
   LeadCanal: { WHATSAPP: "WhatsApp", FACEBOOK: "Facebook", INSTAGRAM: "Instagram", LINKEDIN: "LinkedIn", GOOGLE_MAPS: "Google Maps", GOOGLE_SEARCH: "Recherche Google", SITE_WEB: "Site Web", FORMULAIRE_SITE: "Formulaire Site", MARKETPLACE: "Marketplace", YOUTUBE: "YouTube", EMAIL: "Email", APPORTEUR_AFFAIRES: "Apporteur d'affaires", COMMERCIAL_TERRAIN: "Commercial Terrain", SALON_PROFESSIONNEL: "Salon Professionnel", PARTENARIAT: "Partenariat", RECOMMANDATION_CLIENT: "Recommandation Client", VISITE_BUREAU: "Visite Bureau", EMPLOYE_ENARVA: "Employé Enarva", APPEL_TELEPHONIQUE: "Appel Téléphonique", SMS: "SMS", NUMERO_SUR_PUB: "Numéro sur Pub", AFFICHE: "Affiche", FLYER: "Flyer", ENSEIGNE: "Enseigne", VOITURE_SIGLEE: "Voiture Siglée", RADIO: "Radio", ANNONCE_PRESSE: "Annonce Presse", TELE: "Télé", MANUEL: "Manuel", SOURCING_INTERNE: "Sourcing Interne", PORTE_A_PORTE: "Porte à Porte", CHANTIER_EN_COURS: "Chantier en cours" },
   LeadType: { PARTICULIER: "Particulier", PROFESSIONNEL: "Professionnel", PUBLIC: "Public" },
   UrgencyLevel: { NORMAL: "Normal", URGENT: "Urgent", HIGH_URGENT: "Très urgent", IMMEDIATE: "Immédiat" },
@@ -92,7 +104,8 @@ export const translations = {
 export function translate(key: keyof typeof translations, value: string | null | undefined): string {
     if (!value) return "N/A";
     // @ts-ignore
-    return translations[key]?.[value] || value;
+    const translated = translations[key]?.[value] || value;
+    return translated.charAt(0).toUpperCase() + translated.slice(1).toLowerCase();
 }
 
 

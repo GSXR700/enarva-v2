@@ -66,6 +66,7 @@ export const authOptions: NextAuthOptions = {
         if (dbUser) {
             token.id = dbUser.id;
             token.role = dbUser.role;
+            token.picture = dbUser.image;
         }
       }
       return token;

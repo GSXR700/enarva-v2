@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEdgeStore } from '@/lib/edgestore';
-import { Mission, Lead, Task, TaskStatus } from '@prisma/client';
+import { Mission, Lead, Task, TaskStatus, LeadStatus } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -60,6 +60,20 @@ export default function MissionReportPage() {
         }
     }, [missionId, router]);
     
+    const updateLeadStatus = async (status: LeadStatus) => {
+        if (!mission?.leadId) return;
+        try {
+            await fetch(`/api/leads/${mission.leadId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+            });
+        } catch (error) {
+            console.error("Failed to update lead status:", error);
+            toast.error("Échec de la mise à jour du statut du lead.");
+        }
+    };
+    
     const handleStatusUpdate = async (status: 'IN_PROGRESS' | 'COMPLETED') => {
         try {
             const response = await fetch(`/api/missions/${missionId}`, {
@@ -71,6 +85,11 @@ export default function MissionReportPage() {
             const updatedMission = await response.json();
             setMission(updatedMission);
             toast.success(`Mission marquée comme "${status === 'IN_PROGRESS' ? 'Démarrée' : 'Terminée'}"`);
+
+            if (status === 'IN_PROGRESS') {
+                await updateLeadStatus('ON_VISIT');
+            }
+
         } catch (error: any) {
             toast.error(error.message);
         }
@@ -85,7 +104,6 @@ export default function MissionReportPage() {
             });
             if (!response.ok) throw new Error('Failed to update task');
             
-            // Update local state
             setMission(prev => {
                 if (!prev) return null;
                 return {
@@ -108,7 +126,6 @@ export default function MissionReportPage() {
             return;
         }
 
-        // Check if all tasks are completed for technical visits
         if (mission?.type === 'TECHNICAL_VISIT') {
             const incompleteTasks = mission.tasks.filter(task => 
                 task.status !== 'COMPLETED' && task.status !== 'VALIDATED'
@@ -146,8 +163,9 @@ export default function MissionReportPage() {
             });
             if (!response.ok) throw new Error("Échec de la soumission du rapport.");
 
-            toast.success("Rapport de visite soumis avec succès !");
             await handleStatusUpdate('COMPLETED');
+            await updateLeadStatus('VISIT_DONE');
+            toast.success("Rapport de visite soumis avec succès !");
             router.push('/dashboard');
 
         } catch (error: any) {
@@ -212,7 +230,6 @@ export default function MissionReportPage() {
                 </CardContent>
             </Card>
 
-            {/* Tasks Checklist for Technical Visits */}
             {isVisit && mission.tasks.length > 0 && (
                 <Card className="thread-card">
                     <CardHeader>
