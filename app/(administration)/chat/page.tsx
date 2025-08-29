@@ -56,6 +56,7 @@ export default function ChatPage() {
 
     return (
         <div className="flex h-[calc(100vh-4rem)]">
+            {/* --- MOBILE VIEW --- */}
             <div className="w-full md:hidden">
                 {!selectedConversation ? (
                     <ConversationList 
@@ -72,6 +73,7 @@ export default function ChatPage() {
                     />
                 )}
             </div>
+            {/* --- DESKTOP VIEW --- */}
             <div className="hidden md:flex w-full h-full">
                  <ConversationList 
                     currentUserId={currentUserId}
