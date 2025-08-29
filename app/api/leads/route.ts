@@ -38,9 +38,9 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
-    
+
     const body = await request.json()
-    
+
     if (!body.firstName || !body.lastName || !body.phone || !body.channel) {
       return new NextResponse('Les champs Prénom, Nom, Téléphone et Canal sont obligatoires.', { status: 400 })
     }

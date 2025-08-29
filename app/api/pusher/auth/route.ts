@@ -1,4 +1,3 @@
-//app/api/pusher/auth/route.ts
 import { pusherServer } from '@/lib/pusher';
 import { authOptions } from '@/lib/auth';
 import { getServerSession } from 'next-auth';
@@ -14,8 +13,8 @@ export async function POST(request: Request) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
-  const socketId = (await request.formData()).get('socket_id') as string;
-  const channel = (await request.formData()).get('channel_name') as string;
+  const data = await request.text();
+  const [socketId, channel] = data.split('&').map(str => str.split('=')[1]);
 
   const userData = {
     user_id: session.user.id,
@@ -25,7 +24,6 @@ export async function POST(request: Request) {
     },
   };
 
-  // Update user's last seen status upon authenticating with Pusher
   await prisma.user.update({
     where: { id: session.user.id },
     data: { lastSeen: new Date(), onlineStatus: 'ONLINE' },

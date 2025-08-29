@@ -43,11 +43,6 @@ export default function ChatPage() {
         const pusherClient = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
             cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
             authEndpoint: '/api/pusher/auth',
-            auth: {
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            }
         });
 
         const channel = pusherClient.subscribe('presence-global');
@@ -58,7 +53,7 @@ export default function ChatPage() {
         });
 
         channel.bind('pusher:member_added', (member: { id: string }) => {
-            setOnlineMembers(prev => [...prev, member.id]);
+            setOnlineMembers(prev => Array.from(new Set([...prev, member.id])));
         });
 
         channel.bind('pusher:member_removed', (member: { id: string }) => {
@@ -69,7 +64,6 @@ export default function ChatPage() {
             pusherClient.unsubscribe('presence-global');
         };
     }, [session?.user?.id]);
-
 
     const handleSelectConversation = (conversation: PopulatedConversation) => {
         if (!conversations.find(c => c.id === conversation.id)) {

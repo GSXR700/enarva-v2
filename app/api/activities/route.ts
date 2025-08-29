@@ -1,4 +1,3 @@
-//app/api/activities/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth';
@@ -14,15 +13,10 @@ export async function GET() {
     }
 
     const activities = await prisma.activity.findMany({
-      where: {
-        // In a more complex app, you might filter activities
-        // relevant to the user's role or team.
-        // For now, we fetch all activities for simplicity.
-      },
       orderBy: {
         createdAt: 'desc',
       },
-      take: 10, // Limit to the 10 most recent activities
+      take: 15,
       include: {
         user: {
           select: {
