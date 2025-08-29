@@ -8,6 +8,8 @@ import { Message, User } from '@prisma/client';
 import { ArrowLeft, Check, CheckCheck } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Pusher from 'pusher-js';
+import { ChatWindowSkeleton } from '../skeletons/ChatWindowSkeleton';
+import { getRelativeTime } from '@/lib/utils';
 
 type PopulatedMessage = Message & { sender: User };
 
@@ -15,12 +17,15 @@ interface ChatWindowProps {
     currentUserId: string;
     conversation: PopulatedConversation;
     onBack?: () => void;
+    onlineMembers: string[];
 }
 
-export function ChatWindow({ currentUserId, conversation, onBack }: ChatWindowProps) {
+export function ChatWindow({ currentUserId, conversation, onBack, onlineMembers }: ChatWindowProps) {
     const [messages, setMessages] = useState<PopulatedMessage[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const otherParticipant = conversation.participants.find(p => p.id !== currentUserId);
+    const isOnline = otherParticipant ? onlineMembers.includes(otherParticipant.id) : false;
 
     useEffect(() => {
         if (!conversation?.id) return;
@@ -48,6 +53,12 @@ export function ChatWindow({ currentUserId, conversation, onBack }: ChatWindowPr
 
         const pusherClient = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
             cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+            authEndpoint: '/api/pusher/auth',
+            auth: {
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            }
         });
 
         const channel = pusherClient.subscribe(`conversation-${conversation.id}`);
@@ -66,21 +77,14 @@ export function ChatWindow({ currentUserId, conversation, onBack }: ChatWindowPr
         };
     }, [conversation.id, currentUserId]);
 
-
     const handleSendMessage = async (content: string) => {
         const tempId = Date.now().toString();
         const newMessage: PopulatedMessage = {
-            id: tempId,
-            content,
-            createdAt: new Date(),
-            senderId: currentUserId,
-            conversationId: conversation.id,
-            readByIds: [currentUserId],
-            type: 'TEXT',
-            sender: { id: currentUserId, name: 'Vous', email: '', image: '', /* ... autres champs user */ } as User,
+            id: tempId, content, createdAt: new Date(), senderId: currentUserId,
+            conversationId: conversation.id, readByIds: [currentUserId], type: 'TEXT',
+            sender: { id: currentUserId, name: 'Vous' } as User,
         };
 
-        // Optimistic UI update
         setMessages((prev) => [...prev, newMessage]);
 
         const response = await fetch('/api/messages', {
@@ -91,11 +95,12 @@ export function ChatWindow({ currentUserId, conversation, onBack }: ChatWindowPr
         
         const savedMessage = await response.json();
         
-        // Replace temp message with saved message from DB
         setMessages(prev => prev.map(m => m.id === tempId ? savedMessage : m));
     };
 
-    const otherParticipant = conversation.participants.find(p => p.id !== currentUserId);
+    if (isLoading) {
+        return <ChatWindowSkeleton />;
+    }
 
     return (
         <div className="flex-1 flex flex-col bg-background h-full">
@@ -104,11 +109,13 @@ export function ChatWindow({ currentUserId, conversation, onBack }: ChatWindowPr
                 <Avatar><AvatarImage src={otherParticipant?.image || undefined} /><AvatarFallback>{otherParticipant?.name?.substring(0, 2) || '??'}</AvatarFallback></Avatar>
                 <div>
                     <p className="font-semibold">{otherParticipant?.name || 'Conversation'}</p>
-                    <p className="text-xs text-green-500">{otherParticipant?.onlineStatus === 'ONLINE' ? 'En ligne' : 'Hors ligne'}</p>
+                    <p className={`text-xs ${isOnline ? 'text-green-500' : 'text-muted-foreground'}`}>
+                      {isOnline ? 'En ligne' : (otherParticipant?.lastSeen ? `Vu ${getRelativeTime(otherParticipant.lastSeen)}` : 'Hors ligne')}
+                    </p>
                 </div>
             </div>
 
-            <div className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
+            <div className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
                 <AnimatePresence>
                     {messages.map(msg => {
                         const isSelf = msg.senderId === currentUserId;
@@ -117,20 +124,20 @@ export function ChatWindow({ currentUserId, conversation, onBack }: ChatWindowPr
                             <motion.div
                                 key={msg.id}
                                 layout
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.3 }}
+                                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                transition={{ duration: 0.3, ease: 'easeOut' }}
                                 className={`flex items-end gap-2 ${isSelf ? 'justify-end' : 'justify-start'}`}
                             >
-                                {!isSelf && <Avatar className="h-8 w-8 self-end"><AvatarImage src={msg.sender.image || undefined} /><AvatarFallback>{msg.sender.name?.[0]}</AvatarFallback></Avatar>}
-                                <div className={`max-w-xs md:max-w-md p-3 rounded-2xl flex flex-col ${isSelf ? 'bg-enarva-start text-white rounded-br-none' : 'bg-card border rounded-bl-none'}`}>
-                                    <p className="text-sm">{msg.content}</p>
-                                    <div className="flex items-center gap-2 self-end mt-1">
-                                        <p className={`text-xs ${isSelf ? 'text-gray-200' : 'text-muted-foreground'}`}>
+                                {!isSelf && <Avatar className="h-8 w-8 self-end mb-1"><AvatarImage src={msg.sender.image || undefined} /><AvatarFallback>{msg.sender.name?.[0]}</AvatarFallback></Avatar>}
+                                <div className={`max-w-xs md:max-w-lg px-3 py-2 rounded-2xl flex items-end gap-2 shadow-md ${isSelf ? 'bg-enarva-gradient text-white rounded-br-none' : 'bg-card border rounded-bl-none'}`}>
+                                    <p className="text-sm" style={{ wordBreak: 'break-word' }}>{msg.content}</p>
+                                    <div className="flex-shrink-0 self-end flex items-center gap-1">
+                                        <p className="text-xs opacity-70">
                                             {new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                                         </p>
-                                        {isSelf && (isRead ? <CheckCheck className="w-4 h-4 text-blue-400" /> : <Check className="w-4 h-4 text-gray-300" />)}
+                                        {isSelf && (isRead ? <CheckCheck className="w-4 h-4 text-blue-300" /> : <Check className="w-4 h-4 opacity-70" />)}
                                     </div>
                                 </div>
                             </motion.div>

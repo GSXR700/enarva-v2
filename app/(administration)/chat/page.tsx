@@ -6,7 +6,9 @@ import { useSession } from 'next-auth/react';
 import { ConversationList } from '@/components/chat/ConversationList';
 import { ChatWindow } from '@/components/chat/ChatWindow';
 import { PopulatedConversation } from '@/types/chat';
-import { ChatSkeleton } from '@/components/skeletons/ChatSkeleton'; // Importer le squelette
+import { ConversationListSkeleton } from '@/components/skeletons/ConversationListSkeleton';
+import { ChatWindowSkeleton } from '@/components/skeletons/ChatWindowSkeleton';
+import Pusher from 'pusher-js';
 
 export default function ChatPage() {
     const { data: session } = useSession();
@@ -14,6 +16,7 @@ export default function ChatPage() {
     const [selectedConversation, setSelectedConversation] = useState<PopulatedConversation | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [onlineMembers, setOnlineMembers] = useState<string[]>([]);
 
     useEffect(() => {
         const fetchConversations = async () => {
@@ -34,6 +37,40 @@ export default function ChatPage() {
         fetchConversations();
     }, []);
 
+    useEffect(() => {
+        if (!session?.user?.id) return;
+
+        const pusherClient = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+            cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+            authEndpoint: '/api/pusher/auth',
+            auth: {
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            }
+        });
+
+        const channel = pusherClient.subscribe('presence-global');
+
+        channel.bind('pusher:subscription_succeeded', (data: any) => {
+            const members = Object.keys(data.members);
+            setOnlineMembers(members);
+        });
+
+        channel.bind('pusher:member_added', (member: { id: string }) => {
+            setOnlineMembers(prev => [...prev, member.id]);
+        });
+
+        channel.bind('pusher:member_removed', (member: { id: string }) => {
+            setOnlineMembers(prev => prev.filter(id => id !== member.id));
+        });
+
+        return () => {
+            pusherClient.unsubscribe('presence-global');
+        };
+    }, [session?.user?.id]);
+
+
     const handleSelectConversation = (conversation: PopulatedConversation) => {
         if (!conversations.find(c => c.id === conversation.id)) {
             setConversations(prev => [conversation, ...prev]);
@@ -41,22 +78,26 @@ export default function ChatPage() {
         setSelectedConversation(conversation);
     };
 
-    if (isLoading) {
-        return <ChatSkeleton />;
-    }
-
-    if (error) {
-        return <div className="main-content text-center p-10 text-red-500">{error}</div>;
-    }
-
     const currentUserId = session?.user?.id;
     if (!currentUserId) {
         return <div className="flex items-center justify-center h-full">Veuillez vous connecter pour voir le chat.</div>
     }
 
+    if (isLoading) {
+         return (
+            <div className="flex h-[calc(100vh-4rem)]">
+                <ConversationListSkeleton />
+                <ChatWindowSkeleton />
+            </div>
+        );
+    }
+    
+    if (error) {
+        return <div className="main-content text-center p-10 text-red-500">{error}</div>;
+    }
+
     return (
         <div className="flex h-[calc(100vh-4rem)]">
-            {/* --- MOBILE VIEW --- */}
             <div className="w-full md:hidden">
                 {!selectedConversation ? (
                     <ConversationList 
@@ -70,10 +111,10 @@ export default function ChatPage() {
                         currentUserId={currentUserId}
                         conversation={selectedConversation} 
                         onBack={() => setSelectedConversation(null)}
+                        onlineMembers={onlineMembers}
                     />
                 )}
             </div>
-            {/* --- DESKTOP VIEW --- */}
             <div className="hidden md:flex w-full h-full">
                  <ConversationList 
                     currentUserId={currentUserId}
@@ -83,7 +124,11 @@ export default function ChatPage() {
                     onNewConversation={handleSelectConversation}
                 />
                 {selectedConversation ? (
-                    <ChatWindow currentUserId={currentUserId} conversation={selectedConversation} />
+                    <ChatWindow 
+                        currentUserId={currentUserId} 
+                        conversation={selectedConversation}
+                        onlineMembers={onlineMembers}
+                    />
                 ) : (
                     <div className="flex-1 flex items-center justify-center text-muted-foreground bg-background">
                         <p>Sélectionnez une conversation pour commencer à discuter.</p>
