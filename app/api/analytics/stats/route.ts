@@ -15,8 +15,12 @@ export async function GET() {
         include: { quote: true }
     });
 
+    // Fixed: Check if mission.quote exists before accessing finalPrice
     const totalRevenue = completedMissions.reduce((acc, mission) => {
-        return acc.add(mission.quote.finalPrice);
+        if (mission.quote) { // Only add to total if quote exists
+            return acc.add(mission.quote.finalPrice);
+        }
+        return acc; // Return accumulator unchanged if no quote
     }, new Decimal(0));
 
     const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;

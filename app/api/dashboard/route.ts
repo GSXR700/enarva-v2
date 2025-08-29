@@ -16,15 +16,13 @@ export async function GET() {
         include: { quote: true }
     });
     
-    // --- THE FIX IS HERE ---
-    // We only add to the total revenue if the mission has a quote.
+    // Fixed: Check if mission.quote exists before accessing finalPrice
     const totalRevenue = completedMissions.reduce((acc, mission) => {
         if (mission.quote) { // Check if mission.quote is not null
             return acc.add(mission.quote.finalPrice);
         }
-        return acc;
+        return acc; // Return accumulator unchanged if no quote
     }, new Decimal(0));
-    // --- END OF FIX ---
     
     const acceptedQuotes = await prisma.quote.count({ where: { status: 'ACCEPTED' } });
     const totalQuotes = await prisma.quote.count();
