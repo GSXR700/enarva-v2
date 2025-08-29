@@ -1,4 +1,4 @@
-// app/(administration)/missions/new/NewMissionForm.tsx
+// app/(administration)/missions/new/NewMissionForm.tsx - OPTIMIZED VERSION
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -20,15 +20,13 @@ type TaskTemplate = { id: string; name: string; };
 export default function NewMissionForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [quotes, setQuotes] = useState<QuoteWithLead[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [teamLeaders, setTeamLeaders] = useState<TeamMember[]>([]);
-  const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
-
+  
+  // Get URL parameters
   const missionType = searchParams.get('type') as 'TECHNICAL_VISIT' | 'SERVICE' || 'SERVICE';
   const quoteIdFromParams = searchParams.get('quoteId');
   const leadIdFromParams = searchParams.get('leadId');
 
+  // State for form data
   const [formData, setFormData] = useState({
     quoteId: quoteIdFromParams || '',
     leadId: leadIdFromParams || '',
@@ -39,70 +37,140 @@ export default function NewMissionForm() {
     teamLeaderId: '',
     accessNotes: '',
     type: missionType,
-    taskTemplateId: '', // Field for the selected checklist
+    taskTemplateId: '',
   });
 
+  // State for dropdown options
+  const [teamLeaders, setTeamLeaders] = useState<TeamMember[]>([]);
+  const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
+  const [quotes, setQuotes] = useState<QuoteWithLead[]>([]);
+  
+  // Loading and error states
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch specific lead data directly
+  const fetchSpecificLead = async (leadId: string) => {
+    try {
+      console.log('🎯 Fetching specific lead:', leadId);
+      const response = await fetch(`/api/leads/${leadId}`);
+      if (!response.ok) {
+        throw new Error('Lead not found');
+      }
+      const lead = await response.json();
+      console.log('✅ Lead fetched:', lead);
+      
+      // Update form data with lead information
+      setFormData(prev => ({
+        ...prev,
+        leadId: lead.id,
+        leadName: `${lead.firstName} ${lead.lastName}`,
+        address: lead.address || ''
+      }));
+      
+      return lead;
+    } catch (error) {
+      console.error('❌ Error fetching lead:', error);
+      throw error;
+    }
+  };
+
+  // Fetch specific quote data directly
+  const fetchSpecificQuote = async (quoteId: string) => {
+    try {
+      console.log('🎯 Fetching specific quote:', quoteId);
+      const response = await fetch(`/api/quotes/${quoteId}`);
+      if (!response.ok) {
+        throw new Error('Quote not found');
+      }
+      const quote = await response.json();
+      console.log('✅ Quote fetched:', quote);
+      
+      // Update form data with quote/lead information
+      setFormData(prev => ({
+        ...prev,
+        quoteId: quote.id,
+        leadId: quote.leadId,
+        leadName: `${quote.lead.firstName} ${quote.lead.lastName}`,
+        address: quote.lead.address || ''
+      }));
+      
+      return quote;
+    } catch (error) {
+      console.error('❌ Error fetching quote:', error);
+      throw error;
+    }
+  };
+
+  // Initialize form data based on URL parameters
   useEffect(() => {
-    const fetchData = async () => {
+    const initializeForm = async () => {
+      setIsInitializing(true);
+      setError(null);
+
       try {
-        const [quotesRes, usersRes, leadsRes, templatesRes] = await Promise.all([
-          fetch('/api/quotes?status=ACCEPTED'),
+        // Always fetch team leaders and templates (these are needed for dropdowns)
+        console.log('🔄 Fetching team leaders and templates...');
+        const [usersRes, templatesRes] = await Promise.all([
           fetch('/api/users?role=TEAM_LEADER'),
-          fetch('/api/leads'),
           fetch('/api/task-templates')
         ]);
 
-        if (!quotesRes.ok || !usersRes.ok || !leadsRes.ok || !templatesRes.ok) {
-          throw new Error('Failed to fetch initial data.');
+        if (!usersRes.ok || !templatesRes.ok) {
+          throw new Error('Failed to fetch required data');
         }
 
-        const quotesData = await quotesRes.json();
-        const usersData = await usersRes.json();
-        const leadsData = await leadsRes.json();
-        const templatesData = await templatesRes.json();
+        const [usersData, templatesData] = await Promise.all([
+          usersRes.json(),
+          templatesRes.json()
+        ]);
 
-        setQuotes(quotesData);
         setTeamLeaders(usersData);
-        setLeads(leadsData);
         setTaskTemplates(templatesData);
+        console.log('✅ Team leaders and templates loaded');
 
+        // Handle different initialization scenarios
         if (missionType === 'TECHNICAL_VISIT' && leadIdFromParams) {
-            const selectedLead = leadsData.find((l: Lead) => l.id === leadIdFromParams);
-            if (selectedLead) {
-                setFormData(prev => ({
-                    ...prev,
-                    leadName: `${selectedLead.firstName} ${selectedLead.lastName}`,
-                    address: selectedLead.address || ''
-                }));
+          // For technical visits, fetch the specific lead
+          console.log('🎯 Technical visit mode - fetching lead');
+          await fetchSpecificLead(leadIdFromParams);
+          
+        } else if (missionType === 'SERVICE') {
+          // For service missions, we need quotes
+          console.log('🎯 Service mode - fetching quotes');
+          const quotesRes = await fetch('/api/quotes?status=ACCEPTED');
+          if (quotesRes.ok) {
+            const quotesData = await quotesRes.json();
+            setQuotes(quotesData);
+            
+            // If a specific quote is provided, fetch it
+            if (quoteIdFromParams) {
+              await fetchSpecificQuote(quoteIdFromParams);
             }
-        } else if (quoteIdFromParams) {
-            const selectedQuote = quotesData.find((q: QuoteWithLead) => q.id === quoteIdFromParams);
-            if(selectedQuote) {
-                setFormData(prev => ({
-                    ...prev,
-                    leadId: selectedQuote.leadId,
-                    leadName: `${selectedQuote.lead.firstName} ${selectedQuote.lead.lastName}`,
-                    address: selectedQuote.lead.address || ''
-                }));
-            }
+          }
         }
+
+        console.log('✅ Form initialization complete');
+        
       } catch (err: any) {
-        setError(err.message);
-        toast.error(err.message);
+        console.error('❌ Form initialization failed:', err);
+        setError(`Failed to load form data: ${err.message}`);
+        toast.error(`Failed to load form data: ${err.message}`);
+      } finally {
+        setIsInitializing(false);
       }
     };
-    fetchData();
-  }, [searchParams, missionType, leadIdFromParams, quoteIdFromParams]);
+
+    initializeForm();
+  }, [missionType, leadIdFromParams, quoteIdFromParams]);
 
   const handleSelectChange = (id: keyof typeof formData, value: string) => {
-    // If the "none" value is selected, treat it as an empty string for the state
     const finalValue = value === 'none' ? '' : value;
     setFormData(prev => ({ ...prev, [id]: finalValue }));
 
-    if (id === 'quoteId') {
+    // Handle quote selection for service missions
+    if (id === 'quoteId' && value !== 'none') {
       const selectedQuote = quotes.find(q => q.id === value);
       if (selectedQuote) {
         setFormData(prev => ({
@@ -123,41 +191,96 @@ export default function NewMissionForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🚀 FORM SUBMISSION STARTED');
+    
     setIsLoading(true);
     setError(null);
 
-    if (!formData.leadId) {
-        toast.error("Client non identifié. Impossible de créer la mission.");
-        setIsLoading(false);
-        return;
+    // Comprehensive client-side validation
+    const validationErrors = [];
+    if (!formData.leadId) validationErrors.push('Client non identifié');
+    if (!formData.teamLeaderId) validationErrors.push('Chef d\'équipe non sélectionné');
+    if (!formData.address) validationErrors.push('Adresse manquante');
+    if (!formData.scheduledDate) validationErrors.push('Date/heure manquante');
+    if (!formData.estimatedDuration) validationErrors.push('Durée estimée manquante');
+
+    // For service missions, quote is required
+    if (missionType === 'SERVICE' && !formData.quoteId) {
+      validationErrors.push('Devis non sélectionné');
     }
+
+    if (validationErrors.length > 0) {
+      const errorMsg = `Champs requis manquants: ${validationErrors.join(', ')}`;
+      console.error('❌ Validation failed:', errorMsg);
+      toast.error(errorMsg);
+      setIsLoading(false);
+      return;
+    }
+
+    console.log('✅ Client validation passed');
+    console.log('📤 Submitting data:', JSON.stringify(formData, null, 2));
 
     try {
-        const response = await fetch('/api/missions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ...formData,
-                quoteId: formData.quoteId || undefined,
-            }),
-        });
+      const response = await fetch('/api/missions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          quoteId: formData.quoteId || undefined,
+        }),
+      });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || "Échec de la création de la mission.");
-        }
-        
-        toast.success(`Mission de type "${formData.type}" planifiée avec succès !`);
-        router.push('/missions');
-        router.refresh();
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(responseData.message || "Échec de la création de la mission.");
+      }
+      
+      console.log('✅ Mission created successfully');
+      toast.success(`Mission de type "${missionType === 'TECHNICAL_VISIT' ? 'Visite Technique' : 'Service'}" planifiée avec succès !`);
+      router.push('/missions');
+      router.refresh();
 
     } catch (err: any) {
-        setError(err.message);
-        toast.error(err.message);
+      console.error('💥 Submission error:', err);
+      setError(err.message);
+      toast.error(err.message);
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
+
+  // Show loading state during initialization
+  if (isInitializing) {
+    return (
+      <div className="main-content flex items-center justify-center p-10">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground mt-2">Chargement des données de la mission...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if initialization failed
+  if (error && !formData.leadId) {
+    return (
+      <div className="main-content space-y-6">
+        <div className="flex items-center gap-4">
+          <Link href="/missions">
+            <Button variant="outline" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Erreur de Chargement</h1>
+            <p className="text-red-500">{error}</p>
+          </div>
+        </div>
+        <div className="flex justify-center">
+          <Button onClick={() => window.location.reload()}>Réessayer</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="main-content space-y-6">
@@ -184,7 +307,7 @@ export default function NewMissionForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {missionType === 'SERVICE' && (
                 <div>
-                  <Label htmlFor="quoteId">Devis Accepté</Label>
+                  <Label htmlFor="quoteId">Devis Accepté *</Label>
                   <Select value={formData.quoteId} onValueChange={(value) => handleSelectChange('quoteId', value)} required>
                     <SelectTrigger><SelectValue placeholder="Sélectionner un devis..." /></SelectTrigger>
                     <SelectContent>
@@ -200,24 +323,38 @@ export default function NewMissionForm() {
               
               <div>
                 <Label>Client</Label>
-                <Input value={formData.leadName} disabled placeholder="Généré automatiquement..." />
+                <Input 
+                  value={formData.leadName} 
+                  disabled 
+                  placeholder="Client sera automatiquement identifié..." 
+                  className={formData.leadName ? "text-foreground" : "text-muted-foreground"}
+                />
               </div>
 
               <div className={missionType === 'TECHNICAL_VISIT' ? 'md:col-span-2' : ''}>
-                <Label htmlFor="address">Adresse d'intervention</Label>
-                <Input id="address" value={formData.address} onChange={handleChange} required />
+                <Label htmlFor="address">Adresse d'intervention *</Label>
+                <Input 
+                  id="address" 
+                  value={formData.address} 
+                  onChange={handleChange} 
+                  required 
+                  placeholder="Adresse sera automatiquement remplie..."
+                  className={formData.address ? "text-foreground" : "text-muted-foreground"}
+                />
               </div>
 
               <div>
-                <Label htmlFor="scheduledDate">Date et Heure Planifiées</Label>
+                <Label htmlFor="scheduledDate">Date et Heure Planifiées *</Label>
                 <Input id="scheduledDate" type="datetime-local" value={formData.scheduledDate} onChange={handleChange} required />
               </div>
+              
               <div>
-                <Label htmlFor="estimatedDuration">Durée Estimée (heures)</Label>
-                <Input id="estimatedDuration" type="number" value={formData.estimatedDuration} onChange={handleChange} required />
+                <Label htmlFor="estimatedDuration">Durée Estimée (heures) *</Label>
+                <Input id="estimatedDuration" type="number" min="0.5" step="0.5" value={formData.estimatedDuration} onChange={handleChange} required />
               </div>
+              
               <div>
-                <Label htmlFor="teamLeaderId">Chef d'Équipe</Label>
+                <Label htmlFor="teamLeaderId">Chef d'Équipe *</Label>
                 <Select value={formData.teamLeaderId} onValueChange={(value) => handleSelectChange('teamLeaderId', value)} required>
                   <SelectTrigger><SelectValue placeholder="Assigner un chef d'équipe..." /></SelectTrigger>
                   <SelectContent>
@@ -231,27 +368,35 @@ export default function NewMissionForm() {
               <div>
                 <Label htmlFor="taskTemplateId">Modèle de Checklist</Label>
                 <Select value={formData.taskTemplateId || 'none'} onValueChange={(value) => handleSelectChange('taskTemplateId', value)}>
-                    <SelectTrigger><SelectValue placeholder="Choisir une checklist..." /></SelectTrigger>
-                    <SelectContent>
-                        {/* --- THE FIX IS HERE --- */}
-                        <SelectItem value="none">Aucune (Tâches manuelles)</SelectItem>
-                        {taskTemplates.map(template => (
-                            <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
-                        ))}
-                    </SelectContent>
+                  <SelectTrigger><SelectValue placeholder="Choisir une checklist..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Aucune (Tâches manuelles)</SelectItem>
+                    {taskTemplates.map(template => (
+                      <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
 
               <div className="md:col-span-2">
-                <Label htmlFor="accessNotes">Notes d'accès (optionnel)</Label>
-                <Textarea id="accessNotes" value={formData.accessNotes} onChange={handleChange} placeholder="Code d'entrée, contact sur place, etc." />
+                <Label htmlFor="accessNotes">Notes d'accès</Label>
+                <Textarea 
+                  id="accessNotes" 
+                  value={formData.accessNotes} 
+                  onChange={handleChange} 
+                  placeholder="Code d'entrée, contact sur place, instructions spéciales..." 
+                />
               </div>
             </div>
 
-            {error && <p className="text-red-500 text-sm">{error}</p>}
+            {error && <p className="text-red-500 text-sm bg-red-50 p-3 rounded-md border border-red-200">{error}</p>}
 
             <div className="flex justify-end mt-6">
-              <Button type="submit" className="bg-enarva-gradient rounded-lg px-8" disabled={isLoading}>
+              <Button 
+                type="submit" 
+                className="bg-enarva-gradient rounded-lg px-8" 
+                disabled={isLoading || !formData.leadName || !formData.address}
+              >
                 {isLoading ? 'Planification...' : (missionType === 'TECHNICAL_VISIT' ? 'Planifier la Visite' : 'Planifier la Mission')}
               </Button>
             </div>

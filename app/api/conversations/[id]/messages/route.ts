@@ -1,4 +1,4 @@
-// app/api/conversations/[id]/messages/route.ts
+// app/api/conversations/[id]/messages/route.ts - COMPLETE FIXED VERSION
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 
@@ -10,8 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // In Next.js 15, params is a Promise - we need to await it
-    const { id: conversationId } = await params
+    const { id: conversationId } = await params; // ✅ Await params for Next.js 15
 
     if (!conversationId) {
       return new NextResponse('Conversation ID is required', { status: 400 })

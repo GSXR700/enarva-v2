@@ -1,4 +1,4 @@
-// app/api/quotes/[id]/route.ts
+// app/api/quotes/[id]/route.ts - COMPLETE FIXED VERSION
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -9,9 +9,12 @@ const prisma = new PrismaClient();
  * GET /api/quotes/[id]
  * Fetches a single quote by its ID, including the related lead.
  */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(
+  request: Request, 
+  { params }: { params: Promise<{ id: string }> }
+) {
     try {
-        const { id } = await params; // Await params for Next.js 15
+        const { id } = await params; // ✅ Await params for Next.js 15
         
         const quote = await prisma.quote.findUnique({ 
             where: { id },
@@ -32,9 +35,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
  * PATCH /api/quotes/[id]
  * Updates a specific quote.
  */
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  request: Request, 
+  { params }: { params: Promise<{ id: string }> }
+) {
     try {
-        const { id } = await params; // Await params for Next.js 15
+        const { id } = await params; // ✅ Await params for Next.js 15
         const body = await request.json();
         
         // Prepare data for Prisma, ensuring correct types and handling nulls
@@ -69,9 +75,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
  * DELETE /api/quotes/[id]
  * Deletes a specific quote.
  */
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  request: Request, 
+  { params }: { params: Promise<{ id: string }> }
+) {
     try {
-        const { id } = await params; // Await params for Next.js 15
+        const { id } = await params; // ✅ Await params for Next.js 15
         
         await prisma.quote.delete({
             where: { id },

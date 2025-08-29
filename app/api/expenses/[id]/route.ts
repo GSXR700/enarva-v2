@@ -1,13 +1,16 @@
-// app/api/expenses/[id]/route.ts
+// app/api/expenses/[id]/route.ts - COMPLETE FIXED VERSION
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 const prisma = new PrismaClient();
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  request: Request, 
+  { params }: { params: Promise<{ id: string }> }
+) {
     try {
-        const { id } = await params; // Await params for Next.js 15
+        const { id } = await params; // ✅ Await params for Next.js 15
         const body = await request.json();
         const { amount, ...data } = body;
         
@@ -26,9 +29,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  request: Request, 
+  { params }: { params: Promise<{ id: string }> }
+) {
     try {
-        const { id } = await params; // Await params for Next.js 15
+        const { id } = await params; // ✅ Await params for Next.js 15
         
         await prisma.expense.delete({
             where: { id },
