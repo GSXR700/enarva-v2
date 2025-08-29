@@ -4,7 +4,8 @@
 import { useState } from 'react'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { TopBar } from '@/components/layout/TopBar'
-import { Toaster } from '@/components/ui/sonner' // <-- Importer Toaster
+import { Toaster } from '@/components/ui/sonner'
+import { SplashScreen } from '@/components/layout/SplashScreen'
 
 export default function AdministrationLayout({
   children,
@@ -15,6 +16,7 @@ export default function AdministrationLayout({
 
   return (
     <div className="flex h-screen bg-background">
+      <SplashScreen />
       <Sidebar isOpen={isSidebarOpen} setOpen={setSidebarOpen} />
       
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -24,7 +26,7 @@ export default function AdministrationLayout({
           {children}
         </main>
       </div>
-      <Toaster position="bottom-right" /> {/* <-- Ajouter le Toaster ici */}
+      <Toaster position="bottom-right" />
     </div>
   );
 }
