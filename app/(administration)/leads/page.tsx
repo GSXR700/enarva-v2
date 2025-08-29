@@ -39,10 +39,17 @@ type LeadWithAssignee = Lead & { assignedTo: User | null };
 // Color logic for lead status badges
 const getStatusColor = (status: LeadStatus) => {
     const colors: Record<LeadStatus, string> = {
-        NEW: 'bg-blue-100 text-blue-800', QUALIFIED: 'bg-cyan-100 text-cyan-800',
-        QUOTE_SENT: 'bg-purple-100 text-purple-800', QUOTE_ACCEPTED: 'bg-indigo-100 text-indigo-800',
-        MISSION_SCHEDULED: 'bg-teal-100 text-teal-800', IN_PROGRESS: 'bg-orange-100 text-orange-800',
-        COMPLETED: 'bg-green-100 text-green-800', CANCELLED: 'bg-red-100 text-red-800',
+        NEW: 'bg-blue-100 text-blue-800', 
+        QUALIFIED: 'bg-cyan-100 text-cyan-800',
+        QUOTE_SENT: 'bg-purple-100 text-purple-800', 
+        QUOTE_ACCEPTED: 'bg-indigo-100 text-indigo-800',
+        MISSION_SCHEDULED: 'bg-teal-100 text-teal-800', 
+        IN_PROGRESS: 'bg-orange-100 text-orange-800',
+        COMPLETED: 'bg-green-100 text-green-800', 
+        CANCELLED: 'bg-red-100 text-red-800',
+        VISIT_PLANNED: 'bg-yellow-100 text-yellow-800',
+        ON_VISIT: 'bg-yellow-200 text-yellow-900',
+        VISIT_DONE: 'bg-yellow-300 text-yellow-900',
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
 };
@@ -204,14 +211,14 @@ export default function LeadsPage() {
                         <SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="Statut" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Tous les statuts</SelectItem>
-                            {Object.entries(translations.LeadStatus).map(([key, value]) => <SelectItem key={key} value={key}>{value}</SelectItem>)}
+                            {Object.entries(translations.LeadStatus).map(([key, value]) => <SelectItem key={key} value={key}>{value as string}</SelectItem>)}
                         </SelectContent>
                     </Select>
                     <Select value={channelFilter} onValueChange={setChannelFilter}>
                         <SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="Canal" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Tous les canaux</SelectItem>
-                            {Object.entries(translations.LeadCanal).map(([key, value]) => <SelectItem key={key} value={key}>{value}</SelectItem>)}
+                            {Object.entries(translations.LeadCanal).map(([key, value]) => <SelectItem key={key} value={key}>{value as string}</SelectItem>)}
                         </SelectContent>
                     </Select>
                 </div>
