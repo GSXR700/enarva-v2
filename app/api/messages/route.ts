@@ -6,11 +6,16 @@ import webpush from 'web-push';
 
 const prisma = new PrismaClient();
 
-webpush.setVapidDetails(
-  'mailto:contact@enarva.com',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+// Conditionally configure web-push only if VAPID keys are available
+if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    'mailto:contact@enarva.com',
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+} else {
+  console.warn('VAPID keys not configured. Push notifications are disabled.');
+}
 
 export async function POST(request: Request) {
   try {
@@ -45,24 +50,25 @@ export async function POST(request: Request) {
       newMessage
     );
 
-    // Send push notification to other participants
-    const recipients = conversation?.participants.filter(p => p.id !== senderId);
-    if (recipients) {
-      const notificationPayload = JSON.stringify({
-        title: `Nouveau message de ${newMessage.sender.name}`,
-        body: content,
-      });
+    // Send push notification only if keys are set
+    if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+        const recipients = conversation?.participants.filter(p => p.id !== senderId);
+        if (recipients) {
+          const notificationPayload = JSON.stringify({
+            title: `Nouveau message de ${newMessage.sender.name}`,
+            body: content,
+          });
 
-      for (const recipient of recipients) {
-        if (recipient.pushSubscription) {
-          try {
-            await webpush.sendNotification(recipient.pushSubscription as any, notificationPayload);
-          } catch (error) {
-            console.error(`Failed to send push notification to ${recipient.id}`, error);
-            // Optionnel : nettoyer les abonnements invalides
+          for (const recipient of recipients) {
+            if (recipient.pushSubscription) {
+              try {
+                await webpush.sendNotification(recipient.pushSubscription as any, notificationPayload);
+              } catch (error) {
+                console.error(`Failed to send push notification to ${recipient.id}`, error);
+              }
+            }
           }
         }
-      }
     }
     
     return NextResponse.json(newMessage, { status: 201 });
