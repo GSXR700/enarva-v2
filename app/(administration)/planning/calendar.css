@@ -60,7 +60,8 @@
 }
 
 .fc-event:hover {
-    background-color: var(--enarva-end) !important;
+    background-color: hsl(217, 91%, 50%) !important; /* Darker blue for hover */
+    color: white !important;
 }
 
 .fc-event .fc-event-title {
