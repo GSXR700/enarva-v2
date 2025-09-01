@@ -11,7 +11,7 @@ import { Mission, Lead, Quote } from '@prisma/client'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton'
 
-type BillableMission = Mission & { lead: Lead, quote: Quote };
+type BillableMission = Mission & { lead: Lead, quote: Quote | null };
 
 export default function BillingPage() {
   const [missions, setMissions] = useState<BillableMission[]>([])
@@ -73,7 +73,9 @@ export default function BillingPage() {
                             <th scope="row" className="px-6 py-4 font-medium text-foreground whitespace-nowrap">{mission.missionNumber}</th>
                             <td className="px-6 py-4">{mission.lead.firstName} {mission.lead.lastName}</td>
                             <td className="px-6 py-4">{formatDate(mission.actualEndTime || mission.scheduledDate)}</td>
-                            <td className="px-6 py-4 font-bold text-enarva-start">{formatCurrency(Number(mission.quote.finalPrice))}</td>
+                            <td className="px-6 py-4 font-bold text-enarva-start">
+                                {mission.quote ? formatCurrency(Number(mission.quote.finalPrice)) : 'N/A'}
+                            </td>
                             <td className="px-6 py-4">
                                 {mission.invoiceGenerated ? (
                                     <Badge variant="outline" className="text-green-600 border-green-600">Facturée</Badge>
