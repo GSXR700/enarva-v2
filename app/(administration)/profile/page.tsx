@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { User, Edit, Save, Upload } from 'lucide-react'
+import { User, Edit, Save, Upload, Check } from 'lucide-react'
 import { useEdgeStore } from '@/lib/edgestore'
 import { toast } from 'sonner'
 import { AvatarCropperModal } from '@/components/ui/AvatarCropperModal'
+import { AnimatePresence, motion } from 'framer-motion'
 
 // Helper to convert blob URL to a File object
 async function urlToFile(url: string, filename: string, mimeType: string): Promise<File> {
@@ -26,9 +27,9 @@ export default function ProfilePage() {
   
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success'>('idle');
 
   const [isNameLoading, setIsNameLoading] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
   const { edgestore } = useEdgeStore();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,12 +42,11 @@ export default function ProfilePage() {
       };
       reader.readAsDataURL(file);
     }
-     // Reset file input to allow re-uploading the same file
     e.target.value = '';
   };
 
   const handleSaveCroppedImage = useCallback(async (croppedImageBlobUrl: string) => {
-      setIsUploading(true);
+      setUploadStatus('uploading');
       try {
         const croppedFile = await urlToFile(croppedImageBlobUrl, `${session?.user?.id}-avatar.jpeg`, 'image/jpeg');
 
@@ -63,14 +63,19 @@ export default function ProfilePage() {
             body: JSON.stringify({ image: res.url }),
         });
 
+        setUploadStatus('success');
         await updateSession({ image: res.url });
-        toast.success("Photo de profil mise à jour !");
+        
+        setTimeout(() => {
+            setUploadStatus('idle');
+            toast.success("Photo de profil mise à jour !");
+        }, 1200);
 
       } catch (error) {
+        setUploadStatus('idle');
         toast.error("Échec de la mise à jour de l'image.");
         console.error(error);
       } finally {
-        setIsUploading(false);
         setSelectedImage(null);
       }
   }, [session?.user?.id, session?.user?.image, edgestore.profileImages, updateSession]);
@@ -123,17 +128,44 @@ export default function ProfilePage() {
                       <CardTitle>Photo de Profil</CardTitle>
                   </CardHeader>
                   <CardContent className="flex flex-col items-center gap-4">
-                      <Avatar className="w-32 h-32">
-                          <AvatarImage src={session.user.image || undefined} className="object-cover" />
-                          <AvatarFallback className="text-4xl">
-                            {session.user.name ? session.user.name.split(' ').map(n => n[0]).join('') : <User />}
-                          </AvatarFallback>
-                      </Avatar>
+                      <div className="relative">
+                          <AnimatePresence>
+                              {uploadStatus === 'uploading' && (
+                                  <motion.div 
+                                      key="spinner"
+                                      initial={{ opacity: 0 }}
+                                      animate={{ opacity: 1 }}
+                                      exit={{ opacity: 0 }}
+                                      className="absolute inset-0 z-10 flex items-center justify-center"
+                                  >
+                                      <div className="h-32 w-32 rounded-full border-4 border-gray-200 border-t-blue-600 animate-spin"></div>
+                                  </motion.div>
+                              )}
+                              {uploadStatus === 'success' && (
+                                  <motion.div 
+                                      key="checkmark"
+                                      initial={{ opacity: 0, scale: 0.5 }}
+                                      animate={{ opacity: 1, scale: 1 }}
+                                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                                      className="absolute inset-0 z-20 flex items-center justify-center rounded-full bg-green-500/80"
+                                  >
+                                      <Check className="h-16 w-16 text-white" />
+                                  </motion.div>
+                              )}
+                          </AnimatePresence>
+                          <Avatar className="w-32 h-32">
+                              <AvatarImage src={session.user.image || undefined} className="object-cover" />
+                              <AvatarFallback className="text-4xl">
+                                {session.user.name ? session.user.name.split(' ').map(n => n[0]).join('') : <User />}
+                              </AvatarFallback>
+                          </Avatar>
+                      </div>
+
                       <Label htmlFor="picture" className="w-full">
-                          <Button asChild className="w-full cursor-pointer" variant="outline" disabled={isUploading}>
+                          <Button asChild className="w-full cursor-pointer" variant="outline" disabled={uploadStatus === 'uploading'}>
                               <span>
                                   <Upload className="w-4 h-4 mr-2"/>
-                                  {isUploading ? 'Chargement...' : 'Changer l\'image'}
+                                  {uploadStatus === 'uploading' ? 'Chargement...' : 'Changer l\'image'}
                               </span>
                           </Button>
                           <Input 
@@ -142,7 +174,7 @@ export default function ProfilePage() {
                               className="hidden"
                               accept="image/*"
                               onChange={handleFileChange}
-                              disabled={isUploading}
+                              disabled={uploadStatus === 'uploading'}
                           />
                       </Label>
                   </CardContent>
