@@ -61,21 +61,26 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async jwt({ token, user, trigger, session }) {
-      // Handle session updates (e.g., changing name or profile picture)
-      if (trigger === "update" && session) {
-        token.name = session.name;
-        token.picture = session.image;
-      }
-      
-      // Handle initial sign-in
+      // On initial sign-in, add user details to the token
       if (user) {
-        const dbUser = await prisma.user.findUnique({ where: { email: user.email! } });
+        token.id = user.id;
+        // @ts-ignore
+        token.role = user.role; 
+      }
+
+      // This block will run on every session access (including after `updateSession`)
+      // It ensures the token data is always fresh from the database.
+      if (token.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+        });
         if (dbUser) {
-            token.id = dbUser.id;
-            token.role = dbUser.role;
-            token.picture = dbUser.image;
+          token.name = dbUser.name;
+          token.picture = dbUser.image;
+          token.role = dbUser.role;
         }
       }
+      
       return token;
     },
   },
