@@ -60,7 +60,14 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      // Handle session updates (e.g., changing name or profile picture)
+      if (trigger === "update" && session) {
+        token.name = session.name;
+        token.picture = session.image;
+      }
+      
+      // Handle initial sign-in
       if (user) {
         const dbUser = await prisma.user.findUnique({ where: { email: user.email! } });
         if (dbUser) {
