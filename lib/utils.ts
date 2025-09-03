@@ -108,73 +108,110 @@ export function translate(key: keyof typeof translations, value: string | null |
     return translated.charAt(0).toUpperCase() + translated.slice(1).toLowerCase();
 }
 
+// --- MOTEUR DE CALCUL DE DEVIS ENARVA V2 ---
 
-export function calculateQuotePrice({
-  surface,
-  propertyType,
-  materials,
-  levels,
-  distance,
-  accessibility,
-  urgency,
-}: {
-  surface: number
-  propertyType: string
-  materials: string
-  levels: number
-  distance: number
-  accessibility: string
-  urgency: string
-}) {
-  // Base prices per property type (MAD per m²)
-  const basePrices: Record<string, number> = {
-    APARTMENT_SMALL: 30,    // ≤100m²
-    APARTMENT_MEDIUM: 22,   // 100-300m²
-    APARTMENT_MULTI: 18,    // multi-levels
-    VILLA_LARGE: 18,        // ≥300m²
-    COMMERCIAL: 30,         // 25-35 MAD/m²
-    HOTEL_STANDARD: 22,     // 18-25 MAD/m²
-    HOTEL_LUXURY: 42,       // 35-50 MAD/m²
-    OFFICE: 28,
-    RESIDENCE_B2B: 15,      // Volume discount
-  }
+export type ServiceType = 'GrandMénage' | 'FinDeChantier' | 'CristallisationMarbre';
 
-  // Coefficients
-  const materialCoefficients: Record<string, number> = {
-    STANDARD: 1.0, MARBLE: 1.15, PARQUET: 1.15, LUXURY: 1.35, MIXED: 1.1,
-  }
-  const levelCoefficients: Record<number, number> = { 1: 1.0, 2: 0.95, 3: 0.9, 4: 0.85, }
-  const distanceCoefficients = { local: 1.0, near: 1.1, far: 1.2, very_far: 1.4 }
-  const accessibilityCoefficients: Record<string, number> = { EASY: 1.0, MEDIUM: 1.15, DIFFICULT: 1.35, VERY_DIFFICULT: 1.6, }
-  const urgencyCoefficients: Record<string, number> = { NORMAL: 1.0, URGENT: 1.2, HIGH: 1.5, IMMEDIATE: 2.5, }
+export interface ServiceInput {
+  id: number;
+  type: ServiceType;
+  surface: number;
+  levels: number; // Nombre de niveaux
+  distance: number;
+  etage: 'RDC' | 'AvecAscenseur' | 'SansAscenseur';
+  delai: 'STANDARD' | 'URGENT' | 'IMMEDIAT';
+  difficulte: 'STANDARD' | 'DIFFICILE' | 'EXTREME';
+}
 
-  // Calculate base price
-  const basePrice = basePrices[propertyType] || 25
+export interface QuoteLineItem {
+  id: string;
+  description: string;
+  detail: string;
+  amount: number;
+  editable: boolean;
+}
 
-  // Get distance coefficient
-  let distanceCoeff = 1.0
-  if (distance < 10) distanceCoeff = distanceCoefficients.local
-  else if (distance < 30) distanceCoeff = distanceCoefficients.near
-  else if (distance < 50) distanceCoeff = distanceCoefficients.far
-  else distanceCoeff = distanceCoefficients.very_far
+export interface QuoteCalculation {
+  lineItems: QuoteLineItem[];
+  subTotalHT: number;
+  vatAmount: number;
+  totalTTC: number;
+  finalPrice: number;
+}
 
-  // Calculate final price
-  const finalPrice = surface * basePrice *
-    (materialCoefficients[materials] || 1.0) *
-    (levelCoefficients[levels] || 0.8) *
-    distanceCoeff *
-    (accessibilityCoefficients[accessibility] || 1.0) *
-    (urgencyCoefficients[urgency] || 1.0)
-
-  return {
-    basePrice: surface * basePrice,
-    finalPrice: Math.round(finalPrice),
-    coefficients: {
-      materials: materialCoefficients[materials],
-      levels: levelCoefficients[levels] || 0.8,
-      distance: distanceCoeff,
-      accessibility: accessibilityCoefficients[accessibility],
-      urgency: urgencyCoefficients[urgency],
+const getBaseRate = (type: ServiceType, totalSurface: number): number => {
+    switch (type) {
+        case 'GrandMénage':
+            if (totalSurface <= 80) return 16;
+            if (totalSurface <= 200) return 14;
+            return 12;
+        case 'FinDeChantier':
+            if (totalSurface <= 200) return 24; // Simplifié pour l'exemple
+            return 19;
+        case 'CristallisationMarbre':
+            if (totalSurface <= 100) return 30;
+            if (totalSurface <= 300) return 25;
+            if (totalSurface <= 600) return 20;
+            return 19;
+        default: return 20; // Taux par défaut
     }
-  }
+};
+
+const getCoefficients = (service: ServiceInput) => {
+    const coeffs = {
+        distance: 1.0, etage: 1.0, delai: 1.0, difficulte: 1.0
+    };
+    if (service.distance > 10) coeffs.distance = 1.15;
+    if (service.etage === 'SansAscenseur') coeffs.etage = 1.3;
+    else if (service.etage === 'AvecAscenseur') coeffs.etage = 1.1;
+    if (service.delai === 'IMMEDIAT') coeffs.delai = 1.8;
+    else if (service.delai === 'URGENT') coeffs.delai = 1.4;
+    if (service.difficulte === 'EXTREME') coeffs.difficulte = 1.5;
+    else if (service.difficulte === 'DIFFICILE') coeffs.difficulte = 1.2;
+    return coeffs;
+};
+
+export function generateQuote(services: ServiceInput[]): QuoteCalculation {
+  let subTotalHT = 0;
+  const allLineItems: QuoteLineItem[] = [];
+
+  services.forEach(service => {
+    const totalSurface = service.surface * service.levels;
+    const baseRate = getBaseRate(service.type, totalSurface);
+    const prixDeBase = totalSurface * baseRate;
+
+    const coeffs = getCoefficients(service);
+    const coeffGlobal = coeffs.distance * coeffs.etage * coeffs.delai * coeffs.difficulte;
+    
+    const prixFinalServiceHT = prixDeBase * coeffGlobal;
+    const majorationAmount = prixFinalServiceHT - prixDeBase;
+
+    allLineItems.push({
+      id: `base-${service.id}`,
+      description: `Forfait de Base "${service.type}"`,
+      detail: `${service.surface}m² x ${service.levels} niveaux = ${totalSurface}m² x ${baseRate} DH/m²`,
+      amount: prixDeBase,
+      editable: true,
+    });
+
+    if (majorationAmount > 0) {
+      allLineItems.push({
+        id: `majoration-${service.id}`,
+        description: "Forfait Prestations Renforcées",
+        detail: `Coefficients appliqués (Délai, Difficulté, etc.)`,
+        amount: majorationAmount,
+        editable: true,
+      });
+    }
+    subTotalHT += prixFinalServiceHT;
+  });
+
+  const vatAmount = subTotalHT * 0.20;
+  let totalTTC = subTotalHT + vatAmount;
+
+  if (totalTTC < 500) totalTTC = 500;
+  
+  const finalPrice = Math.round(totalTTC / 10) * 10;
+
+  return { lineItems: allLineItems, subTotalHT, vatAmount, totalTTC, finalPrice };
 }

@@ -1,7 +1,7 @@
 // app/(administration)/quotes/new/NewQuoteForm.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -9,43 +9,24 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Calculator, DollarSign, RefreshCw } from 'lucide-react'
-import { formatCurrency, calculateQuotePrice, translations } from '@/lib/utils' // Importation corrigée
+import { ArrowLeft, Calculator, FileText, User, Plus, Trash2, Edit } from 'lucide-react'
+import { formatCurrency, generateQuote, ServiceInput, QuoteLineItem, ServiceType } from '@/lib/utils'
 import { Lead } from '@prisma/client'
 import { toast } from 'sonner'
 
-type QuoteFormData = {
-  leadId: string;
-  leadName: string;
-  surface: string;
-  propertyType: string;
-  levels: string;
-  materials: string;
-  distance: string;
-  accessibility: string;
-  urgency: string;
-  finalPrice: string;
-};
+type ServiceInputState = ServiceInput & { id: number };
 
 export default function NewQuoteForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
-
-  const [formData, setFormData] = useState<QuoteFormData>({
-    leadId: searchParams.get('leadId') || '',
-    leadName: searchParams.get('leadName') || '',
-    surface: searchParams.get('surface') || '',
-    propertyType: searchParams.get('propertyType') || '',
-    levels: '1',
-    materials: 'STANDARD',
-    distance: '0',
-    accessibility: 'EASY', // Champ réintégré
-    urgency: 'NORMAL',     // Champ réintégré
-    finalPrice: '',
-  });
-
-  const [suggestedPrice, setSuggestedPrice] = useState<number | null>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  
+  const [services, setServices] = useState<ServiceInputState[]>([
+      { id: Date.now(), type: 'GrandMénage', surface: 100, levels: 1, distance: 10, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }
+  ]);
+  
+  const [editableLineItems, setEditableLineItems] = useState<QuoteLineItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -55,209 +36,211 @@ export default function NewQuoteForm() {
         if (!response.ok) throw new Error("Impossible de charger les leads.");
         const data = await response.json();
         setLeads(data);
+        const leadId = searchParams.get('leadId');
+        if (leadId) {
+          const lead = data.find((l: Lead) => l.id === leadId);
+          if(lead) setSelectedLead(lead);
+        }
       } catch (error) {
         toast.error("Erreur lors du chargement des leads.");
       }
     };
     fetchLeads();
-  }, []);
+  }, [searchParams]);
+
+  const quoteCalculation = useMemo(() => {
+    return generateQuote(services);
+  }, [services]);
 
   useEffect(() => {
-    const canCalculate = formData.surface && formData.propertyType && formData.accessibility && formData.urgency;
-    if (canCalculate) {
-      const calculated = calculateQuotePrice({
-        surface: parseInt(formData.surface, 10) || 0,
-        propertyType: formData.propertyType,
-        materials: formData.materials,
-        levels: parseInt(formData.levels, 10) || 1,
-        distance: parseInt(formData.distance, 10) || 0,
-        accessibility: formData.accessibility,
-        urgency: formData.urgency,
-      });
-      setSuggestedPrice(calculated.finalPrice);
-      // Mettre à jour le prix final uniquement s'il n'a pas été modifié manuellement
-      if (formData.finalPrice === '' || formData.finalPrice === suggestedPrice?.toString()) {
-        setFormData(prev => ({ ...prev, finalPrice: calculated.finalPrice.toString() }));
-      }
-    } else {
-      setSuggestedPrice(null);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.surface, formData.propertyType, formData.materials, formData.levels, formData.distance, formData.accessibility, formData.urgency]);
+    setEditableLineItems(quoteCalculation.lineItems);
+  }, [quoteCalculation]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target;
-    setFormData(prev => ({ ...prev, [id]: value }));
+  const handleServiceChange = (id: number, field: keyof ServiceInputState, value: string | number) => {
+    setServices(currentServices =>
+      currentServices.map(s => s.id === id ? { ...s, [field]: value } : s)
+    );
+  };
+  
+  const handleLineItemChange = (id: string, newAmount: number) => {
+    setEditableLineItems(currentItems =>
+        currentItems.map(item => item.id === id ? { ...item, amount: newAmount } : item)
+    );
+  };
+  
+  const finalQuote = useMemo(() => {
+    const subTotalHT = editableLineItems.reduce((acc, item) => acc + item.amount, 0);
+    const vatAmount = subTotalHT * 0.20;
+    let totalTTC = subTotalHT + vatAmount;
+    if (totalTTC < 500) totalTTC = 500;
+    const finalPrice = Math.round(totalTTC / 10) * 10;
+    return { lineItems: editableLineItems, subTotalHT, vatAmount, totalTTC, finalPrice };
+  }, [editableLineItems]);
+
+  const addService = () => {
+    setServices([...services, { id: Date.now(), type: 'GrandMénage', surface: 50, levels: 1, distance: 5, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }]);
   };
 
-  const handleSelectChange = (id: keyof QuoteFormData, value: string) => {
-    if (id === 'leadId') {
-      const selectedLead = leads.find(lead => lead.id === value);
-      if (selectedLead) {
-        setFormData(prev => ({
-          ...prev,
-          leadId: selectedLead.id,
-          leadName: `${selectedLead.firstName} ${selectedLead.lastName}`,
-          surface: selectedLead.estimatedSurface?.toString() || '',
-          propertyType: selectedLead.propertyType || '',
-          accessibility: selectedLead.accessibility || 'EASY',
-          urgency: selectedLead.urgencyLevel || 'NORMAL',
-        }));
-      }
-    } else {
-      setFormData(prev => ({ ...prev, [id]: value }));
-    }
+  const removeService = (id: number) => {
+    setServices(services.filter(s => s.id !== id));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-
-    if (!formData.finalPrice || !formData.leadId) {
-      toast.error("Veuillez sélectionner un lead et définir un prix final.");
-      setIsLoading(false);
+    if (!selectedLead) {
+      toast.error("Veuillez sélectionner un client.");
       return;
     }
-
+    setIsLoading(true);
+    
     try {
-      const response = await fetch('/api/quotes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          quoteNumber: `DEV-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
-          surface: parseInt(formData.surface),
-          levels: parseInt(formData.levels),
-          distance: parseInt(formData.distance),
-          finalPrice: parseFloat(formData.finalPrice),
-        }),
-      });
+        const response = await fetch('/api/quotes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                leadId: selectedLead.id,
+                quoteNumber: `Q-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
+                ...finalQuote,
+                expiresAt: new Date(new Date().setDate(new Date().getDate() + 30)),
+                surface: services.reduce((acc, s) => acc + s.surface * s.levels, 0),
+                levels: services.reduce((acc, s) => Math.max(acc, s.levels), 1),
+                propertyType: selectedLead.propertyType
+            }),
+        });
 
-      if (!response.ok) throw new Error('Échec de la création du devis.');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Échec de la création du devis.');
+        }
 
-      toast.success("Devis créé avec succès !");
-      router.push('/quotes');
+        toast.success("Devis créé avec succès !");
+        router.push('/quotes');
     } catch (err: any) {
-      toast.error(err.message);
+        toast.error(err.message);
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   };
 
   return (
     <div className="main-content space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/quotes">
-          <Button variant="outline" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
-        </Link>
+        <Link href="/quotes"><Button variant="outline" size="icon"><ArrowLeft className="w-4 h-4" /></Button></Link>
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Créer un Devis Express</h1>
-          <p className="text-muted-foreground mt-1">Générez un devis instantané avec un prix suggéré et ajustable.</p>
+          <h1 className="text-2xl md:text-3xl font-bold">Générateur de Devis</h1>
+          <p className="text-muted-foreground mt-1">Construisez un devis détaillé et professionnel.</p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="thread-card md:col-span-2">
-          <CardHeader>
-            <CardTitle>Détails de la Prestation</CardTitle>
-            <CardDescription>Fournissez les informations pour générer le devis.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-1 space-y-6">
+            <Card className="thread-card">
+              <CardHeader><CardTitle className="flex items-center gap-2"><User />Informations Client</CardTitle></CardHeader>
+              <CardContent>
                 <Label htmlFor="leadId">Sélectionner un Lead</Label>
-                <Select value={formData.leadId} onValueChange={(value) => handleSelectChange('leadId', value)} required>
-                  <SelectTrigger><SelectValue placeholder="Choisir un lead..." /></SelectTrigger>
-                  <SelectContent>
-                    {leads.map(lead => (
-                      <SelectItem key={lead.id} value={lead.id}>
-                        {lead.firstName} {lead.lastName} ({lead.company || 'Particulier'})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                <Select value={selectedLead?.id} onValueChange={(id) => setSelectedLead(leads.find(l => l.id === id) || null)} required>
+                  <SelectTrigger><SelectValue placeholder="Choisir un client..." /></SelectTrigger>
+                  <SelectContent>{leads.map(lead => (<SelectItem key={lead.id} value={lead.id}>{lead.firstName} {lead.lastName}</SelectItem>))}</SelectContent>
                 </Select>
-              </div>
-              <div>
-                <Label htmlFor="surface">Surface estimée (m²)</Label>
-                <Input id="surface" type="number" value={formData.surface} onChange={handleChange} required />
-              </div>
-              <div>
-                <Label htmlFor="propertyType">Type de propriété</Label>
-                <Select value={formData.propertyType} onValueChange={(value) => handleSelectChange('propertyType', value)} required>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
-                  <SelectContent>{Object.entries(translations.PropertyType).map(([key, value]: [string, unknown]) => <SelectItem key={key} value={key}>{String(value)}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="materials">Type de matériaux</Label>
-                <Select value={formData.materials} onValueChange={(value) => handleSelectChange('materials', value)}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="STANDARD">Standard</SelectItem>
-                    <SelectItem value="MARBLE">Marbre</SelectItem>
-                    <SelectItem value="PARQUET">Parquet</SelectItem>
-                    <SelectItem value="LUXURY">Luxe</SelectItem>
-                    <SelectItem value="MIXED">Mixte</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div><Label htmlFor="levels">Nombre d'étages</Label><Input id="levels" type="number" value={formData.levels} onChange={handleChange} /></div>
-              <div><Label htmlFor="distance">Distance (km)</Label><Input id="distance" type="number" value={formData.distance} onChange={handleChange} /></div>
-              <div>
-                <Label htmlFor="accessibility">Accessibilité</Label>
-                <Select value={formData.accessibility} onValueChange={(value) => handleSelectChange('accessibility', value)}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
-                  <SelectContent>{Object.entries(translations.AccessibilityLevel).map(([k, v]: [string, unknown]) => <SelectItem key={k} value={k}>{String(v)}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-               <div>
-                <Label htmlFor="urgency">Niveau d'urgence</Label>
-                <Select value={formData.urgency} onValueChange={(value) => handleSelectChange('urgency', value)}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
-                  <SelectContent>{Object.entries(translations.UrgencyLevel).map(([k, v]: [string, unknown]) => <SelectItem key={k} value={k}>{String(v)}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        <div className="md:col-span-1 space-y-6">
+            <Card className="thread-card">
+              <CardHeader><CardTitle className="flex items-center gap-2"><Calculator />Services & Paramètres</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                {services.map((service, index) => (
+                    <div key={service.id} className="p-4 border rounded-lg space-y-4 relative bg-secondary/50">
+                        <Button type="button" variant="destructive" size="icon" className="absolute -top-3 -right-3 h-6 w-6" onClick={() => removeService(service.id)}><Trash2 className="w-4 h-4"/></Button>
+                        <div className="grid grid-cols-2 gap-4">
+                           <div>
+                                <Label>Service</Label>
+                                <Select value={service.type} onValueChange={(v) => handleServiceChange(service.id, 'type', v)}><SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="GrandMénage">Grand Ménage</SelectItem>
+                                        <SelectItem value="FinDeChantier">Fin de Chantier</SelectItem>
+                                        <SelectItem value="CristallisationMarbre">Cristallisation Marbre</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                           </div>
+                           <div><Label>Surface (par niveau)</Label><Input type="number" value={service.surface} onChange={(e) => handleServiceChange(service.id, 'surface', e.target.value)} /></div>
+                           <div><Label>Nombre de Niveaux</Label><Input type="number" value={service.levels} onChange={(e) => handleServiceChange(service.id, 'levels', e.target.value)} /></div>
+                           <div><Label>Distance (km)</Label><Input type="number" value={service.distance} onChange={(e) => handleServiceChange(service.id, 'distance', e.target.value)} /></div>
+                           <div>
+                                <Label>Étage</Label>
+                                <Select value={service.etage} onValueChange={(v) => handleServiceChange(service.id, 'etage', v)}><SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="RDC">RDC</SelectItem>
+                                        <SelectItem value="AvecAscenseur">Avec Ascenseur</SelectItem>
+                                        <SelectItem value="SansAscenseur">Sans Ascenseur</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                           </div>
+                           <div>
+                                <Label>Délai</Label>
+                                <Select value={service.delai} onValueChange={(v) => handleServiceChange(service.id, 'delai', v)}><SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="STANDARD">Standard</SelectItem>
+                                        <SelectItem value="URGENT">Urgent (&lt;72h)</SelectItem>
+                                        <SelectItem value="IMMEDIAT">Immédiat (&lt;24h)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                           </div>
+                        </div>
+                    </div>
+                ))}
+                <Button type="button" variant="outline" className="w-full" onClick={addService}><Plus className="w-4 h-4 mr-2"/> Ajouter un service</Button>
+              </CardContent>
+            </Card>
+        </div>
+
+        <div className="lg:col-span-2 space-y-6">
           <Card className="thread-card sticky top-20">
             <CardHeader>
-              <CardTitle>Calcul du Devis</CardTitle>
+              <CardTitle className="flex items-center gap-2"><FileText />Aperçu du Devis</CardTitle>
+              {selectedLead && <CardDescription>Pour : {selectedLead.firstName} {selectedLead.lastName}</CardDescription>}
             </CardHeader>
             <CardContent className="space-y-4">
-                <div>
-                    <Label className="text-xs text-muted-foreground">Prix Suggéré par le système</Label>
-                    <div className="flex items-center gap-2">
-                        <p className="text-2xl font-bold text-muted-foreground">
-                            {suggestedPrice ? formatCurrency(suggestedPrice) : '--- MAD'}
-                        </p>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setFormData(prev => ({...prev, finalPrice: suggestedPrice?.toString() || ''}))}
-                        >
-                            <RefreshCw className="w-4 h-4" />
-                        </Button>
+              <div className="p-4 border rounded-lg bg-secondary/50 space-y-2">
+                <div className="text-center">
+                    <p className="text-muted-foreground">Investissement Total TTC</p>
+                    <p className="text-3xl font-bold text-enarva-start">{formatCurrency(finalQuote.finalPrice)}</p>
+                </div>
+              </div>
+              
+              <div className="space-y-2 pt-4">
+                <h4 className="font-semibold">DÉTAIL DE LA TARIFICATION</h4>
+                {finalQuote.lineItems.map((item) => (
+                    <div key={item.id} className="flex justify-between items-center text-sm border-b py-2 gap-2">
+                        <div>
+                            <p className="font-medium text-foreground">{item.description}</p>
+                            <p className="text-xs text-muted-foreground">{item.detail}</p>
+                        </div>
+                        <Input 
+                            type="number" 
+                            value={item.amount} 
+                            onChange={(e) => handleLineItemChange(item.id, Number(e.target.value))}
+                            className="w-32 h-8 text-right font-semibold"
+                            disabled={!item.editable}
+                        />
                     </div>
+                ))}
+                <div className="flex justify-between items-center text-sm font-semibold pt-2">
+                    <p>TOTAL HORS TAXES (HT)</p>
+                    <p>{formatCurrency(finalQuote.subTotalHT)}</p>
                 </div>
-
-                <div className="border-t pt-4">
-                    <Label htmlFor="finalPrice" className="font-semibold">Prix Final (MAD)</Label>
-                     <Input
-                        id="finalPrice"
-                        type="number"
-                        className="text-2xl font-bold h-12 mt-1 border-2 border-primary"
-                        value={formData.finalPrice}
-                        onChange={handleChange}
-                        required
-                    />
+                 <div className="flex justify-between items-center text-sm text-muted-foreground">
+                    <p>TVA (20%)</p>
+                    <p>{formatCurrency(finalQuote.vatAmount)}</p>
                 </div>
+                 <div className="flex justify-between items-center font-bold text-lg pt-2 border-t mt-2">
+                    <p>TOTAL TTC</p>
+                    <p>{formatCurrency(finalQuote.totalTTC)} (Arrondi à {formatCurrency(finalQuote.finalPrice)})</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
-          <Button type="submit" className="w-full bg-enarva-gradient py-6 text-lg rounded-lg" disabled={isLoading || !formData.finalPrice}>
-            <DollarSign className="w-5 h-5 mr-2" />
-            {isLoading ? 'Création en cours...' : 'Générer le devis'}
+           <Button type="submit" className="w-full bg-enarva-gradient py-6 text-lg rounded-lg" disabled={isLoading || !selectedLead}>
+            {isLoading ? 'Création en cours...' : 'Générer et Sauvegarder le Devis'}
           </Button>
         </div>
       </form>

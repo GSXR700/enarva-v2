@@ -1,7 +1,6 @@
 // app/api/quotes/route.ts
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import { calculateQuotePrice } from '@/lib/utils'
 import { Decimal } from '@prisma/client/runtime/library'
 
 const prisma = new PrismaClient()
@@ -20,33 +19,29 @@ export async function GET() {
   }
 }
 
-// POST /api/quotes - Crée un nouveau devis
+// POST /api/quotes - Crée un nouveau devis détaillé
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    // --- CORRECTION CLÉ ---
-    // On destructure `leadName` pour l'exclure du reste des données (`quoteDetails`)
-    // qui seront envoyées à Prisma.
-    const { leadId, quoteNumber, leadName, ...quoteDetails } = body
+    const { leadId, quoteNumber, lineItems, subTotalHT, vatAmount, totalTTC, finalPrice, expiresAt } = body;
 
-    if (!leadId || !quoteNumber || !quoteDetails.surface) {
+    if (!leadId || !quoteNumber || !lineItems) {
       return new NextResponse('Missing required fields', { status: 400 })
     }
 
-    // Le calcul du prix reste le même
-    const pricing = calculateQuotePrice(quoteDetails)
-
     const newQuote = await prisma.quote.create({
       data: {
-        ...quoteDetails,
         leadId,
         quoteNumber,
-        basePrice: new Decimal(pricing.basePrice),
-        finalPrice: new Decimal(pricing.finalPrice),
-        coefficients: pricing.coefficients,
-        expiresAt: new Date(new Date().setDate(new Date().getDate() + 30)), // Expire dans 30 jours
+        lineItems,
+        subTotalHT: new Decimal(subTotalHT),
+        vatAmount: new Decimal(vatAmount),
+        totalTTC: new Decimal(totalTTC),
+        finalPrice: new Decimal(finalPrice),
+        expiresAt: new Date(expiresAt),
+        status: 'DRAFT',
       },
-    })
+    });
     return NextResponse.json(newQuote, { status: 201 })
   } catch (error) {
     console.error('Failed to create quote:', error)

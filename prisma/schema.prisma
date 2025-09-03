@@ -130,35 +130,35 @@ model Lead {
   @@map("leads")
 }
 
-// ... (Le reste de vos modèles reste identique)
-
+// --- MODÈLE DEVIS (MIS À JOUR MAJEURE) ---
 model Quote {
   id              String      @id @default(cuid())
   quoteNumber     String      @unique
-  type            QuoteType    @default(STANDARD)
   status          QuoteStatus @default(DRAFT)
-  surface         Int
-  propertyType    PropertyType
-  levels          Int         @default(1)
-  materials       MaterialType
-  distance        Int         @default(0)
-  accessibility   AccessibilityLevel @default(EASY)
-  urgency         UrgencyLevel @default(NORMAL)
-
-  basePrice       Decimal
-  coefficients    Json
-  adjustments     Json?
-  finalPrice      Decimal
-  requiresVisit   Boolean     @default(true)
-  visitScheduled  DateTime?
-  visitCompleted  Boolean     @default(false)
-  visitReport     Json?
+  
+  // Nouveaux champs pour la structure de devis détaillée et éditable
+  lineItems       Json // [{"id": 1, "type": "base", "description": "Forfait de base...", "detail": "170m² x 14 DH/m²", "amount": 2380, "editable": true}, {...}]
+  subTotalHT      Decimal     @default(0)
+  vatAmount       Decimal     @default(0)
+  totalTTC        Decimal     @default(0)
+  finalPrice      Decimal     // Le montant final arrondi présenté au client
+  
+  // Relations
   leadId          String
-  lead            Lead     @relation(fields: [leadId], references: [id])
+  lead            Lead        @relation(fields: [leadId], references: [id])
   missions        Mission[]
+  
+  // Métadonnées
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   expiresAt       DateTime
+  
+  // Champs conservés pour la configuration initiale du calculateur
+  type            QuoteType   @default(STANDARD)
+  propertyType    PropertyType?
+  surface         Int?
+  levels          Int? @default(1) // Ajout du nombre de niveaux
+
   @@map("quotes")
 }
 
