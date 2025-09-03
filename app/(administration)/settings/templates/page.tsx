@@ -128,7 +128,6 @@ export default function TaskTemplatesPage() {
                             <div key={template.id} className="border p-4 rounded-lg flex items-start justify-between gap-2">
                                 <div>
                                     <h3 className="font-bold text-foreground">{template.name}</h3>
-                                    {/* --- THE FIX IS HERE --- */}
                                     <p className="text-sm text-muted-foreground">{template.items?.length || 0} tâche(s)</p>
                                 </div>
                                 <div className="flex gap-2">

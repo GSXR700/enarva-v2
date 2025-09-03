@@ -93,7 +93,6 @@ const DialogTitle = React.forwardRef<
 ))
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
-// --- COMPOSANT MANQUANT AJOUTÉ ICI ---
 const DialogDescription = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
@@ -116,5 +115,5 @@ export {
   DialogHeader,
   DialogFooter,
   DialogTitle,
-  DialogDescription, // <-- EXPORTATION AJOUTÉE
+  DialogDescription,
 }

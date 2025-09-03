@@ -2,10 +2,7 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient, TaskCategory } from '@prisma/client';
 
-// --- THE FIX IS HERE ---
-// This line tells Next.js to always run this route dynamically and not to cache its response.
 export const dynamic = 'force-dynamic';
-// --- END OF FIX ---
 
 const prisma = new PrismaClient();
 

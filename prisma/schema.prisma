@@ -10,30 +10,27 @@ datasource db {
 
 // --- MODÈLE UTILISATEUR (INCHANGÉ) ---
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  role          UserRole  @default(TECHNICIAN)
-
-  onlineStatus    String         @default("OFFLINE")
-  lastSeen        DateTime?
+  id               String         @id @default(cuid())
+  name             String?
+  email            String?        @unique
+  emailVerified    DateTime?
+  image            String?
+  password         String?
+  role             UserRole       @default(TECHNICIAN)
+  onlineStatus     String         @default("OFFLINE")
+  lastSeen         DateTime?
   pushSubscription Json? // Champ ajouté pour les notifications push
-  accounts      Account[]
-  sessions      Session[]
-
-  leads           Lead[]
-  missions        Mission[]      @relation("AssignedTo")
-  teamMember      TeamMember?
-  activities      Activity[]
-  messages        Message[]
-  conversations   Conversation[] @relation("ConversationParticipants")
-  expenses        Expense[]
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  accounts         Account[]
+  sessions         Session[]
+  leads            Lead[]
+  missions         Mission[]      @relation("AssignedTo")
+  teamMember       TeamMember?
+  activities       Activity[]
+  messages         Message[]
+  conversations    Conversation[] @relation("ConversationParticipants")
+  expenses         Expense[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@map("users")
 }
@@ -53,8 +50,10 @@ model Account {
   id_token          String? @db.Text
   session_state     String?
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([provider, providerAccountId])
 }
+
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
@@ -62,55 +61,58 @@ model Session {
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
 model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
+
   @@unique([identifier, token])
 }
 
 // --- MODÈLE LEAD (ENTIÈREMENT MIS À JOUR) ---
 model Lead {
-  id              String     @id @default(cuid())
+  id String @id @default(cuid())
 
   // 1. Informations Générales
-  firstName       String
-  lastName        String
-  phone           String
-  email           String?
-  address         String?
-  gpsLocation     String?
-  status          LeadStatus @default(NEW)
-  score           Int?       @default(0)
+  firstName   String
+  lastName    String
+  phone       String
+  email       String?
+  address     String?
+  gpsLocation String?
+  status      LeadStatus @default(NEW)
+  score       Int?       @default(0)
 
   // 2. Détails Professionnels
-  leadType        LeadType   @default(PARTICULIER)
+  leadType        LeadType @default(PARTICULIER)
   company         String?
   iceNumber       String?
   activitySector  String?
   contactPosition String?
   department      String?
+
   // 3. Détails de la Demande
-  propertyType    PropertyType?
+  propertyType     PropertyType?
   estimatedSurface Int?
-  accessibility   AccessibilityLevel? @default(EASY)
-  materials       Json?      // Stockera les sélections de matériaux
-  urgencyLevel    UrgencyLevel?
-  budgetRange     String?
-  frequency       Frequency? @default(PONCTUEL)
-  contractType    ContractType? @default(INTERVENTION_UNIQUE)
+  accessibility    AccessibilityLevel?   @default(EASY)
+  materials        Json? // Stockera les sélections de matériaux
+  urgencyLevel     UrgencyLevel?
+  budgetRange      String?
+  frequency        Frequency?            @default(PONCTUEL)
+  contractType     ContractType?         @default(INTERVENTION_UNIQUE)
 
   // 4. Produits & Équipements
-  needsProducts   Boolean? @default(false)
-  needsEquipment  Boolean? @default(false)
-  providedBy      ProviderType? @default(ENARVA)
+  needsProducts  Boolean? @default(false)
+  needsEquipment Boolean? @default(false)
+  providedBy     ProviderType?           @default(ENARVA)
 
   // 5. Origine du Lead
   channel         LeadCanal
-  source          String?    // Source précise
-  hasReferrer     Boolean? @default(false)
+  source          String? // Source précise
+  hasReferrer     Boolean?     @default(false)
   referrerContact String?
-  enarvaRole      EnarvaRole? @default(PRESTATAIRE_PRINCIPAL)
+  enarvaRole      EnarvaRole?  @default(PRESTATAIRE_PRINCIPAL)
 
   // 6. Suivi et Planification (Champs existants)
   originalMessage String
@@ -118,88 +120,88 @@ model Lead {
   assignedTo      User?      @relation(fields: [assignedToId], references: [id])
 
   // Relations
-  quotes          Quote[]
-  missions        Mission[]
-  activities      Activity[]
-  subscription    Subscription?
-  expenses        Expense[]
-
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  quotes       Quote[]
+  missions     Mission[]
+  activities   Activity[]
+  subscription Subscription?
+  expenses     Expense[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   @@map("leads")
 }
 
 // --- MODÈLE DEVIS (MIS À JOUR MAJEURE) ---
 model Quote {
-  id              String      @id @default(cuid())
-  quoteNumber     String      @unique
-  status          QuoteStatus @default(DRAFT)
-  
+  id          String      @id @default(cuid())
+  quoteNumber String      @unique
+  status      QuoteStatus @default(DRAFT)
+
   // Nouveaux champs pour la structure de devis détaillée et éditable
-  lineItems       Json // [{"id": 1, "type": "base", "description": "Forfait de base...", "detail": "170m² x 14 DH/m²", "amount": 2380, "editable": true}, {...}]
-  subTotalHT      Decimal     @default(0)
-  vatAmount       Decimal     @default(0)
-  totalTTC        Decimal     @default(0)
-  finalPrice      Decimal     // Le montant final arrondi présenté au client
-  
+  lineItems  Json // [{"id": 1, "type": "base", "description": "Forfait de base...", "detail": "170m² x 14 DH/m²", "amount": 2380, "editable": true}, {...}]
+  subTotalHT Decimal     @default(0)
+  vatAmount  Decimal     @default(0)
+  totalTTC   Decimal     @default(0)
+  finalPrice Decimal // Le montant final arrondi présenté au client
+
   // Relations
-  leadId          String
-  lead            Lead        @relation(fields: [leadId], references: [id])
-  missions        Mission[]
-  
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id])
+  missions Mission[]
+
   // Métadonnées
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  expiresAt       DateTime
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime
+
   // Champs conservés pour la configuration initiale du calculateur
-  type            QuoteType   @default(STANDARD)
-  propertyType    PropertyType?
-  surface         Int?
-  levels          Int? @default(1) // Ajout du nombre de niveaux
+  type         QuoteType    @default(STANDARD)
+  propertyType PropertyType?
+  surface      Int?
+  levels       Int?         @default(1) // Ajout du nombre de niveaux
 
   @@map("quotes")
 }
 
 model Mission {
-  id              String        @id @default(cuid())
-  missionNumber   String        @unique
-  status          MissionStatus @default(SCHEDULED)
-  priority        Priority      @default(NORMAL)
-  type            MissionType   @default(SERVICE)
+  id                   String         @id @default(cuid())
+  missionNumber        String         @unique
+  status               MissionStatus  @default(SCHEDULED)
+  priority             Priority       @default(NORMAL)
+  type                 MissionType    @default(SERVICE)
   technicalVisitReport Json?
-  scheduledDate   DateTime
-  estimatedDuration Int
-  actualStartTime DateTime?
-  actualEndTime   DateTime?
-  address         String
-  coordinates     String?
-  accessNotes     String?
-  teamLeaderId    String?
-  teamLeader      User?         @relation("AssignedTo", fields: [teamLeaderId], references: [id])
-  teamMembers     TeamMember[]  @relation("MissionToTeamMember")
-  leadId          String
-  lead            Lead          @relation(fields: [leadId], references: [id])
-  quoteId         String?       // <-- ADD QUESTION MARK HERE
-  quote           Quote?        @relation(fields: [quoteId], references: [id])
-  tasks           Task[]
-  qualityChecks   QualityCheck[]
-  inventoryUsed   InventoryUsage[]
-  expenses        Expense[]
-  clientValidated Boolean       @default(false)
-  clientFeedback  String?
-  clientRating    Int?
-  invoiceGenerated Boolean      @default(false)
-  invoiceId       String?
-  conversation    Conversation?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  scheduledDate        DateTime
+  estimatedDuration    Int
+  actualStartTime      DateTime?
+  actualEndTime        DateTime?
+  address              String
+  coordinates          String?
+  accessNotes          String?
+  teamLeaderId         String?
+  teamLeader           User?          @relation("AssignedTo", fields: [teamLeaderId], references: [id])
+  teamMembers          TeamMember[]   @relation("MissionToTeamMember")
+  leadId               String
+  lead                 Lead           @relation(fields: [leadId], references: [id])
+  quoteId              String? // <-- MODIFIED: Made optional
+  quote                Quote?         @relation(fields: [quoteId], references: [id]) // <-- MODIFIED: Made optional
+  tasks                Task[]
+  qualityChecks        QualityCheck[]
+  inventoryUsed        InventoryUsage[]
+  expenses             Expense[]
+  clientValidated      Boolean        @default(false)
+  clientFeedback       String?
+  clientRating         Int?
+  invoiceGenerated     Boolean        @default(false)
+  invoiceId            String?
+  conversation         Conversation?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
   @@map("missions")
 }
 
 model Expense {
-  id              String         @id @default(cuid())
+  id              String          @id @default(cuid())
   date            DateTime
   amount          Decimal
   category        ExpenseCategory
@@ -211,13 +213,14 @@ model Expense {
   rentalStartDate DateTime?
   rentalEndDate   DateTime?
   missionId       String?
-  mission         Mission?       @relation(fields: [missionId], references: [id])
+  mission         Mission?        @relation(fields: [missionId], references: [id])
   leadId          String?
-  lead            Lead?          @relation(fields: [leadId], references: [id])
+  lead            Lead?           @relation(fields: [leadId], references: [id])
   userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  user            User            @relation(fields: [userId], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
   @@map("expenses")
 }
 
@@ -242,6 +245,7 @@ model Task {
   notes         String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+
   @@map("tasks")
 }
 
@@ -255,88 +259,93 @@ model TaskTemplate {
 }
 
 model TaskTemplateItem {
-  id             String       @id @default(cuid())
-  title          String
-  category       TaskCategory
-  templateId     String
-  template       TaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id         String       @id @default(cuid())
+  title      String
+  category   TaskCategory
+  templateId String
+  template   TaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 }
 
 model TeamMember {
-  id           String           @id @default(cuid())
-  firstName    String
-  lastName     String
-  phone        String
-  email        String?
-  specialties  TeamSpecialty[]
-  experienceLevel ExperienceLevel @default(JUNIOR)
-  availability TeamAvailability @default(AVAILABLE)
-  completedTasks Int           @default(0)
-  averageRating  Decimal?       @default(0)
-  efficiency     Decimal?       @default(100)
-  userId       String           @unique
-  user         User             @relation(fields: [userId], references: [id])
-  missions     Mission[]        @relation("MissionToTeamMember")
-  tasks        Task[]
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id              String           @id @default(cuid())
+  firstName       String
+  lastName        String
+  phone           String
+  email           String?
+  specialties     TeamSpecialty[]
+  experienceLevel ExperienceLevel  @default(JUNIOR)
+  availability    TeamAvailability @default(AVAILABLE)
+  completedTasks  Int              @default(0)
+  averageRating   Decimal?         @default(0)
+  efficiency      Decimal?         @default(100)
+  userId          String           @unique
+  user            User             @relation(fields: [userId], references: [id])
+  missions        Mission[]        @relation("MissionToTeamMember")
+  tasks           Task[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
   @@map("team_members")
 }
 
 model Conversation {
-  id              String    @id @default(cuid())
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  participants    User[]    @relation("ConversationParticipants")
-  messages        Message[]
-  missionId       String?   @unique
-  mission         Mission?  @relation(fields: [missionId], references: [id])
+  id           String    @id @default(cuid())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  participants User[]    @relation("ConversationParticipants")
+  messages     Message[]
+  missionId    String?   @unique
+  mission      Mission?  @relation(fields: [missionId], references: [id])
+
   @@map("conversations")
 }
 
 model Message {
-  id              String    @id @default(cuid())
-  createdAt       DateTime  @default(now())
-  content         String
-  type            String    @default("TEXT")
-  senderId        String
-  sender          User      @relation(fields: [senderId], references: [id])
-  conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id])
-  readByIds       String[]  @default([])
+  id             String       @id @default(cuid())
+  createdAt      DateTime     @default(now())
+  content        String
+  type           String       @default("TEXT")
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  readByIds      String[]     @default([])
+
   @@map("messages")
 }
 
 model QualityCheck {
-  id          String            @id @default(cuid())
+  id          String         @id @default(cuid())
   type        QualityCheckType
-  status      QualityStatus     @default(PENDING)
+  status      QualityStatus  @default(PENDING)
   score       Int?
   notes       String?
   photos      Json?
   issues      Json?
   corrections Json?
   missionId   String
-  mission     Mission           @relation(fields: [missionId], references: [id])
+  mission     Mission        @relation(fields: [missionId], references: [id])
   checkedBy   String
-  checkedAt   DateTime          @default(now())
+  checkedAt   DateTime       @default(now())
   validatedBy String?
   validatedAt DateTime?
+
   @@map("quality_checks")
 }
 
 model Inventory {
-  id              String            @id @default(cuid())
-  name            String
-  category        ProductCategory
-  unit            String
-  currentStock    Decimal
-  minimumStock    Decimal
-  unitPrice       Decimal
-  supplier        String
-  usages          InventoryUsage[]
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id           String           @id @default(cuid())
+  name         String
+  category     ProductCategory
+  unit         String
+  currentStock Decimal
+  minimumStock Decimal
+  unitPrice    Decimal
+  supplier     String
+  usages       InventoryUsage[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
   @@map("inventory")
 }
 
@@ -349,22 +358,24 @@ model InventoryUsage {
   missionId   String
   mission     Mission   @relation(fields: [missionId], references: [id])
   usedAt      DateTime  @default(now())
+
   @@map("inventory_usage")
 }
 
 model Subscription {
-  id              String             @id @default(cuid())
-  type            SubscriptionType
-  status          SubscriptionStatus @default(ACTIVE)
-  monthlyPrice    Decimal
-  discount        Decimal            @default(0)
-  nextBilling     DateTime
+  id               String             @id @default(cuid())
+  type             SubscriptionType
+  status           SubscriptionStatus @default(ACTIVE)
+  monthlyPrice     Decimal
+  discount         Decimal            @default(0)
+  nextBilling      DateTime
   includedServices Int
-  usedServices    Int                @default(0)
-  leadId          String             @unique
-  lead            Lead               @relation(fields: [leadId], references: [id])
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  usedServices     Int                @default(0)
+  leadId           String             @unique
+  lead             Lead               @relation(fields: [leadId], references: [id])
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
   @@map("subscriptions")
 }
 
@@ -379,11 +390,11 @@ model Activity {
   leadId      String?
   lead        Lead?        @relation(fields: [leadId], references: [id])
   createdAt   DateTime     @default(now())
+
   @@map("activities")
 }
 
 // --- ENUMS ---
-
 // NOUVEAUX ENUMS POUR LES LEADS
 enum LeadCanal {
   WHATSAPP
