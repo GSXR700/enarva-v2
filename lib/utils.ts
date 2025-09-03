@@ -1,7 +1,7 @@
 // lib/utils.ts
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { LeadStatus, LeadCanal, LeadType, UrgencyLevel, PropertyType, Frequency, ContractType, ProviderType, EnarvaRole, AccessibilityLevel } from '@prisma/client'
+import { LeadStatus, LeadCanal, LeadType, UrgencyLevel, PropertyType, Frequency, ContractType, ProviderType, EnarvaRole, AccessibilityLevel, MissionStatus, MissionType } from '@prisma/client'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -83,6 +83,20 @@ export const translations = {
     VISIT_PLANNED: "Visite planifiée",
     ON_VISIT: "Visite en cours",
     VISIT_DONE: "Visite terminée"
+  },
+  MissionStatus: {
+    SCHEDULED: "Planifiée",
+    IN_PROGRESS: "En cours",
+    QUALITY_CHECK: "Contrôle Qualité",
+    CLIENT_VALIDATION: "Validation Client",
+    COMPLETED: "Terminée",
+    CANCELLED: "Annulée",
+  },
+  MissionType: {
+    SERVICE: "Service",
+    TECHNICAL_VISIT: "Visite Technique",
+    DELIVERY: "Livraison",
+    INTERNAL: "Interne",
   },
   LeadCanal: { WHATSAPP: "WhatsApp", FACEBOOK: "Facebook", INSTAGRAM: "Instagram", LINKEDIN: "LinkedIn", GOOGLE_MAPS: "Google Maps", GOOGLE_SEARCH: "Recherche Google", SITE_WEB: "Site Web", FORMULAIRE_SITE: "Formulaire Site", MARKETPLACE: "Marketplace", YOUTUBE: "YouTube", EMAIL: "Email", APPORTEUR_AFFAIRES: "Apporteur d'affaires", COMMERCIAL_TERRAIN: "Commercial Terrain", SALON_PROFESSIONNEL: "Salon Professionnel", PARTENARIAT: "Partenariat", RECOMMANDATION_CLIENT: "Recommandation Client", VISITE_BUREAU: "Visite Bureau", EMPLOYE_ENARVA: "Employé Enarva", APPEL_TELEPHONIQUE: "Appel Téléphonique", SMS: "SMS", NUMERO_SUR_PUB: "Numéro sur Pub", AFFICHE: "Affiche", FLYER: "Flyer", ENSEIGNE: "Enseigne", VOITURE_SIGLEE: "Voiture Siglée", RADIO: "Radio", ANNONCE_PRESSE: "Annonce Presse", TELE: "Télé", MANUEL: "Manuel", SOURCING_INTERNE: "Sourcing Interne", PORTE_A_PORTE: "Porte à Porte", CHANTIER_EN_COURS: "Chantier en cours" },
   LeadType: { PARTICULIER: "Particulier", PROFESSIONNEL: "Professionnel", PUBLIC: "Public" },
