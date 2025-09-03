@@ -1,4 +1,4 @@
-// app/api/quotes/[id]/route.ts - COMPLETE FIXED VERSION
+// app/api/quotes/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -11,10 +11,10 @@ const prisma = new PrismaClient();
  */
 export async function GET(
   request: Request, 
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
     try {
-        const { id } = await params; // ✅ Await params for Next.js 15
+        const { id } = params;
         
         const quote = await prisma.quote.findUnique({ 
             where: { id },
@@ -33,36 +33,32 @@ export async function GET(
 
 /**
  * PATCH /api/quotes/[id]
- * Updates a specific quote.
+ * Updates a specific quote with a new line item structure and totals.
  */
 export async function PATCH(
   request: Request, 
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
     try {
-        const { id } = await params; // ✅ Await params for Next.js 15
+        const { id } = params;
         const body = await request.json();
         
-        // Prepare data for Prisma, ensuring correct types and handling nulls
-        const updateData = {
-            ...body,
-            surface: body.surface ? parseInt(body.surface, 10) : undefined,
-            levels: body.levels ? parseInt(body.levels, 10) : undefined,
-            distance: body.distance ? parseInt(body.distance, 10) : undefined,
-            finalPrice: body.finalPrice ? new Decimal(body.finalPrice) : undefined,
-            propertyType: body.propertyType || null, // Ensure empty strings become null
-        };
-        
-        // Remove fields that should not be updated
-        delete updateData.id;
-        delete updateData.leadId;
-        delete updateData.createdAt;
-        delete updateData.updatedAt;
-        delete updateData.lead;
+        const { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice, status } = body;
+
+        if (!lineItems || subTotalHT === undefined || finalPrice === undefined) {
+             return new NextResponse('Invalid data provided', { status: 400 });
+        }
 
         const updatedQuote = await prisma.quote.update({
             where: { id },
-            data: updateData,
+            data: {
+                lineItems,
+                subTotalHT: new Decimal(subTotalHT),
+                vatAmount: new Decimal(vatAmount),
+                totalTTC: new Decimal(totalTTC),
+                finalPrice: new Decimal(finalPrice),
+                status: status, // Allow status updates as well
+            },
         });
         return NextResponse.json(updatedQuote);
     } catch (error) {
@@ -77,10 +73,10 @@ export async function PATCH(
  */
 export async function DELETE(
   request: Request, 
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
     try {
-        const { id } = await params; // ✅ Await params for Next.js 15
+        const { id } = params;
         
         await prisma.quote.delete({
             where: { id },
