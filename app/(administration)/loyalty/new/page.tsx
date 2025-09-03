@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, Star } from 'lucide-react'
@@ -17,6 +18,7 @@ const subscriptionPlans = {
   SILVER: { name: 'Silver', price: 1800, services: 2, discount: 15 },
   GOLD: { name: 'Gold', price: 3200, services: 4, discount: 20 },
   PLATINUM: { name: 'Platinum', price: 5000, services: 8, discount: 25 },
+  CUSTOM: { name: 'Personnalisé', price: 0, services: 0, discount: 0 },
 };
 
 export default function NewSubscriptionPage() {
@@ -24,6 +26,11 @@ export default function NewSubscriptionPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [selectedPlan, setSelectedPlan] = useState<keyof typeof subscriptionPlans>('BRONZE')
   const [selectedLeadId, setSelectedLeadId] = useState('')
+  const [customDetails, setCustomDetails] = useState({
+    price: '',
+    services: '',
+    discount: '',
+  });
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,6 +43,11 @@ export default function NewSubscriptionPage() {
     fetchLeads();
   }, []);
 
+  const handleCustomDetailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setCustomDetails(prev => ({ ...prev, [id]: value }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLeadId) {
@@ -45,7 +57,22 @@ export default function NewSubscriptionPage() {
     setIsLoading(true);
     setError(null);
 
-    const planDetails = subscriptionPlans[selectedPlan];
+    let planDetails;
+
+    if (selectedPlan === 'CUSTOM') {
+      if (!customDetails.price || !customDetails.services) {
+        setError("Pour un plan personnalisé, le prix et le nombre de services sont obligatoires.");
+        setIsLoading(false);
+        return;
+      }
+      planDetails = {
+        price: parseFloat(customDetails.price),
+        services: parseInt(customDetails.services, 10),
+        discount: parseFloat(customDetails.discount || '0'),
+      };
+    } else {
+      planDetails = subscriptionPlans[selectedPlan];
+    }
 
     try {
       const response = await fetch('/api/subscriptions', {
@@ -73,7 +100,12 @@ export default function NewSubscriptionPage() {
     }
   };
 
-  const plan = subscriptionPlans[selectedPlan];
+  const plan = selectedPlan === 'CUSTOM' ? {
+    name: 'Personnalisé',
+    price: parseFloat(customDetails.price) || 0,
+    services: parseInt(customDetails.services, 10) || 0,
+    discount: parseFloat(customDetails.discount) || 0,
+  } : subscriptionPlans[selectedPlan];
 
   return (
     <div className="main-content space-y-6">
@@ -117,6 +149,23 @@ export default function NewSubscriptionPage() {
                 </SelectContent>
               </Select>
             </div>
+            
+            {selectedPlan === 'CUSTOM' && (
+              <>
+                <div>
+                    <Label htmlFor="price">Prix Mensuel (MAD) *</Label>
+                    <Input id="price" type="number" value={customDetails.price} onChange={handleCustomDetailChange} required />
+                </div>
+                <div>
+                    <Label htmlFor="services">Services Inclus / mois *</Label>
+                    <Input id="services" type="number" value={customDetails.services} onChange={handleCustomDetailChange} required />
+                </div>
+                <div className="md:col-span-2">
+                    <Label htmlFor="discount">Remise sur services additionnels (%)</Label>
+                    <Input id="discount" type="number" value={customDetails.discount} onChange={handleCustomDetailChange} />
+                </div>
+              </>
+            )}
           </CardContent>
           <CardContent>
              <Card className="bg-secondary/50 p-4">
