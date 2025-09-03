@@ -99,7 +99,7 @@ export default function NewQuoteForm() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 leadId: selectedLead.id,
-                quoteNumber: `Q-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
+                quoteNumber: `DV-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
                 ...finalQuote,
                 expiresAt: new Date(new Date().setDate(new Date().getDate() + 30)),
                 surface: services.reduce((acc, s) => acc + s.surface * s.levels, 0),
