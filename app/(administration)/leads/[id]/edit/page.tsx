@@ -222,7 +222,7 @@ export default function EditLeadPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <Label htmlFor="propertyType">Type de propriété</Label>
-                            <Select value={formData.propertyType || undefined} onValueChange={(v) => handleSelectChange('propertyType', v as PropertyType)}>
+                            <Select value={formData.propertyType || ''} onValueChange={(v) => handleSelectChange('propertyType', v as PropertyType)}>
                                 <SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
                                 <SelectContent>{Object.entries(translations.PropertyType).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
                             </Select>
@@ -284,7 +284,7 @@ export default function EditLeadPage() {
             <CardContent>
                 <div>
                     <Label htmlFor="assignedToId">Assigner à</Label>
-                    <Select value={formData.assignedToId || undefined} onValueChange={(v) => handleSelectChange('assignedToId', v)}>
+                    <Select value={formData.assignedToId || ''} onValueChange={(v) => handleSelectChange('assignedToId', v)}>
                         <SelectTrigger><SelectValue placeholder="Choisir un agent..." /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="null">Non assigné</SelectItem>

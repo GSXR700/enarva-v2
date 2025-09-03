@@ -212,7 +212,7 @@ export default function QuotesPage() {
               <DialogContent className="max-w-2xl">
                   <DialogHeader>
                       <DialogTitle className="text-2xl">{selectedQuote.quoteNumber}</DialogTitle>
-                      <DialogDescription>Pour {selectedQuote.lead.firstName} {selectedQuote.lead.lastName}</DialogDescription>
+                      <DialogDescription>Détails du devis pour {selectedQuote.lead.firstName} {selectedQuote.lead.lastName}</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="flex justify-between items-center text-lg">
