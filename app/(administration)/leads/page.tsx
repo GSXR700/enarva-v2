@@ -22,6 +22,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import {
   Phone, Mail, MessageSquare, Plus, Edit, Trash2, Building, Ruler,
@@ -273,7 +274,9 @@ export default function LeadsPage() {
                             <Avatar className="w-12 h-12"><AvatarFallback>{selectedLead.firstName[0]}{selectedLead.lastName[0]}</AvatarFallback></Avatar>
                             <div>
                                 <h2 className="text-xl font-semibold">{selectedLead.firstName} {selectedLead.lastName}</h2>
-                                <p className="text-sm text-muted-foreground font-normal">{selectedLead.company || translate('LeadType', selectedLead.leadType)}</p>
+                                <DialogDescription>
+                                    Détails du lead pour {selectedLead.company || translate('LeadType', selectedLead.leadType)}.
+                                </DialogDescription>
                             </div>
                         </DialogTitle>
                     </DialogHeader>

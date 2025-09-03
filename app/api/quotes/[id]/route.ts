@@ -45,20 +45,23 @@ export async function PATCH(
         
         const { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice, status } = body;
 
-        if (!lineItems || subTotalHT === undefined || finalPrice === undefined) {
-             return new NextResponse('Invalid data provided', { status: 400 });
+        // Build update data dynamically based on what's provided in the body
+        const dataToUpdate: any = {};
+
+        if (lineItems) dataToUpdate.lineItems = lineItems;
+        if (subTotalHT !== undefined) dataToUpdate.subTotalHT = new Decimal(subTotalHT);
+        if (vatAmount !== undefined) dataToUpdate.vatAmount = new Decimal(vatAmount);
+        if (totalTTC !== undefined) dataToUpdate.totalTTC = new Decimal(totalTTC);
+        if (finalPrice !== undefined) dataToUpdate.finalPrice = new Decimal(finalPrice);
+        if (status) dataToUpdate.status = status;
+
+        if (Object.keys(dataToUpdate).length === 0) {
+            return new NextResponse('No update data provided', { status: 400 });
         }
 
         const updatedQuote = await prisma.quote.update({
             where: { id },
-            data: {
-                lineItems,
-                subTotalHT: new Decimal(subTotalHT),
-                vatAmount: new Decimal(vatAmount),
-                totalTTC: new Decimal(totalTTC),
-                finalPrice: new Decimal(finalPrice),
-                status: status, // Allow status updates as well
-            },
+            data: dataToUpdate,
         });
         return NextResponse.json(updatedQuote);
     } catch (error) {
