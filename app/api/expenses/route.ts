@@ -33,14 +33,34 @@ export async function POST(request: Request) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
     const body = await request.json();
-    const { amount, ...data } = body;
+    
+    // Destructure all potential fields from the body
+    const {
+      amount,
+      date,
+      rentalStartDate,
+      rentalEndDate,
+      missionId,
+      leadId,
+      ...data
+    } = body;
+
+    // Sanitize optional fields to convert empty strings to null, as Prisma expects
+    const sanitizedData = {
+      ...data,
+      amount: new Decimal(amount),
+      date: new Date(date),
+      userId: session.user.id,
+      // If the value is a non-empty string, create a Date object, otherwise set to null
+      rentalStartDate: rentalStartDate ? new Date(rentalStartDate) : null,
+      rentalEndDate: rentalEndDate ? new Date(rentalEndDate) : null,
+      // If the ID is an empty string, set it to null to avoid relation errors
+      missionId: missionId || null,
+      leadId: leadId || null,
+    };
+
     const newExpense = await prisma.expense.create({
-      data: {
-        ...data,
-        amount: new Decimal(amount),
-        date: new Date(data.date),
-        userId: session.user.id,
-      },
+      data: sanitizedData,
     });
     return NextResponse.json(newExpense, { status: 201 });
   } catch (error) {
