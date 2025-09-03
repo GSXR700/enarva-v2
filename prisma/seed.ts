@@ -52,21 +52,76 @@ async function main() {
   // --- Création des Leads ---
   const lead1 = await prisma.lead.create({
     data: {
-      firstName: 'Mohammed', lastName: 'Benali', email: 'm.benali@example.com', phone: '+212612345678', company: 'Villa Anfa', leadType: 'PARTICULIER', channel: 'WHATSAPP', status: 'NEW', score: 8, propertyType: 'VILLA_LARGE', estimatedSurface: 400, urgencyLevel: 'HIGH_URGENT', originalMessage: 'Bonjour, je souhaite un devis pour le nettoyage complet de ma villa à Anfa, Casablanca.', assignedToId: user1.id,
+      firstName: 'Mohammed', 
+      lastName: 'Benali', 
+      email: 'm.benali@example.com', 
+      phone: '+212612345678', 
+      company: 'Villa Anfa', 
+      leadType: 'PARTICULIER', 
+      channel: 'WHATSAPP', 
+      status: 'NEW', 
+      score: 8, 
+      propertyType: 'VILLA_LARGE', 
+      estimatedSurface: 400, 
+      urgencyLevel: 'HIGH_URGENT', 
+      originalMessage: 'Bonjour, je souhaite un devis pour le nettoyage complet de ma villa à Anfa, Casablanca.', 
+      assignedToId: user1.id,
     },
   });
 
   const lead2 = await prisma.lead.create({
     data: {
-      firstName: 'Fatima', lastName: 'Alaoui', email: 'f.alaoui@business.com', phone: '+212698765432', company: 'Résidence Les Palmiers', leadType: 'PROFESSIONNEL', iceNumber: '001234567000089', channel: 'EMAIL', status: 'QUALIFIED', score: 9, propertyType: 'RESIDENCE_B2B', estimatedSurface: 1200, urgencyLevel: 'NORMAL', originalMessage: 'Suite à notre conversation, je vous confirme notre besoin pour un nettoyage mensuel de notre résidence.', assignedToId: user2.id,
+      firstName: 'Fatima', 
+      lastName: 'Alaoui', 
+      email: 'f.alaoui@business.com', 
+      phone: '+212698765432', 
+      company: 'Résidence Les Palmiers', 
+      leadType: 'PROFESSIONNEL', 
+      iceNumber: '001234567000089', 
+      channel: 'EMAIL', 
+      status: 'QUALIFIED', 
+      score: 9, 
+      propertyType: 'RESIDENCE_B2B', 
+      estimatedSurface: 1200, 
+      urgencyLevel: 'NORMAL', 
+      originalMessage: 'Suite à notre conversation, je vous confirme notre besoin pour un nettoyage mensuel de notre résidence.', 
+      assignedToId: user2.id,
     },
   });
   console.log(`Création de ${await prisma.lead.count()} leads.`);
 
-  // --- Création d'un Devis pour un Lead ---
+  // --- Création d'un Devis pour un Lead (FIXED VERSION) ---
   const quote1 = await prisma.quote.create({
     data: {
-      quoteNumber: 'DEV-2025-001', type: 'STANDARD', status: 'ACCEPTED', surface: 400, propertyType: 'VILLA_LARGE', materials: 'LUXURY', distance: 15, accessibility: 'MEDIUM', urgency: 'HIGH_URGENT', basePrice: new Decimal(7200.00), finalPrice: new Decimal(8640.00), coefficients: { "materials": 1.35, "urgency": 1.2 }, expiresAt: new Date(), leadId: lead1.id,
+      quoteNumber: 'DEV-2025-001', 
+      type: 'STANDARD', 
+      status: 'ACCEPTED', 
+      surface: 400, 
+      levels: 2,
+      propertyType: 'VILLA_LARGE', 
+      // Updated to match new Quote schema structure
+      lineItems: [
+        {
+          id: "base-1",
+          description: "Forfait de Base Grand Ménage",
+          detail: "400m² x 2 niveaux = 800m² x 14 DH/m²",
+          amount: 11200,
+          editable: true
+        },
+        {
+          id: "majoration-1", 
+          description: "Forfait Prestations Renforcées",
+          detail: "Coefficients appliqués (Délai urgent, Matériaux luxe)",
+          amount: 1440,
+          editable: true
+        }
+      ],
+      subTotalHT: new Decimal(12640.00),
+      vatAmount: new Decimal(2528.00),
+      totalTTC: new Decimal(15168.00),
+      finalPrice: new Decimal(15170.00), // Rounded
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      leadId: lead1.id,
     },
   });
   console.log(`Création de ${await prisma.quote.count()} devis.`);
