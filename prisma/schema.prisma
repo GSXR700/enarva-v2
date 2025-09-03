@@ -182,8 +182,8 @@ model Mission {
   teamMembers          TeamMember[]   @relation("MissionToTeamMember")
   leadId               String
   lead                 Lead           @relation(fields: [leadId], references: [id])
-  quoteId              String? // <-- MODIFIED: Made optional
-  quote                Quote?         @relation(fields: [quoteId], references: [id]) // <-- MODIFIED: Made optional
+  quoteId              String?
+  quote                Quote?         @relation(fields: [quoteId], references: [id])
   tasks                Task[]
   qualityChecks        QualityCheck[]
   inventoryUsed        InventoryUsage[]
@@ -395,7 +395,6 @@ model Activity {
 }
 
 // --- ENUMS ---
-// NOUVEAUX ENUMS POUR LES LEADS
 enum LeadCanal {
   WHATSAPP
   FACEBOOK
@@ -449,6 +448,7 @@ enum MissionType {
   TECHNICAL_VISIT
   DELIVERY
   INTERNAL
+  RECURRING // Ajouté pour les services récurrents
 }
 
 enum ProviderType {
@@ -461,7 +461,6 @@ enum EnarvaRole {
   SOUS_TRAITANT
 }
 
-// ENUMS EXISTANTS
 enum ExpenseCategory {
   OPERATIONS
   REVENTE_NEGOCE
@@ -486,7 +485,7 @@ enum PaymentMethod {
 enum LeadType {
   PARTICULIER
   PROFESSIONNEL
-  PUBLIC // Ajouté
+  PUBLIC
 }
 
 enum UserRole {
@@ -521,7 +520,7 @@ enum PropertyType {
   HOTEL_LUXURY
   OFFICE
   RESIDENCE_B2B
-  RESTAURANT // Ajouté
+  RESTAURANT
 }
 
 enum MaterialType {
@@ -656,6 +655,7 @@ enum SubscriptionType {
   SILVER
   GOLD
   PLATINUM
+  CUSTOM // Ajouté pour les contrats sur mesure
 }
 
 enum SubscriptionStatus {
