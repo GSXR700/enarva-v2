@@ -32,7 +32,8 @@ export default function EditQuotePage() {
       if (!response.ok) throw new Error("Devis non trouvé.");
       const data = await response.json();
       setQuote(data);
-      setEditableLineItems(data.lineItems);
+      // Ensure lineItems is always an array
+      setEditableLineItems(Array.isArray(data.lineItems) ? data.lineItems : []);
     } catch (error) {
       toast.error("Impossible de charger les données du devis.");
       router.push('/quotes');
@@ -51,6 +52,7 @@ export default function EditQuotePage() {
     );
   };
 
+  // Recalculate totals based on the (potentially edited) line items
   const finalQuote = useMemo(() => {
     if (editableLineItems.length === 0) {
       return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 };
@@ -74,7 +76,7 @@ export default function EditQuotePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...finalQuote,
-          status: quote?.status // Conserver le statut actuel
+          status: quote?.status // Preserve the current status
         }),
       });
 
