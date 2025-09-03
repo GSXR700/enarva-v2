@@ -86,7 +86,7 @@ export default function NewExpensePage() {
             const response = await fetch('/api/expenses', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...formData, proofUrl, userId: session?.user?.id }),
+                body: JSON.stringify({ ...formData, proofUrl }),
             });
             if (!response.ok) throw new Error('Échec de la création de la dépense.');
             

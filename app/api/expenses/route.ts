@@ -1,4 +1,4 @@
-// app/api/expenses/route.ts
+// app/api/expenses/route.ts - FIXED VERSION
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -32,39 +32,86 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
+
     const body = await request.json();
-    const { amount, date, rentalStartDate, rentalEndDate, missionId, leadId, ...data } = body;
+    console.log('📥 Received expense data:', body);
+    console.log('👤 Current user ID from session:', session.user.id);
+
+    const { amount, date, rentalStartDate, rentalEndDate, missionId, leadId, ...restData } = body;
+
+    // ✅ FIXED: Clean user handling
+    // Remove any userId from the body to prevent conflicts
+    const { userId: bodyUserId, ...cleanData } = restData;
+
+    // ✅ FIXED: Verify user exists in database
+    const userExists = await prisma.user.findUnique({
+      where: { id: session.user.id }
+    });
+
+    if (!userExists) {
+      console.error('❌ User not found in database:', session.user.id);
+      return new NextResponse('User not found', { status: 400 });
+    }
+
+    console.log('✅ User exists in database:', userExists.name);
 
     // Sanitize the data: convert empty strings to null for optional relations and dates
     const sanitizedData = {
-      ...data,
+      ...cleanData,
       amount: new Decimal(amount),
       date: new Date(date),
-      userId: session.user.id, // Always use the secure session ID
+      userId: session.user.id, // ✅ FIXED: Use verified session user ID
       rentalStartDate: rentalStartDate ? new Date(rentalStartDate) : null,
       rentalEndDate: rentalEndDate ? new Date(rentalEndDate) : null,
       missionId: missionId || null,
       leadId: leadId || null,
     };
-    
-    // Explicitly remove userId from the sanitized data if it was passed in the body
-    // to avoid any potential conflicts, ensuring only the session's userId is used.
-    if ('userId' in sanitizedData) {
-      // @ts-ignore
-      delete sanitizedData.userId;
-    }
-    
-    const finalData = {
+
+    console.log('🔧 Final data for creation:', {
       ...sanitizedData,
-      userId: session.user.id,
-    }
+      amount: sanitizedData.amount.toString() // Log decimal as string for readability
+    });
 
     const newExpense = await prisma.expense.create({
-      data: finalData,
+      data: sanitizedData,
+      include: {
+        mission: { select: { missionNumber: true } },
+        lead: { select: { firstName: true, lastName: true } },
+        user: { select: { name: true } },
+      }
     });
+
+    console.log('✅ Expense created successfully:', newExpense.id);
     return NextResponse.json(newExpense, { status: 201 });
+
   } catch (error) {
-    console.error('Failed to create expense:', error);
+    console.error('❌ Failed to create expense:', error);
+    
+    // Enhanced error handling
+    if (error && typeof error === 'object' && 'code' in error) {
+      switch (error.code) {
+        case 'P2003':
+          return NextResponse.json({
+            error: 'FOREIGN_KEY_CONSTRAINT',
+            message: 'Invalid reference to user, mission, or lead. Please check your data.',
+            details: error
+          }, { status: 400 });
+        case 'P2002':
+          return NextResponse.json({
+            error: 'UNIQUE_CONSTRAINT',
+            message: 'A record with these details already exists.',
+          }, { status: 409 });
+        default:
+          return NextResponse.json({
+            error: 'DATABASE_ERROR',
+            message: 'Database operation failed.',
+            code: error.code
+          }, { status: 500 });
+      }
+    }
+    
     return new NextResponse('Internal Server Error', { status: 500 });
+  } finally {
+    await prisma.$disconnect();
   }
 }
