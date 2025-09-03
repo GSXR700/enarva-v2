@@ -230,7 +230,16 @@ export default function QuotesPage() {
                     <div className="flex flex-col sm:flex-row gap-2">
                         {selectedQuote.status === 'ACCEPTED' && <Link href={`/missions/new?quoteId=${selectedQuote.id}`} className="flex-1"><Button className="w-full gap-2"><Calendar />Planifier Mission</Button></Link>}
                         <Link href={`/quotes/${selectedQuote.id}/edit`} className="flex-1"><Button variant="outline" className="w-full gap-2"><Edit />Modifier</Button></Link>
-                        <Button variant="outline" className="w-full gap-2"><Download />Télécharger PDF</Button>
+                        <Button 
+  variant="outline" 
+  className="flex-1 gap-2"
+  onClick={() => {
+    window.open(`/api/quotes/${selectedQuote.id}/download`, '_blank');
+  }}
+>
+  <Download className="w-4 h-4" />
+  Télécharger PDF
+</Button>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pt-4 border-t">
                         <p className="text-sm font-medium mr-2">Changer le statut:</p>
