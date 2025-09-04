@@ -187,14 +187,14 @@ export default function MissionReportPage() {
     };
 
     const getTaskProgress = () => {
-        if (!mission?.tasks.length) return 0;
+        if (!mission || !mission.tasks || mission.tasks.length === 0) return 0;
         const completedTasks = mission.tasks.filter(t => 
             t.status === 'COMPLETED' || t.status === 'VALIDATED'
         ).length;
         return Math.round((completedTasks / mission.tasks.length) * 100);
     };
 
-    if (isLoading || !mission) {
+    if (isLoading || !mission || !mission.lead) {
         return <TableSkeleton title="Chargement de la Mission..." />;
     }
 

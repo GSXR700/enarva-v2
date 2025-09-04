@@ -200,7 +200,7 @@ export default function MissionsPage() {
           </p>
         </div>
         {(userRole === 'ADMIN' || userRole === 'TEAM_LEADER') && (
-            <Link href="/missions/new"><Button className="gap-2 bg-enarva-gradient rounded-lg"><Plus/>Nouvelle Mission</Button></Link>
+            <Link href="/missions/new"><Button className="gap-2 bg-enarva-gradient rounded-lg"><Plus/>Mission</Button></Link>
         )}
       </div>
 

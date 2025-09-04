@@ -50,7 +50,7 @@ export default function BillingPage() {
           <p className="text-muted-foreground mt-1">{missions.length} missions terminées à facturer.</p>
         </div>
         <Link href="/billing/new">
-            <Button className="gap-2 bg-enarva-gradient rounded-lg"><Plus className="w-4 h-4" />Nouvelle Facture</Button>
+            <Button className="gap-2 bg-enarva-gradient rounded-lg"><Plus className="w-4 h-4" />Facture</Button>
         </Link>
       </div>
       <Card className="thread-card">
