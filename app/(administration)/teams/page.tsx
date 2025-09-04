@@ -91,7 +91,7 @@ export default function TeamsPage() {
         <Link href="/teams/new">
             <Button className="gap-2 bg-enarva-gradient rounded-lg">
                 <Plus className="w-4 h-4" />
-                Nouveau Membre
+                Employé
             </Button>
         </Link>
       </div>

@@ -154,7 +154,7 @@ export default function QuotesPage() {
             {allQuotes.length} devis • {allQuotes.filter(q => q.status === 'SENT').length} envoyés • {allQuotes.filter(q => q.status === 'ACCEPTED').length} acceptés
           </p>
         </div>
-        <Link href="/quotes/new"><Button className="gap-2 bg-enarva-gradient rounded-lg"><Plus />Nouveau Devis</Button></Link>
+        <Link href="/quotes/new"><Button className="gap-2 bg-enarva-gradient rounded-lg"><Plus />Devis</Button></Link>
       </div>
 
       <Card className="thread-card">

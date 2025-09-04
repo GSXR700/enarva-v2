@@ -200,7 +200,7 @@ export default function LeadsPage() {
                     <Button variant="destructive" size="sm" onClick={handleDeleteMany}><Trash2 className="w-4 h-4 mr-2" /> Supprimer</Button>
                 </div>
             ) : (
-                <Link href="/leads/new"><Button className="gap-2 bg-enarva-gradient rounded-lg"><Plus/>Nouveau Lead</Button></Link>
+                <Link href="/leads/new"><Button className="gap-2 bg-enarva-gradient rounded-lg"><Plus/>Lead</Button></Link>
             )}
         </div>
 

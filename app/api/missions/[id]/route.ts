@@ -40,37 +40,48 @@ export async function PATCH(
     try {
         const { id } = await params;
         const body = await request.json();
-        const { teamMemberIds, tasks, ...missionData } = body;
         
-        if (missionData.scheduledDate) {
-            missionData.scheduledDate = new Date(missionData.scheduledDate);
+        // Explicitly destructure only the fields we expect from the client
+        const { 
+            scheduledDate, estimatedDuration, address, priority, status, accessNotes, 
+            teamLeaderId, teamMemberIds, tasks 
+        } = body;
+        
+        // Build a clean data object for Prisma, preventing any unwanted fields
+        const dataToUpdate: any = {};
+        
+        if (scheduledDate) dataToUpdate.scheduledDate = new Date(scheduledDate);
+        if (estimatedDuration) dataToUpdate.estimatedDuration = parseInt(estimatedDuration, 10);
+        if (address) dataToUpdate.address = address;
+        if (priority) dataToUpdate.priority = priority;
+        if (status) dataToUpdate.status = status;
+        if (accessNotes !== undefined) dataToUpdate.accessNotes = accessNotes;
+
+        // Correctly format relation updates
+        if (teamLeaderId) {
+            dataToUpdate.teamLeader = { connect: { id: teamLeaderId } };
+        }
+        if (teamMemberIds && Array.isArray(teamMemberIds)) {
+            dataToUpdate.teamMembers = { set: teamMemberIds.map((memberId: string) => ({ id: memberId })) };
         }
 
         const updatedMission = await prisma.$transaction(async (tx) => {
-            // 1. Update core mission data and team members
+            // 1. Update core mission data and relations
             const mission = await tx.mission.update({
                 where: { id },
-                data: {
-                    ...missionData,
-                    teamMembers: {
-                        set: teamMemberIds ? teamMemberIds.map((memberId: string) => ({ id: memberId })) : [],
-                    },
-                },
+                data: dataToUpdate,
             });
 
             // 2. If tasks are provided, replace the existing ones
             if (tasks && Array.isArray(tasks)) {
-                // Delete all old tasks for this mission
                 await tx.task.deleteMany({ where: { missionId: id } });
-                
-                // Create the new tasks
                 if (tasks.length > 0) {
                     await tx.task.createMany({
                         data: tasks.map((task: any) => ({
                             title: task.title,
                             category: task.category,
                             status: task.status || 'ASSIGNED',
-                            estimatedTime: task.estimatedTime || 0,
+                            estimatedTime: task.estimatedTime || 0, // <-- FIX: Added required field
                             missionId: id,
                         })),
                     });
