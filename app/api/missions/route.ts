@@ -19,7 +19,11 @@ export async function GET() {
       include: {
         lead: true,
         teamLeader: true,
-        teamMembers: true,
+        teamMembers: {
+          include: {
+            user: true // <-- FIX: Correctly include the nested user object
+          }
+        },
         quote: true,
         tasks: true,
       },
