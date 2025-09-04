@@ -254,7 +254,9 @@ export default function MissionsPage() {
             </DialogHeader>
             <div className="space-y-6 py-4">
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1"><Edit className="w-4 h-4 mr-2"/>Modifier</Button>
+                <Link href={`/missions/${selectedMission.id}/edit`} className="flex-1">
+                  <Button variant="outline" className="w-full"><Edit className="w-4 h-4 mr-2"/>Modifier</Button>
+                </Link>
                 <Button variant="destructive" className="flex-1" onClick={() => handleDeleteMission(selectedMission.id)}><Trash2 className="w-4 h-4 mr-2"/>Supprimer</Button>
               </div>
 

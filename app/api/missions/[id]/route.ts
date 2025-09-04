@@ -17,24 +17,8 @@ export async function GET(
             include: { 
                 lead: true,
                 teamLeader: true,
-                teamMembers: {
-                  include: {
-                    user: true
-                  }
-                },
-                tasks: {
-                    include: {
-                        assignedTo: {
-                            select: {
-                                firstName: true,
-                                lastName: true
-                            }
-                        }
-                    },
-                    orderBy: {
-                        createdAt: 'asc'
-                    }
-                }
+                teamMembers: { include: { user: true } },
+                tasks: { orderBy: { createdAt: 'asc' } }
             }
         });
 
@@ -48,7 +32,7 @@ export async function GET(
     }
 }
 
-// PATCH handler to update the mission with a report, new status, or team members
+// PATCH handler to update the mission, team, and tasks
 export async function PATCH(
   request: Request, 
   { params }: { params: Promise<{ id: string }> }
@@ -56,29 +40,43 @@ export async function PATCH(
     try {
         const { id } = await params;
         const body = await request.json();
-        const { teamMemberIds, ...missionData } = body;
-
-        // Ensure that if scheduledDate is passed, it's a valid Date
+        const { teamMemberIds, tasks, ...missionData } = body;
+        
         if (missionData.scheduledDate) {
             missionData.scheduledDate = new Date(missionData.scheduledDate);
         }
 
-        // Handle team member updates
-        if (teamMemberIds && Array.isArray(teamMemberIds)) {
-            missionData.teamMembers = {
-                set: teamMemberIds.map((memberId: string) => ({ id: memberId }))
-            };
-        }
+        const updatedMission = await prisma.$transaction(async (tx) => {
+            // 1. Update core mission data and team members
+            const mission = await tx.mission.update({
+                where: { id },
+                data: {
+                    ...missionData,
+                    teamMembers: {
+                        set: teamMemberIds ? teamMemberIds.map((memberId: string) => ({ id: memberId })) : [],
+                    },
+                },
+            });
 
-        const updatedMission = await prisma.mission.update({
-            where: { id },
-            data: missionData,
-            include: {
-                lead: true,
-                teamLeader: true,
-                teamMembers: { include: { user: true }},
-                tasks: true
+            // 2. If tasks are provided, replace the existing ones
+            if (tasks && Array.isArray(tasks)) {
+                // Delete all old tasks for this mission
+                await tx.task.deleteMany({ where: { missionId: id } });
+                
+                // Create the new tasks
+                if (tasks.length > 0) {
+                    await tx.task.createMany({
+                        data: tasks.map((task: any) => ({
+                            title: task.title,
+                            category: task.category,
+                            status: task.status || 'ASSIGNED',
+                            estimatedTime: task.estimatedTime || 0,
+                            missionId: id,
+                        })),
+                    });
+                }
             }
+            return mission;
         });
 
         return NextResponse.json(updatedMission);
@@ -96,7 +94,6 @@ export async function DELETE(
     try {
         const { id } = await params;
 
-        // Use a transaction to ensure all related data is deleted
         await prisma.$transaction([
             prisma.task.deleteMany({ where: { missionId: id } }),
             prisma.expense.updateMany({ where: { missionId: id }, data: { missionId: null } }),
