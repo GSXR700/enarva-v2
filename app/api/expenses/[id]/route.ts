@@ -7,10 +7,10 @@ const prisma = new PrismaClient();
 
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } } 
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     const expense = await prisma.expense.findUnique({
       where: { id },
       include: {
@@ -32,13 +32,12 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     const body = await request.json();
     
-    // Convert amount to Decimal if it exists
     if (body.amount) {
       body.amount = new Decimal(body.amount);
     }
@@ -56,10 +55,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     await prisma.expense.delete({
       where: { id },
     });
