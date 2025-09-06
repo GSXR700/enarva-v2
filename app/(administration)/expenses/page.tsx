@@ -1,15 +1,14 @@
-// app/(administration)/expenses/page.tsx
+//app/(administration)/expenses/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Receipt, Trash2 } from 'lucide-react';
-import { Expense, Mission, Lead, User } from '@prisma/client';
+import { Plus, Receipt, Trash2, Edit } from 'lucide-react';
+import { Expense } from '@prisma/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
-import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
 type ExpenseWithDetails = Expense & { 
@@ -20,28 +19,43 @@ type ExpenseWithDetails = Expense & {
 
 export default function ExpensesPage() {
     const [expenses, setExpenses] = useState<ExpenseWithDetails[]>([]);
-    const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const fetchExpenses = async () => {
+        try {
+            setIsLoading(true);
+            const response = await fetch('/api/expenses');
+            if (!response.ok) throw new Error('Impossible de charger les dépenses.');
+            const data = await response.json();
+            setExpenses(data);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchExpenses = async () => {
-            try {
-                const response = await fetch('/api/expenses');
-                if (!response.ok) throw new Error('Impossible de charger les dépenses.');
-                const data = await response.json();
-                setExpenses(data);
-            } catch (err: any) {
-                setError(err.message);
-            } finally {
-                setIsLoading(false);
-            }
-        };
         fetchExpenses();
     }, []);
 
-    const handleDeleteMany = async () => {
-        // Implement delete many logic here if needed
+    const handleDelete = async (expenseId: string) => {
+        if (!confirm("Êtes-vous sûr de vouloir supprimer cette dépense ? Cette action est irréversible.")) return;
+
+        try {
+            const response = await fetch(`/api/expenses/${expenseId}`, {
+                method: 'DELETE',
+            });
+            if (response.status !== 204) {
+                const errorText = await response.text();
+                throw new Error(errorText || "La suppression a échoué.");
+            }
+            toast.success("Dépense supprimée avec succès.");
+            fetchExpenses(); // Refresh the list
+        } catch (error: any) {
+            toast.error(error.message);
+        }
     };
 
     if (isLoading) {
@@ -78,6 +92,7 @@ export default function ExpensesPage() {
                                     <th scope="col" className="px-6 py-3">Agent</th>
                                     <th scope="col" className="px-6 py-3">Lié à</th>
                                     <th scope="col" className="px-6 py-3 text-right">Montant</th>
+                                    <th scope="col" className="px-6 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -88,6 +103,16 @@ export default function ExpensesPage() {
                                         <td className="px-6 py-4 text-muted-foreground">{expense.user.name}</td>
                                         <td className="px-6 py-4">{expense.mission?.missionNumber || (expense.lead ? `${expense.lead.firstName} ${expense.lead.lastName}` : 'Général')}</td>
                                         <td className="px-6 py-4 text-right font-bold text-red-500">{formatCurrency(Number(expense.amount))}</td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Link href={`/expenses/${expense.id}/edit`}>
+                                                    <Button variant="ghost" size="icon"><Edit className="w-4 h-4" /></Button>
+                                                </Link>
+                                                <Button variant="ghost" size="icon" onClick={() => handleDelete(expense.id)}>
+                                                    <Trash2 className="w-4 h-4 text-red-500" />
+                                                </Button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

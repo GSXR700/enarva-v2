@@ -1,4 +1,4 @@
-// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/api/inventory/[id]/route.ts
+//app/api/inventory/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -8,10 +8,10 @@ const prisma = new PrismaClient();
 // GET /api/inventory/[id] - Fetch a single inventory item
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
+    const { id } = context.params;
     const item = await prisma.inventory.findUnique({
       where: { id },
     });
@@ -30,10 +30,10 @@ export async function GET(
 // PATCH /api/inventory/[id] - Update an inventory item
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
+    const { id } = context.params;
     const body = await request.json();
     const { name, category, unit, currentStock, minimumStock, unitPrice, supplier } = body;
 
@@ -60,10 +60,10 @@ export async function PATCH(
 // DELETE /api/inventory/[id] - Delete an inventory item
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
+    const { id } = context.params;
 
     // Check for usages before deleting
     const usages = await prisma.inventoryUsage.count({
