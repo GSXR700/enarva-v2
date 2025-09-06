@@ -1,4 +1,4 @@
-// app/api/quotes/[id]/route.ts
+//app/api/quotes/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -14,7 +14,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = await params; // ✅ Await params for Next.js 15
+        const { id } = await params;
         
         const quote = await prisma.quote.findUnique({ 
             where: { id },
@@ -40,10 +40,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = await params; // ✅ Await params for Next.js 15
+        const { id } = await params;
         const body = await request.json();
         
-        const { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice, status } = body;
+        const { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice, status, type, expiresAt } = body;
 
         // Build update data dynamically based on what's provided in the body
         const dataToUpdate: any = {};
@@ -54,6 +54,8 @@ export async function PATCH(
         if (totalTTC !== undefined) dataToUpdate.totalTTC = new Decimal(totalTTC);
         if (finalPrice !== undefined) dataToUpdate.finalPrice = new Decimal(finalPrice);
         if (status) dataToUpdate.status = status;
+        if (type) dataToUpdate.type = type;
+        if (expiresAt) dataToUpdate.expiresAt = new Date(expiresAt);
 
         if (Object.keys(dataToUpdate).length === 0) {
             return new NextResponse('No update data provided', { status: 400 });
@@ -79,7 +81,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = await params; // ✅ Await params for Next.js 15
+        const { id } = await params;
         
         await prisma.quote.delete({
             where: { id },
