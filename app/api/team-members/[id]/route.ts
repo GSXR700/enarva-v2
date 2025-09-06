@@ -1,4 +1,4 @@
-//app/api/team-members/[id]/route.ts
+// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/api/team-members/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
@@ -7,10 +7,10 @@ const prisma = new PrismaClient();
 // GET /api/team-members/[id] - Fetch a single team member
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const teamMember = await prisma.teamMember.findUnique({
       where: { id },
       include: { user: true },
@@ -30,10 +30,10 @@ export async function GET(
 // PATCH /api/team-members/[id] - Update a team member's details
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { email, name, role, firstName, lastName, phone, specialties, experienceLevel, availability } = body;
 
@@ -75,10 +75,10 @@ export async function PATCH(
 // DELETE /api/team-members/[id] - Delete a team member and their user account
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const teamMember = await prisma.teamMember.findUnique({ where: { id } });
     if (!teamMember) {
