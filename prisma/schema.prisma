@@ -265,28 +265,33 @@ model Expense {
 }
 
 model Task {
-  id            String     @id @default(cuid())
-  title         String
-  description   String?
-  category      TaskCategory
-  status        TaskStatus @default(ASSIGNED)
-  estimatedTime Int
-  actualTime    Int?
-  assignedToId  String?
-  assignedTo    TeamMember? @relation(fields: [assignedToId], references: [id])
-  missionId     String
-  mission       Mission    @relation(fields: [missionId], references: [id])
-  startedAt     DateTime?
-  completedAt   DateTime?
-  validatedBy   String?
-  validatedAt   DateTime?
-  beforePhotos  Json?
-  afterPhotos   Json?
-  notes         String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
-  @@map("tasks")
+  id                   String        @id @default(cuid())
+  title                String
+  description          String?       @db.Text
+  category             TaskCategory
+  status               TaskStatus    @default(ASSIGNED)
+  missionId            String
+  mission              Mission       @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  assignedToId         String?
+  assignedTo           TeamMember?   @relation(fields: [assignedToId], references: [id])
+  estimatedTime        Int?
+  actualTime           Int?
+  notes                String?       @db.Text
+  
+  // Timestamps
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  startedAt            DateTime?
+  completedAt          DateTime?
+  validatedAt          DateTime?
+  
+  // Validation & Feedback
+  validatedBy          String?
+  beforePhotos         String[]
+  afterPhotos          String[]
+  clientApproved       Boolean?      // ✅ ADDED: To store client's on-site approval
+  clientFeedback       String?       @db.Text // ✅ ADDED: To store client's feedback for the task
+  teamLeaderValidated  Boolean?
 }
 
 model TaskTemplate {

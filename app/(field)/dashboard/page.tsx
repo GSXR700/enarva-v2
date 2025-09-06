@@ -1,14 +1,14 @@
-// app/(field)/dashboard/page.tsx - ENHANCED FIELD DASHBOARD
+// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/(field)/dashboard/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Mission, Lead, User, Task } from '@prisma/client';
+import { Mission, Lead, User, Task, TaskStatus } from '@prisma/client';
 import { formatDate, formatTime, translate } from '@/lib/utils';
 import { 
   MapPin, 
@@ -46,34 +46,32 @@ export default function FieldDashboardPage() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchMissions = async () => {
-      if (session?.user?.id) {
-        try {
-          const response = await fetch('/api/missions');
-          if (!response.ok) throw new Error("Failed to fetch missions");
-          const allMissions: MissionWithDetails[] = await response.json();
-          
-          // Filter missions for current user (team leader or assigned team member)
-          const assignedMissions = allMissions.filter(
-            mission => 
-              mission.teamLeaderId === session.user.id ||
-              (mission.status !== 'COMPLETED' && mission.status !== 'CANCELLED')
-          );
-          
-          setMyMissions(assignedMissions);
-        } catch (error) {
-          console.error("Failed to fetch missions", error);
-          toast.error("Impossible de charger les missions.");
-        } finally {
-          setIsLoading(false);
-        }
+  const fetchMissions = useCallback(async () => {
+    if (session?.user?.id) {
+      try {
+        const response = await fetch('/api/missions');
+        if (!response.ok) throw new Error("Failed to fetch missions");
+        const allMissions: MissionWithDetails[] = await response.json();
+        
+        const assignedMissions = allMissions.filter(
+          mission => 
+            mission.teamLeaderId === session.user.id ||
+            (mission.status !== 'COMPLETED' && mission.status !== 'CANCELLED')
+        );
+        
+        setMyMissions(assignedMissions);
+      } catch (error) {
+        console.error("Failed to fetch missions", error);
+        toast.error("Impossible de charger les missions.");
+      } finally {
+        setIsLoading(false);
       }
-    };
+    }
+  }, [session?.user?.id]);
 
+  useEffect(() => {
     fetchMissions();
 
-    // Set up real-time notifications
     if (session?.user?.id) {
       const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
         cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
@@ -82,13 +80,11 @@ export default function FieldDashboardPage() {
       const channelName = `user-${session.user.id}`;
       const channel = pusher.subscribe(channelName);
 
-      // Listen for new missions
       channel.bind('mission-new', (newMission: Mission) => {
         toast.success(`Nouvelle mission assignée: ${newMission.missionNumber}`);
         fetchMissions();
       });
 
-      // Listen for mission validation results
       channel.bind('mission-validation', (data: any) => {
         const message = data.approved 
           ? `Mission ${data.missionNumber} approuvée!`
@@ -108,12 +104,15 @@ export default function FieldDashboardPage() {
         pusher.disconnect();
       };
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, fetchMissions]);
 
   const getMissionProgress = (mission: MissionWithDetails) => {
     if (!mission.tasks?.length) return 0;
-    const validatedTasks = mission.tasks.filter(t => t.status === 'VALIDATED').length;
-    return Math.round((validatedTasks / mission.tasks.length) * 100);
+    // ✅ FIX: Count both COMPLETED and VALIDATED tasks for accurate progress
+    const completedTasks = mission.tasks.filter(
+      t => t.status === 'COMPLETED' || t.status === 'VALIDATED'
+    ).length;
+    return Math.round((completedTasks / mission.tasks.length) * 100);
   };
 
   const getMissionStatusInfo = (mission: MissionWithDetails) => {
