@@ -7,10 +7,10 @@ const prisma = new PrismaClient();
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const item = await prisma.inventory.findUnique({ where: { id } });
     if (!item) return new NextResponse('Inventory item not found', { status: 404 });
     return NextResponse.json(item);
@@ -22,10 +22,10 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { currentStock, minimumStock, unitPrice, ...rest } = body;
     const updatedItem = await prisma.inventory.update({
@@ -46,10 +46,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const usages = await prisma.inventoryUsage.count({ where: { inventoryId: id } });
     if (usages > 0) {
         return new NextResponse(`Cannot delete item. It is linked to ${usages} mission usage record(s).`, { status: 409 });

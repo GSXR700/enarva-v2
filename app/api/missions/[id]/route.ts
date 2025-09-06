@@ -60,7 +60,10 @@ export async function PATCH(
                 if (tasks.length > 0) {
                     await tx.task.createMany({
                         data: tasks.map((task: any) => ({
-                            ...task,
+                            title: task.title,
+                            category: task.category,
+                            status: task.status || 'ASSIGNED',
+                            estimatedTime: task.estimatedTime || 0,
                             missionId: id,
                         })),
                     });
