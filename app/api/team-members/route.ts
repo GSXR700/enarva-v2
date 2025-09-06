@@ -1,6 +1,6 @@
-// app/api/team-members/route.ts
+// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/api/team-members/route.ts
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, TeamSpecialty } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
                         lastName,
                         phone,
                         email,
-                        specialties,
+                        specialties: specialties as TeamSpecialty[], // Casting specialties to the enum array
                         experienceLevel,
                     }
                 }

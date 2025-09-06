@@ -1,30 +1,33 @@
-// app/(administration)/teams/new/page.tsx
+// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/(administration)/teams/new/page.tsx
 'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, UserPlus, Shield, User } from 'lucide-react'
-import { toast } from 'sonner' // Import toast
+import { Checkbox } from '@/components/ui/checkbox'
+import { ArrowLeft } from 'lucide-react'
+import { toast } from 'sonner'
+import { TeamSpecialty } from '@prisma/client'
+
+const allSpecialties = Object.values(TeamSpecialty);
 
 export default function NewTeamMemberPage() {
   const router = useRouter()
   
-  // --- MODIFICATION 1: Add password to the form state ---
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
-    password: '', // <-- ADDED
+    password: '',
     phone: '',
     role: 'TECHNICIAN',
     experienceLevel: 'JUNIOR',
-    specialties: [],
+    specialties: [] as TeamSpecialty[],
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,9 +37,18 @@ export default function NewTeamMemberPage() {
     setFormData(prev => ({ ...prev, [id]: value }))
   }
 
-  const handleSelectChange = (id: keyof typeof formData, value: string | string[]) => {
-    setFormData(prev => ({ ...prev, [id]: value }))
+  const handleSelectChange = (id: keyof typeof formData, value: string) => {
+    setFormData(prev => ({ ...prev, [id]: value as any }))
   }
+
+  const handleSpecialtyChange = (specialty: TeamSpecialty) => {
+    setFormData(prev => {
+        const newSpecialties = prev.specialties.includes(specialty)
+            ? prev.specialties.filter(s => s !== specialty)
+            : [...prev.specialties, specialty];
+        return { ...prev, specialties: newSpecialties };
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -74,6 +86,20 @@ export default function NewTeamMemberPage() {
       setIsLoading(false)
     }
   }
+  
+  const translateSpecialty = (specialty: string) => {
+      const translations: { [key: string]: string } = {
+        GENERAL_CLEANING: "Nettoyage Général",
+        WINDOW_SPECIALIST: "Spécialiste Vitres",
+        FLOOR_SPECIALIST: "Spécialiste Sols",
+        LUXURY_SURFACES: "Surfaces de Luxe",
+        EQUIPMENT_HANDLING: "Manipulation d'Équipement",
+        TEAM_MANAGEMENT: "Gestion d'Équipe",
+        QUALITY_CONTROL: "Contrôle Qualité",
+        DETAIL_FINISHING: "Finitions & Détails",
+      };
+      return translations[specialty] || specialty;
+  }
 
   return (
     <div className="main-content space-y-6">
@@ -106,7 +132,6 @@ export default function NewTeamMemberPage() {
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" value={formData.email} onChange={handleChange} required />
               </div>
-               {/* --- MODIFICATION 2: Add password input field --- */}
               <div>
                 <Label htmlFor="password">Mot de passe</Label>
                 <Input id="password" type="password" value={formData.password} onChange={handleChange} required />
@@ -138,6 +163,24 @@ export default function NewTeamMemberPage() {
                 </Select>
               </div>
             </div>
+            
+            <div>
+                <Label>Spécialités</Label>
+                <CardDescription className="text-xs mb-2">Sélectionnez les domaines de compétence de ce membre.</CardDescription>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 border rounded-lg">
+                    {allSpecialties.map(specialty => (
+                        <div key={specialty} className="flex items-center space-x-2">
+                            <Checkbox 
+                                id={specialty}
+                                checked={formData.specialties.includes(specialty)}
+                                onCheckedChange={() => handleSpecialtyChange(specialty)}
+                            />
+                            <Label htmlFor={specialty} className="font-normal">{translateSpecialty(specialty)}</Label>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
             {error && <p className="text-red-500 text-sm">{error}</p>}
             <div className="flex justify-end pt-4">
               <Button type="submit" className="bg-enarva-gradient rounded-lg px-8" disabled={isLoading}>

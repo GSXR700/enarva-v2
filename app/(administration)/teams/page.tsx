@@ -1,4 +1,4 @@
-// app/(administration)/teams/page.tsx
+// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/(administration)/teams/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -9,9 +9,11 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Users, Shield, Award, User as UserIcon } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Plus, Users, Shield, Award, User as UserIcon, MoreVertical, Edit, Trash2 } from 'lucide-react'
 import { User, TeamMember } from '@prisma/client'
 import { CardGridSkeleton } from '@/components/skeletons/CardGridSkeleton'
+import { toast } from 'sonner'
 
 type TeamMemberWithUser = TeamMember & { user: User };
 
@@ -23,20 +25,21 @@ export default function TeamsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const fetchTeamMembers = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/team-members');
+      if (!response.ok) throw new Error('Impossible de récupérer les membres.');
+      const data = await response.json();
+      setAllMembers(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchTeamMembers = async () => {
-      try {
-        const response = await fetch('/api/team-members');
-        if (!response.ok) throw new Error('Impossible de récupérer les membres.');
-        const data = await response.json();
-        setAllMembers(data);
-        setFilteredMembers(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchTeamMembers();
   }, []);
 
@@ -55,6 +58,21 @@ export default function TeamsPage() {
     }
     setFilteredMembers(members);
   }, [searchQuery, roleFilter, allMembers]);
+  
+  const handleDelete = async (memberId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce membre ? Cette action est irréversible et supprimera également son compte utilisateur.")) return;
+
+    try {
+        const response = await fetch(`/api/team-members/${memberId}`, {
+            method: 'DELETE',
+        });
+        if (response.status !== 204) throw new Error("La suppression a échoué.");
+        toast.success("Membre supprimé avec succès.");
+        fetchTeamMembers(); // Refresh the list
+    } catch (error: any) {
+        toast.error(error.message);
+    }
+  }
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -83,7 +101,7 @@ export default function TeamsPage() {
     <div className="main-content space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Gestion des Équipes</h1>
+          <h1 className="text-2-xl md:text-3xl font-bold text-foreground">Gestion des Équipes</h1>
           <p className="text-muted-foreground mt-1">
             {allMembers.length} membres dans votre organisation
           </p>
@@ -123,18 +141,30 @@ export default function TeamsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredMembers.map((member) => (
-          <Card key={member.id} className="thread-card">
+          <Card key={member.id} className="thread-card flex flex-col justify-between">
             <CardContent className="p-6">
-              <div className="flex items-center gap-4 mb-4">
-                <Avatar className="w-16 h-16">
-                  <AvatarImage src={member.user.image || undefined} />
-                  <AvatarFallback>{member.firstName[0]}{member.lastName[0]}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="text-lg font-bold text-foreground">{member.firstName} {member.lastName}</h3>
-                  <p className="text-sm text-muted-foreground">{member.email}</p>
-                </div>
+              <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <Avatar className="w-16 h-16">
+                      <AvatarImage src={member.user.image || undefined} />
+                      <AvatarFallback>{member.firstName[0]}{member.lastName[0]}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h3 className="text-lg font-bold text-foreground">{member.firstName} {member.lastName}</h3>
+                      <p className="text-sm text-muted-foreground">{member.email}</p>
+                    </div>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4"/></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <Link href={`/teams/${member.id}/edit`}><DropdownMenuItem><Edit className="w-4 h-4 mr-2"/>Modifier</DropdownMenuItem></Link>
+                        <DropdownMenuItem className="text-red-500" onClick={() => handleDelete(member.id)}><Trash2 className="w-4 h-4 mr-2"/>Supprimer</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
               </div>
+
               <div className="flex flex-wrap gap-2">
                  <Badge className={`text-xs ${getRoleColor(member.user.role)} flex items-center gap-1`}>
                     {getRoleIcon(member.user.role)}
