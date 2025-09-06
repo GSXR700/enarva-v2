@@ -1,59 +1,83 @@
-// app/api/dashboard/route.ts
-import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-import { Decimal } from '@prisma/client/runtime/library';
+// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/api/dashboard/route.ts
+import { NextResponse } from 'next/server';
+import { PrismaClient, LeadStatus } from '@prisma/client';
+import { startOfMonth, endOfMonth } from 'date-fns';
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    // 1. Fetch Key Statistics
-    const totalLeads = await prisma.lead.count();
-    const activeMissionsCount = await prisma.mission.count({ where: { status: 'IN_PROGRESS' } });
+    const today = new Date();
+    const startOfCurrentMonth = startOfMonth(today);
+
+    // Stats
+    const totalLeads = await prisma.lead.count({
+        where: { status: { notIn: [LeadStatus.LEAD_LOST, LeadStatus.COMPLETED]}}
+    });
     
-    const completedMissions = await prisma.mission.findMany({
-        where: { status: 'COMPLETED' },
+    const activeMissionsCount = await prisma.mission.count({
+      where: { status: { in: ['SCHEDULED', 'IN_PROGRESS'] } }
+    });
+
+    const completedMissionsThisMonth = await prisma.mission.findMany({
+        where: {
+            status: 'COMPLETED',
+            updatedAt: { gte: startOfCurrentMonth }
+        },
         include: { quote: true }
     });
-    
-    // Fixed: Check if mission.quote exists before accessing finalPrice
-    const totalRevenue = completedMissions.reduce((acc, mission) => {
-        if (mission.quote) { // Check if mission.quote is not null
-            return acc.add(mission.quote.finalPrice);
+
+    const totalRevenue = completedMissionsThisMonth.reduce((sum, mission) => {
+        return sum + (mission.quote?.finalPrice.toNumber() || 0);
+    }, 0);
+
+    const leadsWonThisMonth = await prisma.lead.count({
+        where: {
+            status: LeadStatus.QUOTE_ACCEPTED,
+            updatedAt: { gte: startOfCurrentMonth }
         }
-        return acc; // Return accumulator unchanged if no quote
-    }, new Decimal(0));
+    });
+    const totalLeadsThisMonth = await prisma.lead.count({
+        where: {
+            createdAt: { gte: startOfCurrentMonth }
+        }
+    });
+
+    const conversionRate = totalLeadsThisMonth > 0 
+        ? ((leadsWonThisMonth / totalLeadsThisMonth) * 100).toFixed(1)
+        : "0.0";
     
-    const acceptedQuotes = await prisma.quote.count({ where: { status: 'ACCEPTED' } });
-    const totalQuotes = await prisma.quote.count();
-    const conversionRate = totalQuotes > 0 ? (acceptedQuotes / totalQuotes) * 100 : 0;
-
-    // 2. Fetch Recent Leads
+    // Recent Leads
     const recentLeads = await prisma.lead.findMany({
-        take: 3,
-        orderBy: { createdAt: 'desc' }
+      take: 3,
+      orderBy: { createdAt: 'desc' },
+      include: { assignedTo: true }
     });
 
-    // 3. Fetch Active Missions
+    // Active Missions
     const activeMissions = await prisma.mission.findMany({
-        where: { status: 'IN_PROGRESS' },
-        include: { lead: true, teamLeader: true },
-        take: 3,
-        orderBy: { scheduledDate: 'desc' }
+      where: { status: { in: ['SCHEDULED', 'IN_PROGRESS'] } },
+      include: { 
+        lead: { select: { firstName: true, lastName: true, address: true } },
+        // ✅ FIX: Ensure tasks are always included with a minimal selection
+        tasks: { select: { id: true, status: true } }
+      },
+      orderBy: { scheduledDate: 'asc' },
+      take: 5,
     });
-
-    const dashboardData = {
+    
+    const data = {
         stats: {
             totalLeads,
             activeMissions: activeMissionsCount,
-            totalRevenue: totalRevenue.toNumber(),
-            conversionRate: conversionRate.toFixed(1)
+            totalRevenue,
+            conversionRate
         },
         recentLeads,
         activeMissions,
     };
 
-    return NextResponse.json(dashboardData);
+    return NextResponse.json(data);
 
   } catch (error) {
     console.error('Failed to fetch dashboard data:', error);
