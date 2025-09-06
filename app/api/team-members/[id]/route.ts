@@ -1,4 +1,4 @@
-// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/api/team-members/[id]/route.ts
+// app/api/team-members/[id]/route.ts - FIXED FOR NEXT.JS 15
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
@@ -6,10 +6,10 @@ const prisma = new PrismaClient();
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // ✅ Await params for Next.js 15
     const teamMember = await prisma.teamMember.findUnique({ where: { id }, include: { user: true } });
     if (!teamMember) return new NextResponse('Team member not found', { status: 404 });
     return NextResponse.json(teamMember);
@@ -21,10 +21,10 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // ✅ Await params for Next.js 15
     const body = await request.json();
     const { email, role, firstName, lastName, ...teamMemberData } = body;
     const teamMember = await prisma.teamMember.findUnique({ where: { id } });
@@ -50,10 +50,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // ✅ Await params for Next.js 15
     const teamMember = await prisma.teamMember.findUnique({ where: { id } });
     if (!teamMember) return new NextResponse('Team member not found', { status: 404 });
     await prisma.$transaction([

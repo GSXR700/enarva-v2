@@ -1,4 +1,4 @@
-// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/api/quotes/[id]/route.ts
+// app/api/quotes/[id]/route.ts - FIXED FOR NEXT.JS 15
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -7,10 +7,10 @@ const prisma = new PrismaClient();
 
 export async function GET(
   request: Request, 
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = context.params;
+        const { id } = await params; // ✅ Await params for Next.js 15
         
         const quote = await prisma.quote.findUnique({ 
             where: { id },
@@ -29,10 +29,10 @@ export async function GET(
 
 export async function PATCH(
   request: Request, 
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = context.params;
+        const { id } = await params; // ✅ Await params for Next.js 15
         const body = await request.json();
         
         const { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice, status, type, expiresAt } = body;
@@ -65,10 +65,10 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request, 
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = context.params;
+        const { id } = await params; // ✅ Await params for Next.js 15
         
         await prisma.quote.delete({
             where: { id },
