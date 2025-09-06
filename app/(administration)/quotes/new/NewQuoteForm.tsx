@@ -1,4 +1,4 @@
-// app/(administration)/quotes/new/NewQuoteForm.tsx
+// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/(administration)/quotes/new/NewQuoteForm.tsx
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, Calculator, FileText, User, Plus, Trash2, Edit } from 'lucide-react'
 import { formatCurrency, generateQuote, ServiceInput, QuoteLineItem, ServiceType } from '@/lib/utils'
-import { Lead } from '@prisma/client'
+import { Lead, QuoteType } from '@prisma/client'
 import { toast } from 'sonner'
 
 type ServiceInputState = ServiceInput & { id: number };
@@ -21,6 +21,12 @@ export default function NewQuoteForm() {
   const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [quoteType, setQuoteType] = useState<QuoteType>('STANDARD');
+  const [expiresAt, setExpiresAt] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 30);
+    return date.toISOString().split('T')[0];
+  });
   
   const [services, setServices] = useState<ServiceInputState[]>([
       { id: Date.now(), type: 'GrandMénage', surface: 100, levels: 1, distance: 10, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }
@@ -101,7 +107,8 @@ export default function NewQuoteForm() {
                 leadId: selectedLead.id,
                 quoteNumber: `DV-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
                 ...finalQuote,
-                expiresAt: new Date(new Date().setDate(new Date().getDate() + 30)),
+                expiresAt: expiresAt,
+                type: quoteType,
                 surface: services.reduce((acc, s) => acc + s.surface * s.levels, 0),
                 levels: services.reduce((acc, s) => Math.max(acc, s.levels), 1),
                 propertyType: selectedLead.propertyType
@@ -136,12 +143,22 @@ export default function NewQuoteForm() {
         <div className="lg:col-span-1 space-y-6">
             <Card className="thread-card">
               <CardHeader><CardTitle className="flex items-center gap-2"><User />Informations Client</CardTitle></CardHeader>
-              <CardContent>
-                <Label htmlFor="leadId">Sélectionner un Lead</Label>
-                <Select value={selectedLead?.id} onValueChange={(id) => setSelectedLead(leads.find(l => l.id === id) || null)} required>
-                  <SelectTrigger><SelectValue placeholder="Choisir un client..." /></SelectTrigger>
-                  <SelectContent>{leads.map(lead => (<SelectItem key={lead.id} value={lead.id}>{lead.firstName} {lead.lastName}</SelectItem>))}</SelectContent>
-                </Select>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="leadId">Sélectionner un Lead</Label>
+                  <Select value={selectedLead?.id} onValueChange={(id) => setSelectedLead(leads.find(l => l.id === id) || null)} required>
+                    <SelectTrigger><SelectValue placeholder="Choisir un client..." /></SelectTrigger>
+                    <SelectContent>{leads.map(lead => (<SelectItem key={lead.id} value={lead.id}>{lead.firstName} {lead.lastName}</SelectItem>))}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="type">Type de Devis</Label>
+                  <Select value={quoteType} onValueChange={(v) => setQuoteType(v as QuoteType)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="EXPRESS">Express</SelectItem><SelectItem value="STANDARD">Standard</SelectItem><SelectItem value="PREMIUM">Premium</SelectItem></SelectContent></Select>
+                </div>
+                <div>
+                  <Label htmlFor="expiresAt">Date d'expiration</Label>
+                  <Input id="expiresAt" type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} required />
+                </div>
               </CardContent>
             </Card>
 

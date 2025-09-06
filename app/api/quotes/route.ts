@@ -1,6 +1,6 @@
-// app/api/quotes/route.ts
+//app/api/quotes/route.ts
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, QuoteType } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 
 const prisma = new PrismaClient()
@@ -23,7 +23,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { leadId, quoteNumber, lineItems, subTotalHT, vatAmount, totalTTC, finalPrice, expiresAt } = body;
+    const { leadId, quoteNumber, lineItems, subTotalHT, vatAmount, totalTTC, finalPrice, expiresAt, type, ...restData } = body;
 
     if (!leadId || !quoteNumber || !lineItems) {
       return new NextResponse('Missing required fields', { status: 400 })
@@ -31,6 +31,7 @@ export async function POST(request: Request) {
 
     const newQuote = await prisma.quote.create({
       data: {
+        ...restData,
         leadId,
         quoteNumber,
         lineItems,
@@ -38,7 +39,8 @@ export async function POST(request: Request) {
         vatAmount: new Decimal(vatAmount),
         totalTTC: new Decimal(totalTTC),
         finalPrice: new Decimal(finalPrice),
-        expiresAt: new Date(expiresAt),
+        expiresAt: expiresAt ? new Date(expiresAt) : new Date(new Date().setDate(new Date().getDate() + 30)),
+        type: type || QuoteType.STANDARD,
         status: 'DRAFT',
       },
     });
