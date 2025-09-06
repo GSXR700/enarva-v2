@@ -4,14 +4,12 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// GET handler to fetch a single mission by its ID
 export async function GET(
   request: Request, 
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = context.params;
-        
+        const { id } = await params;
         const mission = await prisma.mission.findUnique({
             where: { id },
             include: { 
@@ -21,10 +19,7 @@ export async function GET(
                 tasks: { orderBy: { createdAt: 'asc' } }
             }
         });
-
-        if (!mission) {
-            return new NextResponse('Mission not found', { status: 404 });
-        }
+        if (!mission) return new NextResponse('Mission not found', { status: 404 });
         return NextResponse.json(mission);
     } catch (error) {
         console.error(`Failed to fetch mission:`, error);
@@ -32,38 +27,25 @@ export async function GET(
     }
 }
 
-// PATCH handler to update the mission, team, and tasks
 export async function PATCH(
   request: Request, 
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = context.params;
+        const { id } = await params;
         const body = await request.json();
+        const { teamMemberIds, tasks, ...missionData } = body;
         
-        const { 
-            scheduledDate, estimatedDuration, address, priority, status, accessNotes, 
-            teamLeaderId, teamMemberIds, tasks, coordinates, clientFeedback,
-            clientRating, clientValidated, invoiceGenerated
-        } = body;
-        
-        const dataToUpdate: any = {};
-        
-        if (scheduledDate) dataToUpdate.scheduledDate = new Date(scheduledDate);
-        if (estimatedDuration) dataToUpdate.estimatedDuration = parseInt(estimatedDuration, 10);
-        if (address) dataToUpdate.address = address;
-        if (priority) dataToUpdate.priority = priority;
-        if (status) dataToUpdate.status = status;
-        if (accessNotes !== undefined) dataToUpdate.accessNotes = accessNotes;
-        if (coordinates !== undefined) dataToUpdate.coordinates = coordinates;
-        if (clientFeedback !== undefined) dataToUpdate.clientFeedback = clientFeedback;
-        if (clientRating !== undefined) dataToUpdate.clientRating = parseInt(clientRating, 10) || null;
-        if (clientValidated !== undefined) dataToUpdate.clientValidated = Boolean(clientValidated);
-        if (invoiceGenerated !== undefined) dataToUpdate.invoiceGenerated = Boolean(invoiceGenerated);
+        const dataToUpdate: any = { ...missionData };
+        if (missionData.scheduledDate) dataToUpdate.scheduledDate = new Date(missionData.scheduledDate);
+        if (missionData.estimatedDuration) dataToUpdate.estimatedDuration = parseInt(missionData.estimatedDuration, 10);
+        if (missionData.clientRating) dataToUpdate.clientRating = parseInt(missionData.clientRating, 10) || null;
+        if (missionData.clientValidated !== undefined) dataToUpdate.clientValidated = Boolean(missionData.clientValidated);
+        if (missionData.invoiceGenerated !== undefined) dataToUpdate.invoiceGenerated = Boolean(missionData.invoiceGenerated);
 
-        if (teamLeaderId) {
-            dataToUpdate.teamLeader = { connect: { id: teamLeaderId } };
-        } else if (teamLeaderId === null) {
+        if (missionData.teamLeaderId) {
+            dataToUpdate.teamLeader = { connect: { id: missionData.teamLeaderId } };
+        } else if (missionData.teamLeaderId === null) {
             dataToUpdate.teamLeader = { disconnect: true };
         }
         
@@ -72,20 +54,13 @@ export async function PATCH(
         }
 
         const updatedMission = await prisma.$transaction(async (tx) => {
-            const mission = await tx.mission.update({
-                where: { id },
-                data: dataToUpdate,
-            });
-
+            const mission = await tx.mission.update({ where: { id }, data: dataToUpdate });
             if (tasks && Array.isArray(tasks)) {
                 await tx.task.deleteMany({ where: { missionId: id } });
                 if (tasks.length > 0) {
                     await tx.task.createMany({
                         data: tasks.map((task: any) => ({
-                            title: task.title,
-                            category: task.category,
-                            status: task.status || 'ASSIGNED',
-                            estimatedTime: task.estimatedTime || 0,
+                            ...task,
                             missionId: id,
                         })),
                     });
@@ -93,7 +68,6 @@ export async function PATCH(
             }
             return mission;
         });
-
         return NextResponse.json(updatedMission);
     } catch (error) {
         console.error(`Failed to update mission:`, error);
@@ -101,20 +75,17 @@ export async function PATCH(
     }
 }
 
-// DELETE handler to remove a mission
 export async function DELETE(
   request: Request, 
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const { id } = context.params;
-
+        const { id } = await params;
         await prisma.$transaction([
             prisma.task.deleteMany({ where: { missionId: id } }),
             prisma.expense.updateMany({ where: { missionId: id }, data: { missionId: null } }),
             prisma.mission.delete({ where: { id } }),
         ]);
-
         return new NextResponse(null, { status: 204 });
     } catch (error) {
         console.error(`Failed to delete mission:`, error);
