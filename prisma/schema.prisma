@@ -29,10 +29,30 @@ model User {
   messages         Message[]
   conversations    Conversation[] @relation("ConversationParticipants")
   expenses         Expense[]
+  fieldReports     FieldReport[]
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
   @@map("users")
+}
+
+model FieldReport {
+  id                     String   @id @default(cuid())
+  missionId              String   @unique
+  mission                Mission  @relation(fields: [missionId], references: [id])
+  submittedById          String
+  submittedBy            User     @relation(fields: [submittedById], references: [id])
+  submissionDate         DateTime @default(now())
+  generalObservations    String?  @db.Text
+  clientFeedback         String?  @db.Text
+  issuesEncountered      String?  @db.Text
+  materialsUsed          Json?
+  hoursWorked            Decimal  @db.Decimal(5, 2)
+  beforePhotos           String[]
+  afterPhotos            String[]
+  clientSignatureUrl     String?
+  teamLeadSignatureUrl   String?
+  additionalNotes        String?  @db.Text
 }
 
 // --- MODÈLES NEXT-AUTH (INCHANGÉS) ---
@@ -125,6 +145,7 @@ model Lead {
   activities   Activity[]
   subscription Subscription?
   expenses     Expense[]
+  invoices     Invoice[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -191,14 +212,33 @@ model Mission {
   clientValidated      Boolean        @default(false)
   clientFeedback       String?
   clientRating         Int?
-  invoiceGenerated     Boolean        @default(false)
-  invoiceId            String?
+  invoiceGenerated     Boolean         @default(false)
+  invoiceId            String?         @unique
+  invoice              Invoice?
   conversation         Conversation?
+  fieldReport          FieldReport?
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
 
   @@map("missions")
 }
+
+model Invoice {
+  id              String        @id @default(cuid())
+  invoiceNumber   String        @unique
+  amount          Decimal       @db.Decimal(10, 2)
+  status          InvoiceStatus @default(DRAFT)
+  issueDate       DateTime      @default(now())
+  dueDate         DateTime
+  missionId       String        @unique
+  mission         Mission       @relation(fields: [missionId], references: [id])
+  leadId          String
+  lead            Lead          @relation(fields: [leadId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  description     String?
+}
+
 
 model Expense {
   id              String          @id @default(cuid())
@@ -502,6 +542,14 @@ enum LeadType {
   NGO
   SYNDIC
   OTHER
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
 }
 
 enum UserRole {
