@@ -1,35 +1,56 @@
-// app/(administration)/inventory/page.tsx
+// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/(administration)/inventory/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Package, AlertTriangle } from 'lucide-react'
+import { Plus, Package, AlertTriangle, Edit, Trash2 } from 'lucide-react'
 import { Inventory } from '@prisma/client'
 import { formatCurrency } from '@/lib/utils'
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton'
+import { toast } from 'sonner'
 
 export default function InventoryPage() {
   const [items, setItems] = useState<Inventory[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const fetchItems = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/inventory');
+      if (!response.ok) throw new Error('Impossible de charger l\'inventaire.');
+      const data = await response.json();
+      setItems(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchItems = async () => {
-      try {
-        const response = await fetch('/api/inventory');
-        if (!response.ok) throw new Error('Impossible de charger l\'inventaire.');
-        const data = await response.json();
-        setItems(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchItems();
   }, []);
+
+  const handleDelete = async (itemId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cet article ? Cette action est irréversible.")) return;
+
+    try {
+        const response = await fetch(`/api/inventory/${itemId}`, {
+            method: 'DELETE',
+        });
+        if (response.status !== 204) {
+            const errorText = await response.text();
+            throw new Error(errorText || "La suppression a échoué.");
+        }
+        toast.success("Article supprimé avec succès.");
+        fetchItems(); // Refresh the list
+    } catch (error: any) {
+        toast.error(error.message);
+    }
+  };
 
   const getCategoryLabel = (category: string) => {
     const labels: { [key: string]: string } = {
@@ -72,6 +93,7 @@ export default function InventoryPage() {
                         <th scope="col" className="px-6 py-3">Stock Actuel</th>
                         <th scope="col" className="px-6 py-3">Stock Min.</th>
                         <th scope="col" className="px-6 py-3">Prix Unitaire</th>
+                        <th scope="col" className="px-6 py-3 text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -89,6 +111,16 @@ export default function InventoryPage() {
                                 </td>
                                 <td className="px-6 py-4">{Number(item.minimumStock)} {item.unit}</td>
                                 <td className="px-6 py-4">{formatCurrency(Number(item.unitPrice))}</td>
+                                <td className="px-6 py-4 text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                        <Link href={`/inventory/${item.id}/edit`}>
+                                            <Button variant="ghost" size="icon"><Edit className="w-4 h-4" /></Button>
+                                        </Link>
+                                        <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)}>
+                                            <Trash2 className="w-4 h-4 text-red-500" />
+                                        </Button>
+                                    </div>
+                                </td>
                             </tr>
                         )
                     })}
