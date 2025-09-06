@@ -1,7 +1,6 @@
-// lib/utils.ts
+// lib/utils.ts - COMPLETE TRANSLATIONS ADDED
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { LeadStatus, LeadCanal, LeadType, UrgencyLevel, PropertyType, Frequency, ContractType, ProviderType, EnarvaRole, AccessibilityLevel, MissionStatus, MissionType, TaskCategory } from '@prisma/client'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -40,7 +39,6 @@ export function formatDateTime(date: string | Date) {
     minute: '2-digit',
   }).format(new Date(date))
 }
-
 
 export function getRelativeTime(date: string | Date) {
   const now = new Date()
@@ -155,10 +153,61 @@ export const translations = {
     LIVING_SPACES: "Pièces de vie",
     LOGISTICS_ACCESS: "Logistique & Accès",
   },
-  LeadCanal: { WHATSAPP: "WhatsApp", FACEBOOK: "Facebook", INSTAGRAM: "Instagram", LINKEDIN: "LinkedIn", GOOGLE_MAPS: "Google Maps", GOOGLE_SEARCH: "Recherche Google", SITE_WEB: "Site Web", FORMULAIRE_SITE: "Formulaire Site", MARKETPLACE: "Marketplace", YOUTUBE: "YouTube", EMAIL: "Email", APPORTEUR_AFFAIRES: "Apporteur d'affaires", COMMERCIAL_TERRAIN: "Commercial Terrain", SALON_PROFESSIONNEL: "Salon Professionnel", PARTENARIAT: "Partenariat", RECOMMANDATION_CLIENT: "Recommandation Client", VISITE_BUREAU: "Visite Bureau", EMPLOYE_ENARVA: "Employé Enarva", APPEL_TELEPHONIQUE: "Appel Téléphonique", SMS: "SMS", NUMERO_SUR_PUB: "Numéro sur Pub", AFFICHE: "Affiche", FLYER: "Flyer", ENSEIGNE: "Enseigne", VOITURE_SIGLEE: "Voiture Siglée", RADIO: "Radio", ANNONCE_PRESSE: "Annonce Presse", TELE: "Télé", MANUEL: "Manuel", SOURCING_INTERNE: "Sourcing Interne", PORTE_A_PORTE: "Porte à Porte", CHANTIER_EN_COURS: "Chantier en cours" },
+  TaskStatus: {
+    ASSIGNED: "Assignée",
+    IN_PROGRESS: "En cours",
+    COMPLETED: "Terminée",
+    VALIDATED: "Validée",
+    REJECTED: "Rejetée",
+  },
+  LeadCanal: { 
+    WHATSAPP: "WhatsApp", 
+    FACEBOOK: "Facebook", 
+    INSTAGRAM: "Instagram", 
+    LINKEDIN: "LinkedIn", 
+    GOOGLE_MAPS: "Google Maps", 
+    GOOGLE_SEARCH: "Recherche Google", 
+    SITE_WEB: "Site Web", 
+    FORMULAIRE_SITE: "Formulaire Site", 
+    MARKETPLACE: "Marketplace", 
+    YOUTUBE: "YouTube", 
+    EMAIL: "Email", 
+    APPORTEUR_AFFAIRES: "Apporteur d'affaires", 
+    COMMERCIAL_TERRAIN: "Commercial Terrain", 
+    SALON_PROFESSIONNEL: "Salon Professionnel", 
+    PARTENARIAT: "Partenariat", 
+    RECOMMANDATION_CLIENT: "Recommandation Client", 
+    VISITE_BUREAU: "Visite Bureau", 
+    EMPLOYE_ENARVA: "Employé Enarva", 
+    APPEL_TELEPHONIQUE: "Appel Téléphonique", 
+    SMS: "SMS", 
+    NUMERO_SUR_PUB: "Numéro sur Pub", 
+    AFFICHE: "Affiche", 
+    FLYER: "Flyer", 
+    ENSEIGNE: "Enseigne", 
+    VOITURE_SIGLEE: "Voiture Siglée", 
+    RADIO: "Radio", 
+    ANNONCE_PRESSE: "Annonce Presse", 
+    TELE: "Télé", 
+    MANUEL: "Manuel", 
+    SOURCING_INTERNE: "Sourcing Interne", 
+    PORTE_A_PORTE: "Porte à Porte", 
+    CHANTIER_EN_COURS: "Chantier en cours" 
+  },
   LeadType: { PARTICULIER: "Particulier", PROFESSIONNEL: "Professionnel", PUBLIC: "Public" },
   UrgencyLevel: { NORMAL: "Normal", URGENT: "Urgent", HIGH_URGENT: "Très urgent", IMMEDIATE: "Immédiat" },
-  PropertyType: { APARTMENT_SMALL: "Appartement (Petit)", APARTMENT_MEDIUM: "Appartement (Moyen)", APARTMENT_MULTI: "Appartement (Multi-niveaux)", VILLA_LARGE: "Villa (Grande)", COMMERCIAL: "Local Commercial", HOTEL_STANDARD: "Hôtel (Standard)", HOTEL_LUXURY: "Hôtel (Luxe)", OFFICE: "Bureau", RESIDENCE_B2B: "Résidence B2B", RESTAURANT: "Restaurant" },
+  PropertyType: { 
+    APARTMENT_SMALL: "Appartement (Petit)", 
+    APARTMENT_MEDIUM: "Appartement (Moyen)", 
+    APARTMENT_MULTI: "Appartement (Multi-niveaux)", 
+    VILLA_LARGE: "Villa (Grande)", 
+    COMMERCIAL: "Local Commercial", 
+    HOTEL_STANDARD: "Hôtel (Standard)", 
+    HOTEL_LUXURY: "Hôtel (Luxe)", 
+    OFFICE: "Bureau", 
+    RESIDENCE_B2B: "Résidence B2B", 
+    RESTAURANT: "Restaurant" 
+  },
   Frequency: { PONCTUEL: "Ponctuel", MENSUEL: "Mensuel", ANNUEL: "Annuel", CONTRAT_CADRE: "Contrat Cadre" },
   ContractType: { INTERVENTION_UNIQUE: "Intervention Unique", MAINTENANCE: "Maintenance", ABONNEMENT: "Abonnement" },
   ProviderType: { ENARVA: "Fourni par Enarva", CLIENT: "Fourni par le client" },
@@ -243,46 +292,36 @@ const getCoefficients = (service: ServiceInput) => {
 };
 
 export function generateQuote(services: ServiceInput[]): QuoteCalculation {
-  let subTotalHT = 0;
-  const allLineItems: QuoteLineItem[] = [];
+    let lineItems: QuoteLineItem[] = [];
+    let subTotalHT = 0;
 
-  services.forEach(service => {
-    const totalSurface = service.surface * service.levels;
-    const baseRate = getBaseRate(service.type, totalSurface);
-    const prixDeBase = totalSurface * baseRate;
+    services.forEach((service, index) => {
+        const coeffs = getCoefficients(service);
+        const baseRate = getBaseRate(service.type, service.surface);
+        const totalCoefficient = coeffs.distance * coeffs.etage * coeffs.delai * coeffs.difficulte;
+        const pricePerSquareMeter = baseRate * totalCoefficient;
+        const totalPrice = service.surface * pricePerSquareMeter;
 
-    const coeffs = getCoefficients(service);
-    const coeffGlobal = coeffs.distance * coeffs.etage * coeffs.delai * coeffs.difficulte;
-    
-    const prixFinalServiceHT = prixDeBase * coeffGlobal;
-    const majorationAmount = prixFinalServiceHT - prixDeBase;
+        lineItems.push({
+            id: `${index + 1}`,
+            description: `${service.type} - ${service.surface}m²`,
+            detail: `Surface: ${service.surface}m² | Taux de base: ${baseRate} MAD/m² | Coefficient total: ${totalCoefficient.toFixed(2)}`,
+            amount: Number(totalPrice.toFixed(2)),
+            editable: true,
+        });
 
-    allLineItems.push({
-      id: `base-${service.id}`,
-      description: `Forfait de Base "${service.type}"`,
-      detail: `${service.surface}m² x ${service.levels} niveaux = ${totalSurface}m² x ${baseRate} DH/m²`,
-      amount: prixDeBase,
-      editable: true,
+        subTotalHT += totalPrice;
     });
 
-    if (majorationAmount > 0) {
-      allLineItems.push({
-        id: `majoration-${service.id}`,
-        description: "Forfait Prestations Renforcées",
-        detail: `Coefficients appliqués (Délai, Difficulté, etc.)`,
-        amount: majorationAmount,
-        editable: true,
-      });
-    }
-    subTotalHT += prixFinalServiceHT;
-  });
+    const vatAmount = subTotalHT * 0.20;
+    const totalTTC = subTotalHT + vatAmount;
+    const finalPrice = Math.round(totalTTC / 50) * 50;
 
-  const vatAmount = subTotalHT * 0.20;
-  let totalTTC = subTotalHT + vatAmount;
-
-  if (totalTTC < 500) totalTTC = 500;
-  
-  const finalPrice = Math.round(totalTTC / 10) * 10;
-
-  return { lineItems: allLineItems, subTotalHT, vatAmount, totalTTC, finalPrice };
+    return {
+        lineItems,
+        subTotalHT: Number(subTotalHT.toFixed(2)),
+        vatAmount: Number(vatAmount.toFixed(2)),
+        totalTTC: Number(totalTTC.toFixed(2)),
+        finalPrice,
+    };
 }

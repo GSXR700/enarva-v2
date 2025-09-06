@@ -1,85 +1,112 @@
-// app/(administration)/page.tsx
+// app/(administration)/page.tsx - FULLY FIXED VERSION
 'use client'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { Users, TrendingUp, Clock, DollarSign, Phone, Mail, MessageSquare, MapPin, Edit, Plus, ListChecks, Tag, Star } from 'lucide-react'
+import { Progress } from '@/components/ui/progress'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency, formatDate, translate } from '@/lib/utils'
-import { Lead, Mission, User, LeadStatus, PropertyType, UrgencyLevel } from '@prisma/client'
-import ClientOnly from '@/components/providers/ClientOnly'
+import { 
+  Users, 
+  Clock, 
+  DollarSign, 
+  TrendingUp, 
+  MessageSquare, 
+  Mail, 
+  Phone,
+  MapPin,
+  Calendar
+} from 'lucide-react'
+import { Lead, Mission, User, LeadStatus } from '@prisma/client'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
-import Pusher from 'pusher-js';
-import { toast } from "sonner"
+import { toast } from 'sonner'
+import Pusher from 'pusher-js'
+import ClientOnly from '@/components/providers/ClientOnly'
 
-type LeadWithAssignee = Lead & { assignedTo: User | null };
+type LeadWithAssignee = Lead & { assignedTo?: User | null };
 
-type DashboardStats = {
-  totalLeads: number;
-  activeMissions: number;
-  totalRevenue: number;
-  conversionRate: string;
+type ActiveMission = Mission & {
+  lead: { firstName: string; lastName: string; address: string };
+  tasks: { id: string; status: string }[];
 };
 
-type ActiveMission = Mission & { lead: Lead; teamLeader: User | null };
-
 type DashboardData = {
-  stats: DashboardStats;
+  stats: {
+    totalLeads: number;
+    activeMissions: number;
+    totalRevenue: number;
+    conversionRate: string;
+  };
   recentLeads: LeadWithAssignee[];
   activeMissions: ActiveMission[];
 };
 
 const getStatusColor = (status: LeadStatus) => {
-    const colors: Record<LeadStatus, string> = {
-        // PHASE 1: Acquisition & Qualification
+    const colors: Record<string, string> = {
+        // PHASE 1: Nouveau & Premier Contact
         NEW: 'bg-blue-100 text-blue-800',
-        TO_QUALIFY: 'bg-blue-200 text-blue-900',
-        WAITING_INFO: 'bg-yellow-100 text-yellow-800',
-        QUALIFIED: 'bg-cyan-100 text-cyan-800',
+        NEW_CONTACT: 'bg-blue-200 text-blue-900',
+        FOLLOW_UP_NEEDED: 'bg-yellow-100 text-yellow-800',
+        CONTACTED: 'bg-blue-300 text-blue-900',
+        CALLBACK_REQUESTED: 'bg-yellow-200 text-yellow-900',
+        
+        // PHASE 2: Qualification & Évaluation
+        QUALIFIED: 'bg-green-100 text-green-800',
+        QUALIFIED_HIGH: 'bg-green-200 text-green-900',
+        QUALIFIED_MEDIUM: 'bg-yellow-300 text-yellow-900',
+        QUALIFIED_LOW: 'bg-orange-100 text-orange-800',
+        NEEDS_ASSESSMENT: 'bg-purple-100 text-purple-800',
+        EVALUATING: 'bg-purple-200 text-purple-900',
+        INTERESTED: 'bg-green-300 text-green-900',
+        NOT_INTERESTED: 'bg-red-100 text-red-800',
+        HOT: 'bg-red-200 text-red-900',
+        WARM: 'bg-orange-200 text-orange-900',
+        COLD: 'bg-gray-200 text-gray-800',
 
-        // PHASE 2: Pré-vente / Devis
-        VISIT_PLANNED: 'bg-indigo-100 text-indigo-800',
-        ON_VISIT: 'bg-indigo-200 text-indigo-900',
+        // PHASE 3: Visite & Devis
+        VISIT_SCHEDULED: 'bg-indigo-100 text-indigo-800',
+        VISIT_PLANNED: 'bg-indigo-200 text-indigo-900',
         VISIT_DONE: 'bg-indigo-300 text-indigo-900',
-        QUOTE_SENT: 'bg-purple-100 text-purple-800',
-        QUOTE_ACCEPTED: 'bg-green-100 text-green-800',
-        QUOTE_REFUSED: 'bg-red-100 text-red-800',
+        VISIT_RESCHEDULED: 'bg-orange-300 text-orange-900',
+        QUOTE_REQUESTED: 'bg-cyan-100 text-cyan-800',
+        QUOTE_PENDING: 'bg-cyan-200 text-cyan-900',
+        QUOTE_SENT: 'bg-cyan-300 text-cyan-900',
+        QUOTE_REVIEWED: 'bg-teal-100 text-teal-800',
+        QUOTE_FOLLOW_UP: 'bg-teal-200 text-teal-900',
 
-        // PHASE 3: Intervention & Livraison
-        MISSION_SCHEDULED: 'bg-teal-100 text-teal-800',
-        IN_PROGRESS: 'bg-orange-100 text-orange-800',
-        COMPLETED: 'bg-green-200 text-green-900',
-        INTERVENTION_PLANNED: 'bg-teal-200 text-teal-900',
-        INTERVENTION_IN_PROGRESS: 'bg-orange-200 text-orange-900',
-        INTERVENTION_DONE: 'bg-green-300 text-green-900',
-        QUALITY_CONTROL: 'bg-yellow-200 text-yellow-900',
-        CLIENT_TO_CONFIRM_END: 'bg-purple-200 text-purple-900',
-        CLIENT_CONFIRMED: 'bg-green-600 text-white',
-        DELIVERY_PLANNED: 'bg-sky-100 text-sky-800',
-        DELIVERY_DONE: 'bg-sky-200 text-sky-900',
-        SIGNED_DELIVERY_NOTE: 'bg-sky-300 text-sky-900',
-        
-        // PHASE 4: Paiement
-        PENDING_PAYMENT: 'bg-yellow-300 text-yellow-900',
-        PAID_OFFICIAL: 'bg-green-400 text-green-900',
-        PAID_CASH: 'bg-green-300 text-green-900',
-        REFUNDED: 'bg-gray-400 text-white',
-        PENDING_REFUND: 'bg-yellow-400 text-yellow-900',
-        
-        // PHASE 5: Suivi / SAV / Upsell
-        FOLLOW_UP_SENT: 'bg-blue-50 text-blue-700',
-        UPSELL_IN_PROGRESS: 'bg-purple-50 text-purple-700',
-        UPSELL_CONVERTED: 'bg-purple-300 text-purple-900',
-        REWORK_PLANNED: 'bg-orange-50 text-orange-700',
-        REWORK_DONE: 'bg-orange-200 text-orange-900',
-        UNDER_WARRANTY: 'bg-cyan-50 text-cyan-700',
-        AFTER_SALES_SERVICE: 'bg-blue-300 text-blue-900',
-        
-        // PHASE 6: Problèmes / Anomalies
+        // PHASE 4: Négociation & Décision  
+        NEGOTIATING: 'bg-amber-100 text-amber-800',
+        BUDGET_REVIEW: 'bg-amber-200 text-amber-900',
+        DECISION_PENDING: 'bg-purple-300 text-purple-900',
+        PROPOSAL_REVIEW: 'bg-violet-100 text-violet-800',
+        FINAL_DECISION: 'bg-violet-200 text-violet-900',
+
+        // PHASE 5: Acceptation & Signature
+        QUOTE_ACCEPTED: 'bg-emerald-100 text-emerald-800',
+        READY_TO_SIGN: 'bg-emerald-200 text-emerald-900',
+        CONTRACT_PENDING: 'bg-emerald-300 text-emerald-900',
+        SIGNED: 'bg-emerald-400 text-white',
+
+        // PHASE 6: Exécution & Suivi
+        MISSION_SCHEDULED: 'bg-sky-100 text-sky-800',
+        IN_PROGRESS: 'bg-sky-200 text-sky-900',
+        WORK_STARTED: 'bg-sky-300 text-sky-900',
+        WORK_IN_PROGRESS: 'bg-sky-400 text-white',
+        WORK_COMPLETED: 'bg-green-400 text-white',
+        VALIDATION_PENDING: 'bg-lime-100 text-lime-800',
+        VALIDATED: 'bg-lime-200 text-lime-900',
+        INVOICED: 'bg-stone-100 text-stone-800',
+        PAID: 'bg-green-500 text-white',
+        FOLLOW_UP_SCHEDULED: 'bg-slate-100 text-slate-800',
+        REWORK_NEEDED: 'bg-red-300 text-red-900',
+        REWORK_SCHEDULED: 'bg-red-100 text-red-800',
+        REWORK_IN_PROGRESS: 'bg-orange-400 text-white',
+        REWORK_DONE: 'bg-green-600 text-white',
+        UNDER_WARRANTY: 'bg-blue-400 text-white',
+        AFTER_SALES_SERVICE: 'bg-blue-500 text-white',
         CLIENT_ISSUE: 'bg-red-200 text-red-900',
         IN_DISPUTE: 'bg-red-300 text-red-900',
         CLIENT_PAUSED: 'bg-gray-300 text-gray-800',
@@ -103,6 +130,30 @@ const getStatusColor = (status: LeadStatus) => {
         DELIVERY_ONLY: 'bg-sky-200 text-sky-900',
         AFFILIATE_LEAD: 'bg-rose-100 text-rose-800',
         SUBCONTRACTOR_LEAD: 'bg-rose-200 text-rose-900',
+
+        // Additional common statuses
+        COMPLETED: 'bg-green-500 text-white',
+        TO_QUALIFY: 'bg-yellow-100 text-yellow-800',
+        WAITING_INFO: 'bg-yellow-200 text-yellow-900',
+        ON_VISIT: 'bg-indigo-200 text-indigo-900',
+        QUOTE_REFUSED: 'bg-red-100 text-red-800',
+        INTERVENTION_PLANNED: 'bg-sky-100 text-sky-800',
+        INTERVENTION_IN_PROGRESS: 'bg-sky-300 text-sky-900',
+        INTERVENTION_DONE: 'bg-green-300 text-green-900',
+        QUALITY_CONTROL: 'bg-amber-100 text-amber-800',
+        CLIENT_TO_CONFIRM_END: 'bg-purple-100 text-purple-800',
+        CLIENT_CONFIRMED: 'bg-green-200 text-green-900',
+        DELIVERY_PLANNED: 'bg-blue-100 text-blue-800',
+        DELIVERY_DONE: 'bg-blue-200 text-blue-900',
+        SIGNED_DELIVERY_NOTE: 'bg-blue-300 text-blue-900',
+        PENDING_PAYMENT: 'bg-orange-100 text-orange-800',
+        PAID_OFFICIAL: 'bg-green-400 text-white',
+        PAID_CASH: 'bg-green-300 text-green-900',
+        REFUNDED: 'bg-gray-300 text-gray-800',
+        PENDING_REFUND: 'bg-gray-200 text-gray-800',
+        FOLLOW_UP_SENT: 'bg-yellow-100 text-yellow-800',
+        UPSELL_IN_PROGRESS: 'bg-purple-200 text-purple-900',
+        UPSELL_CONVERTED: 'bg-purple-300 text-purple-900',
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
 };
@@ -200,19 +251,20 @@ export default function Dashboard() {
         </ClientOnly>
       </div>
 
+      {/* ✅ FIXED: Equal height cards with consistent structure */}
       <div className="responsive-grid">
         {statsCards.map((stat) => {
           const Icon = stat.icon
           return (
             <Link href={stat.href} key={stat.title}>
-              <Card className="thread-card hover:border-primary/50">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
-                      <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
+              <Card className="thread-card hover:border-primary/50 h-full">
+                <CardContent className="p-6 h-full flex flex-col justify-between min-h-[120px]">
+                  <div className="flex items-start justify-between w-full">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-muted-foreground mb-2 leading-tight">{stat.title}</p>
+                      <p className="text-2xl font-bold text-foreground leading-tight break-words">{stat.value}</p>
                     </div>
-                    <div className="w-12 h-12 bg-enarva-start/10 rounded-xl flex items-center justify-center">
+                    <div className="w-12 h-12 bg-enarva-start/10 rounded-xl flex items-center justify-center flex-shrink-0 ml-4">
                       <Icon className="w-6 h-6 text-enarva-start" />
                     </div>
                   </div>
@@ -225,135 +277,200 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="thread-card">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Leads Récents</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {dashboardData?.recentLeads.map((lead) => (
-              <div key={lead.id} onClick={() => setSelectedLead(lead)} className="flex items-start gap-3 p-4 rounded-xl bg-background hover:bg-secondary/50 transition-colors cursor-pointer">
-                <Avatar className="w-10 h-10">
-                  <AvatarFallback>{lead.firstName[0]}{lead.lastName[0]}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">{lead.firstName} {lead.lastName}</p>
-                      <p className="text-sm text-muted-foreground">{lead.company}</p>
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Leads Récents</h3>
+            <div className="space-y-4">
+              {dashboardData?.recentLeads.map((lead) => (
+                <div key={lead.id} onClick={() => setSelectedLead(lead)} className="flex items-start gap-3 p-4 rounded-xl bg-background hover:bg-secondary/50 transition-colors cursor-pointer">
+                  <Avatar className="w-10 h-10">
+                    <AvatarFallback>{lead.firstName[0]}{lead.lastName[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-foreground">{lead.firstName} {lead.lastName}</p>
+                        <p className="text-sm text-muted-foreground">{lead.company}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getChannelIcon(lead.channel)}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {getChannelIcon(lead.channel)}
+                    <div className="flex items-center justify-between">
+                      <Badge className={`text-xs ${getStatusColor(lead.status)}`}>
+                        {translate('LeadStatus', lead.status)}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">{formatDate(lead.createdAt)}</span>
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2">{lead.originalMessage}</p>
                 </div>
-              </div>
-            ))}
+              )) || <p className="text-center text-muted-foreground py-4">Aucun lead récent</p>}
+            </div>
           </CardContent>
         </Card>
 
         <Card className="thread-card">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Missions en Cours</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {dashboardData?.activeMissions.map((mission) => (
-              <div key={mission.id} onClick={() => setSelectedMission(mission)} className="p-4 rounded-xl bg-background border cursor-pointer hover:bg-secondary/50">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="font-medium text-foreground">{mission.lead.firstName} {mission.lead.lastName}</p>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                      <MapPin className="w-3 h-3" />
-                      {mission.address}
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Missions Actives</h3>
+            <div className="space-y-4">
+              {dashboardData?.activeMissions.map((mission) => {
+                const completedTasks = mission.tasks.filter(task => task.status === 'COMPLETED' || task.status === 'VALIDATED').length;
+                const progress = mission.tasks.length > 0 ? Math.round((completedTasks / mission.tasks.length) * 100) : 0;
+
+                return (
+                  <div
+                    key={mission.id}
+                    onClick={() => setSelectedMission(mission)}
+                    className="p-4 rounded-xl border hover:bg-secondary/50 transition-colors cursor-pointer space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-foreground">{mission.lead.firstName} {mission.lead.lastName}</h4>
+                      <Badge variant="outline" className="text-xs">
+                        {translate('MissionStatus', mission.status)}
+                      </Badge>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Progression</span>
+                        <span className="text-foreground font-medium">{progress}%</span>
+                      </div>
+                      <Progress value={progress} className="h-2" />
                     </div>
                   </div>
-                  <Badge className="text-xs bg-orange-100 text-orange-800">{translate('MissionStatus', mission.status)}</Badge>
-                </div>
-                <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>Chef: {mission.teamLeader?.name || 'N/A'}</span>
-                    <span>Prévu le: {formatDate(mission.scheduledDate)}</span>
-                </div>
-              </div>
-            ))}
+                );
+              }) || <p className="text-center text-muted-foreground py-4">Aucune mission active</p>}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {selectedLead && (
-        <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-3">
-                        <Avatar className="w-12 h-12"><AvatarFallback>{selectedLead.firstName[0]}{selectedLead.lastName[0]}</AvatarFallback></Avatar>
-                        <div>
-                            <h2 className="text-xl font-semibold">{selectedLead.firstName} {selectedLead.lastName}</h2>
-                            <p className="text-sm text-muted-foreground font-normal">{selectedLead.company || translate('LeadType', selectedLead.leadType)}</p>
-                        </div>
-                    </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 mt-4">
-                    <div className="flex flex-col sm:flex-row gap-2">
-                        <Link href={`/missions/new?type=TECHNICAL_VISIT&leadId=${selectedLead.id}`} className="flex-1"><Button className="w-full gap-2 bg-orange-500 hover:bg-orange-600 text-white"><ListChecks/>Planifier Visite</Button></Link>
-                        <Link href={`/quotes/new?leadId=${selectedLead.id}`} className="flex-1"><Button className="w-full gap-2 bg-enarva-gradient"><Plus/>Créer un Devis</Button></Link>
-                        <Link href={`/leads/${selectedLead.id}/edit`} className="flex-1"><Button variant="outline" className="w-full gap-2"><Edit/>Modifier</Button></Link>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card><CardHeader><CardTitle className="text-base">Informations de Contact</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">
-                            <div className="flex items-center gap-3"><Phone className="w-4 h-4 text-muted-foreground" /><span>{selectedLead.phone}</span></div>
-                            <div className="flex items-center gap-3"><Mail className="w-4 h-4 text-muted-foreground" /><span>{selectedLead.email || 'Non fourni'}</span></div>
-                            <div className="flex items-center gap-3"><MapPin className="w-4 h-4 text-muted-foreground" /><span>{selectedLead.address || 'Non fournie'}</span></div>
-                        </CardContent></Card>
-                        <Card><CardHeader><CardTitle className="text-base">Qualification</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">
-                            <div className="flex items-center gap-3"><Tag className="w-4 h-4 text-muted-foreground" />Statut: <Badge className={getStatusColor(selectedLead.status)}>{translate('LeadStatus', selectedLead.status)}</Badge></div>
-                            <div className="flex items-center gap-3"><Star className="w-4 h-4 text-muted-foreground" />Score: {selectedLead.score || 0}</div>
-                            <div className="flex items-center gap-3"><MessageSquare className="w-4 h-4 text-muted-foreground" />Canal: {translate('LeadCanal', selectedLead.channel)}</div>
-                            <div className="flex items-center gap-3"><Users className="w-4 h-4 text-muted-foreground" />Assigné à: {selectedLead.assignedTo?.name || 'Personne'}</div>
-                        </CardContent></Card>
-                    </div>
-                    <Card><CardHeader><CardTitle className="text-base">Détails de la Demande</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-4 text-sm">
-                        <div><span className="font-semibold text-muted-foreground">Type de bien:</span><p>{selectedLead.propertyType ? translate('PropertyType', selectedLead.propertyType as PropertyType) : 'N/A'}</p></div>
-                        <div><span className="font-semibold text-muted-foreground">Surface:</span><p>{selectedLead.estimatedSurface ? `${selectedLead.estimatedSurface}m²` : 'N/A'}</p></div>
-                        <div><span className="font-semibold text-muted-foreground">Urgence:</span><p>{translate('UrgencyLevel', selectedLead.urgencyLevel)}</p></div>
-                        <div><span className="font-semibold text-muted-foreground">Budget:</span><p>{selectedLead.budgetRange || 'N/A'}</p></div>
-                    </CardContent></Card>
-                    <Card><CardHeader><CardTitle className="text-base">Message Initial</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground leading-relaxed">{selectedLead.originalMessage || "Aucun message."}</p></CardContent></Card>
+      {/* Lead Detail Dialog */}
+      <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Détails du Lead</DialogTitle>
+            <DialogDescription>
+              Informations complètes sur {selectedLead?.firstName} {selectedLead?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedLead && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Nom complet</label>
+                  <p className="text-foreground">{selectedLead.firstName} {selectedLead.lastName}</p>
                 </div>
-            </DialogContent>
-        </Dialog>
-      )}
-      
-      {selectedMission && (
-        <Dialog open={!!selectedMission} onOpenChange={() => setSelectedMission(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="text-xl">Mission {selectedMission.missionNumber}</DialogTitle>
-              <DialogDescription>Pour {selectedMission.lead.firstName} {selectedMission.lead.lastName}</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3 py-4 text-sm">
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Statut</span>
-                    <Badge className="text-xs bg-orange-100 text-orange-800">{translate('MissionStatus', selectedMission.status)}</Badge>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Entreprise</label>
+                  <p className="text-foreground">{selectedLead.company || 'N/A'}</p>
                 </div>
-                 <div className="flex justify-between">
-                    <span className="text-muted-foreground">Chef d'équipe</span>
-                    <span>{selectedMission.teamLeader?.name || 'Non assigné'}</span>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Téléphone</label>
+                  <p className="text-foreground">{selectedLead.phone}</p>
                 </div>
-                 <div className="flex justify-between">
-                    <span className="text-muted-foreground">Adresse</span>
-                    <span>{selectedMission.address}</span>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Email</label>
+                  <p className="text-foreground">{selectedLead.email || 'N/A'}</p>
                 </div>
-                 <div className="flex justify-between">
-                    <span className="text-muted-foreground">Date Prévue</span>
-                    <span>{formatDate(selectedMission.scheduledDate)}</span>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-muted-foreground">Adresse</label>
+                  <p className="text-foreground">{selectedLead.address || 'N/A'}</p>
                 </div>
-                <div className="flex pt-4 mt-4 border-t">
-                    <Link href={`/missions`} className="w-full">
-                        <Button variant="outline" className="w-full">Voir toutes les missions</Button>
-                    </Link>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Statut</label>
+                  <Badge className={`text-xs ${getStatusColor(selectedLead.status)}`}>
+                    {translate('LeadStatus', selectedLead.status)}
+                  </Badge>
                 </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Score</label>
+                  <p className="text-foreground">{selectedLead.score || 0}/100</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Canal</label>
+                  <p className="text-foreground">{translate('LeadCanal', selectedLead.channel)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Type de propriété</label>
+                  <p className="text-foreground">{selectedLead.propertyType ? translate('PropertyType', selectedLead.propertyType) : 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Surface estimée</label>
+                  <p className="text-foreground">{selectedLead.estimatedSurface ? `${selectedLead.estimatedSurface}m²` : 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Urgence</label>
+                  <p className="text-foreground">{selectedLead.urgencyLevel ? translate('UrgencyLevel', selectedLead.urgencyLevel) : 'N/A'}</p>
+                </div>
+              </div>
+              {selectedLead.originalMessage && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Message original</label>
+                  <p className="text-foreground mt-1">{selectedLead.originalMessage}</p>
+                </div>
+              )}
             </div>
-          </DialogContent>
-        </Dialog>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Mission Detail Dialog */}
+      <Dialog open={!!selectedMission} onOpenChange={() => setSelectedMission(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Détails de la Mission</DialogTitle>
+            <DialogDescription>
+              Mission pour {selectedMission?.lead.firstName} {selectedMission?.lead.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedMission && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Client</label>
+                  <p className="text-foreground">{selectedMission.lead.firstName} {selectedMission.lead.lastName}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Statut</label>
+                  <Badge variant="outline" className="text-xs">
+                    {translate('MissionStatus', selectedMission.status)}
+                  </Badge>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Adresse
+                  </label>
+                  <p className="text-foreground">{selectedMission.lead.address}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Date prévue
+                  </label>
+                  <p className="text-foreground">{formatDate(selectedMission.scheduledDate)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Durée estimée</label>
+                  <p className="text-foreground">{selectedMission.estimatedDuration}h</p>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Tâches ({selectedMission.tasks.length})</label>
+                <div className="mt-2 space-y-2">
+                  {selectedMission.tasks.map((task, index) => (
+                    <div key={task.id} className="flex items-center justify-between p-2 rounded border">
+                      <span className="text-sm">Tâche {index + 1}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {translate('TaskStatus', task.status)}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
