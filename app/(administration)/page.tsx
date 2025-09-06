@@ -7,35 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog'
-import {
-  Users,
-  TrendingUp,
-  Clock,
-  DollarSign,
-  Phone,
-  Mail,
-  MessageSquare,
-  MapPin,
-  Edit,
-  Trash2,
-  Plus,
-  ListChecks,
-  Calendar as CalendarIcon,
-  Tag,
-  Briefcase,
-  Ruler,
-  AlertTriangle,
-  Star
-} from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Users, TrendingUp, Clock, DollarSign, Phone, Mail, MessageSquare, MapPin, Edit, Plus, ListChecks, Tag, Star } from 'lucide-react'
 import { formatCurrency, formatDate, translate } from '@/lib/utils'
-import { Lead, Mission, User, LeadStatus, PropertyType, UrgencyLevel, MissionStatus } from '@prisma/client'
+import { Lead, Mission, User, LeadStatus, PropertyType, UrgencyLevel } from '@prisma/client'
 import ClientOnly from '@/components/providers/ClientOnly'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import Pusher from 'pusher-js';
@@ -60,20 +35,78 @@ type DashboardData = {
 
 const getStatusColor = (status: LeadStatus) => {
     const colors: Record<LeadStatus, string> = {
-        NEW: 'bg-blue-100 text-blue-800', 
+        // PHASE 1: Acquisition & Qualification
+        NEW: 'bg-blue-100 text-blue-800',
+        TO_QUALIFY: 'bg-blue-200 text-blue-900',
+        WAITING_INFO: 'bg-yellow-100 text-yellow-800',
         QUALIFIED: 'bg-cyan-100 text-cyan-800',
-        QUOTE_SENT: 'bg-purple-100 text-purple-800', 
-        QUOTE_ACCEPTED: 'bg-indigo-100 text-indigo-800',
-        MISSION_SCHEDULED: 'bg-teal-100 text-teal-800', 
+
+        // PHASE 2: Pré-vente / Devis
+        VISIT_PLANNED: 'bg-indigo-100 text-indigo-800',
+        ON_VISIT: 'bg-indigo-200 text-indigo-900',
+        VISIT_DONE: 'bg-indigo-300 text-indigo-900',
+        QUOTE_SENT: 'bg-purple-100 text-purple-800',
+        QUOTE_ACCEPTED: 'bg-green-100 text-green-800',
+        QUOTE_REFUSED: 'bg-red-100 text-red-800',
+
+        // PHASE 3: Intervention & Livraison
+        MISSION_SCHEDULED: 'bg-teal-100 text-teal-800',
         IN_PROGRESS: 'bg-orange-100 text-orange-800',
-        COMPLETED: 'bg-green-100 text-green-800', 
-        CANCELLED: 'bg-red-100 text-red-800',
-        VISIT_PLANNED: 'bg-yellow-100 text-yellow-800',
-        ON_VISIT: 'bg-yellow-200 text-yellow-900',
-        VISIT_DONE: 'bg-yellow-300 text-yellow-900',
+        COMPLETED: 'bg-green-200 text-green-900',
+        INTERVENTION_PLANNED: 'bg-teal-200 text-teal-900',
+        INTERVENTION_IN_PROGRESS: 'bg-orange-200 text-orange-900',
+        INTERVENTION_DONE: 'bg-green-300 text-green-900',
+        QUALITY_CONTROL: 'bg-yellow-200 text-yellow-900',
+        CLIENT_TO_CONFIRM_END: 'bg-purple-200 text-purple-900',
+        CLIENT_CONFIRMED: 'bg-green-600 text-white',
+        DELIVERY_PLANNED: 'bg-sky-100 text-sky-800',
+        DELIVERY_DONE: 'bg-sky-200 text-sky-900',
+        SIGNED_DELIVERY_NOTE: 'bg-sky-300 text-sky-900',
+        
+        // PHASE 4: Paiement
+        PENDING_PAYMENT: 'bg-yellow-300 text-yellow-900',
+        PAID_OFFICIAL: 'bg-green-400 text-green-900',
+        PAID_CASH: 'bg-green-300 text-green-900',
+        REFUNDED: 'bg-gray-400 text-white',
+        PENDING_REFUND: 'bg-yellow-400 text-yellow-900',
+        
+        // PHASE 5: Suivi / SAV / Upsell
+        FOLLOW_UP_SENT: 'bg-blue-50 text-blue-700',
+        UPSELL_IN_PROGRESS: 'bg-purple-50 text-purple-700',
+        UPSELL_CONVERTED: 'bg-purple-300 text-purple-900',
+        REWORK_PLANNED: 'bg-orange-50 text-orange-700',
+        REWORK_DONE: 'bg-orange-200 text-orange-900',
+        UNDER_WARRANTY: 'bg-cyan-50 text-cyan-700',
+        AFTER_SALES_SERVICE: 'bg-blue-300 text-blue-900',
+        
+        // PHASE 6: Problèmes / Anomalies
+        CLIENT_ISSUE: 'bg-red-200 text-red-900',
+        IN_DISPUTE: 'bg-red-300 text-red-900',
+        CLIENT_PAUSED: 'bg-gray-300 text-gray-800',
+        LEAD_LOST: 'bg-red-400 text-white',
+        CANCELLED: 'bg-red-200 text-red-900',
+        CANCELED_BY_CLIENT: 'bg-red-200 text-red-900',
+        CANCELED_BY_ENARVA: 'bg-red-200 text-red-900',
+        INTERNAL_REVIEW: 'bg-yellow-50 text-yellow-700',
+        AWAITING_PARTS: 'bg-gray-200 text-gray-800',
+
+        // PHASE 7: Contrats / Sous-traitance
+        CONTRACT_SIGNED: 'bg-emerald-100 text-emerald-800',
+        UNDER_CONTRACT: 'bg-emerald-200 text-emerald-900',
+        SUBCONTRACTED: 'bg-gray-300 text-gray-900',
+        OUTSOURCED: 'bg-gray-400 text-gray-900',
+        WAITING_THIRD_PARTY: 'bg-yellow-100 text-yellow-800',
+
+        // PHASE 8: Produits / Leads externes
+        PRODUCT_ONLY: 'bg-stone-200 text-stone-800',
+        PRODUCT_SUPPLIER: 'bg-stone-300 text-stone-900',
+        DELIVERY_ONLY: 'bg-sky-200 text-sky-900',
+        AFFILIATE_LEAD: 'bg-rose-100 text-rose-800',
+        SUBCONTRACTOR_LEAD: 'bg-rose-200 text-rose-900',
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
 };
+
 
 export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -245,7 +278,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Lead Details Modal */}
       {selectedLead && (
         <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -288,8 +320,7 @@ export default function Dashboard() {
             </DialogContent>
         </Dialog>
       )}
-
-      {/* Mission Details Modal */}
+      
       {selectedMission && (
         <Dialog open={!!selectedMission} onOpenChange={() => setSelectedMission(null)}>
           <DialogContent>
