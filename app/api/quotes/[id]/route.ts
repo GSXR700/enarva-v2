@@ -1,20 +1,16 @@
-//app/api/quotes/[id]/route.ts
+// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/api/quotes/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 const prisma = new PrismaClient();
 
-/**
- * GET /api/quotes/[id]
- * Fetches a single quote by its ID, including the related lead.
- */
 export async function GET(
   request: Request, 
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: { id: string } }
 ) {
     try {
-        const { id } = await params;
+        const { id } = context.params;
         
         const quote = await prisma.quote.findUnique({ 
             where: { id },
@@ -31,21 +27,16 @@ export async function GET(
     }
 }
 
-/**
- * PATCH /api/quotes/[id]
- * Updates a specific quote with a new line item structure and totals.
- */
 export async function PATCH(
   request: Request, 
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: { id: string } }
 ) {
     try {
-        const { id } = await params;
+        const { id } = context.params;
         const body = await request.json();
         
         const { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice, status, type, expiresAt } = body;
 
-        // Build update data dynamically based on what's provided in the body
         const dataToUpdate: any = {};
 
         if (lineItems) dataToUpdate.lineItems = lineItems;
@@ -72,16 +63,12 @@ export async function PATCH(
     }
 }
 
-/**
- * DELETE /api/quotes/[id]
- * Deletes a specific quote.
- */
 export async function DELETE(
   request: Request, 
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: { id: string } }
 ) {
     try {
-        const { id } = await params;
+        const { id } = context.params;
         
         await prisma.quote.delete({
             where: { id },
