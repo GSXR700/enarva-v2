@@ -4,12 +4,14 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// GET handler to fetch a single mission by its ID
 export async function GET(
   request: Request, 
   { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
+        
         const mission = await prisma.mission.findUnique({
             where: { id },
             include: { 
@@ -19,7 +21,10 @@ export async function GET(
                 tasks: { orderBy: { createdAt: 'asc' } }
             }
         });
-        if (!mission) return new NextResponse('Mission not found', { status: 404 });
+
+        if (!mission) {
+            return new NextResponse('Mission not found', { status: 404 });
+        }
         return NextResponse.json(mission);
     } catch (error) {
         console.error(`Failed to fetch mission:`, error);
@@ -27,6 +32,7 @@ export async function GET(
     }
 }
 
+// PATCH handler to update the mission, team, and tasks
 export async function PATCH(
   request: Request, 
   { params }: { params: Promise<{ id: string }> }
@@ -34,18 +40,34 @@ export async function PATCH(
     try {
         const { id } = await params;
         const body = await request.json();
-        const { teamMemberIds, tasks, ...missionData } = body;
         
-        const dataToUpdate: any = { ...missionData };
-        if (missionData.scheduledDate) dataToUpdate.scheduledDate = new Date(missionData.scheduledDate);
-        if (missionData.estimatedDuration) dataToUpdate.estimatedDuration = parseInt(missionData.estimatedDuration, 10);
-        if (missionData.clientRating) dataToUpdate.clientRating = parseInt(missionData.clientRating, 10) || null;
-        if (missionData.clientValidated !== undefined) dataToUpdate.clientValidated = Boolean(missionData.clientValidated);
-        if (missionData.invoiceGenerated !== undefined) dataToUpdate.invoiceGenerated = Boolean(missionData.invoiceGenerated);
+        // Explicitly destructure only the fields we expect from the client
+        const { 
+            scheduledDate, estimatedDuration, address, priority, status, accessNotes, 
+            teamLeaderId, teamMemberIds, tasks, coordinates, clientFeedback,
+            clientRating, clientValidated, invoiceGenerated
+        } = body;
+        
+        // Build a clean data object for Prisma, preventing any unwanted fields
+        const dataToUpdate: any = {};
+        
+        if (scheduledDate) dataToUpdate.scheduledDate = new Date(scheduledDate);
+        if (estimatedDuration) dataToUpdate.estimatedDuration = parseInt(estimatedDuration, 10);
+        if (address) dataToUpdate.address = address;
+        if (priority) dataToUpdate.priority = priority;
+        if (status) dataToUpdate.status = status;
+        if (accessNotes !== undefined) dataToUpdate.accessNotes = accessNotes;
+        if (coordinates !== undefined) dataToUpdate.coordinates = coordinates;
+        if (clientFeedback !== undefined) dataToUpdate.clientFeedback = clientFeedback;
+        if (clientRating !== undefined) dataToUpdate.clientRating = parseInt(clientRating, 10) || null;
+        if (clientValidated !== undefined) dataToUpdate.clientValidated = Boolean(clientValidated);
+        if (invoiceGenerated !== undefined) dataToUpdate.invoiceGenerated = Boolean(invoiceGenerated);
 
-        if (missionData.teamLeaderId) {
-            dataToUpdate.teamLeader = { connect: { id: missionData.teamLeaderId } };
-        } else if (missionData.teamLeaderId === null) {
+
+        // Correctly format relation updates
+        if (teamLeaderId) {
+            dataToUpdate.teamLeader = { connect: { id: teamLeaderId } };
+        } else if (teamLeaderId === null) {
             dataToUpdate.teamLeader = { disconnect: true };
         }
         
@@ -54,7 +76,13 @@ export async function PATCH(
         }
 
         const updatedMission = await prisma.$transaction(async (tx) => {
-            const mission = await tx.mission.update({ where: { id }, data: dataToUpdate });
+            // 1. Update core mission data and relations
+            const mission = await tx.mission.update({
+                where: { id },
+                data: dataToUpdate,
+            });
+
+            // 2. If tasks are provided, replace the existing ones
             if (tasks && Array.isArray(tasks)) {
                 await tx.task.deleteMany({ where: { missionId: id } });
                 if (tasks.length > 0) {
@@ -71,6 +99,7 @@ export async function PATCH(
             }
             return mission;
         });
+
         return NextResponse.json(updatedMission);
     } catch (error) {
         console.error(`Failed to update mission:`, error);
@@ -78,17 +107,20 @@ export async function PATCH(
     }
 }
 
+// DELETE handler to remove a mission
 export async function DELETE(
   request: Request, 
   { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
+
         await prisma.$transaction([
             prisma.task.deleteMany({ where: { missionId: id } }),
             prisma.expense.updateMany({ where: { missionId: id }, data: { missionId: null } }),
             prisma.mission.delete({ where: { id } }),
         ]);
+
         return new NextResponse(null, { status: 204 });
     } catch (error) {
         console.error(`Failed to delete mission:`, error);

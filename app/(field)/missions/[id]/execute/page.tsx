@@ -1,4 +1,4 @@
-// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/(field)/missions/[id]/execute/page.tsx
+//app/(field)/missions/[id]/execute/page.tsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
