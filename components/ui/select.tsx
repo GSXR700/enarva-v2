@@ -1,14 +1,15 @@
-// components/ui/select.tsx
 "use client"
 
 import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
-import { Check, ChevronDown, ChevronUp } from "lucide-react"
+import { Check, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const Select = SelectPrimitive.Root
 const SelectGroup = SelectPrimitive.Group
 const SelectValue = SelectPrimitive.Value
+const SelectLabel = SelectPrimitive.Label
+const SelectSeparator = SelectPrimitive.Separator
 
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
@@ -77,7 +78,6 @@ const SelectItem = React.forwardRef<
         <Check className="h-4 w-4" />
       </SelectPrimitive.ItemIndicator>
     </span>
-
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
   </SelectPrimitive.Item>
 ))
@@ -87,6 +87,8 @@ export {
   Select,
   SelectGroup,
   SelectValue,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectContent,
   SelectItem,

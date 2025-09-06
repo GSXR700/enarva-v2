@@ -1,349 +1,674 @@
 // app/(administration)/leads/page.tsx
-'use client'
+'use client';
 
-import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Input } from '@/components/ui/input'
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog'
-import {
-  Phone, Mail, MessageSquare, Plus, Edit, Trash2, Building, Ruler,
-  AlertTriangle, Clock, Star, Users, Briefcase, Tag, MapPin, Eye, CheckCircle, Calendar, ListChecks
-} from 'lucide-react'
-import { formatDate, translate, translations } from '@/lib/utils'
-import { Lead, LeadStatus, LeadCanal, UrgencyLevel, User, PropertyType, LeadType } from '@prisma/client'
-import { CardGridSkeleton } from '@/components/skeletons/CardGridSkeleton'
-import Pusher from 'pusher-js'
-import { toast } from 'sonner'
+import { useState, useEffect } from 'react';
+import { Lead, LeadStatus, User } from '@prisma/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { LeadForm } from '@/components/leads/LeadForm';
+import { Plus, Search, Filter, Eye, Edit, Trash2, Download, Phone, Mail, Building2, MapPin } from 'lucide-react';
+import { formatDate, formatCurrency } from '@/lib/utils';
+import { toast } from 'sonner';
+import { Table,TableBody,TableCell,TableHead,TableHeader,TableRow} from '@/components/ui/table';
+import {Tabs,TabsContent,TabsList,TabsTrigger} from '@/components/ui/tabs';
 
-// Type alias for a Lead with its assigned user, matching API responses
-type LeadWithAssignee = Lead & { assignedTo: User | null };
-
-// Color logic for lead status badges
-const getStatusColor = (status: LeadStatus) => {
-    const colors: Record<LeadStatus, string> = {
-        NEW: 'bg-blue-100 text-blue-800', 
-        QUALIFIED: 'bg-cyan-100 text-cyan-800',
-        QUOTE_SENT: 'bg-purple-100 text-purple-800', 
-        QUOTE_ACCEPTED: 'bg-indigo-100 text-indigo-800',
-        MISSION_SCHEDULED: 'bg-teal-100 text-teal-800', 
-        IN_PROGRESS: 'bg-orange-100 text-orange-800',
-        COMPLETED: 'bg-green-100 text-green-800', 
-        CANCELLED: 'bg-red-100 text-red-800',
-        VISIT_PLANNED: 'bg-yellow-100 text-yellow-800',
-        ON_VISIT: 'bg-yellow-200 text-yellow-900',
-        VISIT_DONE: 'bg-yellow-300 text-yellow-900',
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-};
-
-const getUrgencyIcon = (urgency: UrgencyLevel | null) => {
-  switch (urgency) {
-    case 'IMMEDIATE': return <AlertTriangle className="w-4 h-4 text-red-600" />;
-    case 'HIGH_URGENT': return <AlertTriangle className="w-4 h-4 text-orange-600" />;
-    default: return <Clock className="w-4 h-4 text-blue-600" />;
-  }
-}
-
-const getScoreColor = (score: number | null) => {
-  if (score === null) return 'text-gray-400';
-  if (score >= 8) return 'text-green-600'
-  if (score >= 5) return 'text-yellow-600'
-  return 'text-red-600'
-}
+type LeadWithRelations = Lead & { assignedTo?: User | null };
 
 export default function LeadsPage() {
-  const router = useRouter();
-  const [allLeads, setAllLeads] = useState<LeadWithAssignee[]>([])
-  const [filteredLeads, setFilteredLeads] = useState<LeadWithAssignee[]>([])
-  const [selectedLead, setSelectedLead] = useState<LeadWithAssignee | null>(null)
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
-  
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [channelFilter, setChannelFilter] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+ const [leads, setLeads] = useState<LeadWithRelations[]>([]);
+ const [filteredLeads, setFilteredLeads] = useState<LeadWithRelations[]>([]);
+ const [searchTerm, setSearchTerm] = useState('');
+ const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+ const [isFormOpen, setIsFormOpen] = useState(false);
+ const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+ const [isLoading, setIsLoading] = useState(true);
+ const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
-  const fetchLeads = useCallback(async () => {
-    try {
-      const response = await fetch('/api/leads')
-      if (!response.ok) throw new Error('Impossible de récupérer les leads.')
-      const data = await response.json()
-      setAllLeads(data)
-    } catch (err: any) {
-      setError(err.message);
-      toast.error(err.message);
-    }
-  }, []);
+ useEffect(() => {
+   fetchLeads();
+ }, []);
 
-  useEffect(() => {
-    const initialFetch = async () => {
-        setIsLoading(true);
-        await fetchLeads();
-        setIsLoading(false);
-    }
-    initialFetch();
+ useEffect(() => {
+   filterLeads();
+ }, [searchTerm, statusFilter, leads]);
 
-    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-    });
+ const fetchLeads = async () => {
+   setIsLoading(true);
+   try {
+     const response = await fetch('/api/leads');
+     if (!response.ok) throw new Error('Failed to fetch leads');
+     const data = await response.json();
+     setLeads(data);
+     setFilteredLeads(data);
+   } catch (error) {
+     toast.error('Erreur lors du chargement des leads');
+     console.error('Fetch error:', error);
+   } finally {
+     setIsLoading(false);
+   }
+ };
 
-    const channel = pusher.subscribe('leads-channel');
+ const filterLeads = () => {
+   let filtered = leads;
 
-    channel.bind('new-lead', (newLead: LeadWithAssignee) => {
-      toast.info(`Nouveau lead reçu : ${newLead.firstName}`);
-      setAllLeads(prev => [newLead, ...prev]);
-    });
+   // Filter by search term
+   if (searchTerm) {
+     filtered = filtered.filter(lead =>
+       lead.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       lead.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       lead.phone.includes(searchTerm) ||
+       lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+       lead.company?.toLowerCase().includes(searchTerm.toLowerCase())
+     );
+   }
 
-    return () => {
-      pusher.unsubscribe('leads-channel');
-      pusher.disconnect();
-    };
-  }, [fetchLeads]);
+   // Filter by status
+   if (statusFilter !== 'ALL') {
+     filtered = filtered.filter(lead => lead.status === statusFilter);
+   }
 
-  useEffect(() => {
-    let leads = [...allLeads]
-    if (statusFilter !== 'all') leads = leads.filter(lead => lead.status === statusFilter)
-    if (channelFilter !== 'all') leads = leads.filter(lead => lead.channel === channelFilter)
-    if (searchQuery) {
-      const lowercasedQuery = searchQuery.toLowerCase()
-      leads = leads.filter(lead =>
-        lead.firstName.toLowerCase().includes(lowercasedQuery) ||
-        lead.lastName.toLowerCase().includes(lowercasedQuery) ||
-        (lead.company && lead.company.toLowerCase().includes(lowercasedQuery)) ||
-        (lead.email && lead.email.toLowerCase().includes(lowercasedQuery))
-      )
-    }
-    setFilteredLeads(leads)
-  }, [searchQuery, statusFilter, channelFilter, allLeads]);
+   setFilteredLeads(filtered);
+ };
 
-  const handleSelect = (id: string) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
+ const handleDelete = async (id: string) => {
+   if (!confirm('Êtes-vous sûr de vouloir supprimer ce lead?')) return;
 
-  const handleDeleteMany = async () => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer ${selectedIds.length} lead(s) ?`)) return;
+   try {
+     const response = await fetch(`/api/leads/${id}`, { method: 'DELETE' });
+     if (!response.ok) throw new Error('Failed to delete lead');
+     
+     toast.success('Lead supprimé avec succès');
+     fetchLeads();
+   } catch (error) {
+     toast.error('Erreur lors de la suppression');
+     console.error('Delete error:', error);
+   }
+ };
 
-    try {
-        const response = await fetch('/api/leads/delete-many', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: selectedIds }),
-        });
+ const exportToCSV = () => {
+   const headers = [
+     'ID', 'Prénom', 'Nom', 'Téléphone', 'Email', 'Société', 'ICE',
+     'Type', 'Statut', 'Score', 'Surface', 'Budget', 'Canal',
+     'Assigné à', 'Date création'
+   ];
+   
+   const rows = filteredLeads.map(lead => [
+     lead.id,
+     lead.firstName,
+     lead.lastName,
+     lead.phone,
+     lead.email || '',
+     lead.company || '',
+     lead.iceNumber || '',
+     lead.leadType,
+     lead.status,
+     lead.score || '',
+     lead.estimatedSurface || '',
+     lead.budgetRange || '',
+     lead.channel,
+     lead.assignedTo?.name || '',
+     formatDate(lead.createdAt)
+   ]);
 
-        if (!response.ok) {
-            const result = await response.json();
-            throw new Error(result.message || "La suppression a échoué.");
-        }
+   const csvContent = [
+     headers.join(','),
+     ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+   ].join('\n');
 
-        setAllLeads(prev => prev.filter(lead => !selectedIds.includes(lead.id)));
-        setSelectedIds([]);
-        toast.success(`${selectedIds.length} lead(s) ont été supprimés.`);
-    } catch (err: any) {
-        toast.error(`Erreur: ${err.message}`);
-    }
-  };
-  
-  const handleDeleteOne = async (id: string) => {
-    const lead = allLeads.find(l => l.id === id);
-    if (!lead) return;
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer le lead de ${lead.firstName} ${lead.lastName} ?`)) return;
+   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+   const link = document.createElement('a');
+   link.href = URL.createObjectURL(blob);
+   link.download = `leads_${new Date().toISOString().split('T')[0]}.csv`;
+   link.click();
+ };
 
-    try {
-        const response = await fetch(`/api/leads/${id}`, { method: 'DELETE' });
+ const LeadDetailsModal = ({ lead }: { lead: Lead }) => (
+   <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+     <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+       <DialogHeader>
+         <DialogTitle>Détails du Lead</DialogTitle>
+       </DialogHeader>
+       
+       <Tabs defaultValue="general" className="w-full">
+         <TabsList className="grid w-full grid-cols-5">
+           <TabsTrigger value="general">Général</TabsTrigger>
+           <TabsTrigger value="professional">Pro</TabsTrigger>
+           <TabsTrigger value="request">Demande</TabsTrigger>
+           <TabsTrigger value="origin">Origine</TabsTrigger>
+           <TabsTrigger value="history">Historique</TabsTrigger>
+         </TabsList>
 
-        if (!response.ok) {
-            const result = await response.json();
-            throw new Error(result.message || "La suppression a échoué.");
-        }
+         <TabsContent value="general" className="space-y-4">
+           <Card>
+             <CardHeader>
+               <CardTitle className="text-lg">Informations Personnelles</CardTitle>
+             </CardHeader>
+             <CardContent className="grid grid-cols-2 gap-4">
+               <div>
+                 <p className="text-sm text-muted-foreground">Nom complet</p>
+                 <p className="font-medium">{lead.firstName} {lead.lastName}</p>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">Téléphone</p>
+                 <p className="font-medium flex items-center gap-2">
+                   <Phone className="h-4 w-4" />
+                   {lead.phone}
+                 </p>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">Email</p>
+                 <p className="font-medium flex items-center gap-2">
+                   <Mail className="h-4 w-4" />
+                   {lead.email || 'Non renseigné'}
+                 </p>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">Adresse</p>
+                 <p className="font-medium flex items-center gap-2">
+                   <MapPin className="h-4 w-4" />
+                   {lead.address || 'Non renseignée'}
+                 </p>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">GPS</p>
+                 <p className="font-medium">{lead.gpsLocation || 'Non renseigné'}</p>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">Score</p>
+                 <div className="flex items-center gap-2">
+                   <div className="w-full bg-gray-200 rounded-full h-2">
+                     <div 
+                       className="bg-green-600 h-2 rounded-full"
+                       style={{ width: `${lead.score || 0}%` }}
+                     />
+                   </div>
+                   <span className="text-sm font-medium">{lead.score || 0}%</span>
+                 </div>
+               </div>
+             </CardContent>
+           </Card>
+         </TabsContent>
 
-        setAllLeads(prev => prev.filter(lead => lead.id !== id));
-        setSelectedLead(null);
-        toast.success(`Lead ${lead.firstName} ${lead.lastName} supprimé avec succès.`);
-    } catch (err: any) {
-        toast.error(`Erreur: ${err.message}`);
-    }
-  }
+         <TabsContent value="professional" className="space-y-4">
+           <Card>
+             <CardHeader>
+               <CardTitle className="text-lg">Informations Professionnelles</CardTitle>
+             </CardHeader>
+             <CardContent className="grid grid-cols-2 gap-4">
+               <div>
+                 <p className="text-sm text-muted-foreground">Type de Lead</p>
+                 <Badge>{lead.leadType}</Badge>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">Société</p>
+                 <p className="font-medium flex items-center gap-2">
+                   <Building2 className="h-4 w-4" />
+                   {lead.company || 'Non renseignée'}
+                 </p>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">N° ICE</p>
+                 <p className="font-medium">{lead.iceNumber || 'Non renseigné'}</p>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">Secteur</p>
+                 <p className="font-medium">{lead.activitySector || 'Non renseigné'}</p>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">Poste</p>
+                 <p className="font-medium">{lead.contactPosition || 'Non renseigné'}</p>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">Département</p>
+                 <p className="font-medium">{lead.department || 'Non renseigné'}</p>
+               </div>
+             </CardContent>
+           </Card>
+         </TabsContent>
 
-  if (isLoading) return <CardGridSkeleton title="Gestion des Leads" description="Chargement des prospects..." />;
-  if (error) return <div className="main-content text-center p-10 text-red-500">Erreur: {error}</div>;
+         <TabsContent value="request" className="space-y-4">
+           <Card>
+             <CardHeader>
+               <CardTitle className="text-lg">Détails de la Demande</CardTitle>
+             </CardHeader>
+             <CardContent className="space-y-4">
+               <div className="grid grid-cols-2 gap-4">
+                 <div>
+                   <p className="text-sm text-muted-foreground">Type de Propriété</p>
+                   <Badge variant="outline">{lead.propertyType || 'Non défini'}</Badge>
+                 </div>
+                 <div>
+                   <p className="text-sm text-muted-foreground">Surface</p>
+                   <p className="font-medium">{lead.estimatedSurface ? `${lead.estimatedSurface} m²` : 'Non renseignée'}</p>
+                 </div>
+                 <div>
+                   <p className="text-sm text-muted-foreground">Accessibilité</p>
+                   <Badge variant={lead.accessibility === 'DIFFICULT' ? 'destructive' : 'default'}>
+                     {lead.accessibility || 'EASY'}
+                   </Badge>
+                 </div>
+                 <div>
+                   <p className="text-sm text-muted-foreground">Urgence</p>
+                   <Badge variant={lead.urgencyLevel === 'URGENT' ? 'destructive' : 'secondary'}>
+                     {lead.urgencyLevel || 'Non définie'}
+                   </Badge>
+                 </div>
+                 <div>
+                   <p className="text-sm text-muted-foreground">Budget</p>
+                   <p className="font-medium">{lead.budgetRange || 'Non défini'}</p>
+                 </div>
+                 <div>
+                   <p className="text-sm text-muted-foreground">Fréquence</p>
+                   <Badge>{lead.frequency || 'PONCTUEL'}</Badge>
+                 </div>
+                 <div>
+                   <p className="text-sm text-muted-foreground">Type de Contrat</p>
+                   <Badge>{lead.contractType || 'INTERVENTION_UNIQUE'}</Badge>
+                 </div>
+               </div>
 
-  return (
-    <div className="main-content space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-foreground">Gestion des Leads</h1>
-                <p className="text-muted-foreground mt-1">{allLeads.length} leads • {allLeads.filter(l => l.status === 'NEW').length} nouveaux</p>
-            </div>
-            {selectedIds.length > 0 ? (
-                <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{selectedIds.length} sélectionné(s)</span>
-                    <Button variant="destructive" size="sm" onClick={handleDeleteMany}><Trash2 className="w-4 h-4 mr-2" /> Supprimer</Button>
-                </div>
-            ) : (
-                <Link href="/leads/new"><Button className="gap-2 bg-enarva-gradient rounded-lg"><Plus/>Lead</Button></Link>
-            )}
-        </div>
+               {lead.materials && Object.keys(lead.materials).length > 0 && (
+                 <div>
+                   <p className="text-sm text-muted-foreground mb-2">Matériaux</p>
+                   <div className="flex flex-wrap gap-2">
+                     {Object.entries(lead.materials as any).map(([key, value]) => {
+                       if (value === true) {
+                         return <Badge key={key} variant="outline">{key}</Badge>;
+                       } else if (key === 'other' && value) {
+                         return <Badge key={key} variant="outline">{value as string}</Badge>;
+                       }
+                       return null;
+                     })}
+                   </div>
+                 </div>
+               )}
 
-        <Card className="thread-card">
-            <CardContent className="p-4">
-                <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex-1 min-w-full sm:min-w-64"><Input placeholder="Rechercher par nom, entreprise..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-background"/></div>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="Statut" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Tous les statuts</SelectItem>
-                            {Object.entries(translations.LeadStatus).map(([key, value]) => <SelectItem key={key} value={key}>{value as string}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <Select value={channelFilter} onValueChange={setChannelFilter}>
-                        <SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="Canal" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Tous les canaux</SelectItem>
-                            {Object.entries(translations.LeadCanal).map(([key, value]) => <SelectItem key={key} value={key}>{value as string}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-            </CardContent>
-        </Card>
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="flex items-center gap-2">
+                   <input type="checkbox" checked={lead.needsProducts || false} disabled />
+                   <label>Besoin de produits</label>
+                 </div>
+                 <div className="flex items-center gap-2">
+                   <input type="checkbox" checked={lead.needsEquipment || false} disabled />
+                   <label>Besoin d'équipement</label>
+                 </div>
+               </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredLeads.map((lead) => (
-            <Card key={lead.id} className="thread-card relative transition-all hover:shadow-lg flex flex-col">
-                <div className="absolute top-4 left-4 z-10"><Checkbox id={`select-${lead.id}`} checked={selectedIds.includes(lead.id)} onCheckedChange={() => handleSelect(lead.id)} /></div>
-                <div onClick={() => setSelectedLead(lead)} className="cursor-pointer p-6 flex flex-col flex-grow">
-                    <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3 pl-8">
-                            <Avatar className="w-12 h-12"><AvatarFallback>{lead.firstName[0]}{lead.lastName[0]}</AvatarFallback></Avatar>
-                            <div>
-                                <h3 className="font-semibold text-foreground">{lead.firstName} {lead.lastName}</h3>
-                                <p className="text-sm text-muted-foreground">{lead.company || translate('LeadType', lead.leadType)}</p>
-                            </div>
-                        </div>
-                        <div className={`flex items-center gap-1 text-sm font-bold ${getScoreColor(lead.score)}`}><Star className="w-4 h-4 fill-current" />{lead.score || 0}</div>
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-2 mb-4 h-10 flex-grow">{lead.originalMessage}</p>
-                    <div className="space-y-3 text-xs text-muted-foreground mt-auto">
-                        <div className="flex flex-wrap gap-2">
-                            <Badge className={`text-xs ${getStatusColor(lead.status)}`}>{translate('LeadStatus', lead.status)}</Badge>
-                            <Badge variant="outline">{translate('LeadCanal', lead.channel)}</Badge>
-                            {lead.urgencyLevel && <Badge variant="outline" className="flex items-center gap-1">{getUrgencyIcon(lead.urgencyLevel)} {translate('UrgencyLevel', lead.urgencyLevel)}</Badge>}
-                        </div>
-                        <div className="flex justify-between items-center border-t pt-3">
-                            <span className="flex items-center gap-1" title="Agent Assigné"><Users className="w-4 h-4"/> {lead.assignedTo?.name || 'Non assigné'}</span>
-                            <span className="flex items-center gap-1" title="Date de création"><Clock className="w-4 h-4"/> {formatDate(lead.createdAt)}</span>
-                        </div>
-                    </div>
-                </div>
-            </Card>
-            ))}
-        </div>
+               {(lead.needsProducts || lead.needsEquipment) && (
+                 <div>
+                   <p className="text-sm text-muted-foreground">Fourni par</p>
+                   <Badge>{lead.providedBy || 'ENARVA'}</Badge>
+                 </div>
+               )}
+             </CardContent>
+           </Card>
+         </TabsContent>
 
-        {!isLoading && filteredLeads.length === 0 && (
-            <Card className="thread-card col-span-full"><CardContent className="p-12 text-center">
-                <Eye className="w-16 h-16 bg-muted rounded-full p-4 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Aucun lead trouvé</h3>
-                <p className="text-muted-foreground">Vos critères de recherche ne correspondent à aucun lead.</p>
-            </CardContent></Card>
-        )}
-        
-        {selectedLead && (
-            <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-3">
-                            <Avatar className="w-12 h-12"><AvatarFallback>{selectedLead.firstName[0]}{selectedLead.lastName[0]}</AvatarFallback></Avatar>
-                            <div>
-                                <h2 className="text-xl font-semibold">{selectedLead.firstName} {selectedLead.lastName}</h2>
-                                <DialogDescription>
-                                    Détails du lead pour {selectedLead.company || translate('LeadType', selectedLead.leadType)}.
-                                </DialogDescription>
-                            </div>
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 mt-4">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                            <Link href={`/missions/new?type=TECHNICAL_VISIT&leadId=${selectedLead.id}`} className="flex-1">
-                                <Button className="w-full gap-2 bg-orange-500 hover:bg-orange-600 text-white">
-                                    <ListChecks className="w-4 h-4"/>Planifier Visite
-                                </Button>
-                            </Link>
-                            <Link href={`/quotes/new?leadId=${selectedLead.id}`} className="flex-1">
-                                <Button className="w-full gap-2 bg-enarva-gradient">
-                                    <Plus className="w-4 h-4"/>Créer un Devis
-                                </Button>
-                            </Link>
-                            <Link href={`/leads/${selectedLead.id}/edit`} className="flex-1">
-                                <Button variant="outline" className="w-full gap-2">
-                                    <Edit/>Modifier
-                                </Button>
-                            </Link>
-                            <Button variant="destructive" className="flex-1 gap-2" onClick={() => handleDeleteOne(selectedLead.id)}>
-                                <Trash2/>Supprimer
-                            </Button>
-                        </div>
+         <TabsContent value="origin" className="space-y-4">
+           <Card>
+             <CardHeader>
+               <CardTitle className="text-lg">Origine et Acquisition</CardTitle>
+             </CardHeader>
+             <CardContent className="grid grid-cols-2 gap-4">
+               <div>
+                 <p className="text-sm text-muted-foreground">Canal</p>
+                 <Badge>{lead.channel}</Badge>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">Source</p>
+                 <p className="font-medium">{lead.source || 'Non renseignée'}</p>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">Parrain</p>
+                 <p className="font-medium">
+                   {lead.hasReferrer ? (lead.referrerContact || 'Oui') : 'Non'}
+                 </p>
+               </div>
+               <div>
+                 <p className="text-sm text-muted-foreground">Rôle Enarva</p>
+                 <Badge>{lead.enarvaRole || 'PRESTATAIRE_PRINCIPAL'}</Badge>
+               </div>
+             </CardContent>
+           </Card>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Card><CardHeader><CardTitle className="text-base">Informations de Contact</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">
-                                <div className="flex items-center gap-3"><Phone className="w-4 h-4 text-muted-foreground" /><span>{selectedLead.phone}</span></div>
-                                <div className="flex items-center gap-3"><Mail className="w-4 h-4 text-muted-foreground" /><span>{selectedLead.email || 'Non fourni'}</span></div>
-                                <div className="flex items-center gap-3"><MapPin className="w-4 h-4 text-muted-foreground" /><span>{selectedLead.address || 'Non fournie'}</span></div>
-                            </CardContent></Card>
+           <Card>
+             <CardHeader>
+               <CardTitle className="text-lg">Message Original</CardTitle>
+             </CardHeader>
+             <CardContent>
+               <p className="whitespace-pre-wrap">{lead.originalMessage}</p>
+             </CardContent>
+           </Card>
+         </TabsContent>
 
-                            <Card><CardHeader><CardTitle className="text-base">Qualification</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">
-                                <div className="flex items-center gap-3"><Tag className="w-4 h-4 text-muted-foreground" />Statut: <Badge className={getStatusColor(selectedLead.status)}>{translate('LeadStatus', selectedLead.status)}</Badge></div>
-                                <div className="flex items-center gap-3"><Star className="w-4 h-4 text-muted-foreground" />Score: {selectedLead.score || 0}</div>
-                                <div className="flex items-center gap-3"><MessageSquare className="w-4 h-4 text-muted-foreground" />Canal: {translate('LeadCanal', selectedLead.channel)}</div>
-                                <div className="flex items-center gap-3"><Users className="w-4 h-4 text-muted-foreground" />Assigné à: {selectedLead.assignedTo?.name || 'Personne'}</div>
-                            </CardContent></Card>
-                        </div>
+         <TabsContent value="history" className="space-y-4">
+           <Card>
+             <CardHeader>
+               <CardTitle className="text-lg">Historique</CardTitle>
+             </CardHeader>
+             <CardContent className="space-y-2">
+               <div className="flex justify-between items-center py-2 border-b">
+                 <div>
+                   <p className="font-medium">Lead créé</p>
+                   <p className="text-sm text-muted-foreground">
+                     {formatDate(lead.createdAt)}
+                   </p>
+                 </div>
+                 <Badge>{lead.status}</Badge>
+               </div>
+               {lead.assignedToId !== null && (
+                 <div className="flex justify-between items-center py-2">
+                   <div>
+                     <p className="font-medium">Assigné à</p>
+                     <p className="text-sm">{lead.assignedToId}</p>
+                   </div>
+                 </div>
+               )}
+             </CardContent>
+           </Card>
+         </TabsContent>
+       </Tabs>
 
-                        {selectedLead.leadType !== 'PARTICULIER' && (
-                            <Card>
-                                <CardHeader><CardTitle className="text-base">Détails Professionnels</CardTitle></CardHeader>
-                                <CardContent className="grid grid-cols-2 gap-4 text-sm">
-                                    <div><span className="font-semibold text-muted-foreground">Entreprise:</span><p>{selectedLead.company}</p></div>
-                                    <div><span className="font-semibold text-muted-foreground">ICE:</span><p>{selectedLead.iceNumber}</p></div>
-                                    <div><span className="font-semibold text-muted-foreground">Secteur:</span><p>{selectedLead.activitySector || 'N/A'}</p></div>
-                                    <div><span className="font-semibold text-muted-foreground">Fonction:</span><p>{selectedLead.contactPosition || 'N/A'}</p></div>
-                                </CardContent>
-                            </Card>
-                        )}
+       <div className="flex justify-end gap-2 mt-4">
+         <Button
+           variant="outline"
+           onClick={() => {
+             setSelectedLead(lead);
+             setIsDetailsOpen(false);
+             setIsFormOpen(true);
+           }}
+         >
+           <Edit className="h-4 w-4 mr-2" />
+           Modifier
+         </Button>
+         <Button onClick={() => setIsDetailsOpen(false)}>
+           Fermer
+         </Button>
+       </div>
+     </DialogContent>
+   </Dialog>
+ );
 
-                        <Card>
-                            <CardHeader><CardTitle className="text-base">Détails de la Demande</CardTitle></CardHeader>
-                            <CardContent className="grid grid-cols-2 gap-4 text-sm">
-                                <div><span className="font-semibold text-muted-foreground">Type de bien:</span><p>{selectedLead.propertyType ? translate('PropertyType', selectedLead.propertyType as PropertyType) : 'N/A'}</p></div>
-                                <div><span className="font-semibold text-muted-foreground">Surface:</span><p>{selectedLead.estimatedSurface ? `${selectedLead.estimatedSurface}m²` : 'N/A'}</p></div>
-                                <div><span className="font-semibold text-muted-foreground">Urgence:</span><p>{translate('UrgencyLevel', selectedLead.urgencyLevel)}</p></div>
-                                <div><span className="font-semibold text-muted-foreground">Budget:</span><p>{selectedLead.budgetRange || 'N/A'}</p></div>
-                            </CardContent>
-                        </Card>
+ return (
+   <div className="container mx-auto py-6 space-y-6">
+     {/* Header */}
+     <div className="flex justify-between items-center">
+       <div>
+         <h1 className="text-3xl font-bold">Gestion des Leads</h1>
+         <p className="text-muted-foreground">
+           {filteredLeads.length} lead{filteredLeads.length > 1 ? 's' : ''} trouvé{filteredLeads.length > 1 ? 's' : ''}
+         </p>
+       </div>
+       <div className="flex gap-2">
+         <Button onClick={exportToCSV} variant="outline">
+           <Download className="h-4 w-4 mr-2" />
+           Exporter CSV
+         </Button>
+         <Button onClick={() => {
+           setSelectedLead(null);
+           setIsFormOpen(true);
+         }}>
+           <Plus className="h-4 w-4 mr-2" />
+           Nouveau Lead
+         </Button>
+       </div>
+     </div>
 
-                        <Card><CardHeader><CardTitle className="text-base">Message Initial & Notes</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground leading-relaxed">{selectedLead.originalMessage || "Aucun message."}</p></CardContent></Card>
-                    </div>
-                </DialogContent>
-            </Dialog>
-        )}
-    </div>
-  )
+     {/* Filters */}
+     <Card>
+       <CardContent className="pt-6">
+         <div className="flex gap-4">
+           <div className="flex-1">
+             <div className="relative">
+               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+               <Input
+                 placeholder="Rechercher par nom, téléphone, email, société..."
+                 value={searchTerm}
+                 onChange={(e) => setSearchTerm(e.target.value)}
+                 className="pl-10"
+               />
+             </div>
+           </div>
+           <select
+             className="px-4 py-2 border rounded-md"
+             value={statusFilter}
+             onChange={(e) => setStatusFilter(e.target.value)}
+           >
+             <option value="ALL">Tous les statuts</option>
+             <option value="NEW">Nouveau</option>
+            <option value="TO_QUALIFY">À qualifier</option>
+            <option value="WAITING_INFO">En attente d'informations</option>
+            <option value="QUALIFIED">Qualifié</option>
+            <option value="VISIT_PLANNED">Visite planifiée</option>
+            <option value="ON_VISIT">En visite</option>
+            <option value="VISIT_DONE">Visite terminée</option>
+            <option value="QUOTE_SENT">Devis envoyé</option>
+            <option value="QUOTE_ACCEPTED">Devis accepté</option>
+            <option value="QUOTE_REFUSED">Devis refusé</option>
+            <option value="MISSION_SCHEDULED">Mission planifiée</option>
+            <option value="IN_PROGRESS">En cours</option>
+            <option value="COMPLETED">Terminé</option>
+            <option value="INTERVENTION_PLANNED">Intervention planifiée</option>
+            <option value="INTERVENTION_IN_PROGRESS">Intervention en cours</option>
+            <option value="INTERVENTION_DONE">Intervention terminée</option>
+            <option value="QUALITY_CONTROL">Contrôle qualité</option>
+            <option value="CLIENT_TO_CONFIRM_END">Client à confirmer la fin</option>
+            <option value="CLIENT_CONFIRMED">Client confirmé</option>
+            <option value="DELIVERY_PLANNED">Livraison planifiée</option>
+            <option value="DELIVERY_DONE">Livraison terminée</option>
+            <option value="SIGNED_DELIVERY_NOTE">Bon de livraison signé</option>
+            <option value="PENDING_PAYMENT">Paiement en attente</option>
+            <option value="PAID_OFFICIAL">Payé officiellement</option>
+            <option value="PAID_CASH">Payé en espèces</option>
+            <option value="REFUNDED">Remboursé</option>
+            <option value="PENDING_REFUND">Remboursement en attente</option>
+            <option value="FOLLOW_UP_SENT">Suivi envoyé</option>
+            <option value="UPSELL_IN_PROGRESS">Upsell en cours</option>
+            <option value="UPSELL_CONVERTED">Upsell converti</option>
+            <option value="REWORK_PLANNED">Retravail planifié</option>
+            <option value="REWORK_DONE">Retravail terminé</option>
+            <option value="UNDER_WARRANTY">Sous garantie</option>
+            <option value="AFTER_SALES_SERVICE">Service après-vente</option>
+            <option value="CLIENT_ISSUE">Problème client</option>
+            <option value="IN_DISPUTE">En litige</option>
+            <option value="CLIENT_PAUSED">Client en pause</option>
+            <option value="LEAD_LOST">Lead perdu</option>
+            <option value="CANCELLED">Annulé</option>
+            <option value="CANCELED_BY_CLIENT">Annulé par le client</option>
+            <option value="CANCELED_BY_ENARVA">Annulé par Enarva</option>
+            <option value="INTERNAL_REVIEW">Revue interne</option>
+            <option value="AWAITING_PARTS">En attente de pièces</option>
+            <option value="CONTRACT_SIGNED">Contrat signé</option>
+            <option value="UNDER_CONTRACT">Sous contrat</option>
+            <option value="SUBCONTRACTED">Sous-traité</option>
+            <option value="OUTSOURCED">Externalisé</option>
+            <option value="WAITING_THIRD_PARTY">En attente d'un tiers</option>
+            <option value="PRODUCT_ONLY">Produit uniquement</option>
+            <option value="PRODUCT_SUPPLIER">Fournisseur de produit</option>
+            <option value="DELIVERY_ONLY">Livraison uniquement</option>
+            <option value="AFFILIATE_LEAD">Lead affilié</option>
+            <option value="SUBCONTRACTOR_LEAD">Lead sous-traitant</option>
+           </select>
+         </div>
+       </CardContent>
+     </Card>
+
+     {/* Leads Table */}
+     <Card>
+       <CardContent className="p-0">
+         {isLoading ? (
+           <div className="p-8 text-center">Chargement...</div>
+         ) : filteredLeads.length === 0 ? (
+           <div className="p-8 text-center text-muted-foreground">
+             Aucun lead trouvé
+           </div>
+         ) : (
+           <div className="overflow-x-auto">
+             <Table>
+               <TableHeader>
+                 <TableRow>
+                   <TableHead>Lead</TableHead>
+                   <TableHead>Contact</TableHead>
+                   <TableHead>Société</TableHead>
+                   <TableHead>Détails Demande</TableHead>
+                   <TableHead>Canal</TableHead>
+                   <TableHead>Statut</TableHead>
+                   <TableHead>Score</TableHead>
+                   <TableHead>Assigné</TableHead>
+                   <TableHead>Date</TableHead>
+                   <TableHead>Actions</TableHead>
+                 </TableRow>
+               </TableHeader>
+               <TableBody>
+                 {filteredLeads.map((lead) => (
+                   <TableRow key={lead.id}>
+                     <TableCell>
+                       <div>
+                         <p className="font-medium">{lead.firstName} {lead.lastName}</p>
+                         <Badge variant="outline" className="text-xs">
+                           {lead.leadType}
+                         </Badge>
+                       </div>
+                     </TableCell>
+                     <TableCell>
+                       <div className="space-y-1">
+                         <p className="text-sm">{lead.phone}</p>
+                         {lead.email && (
+                           <p className="text-xs text-muted-foreground">{lead.email}</p>
+                         )}
+                       </div>
+                     </TableCell>
+                     <TableCell>
+                       {lead.company ? (
+                         <div>
+                           <p className="text-sm font-medium">{lead.company}</p>
+                           {lead.activitySector && (
+                             <p className="text-xs text-muted-foreground">{lead.activitySector}</p>
+                           )}
+                         </div>
+                       ) : (
+                         <span className="text-muted-foreground">-</span>
+                       )}
+                     </TableCell>
+                     <TableCell>
+                       <div className="space-y-1">
+                         {lead.propertyType && (
+                           <Badge variant="outline" className="text-xs">
+                             {lead.propertyType}
+                           </Badge>
+                         )}
+                         {lead.estimatedSurface && (
+                           <p className="text-xs">{lead.estimatedSurface} m²</p>
+                         )}
+                         {lead.urgencyLevel && (
+                           <Badge 
+                             variant={lead.urgencyLevel === 'URGENT' ? 'destructive' : 'secondary'}
+                             className="text-xs"
+                           >
+                             {lead.urgencyLevel}
+                           </Badge>
+                         )}
+                       </div>
+                     </TableCell>
+                     <TableCell>
+                       <Badge variant="outline">{lead.channel}</Badge>
+                     </TableCell>
+                     <TableCell>
+                       <Badge 
+                         variant={
+                           lead.status === LeadStatus.COMPLETED ? 'default' :
+                           lead.status === LeadStatus.CANCELLED ? 'destructive' :
+                           'secondary'
+                         }
+                       >
+                         {lead.status}
+                       </Badge>
+                     </TableCell>
+                     <TableCell>
+                       <div className="flex items-center gap-1">
+                         <div className="w-12 bg-gray-200 rounded-full h-2">
+                           <div 
+                             className="bg-green-600 h-2 rounded-full"
+                             style={{ width: `${lead.score || 0}%` }}
+                           />
+                         </div>
+                         <span className="text-xs">{lead.score || 0}%</span>
+                       </div>
+                     </TableCell>
+                     <TableCell>
+                       {lead.assignedTo ? (
+                         <p className="text-sm">{lead.assignedTo.name}</p>
+                       ) : (
+                         <span className="text-muted-foreground">Non assigné</span>
+                       )}
+                     </TableCell>
+                     <TableCell>
+                       <p className="text-sm">{formatDate(lead.createdAt)}</p>
+                     </TableCell>
+                     <TableCell>
+                       <div className="flex gap-1">
+                         <Button
+                           size="sm"
+                           variant="ghost"
+                           onClick={() => {
+                             setSelectedLead(lead);
+                             setIsDetailsOpen(true);
+                           }}
+                         >
+                           <Eye className="h-4 w-4" />
+                         </Button>
+                         <Button
+                           size="sm"
+                           variant="ghost"
+                           onClick={() => {
+                             setSelectedLead(lead);
+                             setIsFormOpen(true);
+                           }}
+                         >
+                           <Edit className="h-4 w-4" />
+                         </Button>
+                         <Button
+                           size="sm"
+                           variant="ghost"
+                           onClick={() => handleDelete(lead.id)}
+                         >
+                           <Trash2 className="h-4 w-4 text-red-500" />
+                         </Button>
+                       </div>
+                     </TableCell>
+                   </TableRow>
+                 ))}
+               </TableBody>
+             </Table>
+           </div>
+         )}
+       </CardContent>
+     </Card>
+
+     {/* Form Dialog */}
+     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+         <DialogHeader>
+           <DialogTitle>
+             {selectedLead ? 'Modifier le Lead' : 'Nouveau Lead'}
+           </DialogTitle>
+         </DialogHeader>
+         <LeadForm
+           lead={selectedLead || undefined}
+           onSuccess={() => {
+             setIsFormOpen(false);
+             fetchLeads();
+           }}
+           onCancel={() => setIsFormOpen(false)}
+         />
+       </DialogContent>
+     </Dialog>
+
+     {/* Details Modal */}
+     {selectedLead && isDetailsOpen && <LeadDetailsModal lead={selectedLead} />}
+   </div>
+ );
 }
