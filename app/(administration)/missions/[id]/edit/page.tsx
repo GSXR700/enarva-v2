@@ -1,4 +1,4 @@
-// app/(administration)/missions/[id]/edit/page.tsx
+//app/(administration)/missions/[id]/edit/page.tsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ArrowLeft, Save, Users, ListChecks, Plus, Trash2 } from 'lucide-react'
 import { Mission, User, TeamMember, Task, TaskCategory } from '@prisma/client'
 import { toast } from 'sonner'
@@ -153,6 +154,7 @@ export default function EditMissionPage() {
                 <div><Label>Date et Heure</Label><Input type="datetime-local" id="scheduledDate" value={mission.scheduledDate ? new Date(mission.scheduledDate).toISOString().substring(0, 16) : ''} onChange={handleMissionChange} /></div>
                 <div><Label>Durée Estimée (heures)</Label><Input type="number" id="estimatedDuration" value={mission.estimatedDuration} onChange={handleMissionChange} /></div>
                 <div className="md:col-span-2"><Label>Adresse</Label><Input id="address" value={mission.address} onChange={handleMissionChange} /></div>
+                <div><Label>Coordonnées GPS</Label><Input id="coordinates" value={mission.coordinates || ''} onChange={handleMissionChange} /></div>
                 <div><Label>Priorité</Label><Select value={mission.priority || ''} onValueChange={(v) => handleSelectChange('priority', v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="LOW">Faible</SelectItem><SelectItem value="NORMAL">Normale</SelectItem><SelectItem value="HIGH">Élevée</SelectItem><SelectItem value="CRITICAL">Critique</SelectItem></SelectContent></Select></div>
                 <div><Label>Statut</Label><Select value={mission.status || ''} onValueChange={(v) => handleSelectChange('status', v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="SCHEDULED">Planifiée</SelectItem><SelectItem value="IN_PROGRESS">En cours</SelectItem><SelectItem value="COMPLETED">Terminée</SelectItem><SelectItem value="CANCELLED">Annulée</SelectItem></SelectContent></Select></div>
                 <div className="md:col-span-2"><Label>Notes d'accès</Label><Textarea id="accessNotes" value={mission.accessNotes || ''} onChange={handleMissionChange} /></div>
@@ -193,6 +195,38 @@ export default function EditMissionPage() {
                     </div>
                 ))}
                 <Button type="button" variant="outline" onClick={addTask} className="w-full mt-2"><Plus className="w-4 h-4 mr-2"/>Ajouter une tâche</Button>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader><CardTitle>Feedback & Validation</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <Label htmlFor="clientFeedback">Feedback Client</Label>
+                        <Textarea id="clientFeedback" value={mission.clientFeedback || ''} onChange={handleMissionChange} />
+                    </div>
+                    <div>
+                        <Label htmlFor="clientRating">Note Client (1-5)</Label>
+                        <Input id="clientRating" type="number" min="1" max="5" value={mission.clientRating || ''} onChange={handleMissionChange} />
+                    </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox 
+                        id="clientValidated" 
+                        checked={mission.clientValidated || false} 
+                        onCheckedChange={(checked) => setMission(prev => ({...prev, clientValidated: !!checked}))}
+                    />
+                    <Label htmlFor="clientValidated">Mission validée par le client</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox 
+                        id="invoiceGenerated" 
+                        checked={mission.invoiceGenerated || false}
+                        onCheckedChange={(checked) => setMission(prev => ({...prev, invoiceGenerated: !!checked}))}
+                    />
+                    <Label htmlFor="invoiceGenerated">Facture générée</Label>
+                </div>
             </CardContent>
         </Card>
 

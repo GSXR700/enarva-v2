@@ -1,4 +1,4 @@
-// app/api/missions/[id]/route.ts
+//app/api/missions/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
@@ -44,7 +44,8 @@ export async function PATCH(
         // Explicitly destructure only the fields we expect from the client
         const { 
             scheduledDate, estimatedDuration, address, priority, status, accessNotes, 
-            teamLeaderId, teamMemberIds, tasks 
+            teamLeaderId, teamMemberIds, tasks, coordinates, clientFeedback,
+            clientRating, clientValidated, invoiceGenerated
         } = body;
         
         // Build a clean data object for Prisma, preventing any unwanted fields
@@ -56,11 +57,20 @@ export async function PATCH(
         if (priority) dataToUpdate.priority = priority;
         if (status) dataToUpdate.status = status;
         if (accessNotes !== undefined) dataToUpdate.accessNotes = accessNotes;
+        if (coordinates !== undefined) dataToUpdate.coordinates = coordinates;
+        if (clientFeedback !== undefined) dataToUpdate.clientFeedback = clientFeedback;
+        if (clientRating !== undefined) dataToUpdate.clientRating = parseInt(clientRating, 10) || null;
+        if (clientValidated !== undefined) dataToUpdate.clientValidated = Boolean(clientValidated);
+        if (invoiceGenerated !== undefined) dataToUpdate.invoiceGenerated = Boolean(invoiceGenerated);
+
 
         // Correctly format relation updates
         if (teamLeaderId) {
             dataToUpdate.teamLeader = { connect: { id: teamLeaderId } };
+        } else if (teamLeaderId === null) {
+            dataToUpdate.teamLeader = { disconnect: true };
         }
+        
         if (teamMemberIds && Array.isArray(teamMemberIds)) {
             dataToUpdate.teamMembers = { set: teamMemberIds.map((memberId: string) => ({ id: memberId })) };
         }
@@ -81,7 +91,7 @@ export async function PATCH(
                             title: task.title,
                             category: task.category,
                             status: task.status || 'ASSIGNED',
-                            estimatedTime: task.estimatedTime || 0, // <-- FIX: Added required field
+                            estimatedTime: task.estimatedTime || 0,
                             missionId: id,
                         })),
                     });

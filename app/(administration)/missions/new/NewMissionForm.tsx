@@ -1,4 +1,4 @@
-// app/(administration)/missions/new/NewMissionForm.tsx - OPTIMIZED VERSION
+// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/(administration)/missions/new/NewMissionForm.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, ListChecks } from 'lucide-react'
-import { Quote, User as TeamMember, Lead } from '@prisma/client'
+import { Quote, User as TeamMember, Lead, Priority } from '@prisma/client'
 import { toast } from 'sonner'
 
 type QuoteWithLead = Quote & { lead: Lead };
@@ -32,8 +32,10 @@ export default function NewMissionForm() {
     leadId: leadIdFromParams || '',
     leadName: '',
     address: '',
+    coordinates: '',
     scheduledDate: '',
     estimatedDuration: missionType === 'TECHNICAL_VISIT' ? '1' : '',
+    priority: Priority.NORMAL,
     teamLeaderId: '',
     accessNotes: '',
     type: missionType,
@@ -53,20 +55,19 @@ export default function NewMissionForm() {
   // Fetch specific lead data directly
   const fetchSpecificLead = async (leadId: string) => {
     try {
-      console.log('🎯 Fetching specific lead:', leadId);
       const response = await fetch(`/api/leads/${leadId}`);
       if (!response.ok) {
         throw new Error('Lead not found');
       }
       const lead = await response.json();
-      console.log('✅ Lead fetched:', lead);
       
       // Update form data with lead information
       setFormData(prev => ({
         ...prev,
         leadId: lead.id,
         leadName: `${lead.firstName} ${lead.lastName}`,
-        address: lead.address || ''
+        address: lead.address || '',
+        coordinates: lead.gpsLocation || ''
       }));
       
       return lead;
@@ -79,13 +80,11 @@ export default function NewMissionForm() {
   // Fetch specific quote data directly
   const fetchSpecificQuote = async (quoteId: string) => {
     try {
-      console.log('🎯 Fetching specific quote:', quoteId);
       const response = await fetch(`/api/quotes/${quoteId}`);
       if (!response.ok) {
         throw new Error('Quote not found');
       }
       const quote = await response.json();
-      console.log('✅ Quote fetched:', quote);
       
       // Update form data with quote/lead information
       setFormData(prev => ({
@@ -93,7 +92,8 @@ export default function NewMissionForm() {
         quoteId: quote.id,
         leadId: quote.leadId,
         leadName: `${quote.lead.firstName} ${quote.lead.lastName}`,
-        address: quote.lead.address || ''
+        address: quote.lead.address || '',
+        coordinates: quote.lead.gpsLocation || ''
       }));
       
       return quote;
@@ -111,7 +111,6 @@ export default function NewMissionForm() {
 
       try {
         // Always fetch team leaders and templates (these are needed for dropdowns)
-        console.log('🔄 Fetching team leaders and templates...');
         const [usersRes, templatesRes] = await Promise.all([
           fetch('/api/users?role=TEAM_LEADER'),
           fetch('/api/task-templates')
@@ -128,17 +127,14 @@ export default function NewMissionForm() {
 
         setTeamLeaders(usersData);
         setTaskTemplates(templatesData);
-        console.log('✅ Team leaders and templates loaded');
 
         // Handle different initialization scenarios
         if (missionType === 'TECHNICAL_VISIT' && leadIdFromParams) {
           // For technical visits, fetch the specific lead
-          console.log('🎯 Technical visit mode - fetching lead');
           await fetchSpecificLead(leadIdFromParams);
           
         } else if (missionType === 'SERVICE') {
           // For service missions, we need quotes
-          console.log('🎯 Service mode - fetching quotes');
           const quotesRes = await fetch('/api/quotes?status=ACCEPTED');
           if (quotesRes.ok) {
             const quotesData = await quotesRes.json();
@@ -150,11 +146,8 @@ export default function NewMissionForm() {
             }
           }
         }
-
-        console.log('✅ Form initialization complete');
         
       } catch (err: any) {
-        console.error('❌ Form initialization failed:', err);
         setError(`Failed to load form data: ${err.message}`);
         toast.error(`Failed to load form data: ${err.message}`);
       } finally {
@@ -167,7 +160,7 @@ export default function NewMissionForm() {
 
   const handleSelectChange = (id: keyof typeof formData, value: string) => {
     const finalValue = value === 'none' ? '' : value;
-    setFormData(prev => ({ ...prev, [id]: finalValue }));
+    setFormData(prev => ({ ...prev, [id]: finalValue as any }));
 
     // Handle quote selection for service missions
     if (id === 'quoteId' && value !== 'none') {
@@ -178,7 +171,8 @@ export default function NewMissionForm() {
           quoteId: value,
           leadId: selectedQuote.leadId,
           leadName: `${selectedQuote.lead.firstName} ${selectedQuote.lead.lastName}`,
-          address: selectedQuote.lead.address || ''
+          address: selectedQuote.lead.address || '',
+          coordinates: selectedQuote.lead.gpsLocation || ''
         }));
       }
     }
@@ -191,7 +185,6 @@ export default function NewMissionForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🚀 FORM SUBMISSION STARTED');
     
     setIsLoading(true);
     setError(null);
@@ -211,14 +204,10 @@ export default function NewMissionForm() {
 
     if (validationErrors.length > 0) {
       const errorMsg = `Champs requis manquants: ${validationErrors.join(', ')}`;
-      console.error('❌ Validation failed:', errorMsg);
       toast.error(errorMsg);
       setIsLoading(false);
       return;
     }
-
-    console.log('✅ Client validation passed');
-    console.log('📤 Submitting data:', JSON.stringify(formData, null, 2));
 
     try {
       const response = await fetch('/api/missions', {
@@ -236,13 +225,11 @@ export default function NewMissionForm() {
         throw new Error(responseData.message || "Échec de la création de la mission.");
       }
       
-      console.log('✅ Mission created successfully');
       toast.success(`Mission de type "${missionType === 'TECHNICAL_VISIT' ? 'Visite Technique' : 'Service'}" planifiée avec succès !`);
       router.push('/missions');
       router.refresh();
 
     } catch (err: any) {
-      console.error('💥 Submission error:', err);
       setError(err.message);
       toast.error(err.message);
     } finally {
@@ -331,7 +318,7 @@ export default function NewMissionForm() {
                 />
               </div>
 
-              <div className={missionType === 'TECHNICAL_VISIT' ? 'md:col-span-2' : ''}>
+              <div>
                 <Label htmlFor="address">Adresse d'intervention *</Label>
                 <Input 
                   id="address" 
@@ -340,6 +327,16 @@ export default function NewMissionForm() {
                   required 
                   placeholder="Adresse sera automatiquement remplie..."
                   className={formData.address ? "text-foreground" : "text-muted-foreground"}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="coordinates">Coordonnées GPS</Label>
+                <Input 
+                  id="coordinates" 
+                  value={formData.coordinates} 
+                  onChange={handleChange} 
+                  placeholder="Lien Google Maps, Lat/Lon..."
                 />
               </div>
 
@@ -354,6 +351,19 @@ export default function NewMissionForm() {
               </div>
               
               <div>
+                <Label htmlFor="priority">Priorité *</Label>
+                <Select value={formData.priority} onValueChange={(value) => handleSelectChange('priority', value)} required>
+                  <SelectTrigger><SelectValue/></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={Priority.LOW}>Faible</SelectItem>
+                    <SelectItem value={Priority.NORMAL}>Normale</SelectItem>
+                    <SelectItem value={Priority.HIGH}>Élevée</SelectItem>
+                    <SelectItem value={Priority.CRITICAL}>Critique</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
                 <Label htmlFor="teamLeaderId">Chef d'Équipe *</Label>
                 <Select value={formData.teamLeaderId} onValueChange={(value) => handleSelectChange('teamLeaderId', value)} required>
                   <SelectTrigger><SelectValue placeholder="Assigner un chef d'équipe..." /></SelectTrigger>
@@ -365,7 +375,7 @@ export default function NewMissionForm() {
                 </Select>
               </div>
               
-              <div>
+              <div className="md:col-span-2">
                 <Label htmlFor="taskTemplateId">Modèle de Checklist</Label>
                 <Select value={formData.taskTemplateId || 'none'} onValueChange={(value) => handleSelectChange('taskTemplateId', value)}>
                   <SelectTrigger><SelectValue placeholder="Choisir une checklist..." /></SelectTrigger>

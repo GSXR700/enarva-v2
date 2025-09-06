@@ -1,3 +1,4 @@
+// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/api/missions/route.ts
 // app/api/missions/route.ts - COMPLETE FIXED VERSION
 import { NextResponse } from 'next/server'
 import { PrismaClient, LeadStatus } from '@prisma/client'
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
         const body = await request.json();
         console.log('🔍 Mission creation request:', JSON.stringify(body, null, 2));
 
-        const { quoteId, leadId, teamLeaderId, type, leadName, taskTemplateId, ...missionData } = body;
+        const { quoteId, leadId, teamLeaderId, type, taskTemplateId, ...missionData } = body;
 
         // Enhanced validation with detailed logging
         const missingFields = [];
@@ -129,12 +130,10 @@ export async function POST(request: Request) {
                 },
                 include: { lead: true }
             }),
-            ...(type === 'TECHNICAL_VISIT' ? [
-                prisma.lead.update({
-                    where: { id: leadId },
-                    data: { status: 'VISIT_PLANNED' }
-                })
-            ] : [])
+            prisma.lead.update({
+                where: { id: leadId },
+                data: { status: type === 'TECHNICAL_VISIT' ? 'VISIT_PLANNED' : 'MISSION_SCHEDULED' }
+            })
         ]);
 
         console.log('✅ Mission created successfully:', newMission.id);
