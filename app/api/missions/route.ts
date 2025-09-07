@@ -22,7 +22,7 @@ export async function GET() {
         teamLeader: true,
         teamMembers: {
           include: {
-            user: true // <-- FIX: Correctly include the nested user object
+            user: true
           }
         },
         quote: true,
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         const body = await request.json();
         console.log('🔍 Mission creation request:', JSON.stringify(body, null, 2));
 
-        const { quoteId, leadId, teamLeaderId, type, taskTemplateId, ...missionData } = body;
+        const { quoteId, leadId, teamLeaderId, type, leadName, taskTemplateId, ...missionData } = body;
 
         // Enhanced validation with detailed logging
         const missingFields = [];
@@ -130,10 +130,12 @@ export async function POST(request: Request) {
                 },
                 include: { lead: true }
             }),
-            prisma.lead.update({
-                where: { id: leadId },
-                data: { status: type === 'TECHNICAL_VISIT' ? 'VISIT_PLANNED' : 'MISSION_SCHEDULED' }
-            })
+            ...(type === 'TECHNICAL_VISIT' ? [
+                prisma.lead.update({
+                    where: { id: leadId },
+                    data: { status: 'VISIT_PLANNED' }
+                })
+            ] : [])
         ]);
 
         console.log('✅ Mission created successfully:', newMission.id);
