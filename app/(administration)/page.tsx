@@ -1,4 +1,5 @@
-// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/(administration)/page.tsx
+// app/(administration)/page.tsx - FIXED
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -8,7 +9,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { formatCurrency, formatDate, translate } from '@/lib/utils'
+import { formatCurrency, formatDate, translate } from '@/lib/utils' 
 import { 
   Users, 
   Clock, 
@@ -198,7 +199,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center justify-between">
                       <Badge className={`text-xs ${getStatusColor(lead.status)}`}>
-                        {translate('LeadStatus', lead.status)}
+                        {translate(lead.status)}
                       </Badge>
                       <span className="text-xs text-muted-foreground">{formatDate(lead.createdAt)}</span>
                     </div>
@@ -228,7 +229,7 @@ export default function Dashboard() {
                     <div className="flex items-center justify-between">
                       <h4 className="font-medium text-foreground">{mission.lead.firstName} {mission.lead.lastName}</h4>
                       <Badge variant="outline" className="text-xs">
-                        {translate('MissionStatus', mission.status)}
+                        {translate(mission.status)}
                       </Badge>
                     </div>
                     <div className="space-y-2">
