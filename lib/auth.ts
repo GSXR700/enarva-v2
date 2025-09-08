@@ -1,4 +1,3 @@
-import NextAuth from 'next-auth'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { PrismaClient, UserRole } from '@prisma/client'
 import CredentialsProvider from 'next-auth/providers/credentials'
@@ -26,7 +25,7 @@ export const authOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" }
       },
-      async authorize(credentials) {
+      async authorize(credentials: any) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Email et mot de passe requis')
         }
