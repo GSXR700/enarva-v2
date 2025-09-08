@@ -1,9 +1,9 @@
-//app/(field)/missions/[id]/execute/page.tsx
+// app/(field)/missions/[id]/execute/page.tsx - FINAL FIX
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useCurrentUser } from '@/hooks/use-current-user' // <-- IMPORT THE CORRECT HOOK
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -71,7 +71,7 @@ const getTaskStatusIcon = (status: TaskStatus) => {
 export default function MissionExecutePage() {
   const params = useParams()
   const router = useRouter()
-  const { data: session } = useSession()
+  const currentUser = useCurrentUser() // <-- USE THE TYPE-SAFE HOOK
   const { edgestore } = useEdgeStore()
   const missionId = params.id as string
 
@@ -218,7 +218,7 @@ export default function MissionExecutePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           status: approved ? 'VALIDATED' : 'REJECTED',
-          validatedBy: session?.user?.id,
+          validatedBy: currentUser?.id, // <-- FIX: Use currentUser
           validatedAt: new Date().toISOString()
         })
       })
@@ -311,7 +311,7 @@ export default function MissionExecutePage() {
               mission.status === 'QUALITY_CHECK' ? 'bg-purple-100 text-purple-800' :
               'bg-green-100 text-green-800'
             }`}>
-              {translate('MissionStatus', mission.status)}
+              {translate(mission.status)}
             </Badge>
           </div>
         </CardHeader>
@@ -382,7 +382,7 @@ export default function MissionExecutePage() {
                     {index + 1}. {task.title}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {translate('TaskCategory', task.category)}
+                    {translate(task.category)}
                   </p>
                   {task.notes && (
                     <p className="text-xs text-muted-foreground mt-1">
@@ -394,7 +394,7 @@ export default function MissionExecutePage() {
                 <div className="flex items-center gap-2">
                   <Badge className={`${getTaskStatusColor(task.status)} flex items-center gap-1`}>
                     {getTaskStatusIcon(task.status)}
-                    {translate('TaskStatus', task.status)}
+                    {translate(task.status)}
                   </Badge>
                   
                   {/* Task Action Buttons */}
@@ -420,7 +420,7 @@ export default function MissionExecutePage() {
                         </Button>
                       )}
                       
-                      {task.status === 'COMPLETED' && session?.user?.role === 'TEAM_LEADER' && (
+                      {task.status === 'COMPLETED' && currentUser?.role === 'TEAM_LEADER' && (
                         <div className="flex gap-1">
                           <Button 
                             size="sm" 
