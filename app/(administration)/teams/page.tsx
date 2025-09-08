@@ -1,4 +1,3 @@
-// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/(administration)/teams/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -28,12 +27,17 @@ export default function TeamsPage() {
   const fetchTeamMembers = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       const response = await fetch('/api/team-members');
       if (!response.ok) throw new Error('Impossible de récupérer les membres.');
       const data = await response.json();
-      setAllMembers(data);
+      
+      // FIX: Extract teamMembers array from the API response object
+      const members = Array.isArray(data) ? data : (data.teamMembers || []);
+      setAllMembers(members);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Une erreur est survenue');
+      setAllMembers([]); // Ensure allMembers is always an array
     } finally {
       setIsLoading(false);
     }
@@ -44,15 +48,21 @@ export default function TeamsPage() {
   }, []);
 
   useEffect(() => {
+    // FIX: Ensure allMembers is always an array before spreading
+    if (!Array.isArray(allMembers)) {
+      setFilteredMembers([]);
+      return;
+    }
+
     let members = [...allMembers];
     if (roleFilter !== 'all') {
-      members = members.filter(member => member.user.role === roleFilter);
+      members = members.filter(member => member.user?.role === roleFilter);
     }
     if (searchQuery) {
         const lowercasedQuery = searchQuery.toLowerCase();
         members = members.filter(member =>
-            member.firstName.toLowerCase().includes(lowercasedQuery) ||
-            member.lastName.toLowerCase().includes(lowercasedQuery) ||
+            member.firstName?.toLowerCase().includes(lowercasedQuery) ||
+            member.lastName?.toLowerCase().includes(lowercasedQuery) ||
             (member.email && member.email.toLowerCase().includes(lowercasedQuery))
         );
     }
@@ -70,7 +80,7 @@ export default function TeamsPage() {
         toast.success("Membre supprimé avec succès.");
         fetchTeamMembers(); // Refresh the list
     } catch (error: any) {
-        toast.error(error.message);
+        toast.error(error.message || 'Erreur lors de la suppression');
     }
   }
 
@@ -94,91 +104,177 @@ export default function TeamsPage() {
   }
 
   if (error) {
-    return <div className="main-content text-center p-10 text-red-500">Erreur: {error}</div>;
+    return (
+      <div className="main-content space-y-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Gestion des Équipes</h1>
+          <p className="text-muted-foreground mt-1">Une erreur est survenue</p>
+        </div>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <div className="text-red-500 mb-4">Erreur: {error}</div>
+            <Button onClick={fetchTeamMembers}>Réessayer</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
     <div className="main-content space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <div>
-          <h1 className="text-2-xl md:text-3xl font-bold text-foreground">Gestion des Équipes</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Gestion des Équipes</h1>
           <p className="text-muted-foreground mt-1">
-            {allMembers.length} membres dans votre organisation
+            {allMembers.length} membre{allMembers.length !== 1 ? 's' : ''} dans votre organisation
           </p>
         </div>
         <Link href="/teams/new">
             <Button className="gap-2 bg-enarva-gradient rounded-lg">
                 <Plus className="w-4 h-4" />
-                Employé
+                Nouvel Employé
             </Button>
         </Link>
       </div>
 
-      <Card className="thread-card">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex-1 min-w-full sm:min-w-64">
-              <Input
-                placeholder="Rechercher par nom, email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-background"
-              />
-            </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Rôle" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les rôles</SelectItem>
-                <SelectItem value="TEAM_LEADER">Chef d'équipe</SelectItem>
-                <SelectItem value="TECHNICIAN">Technicien</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <Input
+            placeholder="Rechercher par nom ou email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="max-w-sm"
+          />
+        </div>
+        <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filtrer par rôle" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les rôles</SelectItem>
+            <SelectItem value="TEAM_LEADER">Chef d'équipe</SelectItem>
+            <SelectItem value="TECHNICIAN">Technicien</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredMembers.map((member) => (
-          <Card key={member.id} className="thread-card flex flex-col justify-between">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="w-16 h-16">
-                      <AvatarImage src={member.user.image || undefined} />
-                      <AvatarFallback>{member.firstName[0]}{member.lastName[0]}</AvatarFallback>
+      {/* Team Members Grid */}
+      {filteredMembers.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">
+              {searchQuery || roleFilter !== 'all' ? 'Aucun membre trouvé' : 'Aucun membre dans l\'équipe'}
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              {searchQuery || roleFilter !== 'all' 
+                ? 'Essayez de modifier vos critères de recherche.' 
+                : 'Commencez par ajouter des membres à votre équipe.'}
+            </p>
+            {!searchQuery && roleFilter === 'all' && (
+              <Link href="/teams/new">
+                <Button>Ajouter un membre</Button>
+              </Link>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredMembers.map((member) => (
+            <Card key={member.id} className="thread-card hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-10 h-10">
+                      <AvatarImage src={member.user?.image || undefined} />
+                      <AvatarFallback>
+                        {member.firstName?.[0]}{member.lastName?.[0]}
+                      </AvatarFallback>
                     </Avatar>
                     <div>
-                      <h3 className="text-lg font-bold text-foreground">{member.firstName} {member.lastName}</h3>
-                      <p className="text-sm text-muted-foreground">{member.email}</p>
+                      <CardTitle className="text-lg">
+                        {member.firstName} {member.lastName}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        {member.email}
+                      </p>
                     </div>
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4"/></Button>
+                      <Button variant="ghost" size="sm">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <Link href={`/teams/${member.id}/edit`}><DropdownMenuItem><Edit className="w-4 h-4 mr-2"/>Modifier</DropdownMenuItem></Link>
-                        <DropdownMenuItem className="text-red-500" onClick={() => handleDelete(member.id)}><Trash2 className="w-4 h-4 mr-2"/>Supprimer</DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href={`/teams/${member.id}/edit`} className="flex items-center gap-2">
+                          <Edit className="w-4 h-4" />
+                          Modifier
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleDelete(member.id)}
+                        className="flex items-center gap-2 text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Supprimer
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-              </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  {getRoleIcon(member.user?.role || '')}
+                  <Badge className={getRoleColor(member.user?.role || '')}>
+                    {member.user?.role === 'TEAM_LEADER' ? 'Chef d\'équipe' : 'Technicien'}
+                  </Badge>
+                </div>
+                
+                {member.specialties && member.specialties.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Spécialités:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {member.specialties.slice(0, 2).map((specialty) => (
+                        <Badge key={specialty} variant="secondary" className="text-xs">
+                          {specialty.replace('_', ' ')}
+                        </Badge>
+                      ))}
+                      {member.specialties.length > 2 && (
+                        <Badge variant="secondary" className="text-xs">
+                          +{member.specialties.length - 2}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
 
-              <div className="flex flex-wrap gap-2">
-                 <Badge className={`text-xs ${getRoleColor(member.user.role)} flex items-center gap-1`}>
-                    {getRoleIcon(member.user.role)}
-                    {member.user.role === 'TEAM_LEADER' ? "Chef d'équipe" : "Technicien"}
-                 </Badge>
-                 <Badge variant="outline" className="flex items-center gap-1">
-                    <Award className="w-4 h-4" />
-                    {member.experienceLevel}
-                 </Badge>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">
+                      {member.experienceLevel === 'JUNIOR' ? 'Junior' : 
+                       member.experienceLevel === 'SENIOR' ? 'Senior' : 'Expert'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className={`w-2 h-2 rounded-full ${
+                      member.user?.onlineStatus === 'ONLINE' ? 'bg-green-500' : 
+                      member.user?.onlineStatus === 'BUSY' ? 'bg-yellow-500' : 'bg-gray-300'
+                    }`} />
+                    <span className="text-xs text-muted-foreground">
+                      {member.user?.onlineStatus === 'ONLINE' ? 'En ligne' : 
+                       member.user?.onlineStatus === 'BUSY' ? 'Occupé' : 'Hors ligne'}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
