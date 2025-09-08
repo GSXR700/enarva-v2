@@ -1,8 +1,7 @@
-// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/(field)/dashboard/page.tsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
+import { useCurrentUser } from '@/hooks/use-current-user'; // <-- CORRECT HOOK
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,11 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Mission, Lead, User, Task, TaskStatus } from '@prisma/client';
 import { formatDate, formatTime, translate } from '@/lib/utils';
-import { 
-  MapPin, 
-  Clock, 
-  Play, 
-  CheckCircle, 
+import {
+  MapPin,
+  Clock,
+  Play,
+  CheckCircle,
   AlertTriangle,
   Calendar,
   Users,
@@ -35,27 +34,27 @@ type TaskWithDetails = Task & {
   clientApproved?: boolean;
 };
 
-type MissionWithDetails = Mission & { 
+type MissionWithDetails = Mission & {
   lead: Lead;
   tasks: TaskWithDetails[];
 };
 
 export default function FieldDashboardPage() {
-  const { data: session } = useSession();
+  const currentUser = useCurrentUser(); // <-- USE THE TYPE-SAFE HOOK
   const [myMissions, setMyMissions] = useState<MissionWithDetails[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchMissions = useCallback(async () => {
-    if (session?.user?.id) {
+    if (currentUser?.id) { // <-- FIX: Check for the user ID from our type-safe hook
       try {
         const response = await fetch('/api/missions');
         if (!response.ok) throw new Error("Failed to fetch missions");
         const allMissions: MissionWithDetails[] = await response.json();
         
         const assignedMissions = allMissions.filter(
-          mission => 
-            mission.teamLeaderId === session.user.id ||
+          mission =>
+            mission.teamLeaderId === currentUser.id || // <-- FIX: Use currentUser.id
             (mission.status !== 'COMPLETED' && mission.status !== 'CANCELLED')
         );
         
@@ -67,17 +66,17 @@ export default function FieldDashboardPage() {
         setIsLoading(false);
       }
     }
-  }, [session?.user?.id]);
+  }, [currentUser]); // <-- FIX: Dependency array now correctly uses currentUser
 
   useEffect(() => {
     fetchMissions();
 
-    if (session?.user?.id) {
+    if (currentUser?.id) { // <-- FIX: Use currentUser
       const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
         cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
       });
 
-      const channelName = `user-${session.user.id}`;
+      const channelName = `user-${currentUser.id}`; // <-- FIX: Use currentUser.id for channel name
       const channel = pusher.subscribe(channelName);
 
       channel.bind('mission-new', (newMission: Mission) => {
@@ -86,7 +85,7 @@ export default function FieldDashboardPage() {
       });
 
       channel.bind('mission-validation', (data: any) => {
-        const message = data.approved 
+        const message = data.approved
           ? `Mission ${data.missionNumber} approuvée!`
           : `Mission ${data.missionNumber} nécessite des corrections`;
         
@@ -104,11 +103,10 @@ export default function FieldDashboardPage() {
         pusher.disconnect();
       };
     }
-  }, [session?.user?.id, fetchMissions]);
+  }, [currentUser, fetchMissions]); // <-- FIX: Dependency array now uses currentUser
 
   const getMissionProgress = (mission: MissionWithDetails) => {
     if (!mission.tasks?.length) return 0;
-    // ✅ FIX: Count both COMPLETED and VALIDATED tasks for accurate progress
     const completedTasks = mission.tasks.filter(
       t => t.status === 'COMPLETED' || t.status === 'VALIDATED'
     ).length;
@@ -118,11 +116,11 @@ export default function FieldDashboardPage() {
   const getMissionStatusInfo = (mission: MissionWithDetails) => {
     const progress = getMissionProgress(mission);
     const totalTasks = mission.tasks.length;
-    const completedTasks = mission.tasks.filter(t => 
+    const completedTasks = mission.tasks.filter(t =>
       t.status === 'COMPLETED' || t.status === 'VALIDATED'
     ).length;
-    const withPhotos = mission.tasks.filter(t => 
-      (t.beforePhotos && t.beforePhotos.length > 0) || 
+    const withPhotos = mission.tasks.filter(t =>
+      (t.beforePhotos && t.beforePhotos.length > 0) ||
       (t.afterPhotos && t.afterPhotos.length > 0)
     ).length;
     const clientApproved = mission.tasks.filter(t => t.clientApproved).length;
@@ -186,13 +184,13 @@ export default function FieldDashboardPage() {
     return <TableSkeleton title="Chargement de vos missions..." />;
   }
 
-  const activeMissions = myMissions.filter(m => 
+  const activeMissions = myMissions.filter(m =>
     ['SCHEDULED', 'IN_PROGRESS'].includes(m.status)
   );
-  const pendingMissions = myMissions.filter(m => 
+  const pendingMissions = myMissions.filter(m =>
     ['QUALITY_CHECK', 'CLIENT_VALIDATION'].includes(m.status)
   );
-  const completedMissions = myMissions.filter(m => 
+  const completedMissions = myMissions.filter(m =>
     m.status === 'COMPLETED'
   );
 
@@ -205,7 +203,7 @@ export default function FieldDashboardPage() {
             Tableau de Bord Terrain
           </h1>
           <p className="text-muted-foreground mt-1">
-            Bonjour {session?.user?.name}, voici vos missions du jour
+            Bonjour {currentUser?.name}, voici vos missions du jour
           </p>
         </div>
         {notifications.length > 0 && (
@@ -303,7 +301,7 @@ export default function FieldDashboardPage() {
                       </div>
                       <Badge className={`flex items-center gap-1 ${getStatusColor(mission.status)}`}>
                         {getStatusIcon(mission.status)}
-                        {translate('MissionStatus', mission.status)}
+                        {translate(mission.status as any)}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -352,7 +350,7 @@ export default function FieldDashboardPage() {
 
                     {/* Action Button */}
                     <Link href={`/missions/${mission.id}/execute`} className="block">
-                      <Button 
+                      <Button
                         className={`w-full ${
                           statusInfo.nextAction.color === 'green' ? 'bg-green-600 hover:bg-green-700' :
                           statusInfo.nextAction.color === 'blue' ? 'bg-blue-600 hover:bg-blue-700' :
@@ -392,7 +390,7 @@ export default function FieldDashboardPage() {
                             </p>
                           </div>
                           <Badge className={getStatusColor(mission.status)}>
-                            {translate('MissionStatus', mission.status)}
+                            {translate(mission.status as any)}
                           </Badge>
                         </div>
                         <div className="mt-2 text-sm text-muted-foreground">
