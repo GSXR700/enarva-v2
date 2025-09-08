@@ -1,4 +1,4 @@
-// lib/validation.ts - Added missing validation functions
+// lib/validation.ts - CLEAN VERSION WITHOUT DUPLICATES
 import { z } from 'zod';
 
 // Lead validation schema
@@ -71,7 +71,7 @@ export const leadValidationSchema = z.object({
   ]).optional(),
   
   assignedToId: z.string().optional(),
-  materials: z.any().optional(), // JSON field
+  materials: z.any().optional(),
   score: z.number().min(0).max(100).optional(),
 });
 
@@ -80,7 +80,7 @@ export function validateLeadInput(data: any) {
 }
 
 // Mission validation schema
-export const missionValidationSchema = z.object({
+export const missionSchema = z.object({
   missionNumber: z.string().min(1, 'Numéro de mission requis'),
   status: z.enum(['SCHEDULED', 'IN_PROGRESS', 'QUALITY_CHECK', 'CLIENT_VALIDATION', 'COMPLETED', 'CANCELLED']),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']),
@@ -96,7 +96,7 @@ export const missionValidationSchema = z.object({
 });
 
 export function validateMissionInput(data: any) {
-  return missionValidationSchema.safeParse(data);
+  return missionSchema.safeParse(data);
 }
 
 // Task validation schema
@@ -128,8 +128,8 @@ export const quoteValidationSchema = z.object({
   totalPrice: z.number().min(0, 'Prix total invalide'),
   validUntil: z.string().or(z.date()),
   leadId: z.string().min(1, 'Lead ID requis'),
-  services: z.array(z.any()).optional(), // JSON field
-  lineItems: z.array(z.any()).optional(), // JSON field
+  services: z.array(z.any()).optional(),
+  lineItems: z.array(z.any()).optional(),
 });
 
 export function validateQuoteInput(data: any) {

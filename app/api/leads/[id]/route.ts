@@ -1,4 +1,4 @@
-// app/api/leads/[id]/route.ts - FIXED WITH TYPE ASSERTIONS
+// app/api/leads/[id]/route.ts - FIXED ROUTE CONTEXT
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -7,18 +7,14 @@ import { validateLeadInput } from '@/lib/validation';
 import { withErrorHandler } from '@/lib/error-handler';
 import { LeadStatus } from '@prisma/client';
 
-interface RouteContext {
-  params: { id: string };
-}
-
-export async function GET(request: NextRequest, { params }: RouteContext) {
+export async function GET(request: NextRequest, context: { params: { id: string } }) {
   return withErrorHandler(async () => {
     const session = await getServerSession(authOptions) as any;
     if (!session?.user) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
 
-    const lead = await leadService.getLeadById(params.id, {
+    const lead = await leadService.getLeadById(context.params.id, {
       assignedTo: {
         select: {
           id: true,
@@ -57,14 +53,14 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
   });
 }
 
-export async function PATCH(request: NextRequest, { params }: RouteContext) {
+export async function PATCH(request: NextRequest, context: { params: { id: string } }) {
   return withErrorHandler(async () => {
     const session = await getServerSession(authOptions) as any;
     if (!session?.user) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
 
-    const leadId = params.id;
+    const leadId = context.params.id;
     
     const existingLead = await leadService.getLeadById(leadId);
     if (!existingLead) {
@@ -170,7 +166,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   });
 }
 
-export async function DELETE(request: NextRequest, { params }: RouteContext) {
+export async function DELETE(request: NextRequest, context: { params: { id: string } }) {
   return withErrorHandler(async () => {
     const session = await getServerSession(authOptions) as any;
     if (!session?.user) {
@@ -181,7 +177,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Permissions insuffisantes' }, { status: 403 });
     }
 
-    const leadId = params.id;
+    const leadId = context.params.id;
     
     const existingLead = await leadService.getLeadById(leadId);
     if (!existingLead) {
