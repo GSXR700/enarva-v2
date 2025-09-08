@@ -1,6 +1,7 @@
 module.exports = {
   experimental: {
-    optimizeCss: true,
+    // Temporarily disable optimizeCss to fix the critters issue
+    // optimizeCss: true,
     optimizePackageImports: ['lucide-react', '@radix-ui/react-*', 'recharts']
   },
   images: {
@@ -44,4 +45,3 @@ module.exports = {
     return config;
   },
 };
-

@@ -43,6 +43,7 @@
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "critters": "^0.0.24",
     "date-fns": "^3.0.6",
     "framer-motion": "^10.16.16",
     "jspdf": "^3.0.2",
