@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 // Use 'import type' for type-only imports from declaration files
-import type { ExtendedUser } from "@/next-auth.d.ts";
+import type { ExtendedUser } from "@/types/next-auth";
 
 /**
  * A custom hook to access the current user's session data with proper typing.

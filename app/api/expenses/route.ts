@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { ExtendedUser } from '@/types/next-auth';
 
 const prisma = new PrismaClient();
 
@@ -28,24 +29,29 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    const user = session.user as ExtendedUser;
+    if (!user.id) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const body = await request.json();
     console.log('📥 Received expense data:', body);
-    console.log('👤 Current user ID from session:', session.user.id);
+    console.log('👤 Current user ID from session:', user.id);
 
     const { amount, date, rentalStartDate, rentalEndDate, missionId, leadId, ...restData } = body;
 
     const { userId: bodyUserId, ...cleanData } = restData;
 
     const userExists = await prisma.user.findUnique({
-      where: { id: session.user.id }
+      where: { id: user.id }
     });
 
     if (!userExists) {
-      console.error('❌ User not found in database:', session.user.id);
+      console.error('❌ User not found in database:', user.id);
       return new NextResponse('User not found', { status: 400 });
     }
 
@@ -55,7 +61,7 @@ export async function POST(request: Request) {
       ...cleanData,
       amount: new Decimal(amount),
       date: new Date(date),
-      userId: session.user.id,
+      userId: user.id,
       rentalStartDate: rentalStartDate ? new Date(rentalStartDate) : null,
       rentalEndDate: rentalEndDate ? new Date(rentalEndDate) : null,
       missionId: missionId || null,
