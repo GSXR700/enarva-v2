@@ -1,4 +1,4 @@
-// app/api/leads/[id]/route.ts - FIXED FOR NEXT.JS 15 WITHOUT withErrorHandler
+// app/api/leads/[id]/route.ts - COMPLETE NEXT.JS 15 FIX
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -8,7 +8,7 @@ import { errorHandler } from '@/lib/error-handler';
 import { LeadStatus } from '@prisma/client';
 
 export async function GET(
-  request: NextRequest, 
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -62,7 +62,7 @@ export async function GET(
 }
 
 export async function PATCH(
-  request: NextRequest, 
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -153,7 +153,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest, 
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
