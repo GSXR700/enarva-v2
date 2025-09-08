@@ -1,4 +1,4 @@
-// app/api/leads/route.ts - COMPLETE ERROR-FREE VERSION
+// app/api/leads/route.ts - COMPLETE CORRECTED VERSION
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -111,9 +111,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const validation = validateLeadInput(body);
+    console.log('Lead creation request body:', body);
+
+    // Use strict validation for creation
+    const validation = validateLeadInput(body, true);
     
     if (!validation.success) {
+      console.error('Validation errors:', validation.error.errors);
       return NextResponse.json(
         { 
           error: 'Données invalides', 
@@ -123,18 +127,58 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const score = calculateLeadScore(validation.data);
-    const leadData = {
-      ...validation.data,
+    const validatedData = validation.data;
+
+    // Ensure all required fields are present with proper types
+    if (!validatedData.firstName || !validatedData.lastName || !validatedData.phone || !validatedData.channel) {
+      return NextResponse.json(
+        { error: 'Champs requis manquants: firstName, lastName, phone, channel' },
+        { status: 400 }
+      );
+    }
+
+    const score = calculateLeadScore(validatedData);
+    
+    // Create leadData with guaranteed required fields
+    const leadData: Prisma.LeadCreateInput = {
+      firstName: validatedData.firstName,
+      lastName: validatedData.lastName,
+      phone: validatedData.phone,
+      channel: validatedData.channel,
+      originalMessage: validatedData.originalMessage || 'Lead créé depuis l\'interface',
       score,
-      originalMessage: validation.data.originalMessage || 'Lead créé depuis l\'interface',
-      createdById: user.id
+      status: validatedData.status || 'NEW',
+      leadType: validatedData.leadType || 'PARTICULIER',
+      accessibility: validatedData.accessibility || 'EASY',
+      frequency: validatedData.frequency || 'PONCTUEL',
+      contractType: validatedData.contractType || 'INTERVENTION_UNIQUE',
+      needsProducts: validatedData.needsProducts || false,
+      needsEquipment: validatedData.needsEquipment || false,
+      providedBy: validatedData.providedBy || 'ENARVA',
+      hasReferrer: validatedData.hasReferrer || false,
+      enarvaRole: validatedData.enarvaRole || 'PRESTATAIRE_PRINCIPAL',
+      // Optional fields
+      ...(validatedData.email && { email: validatedData.email }),
+      ...(validatedData.address && { address: validatedData.address }),
+      ...(validatedData.gpsLocation && { gpsLocation: validatedData.gpsLocation }),
+      ...(validatedData.company && { company: validatedData.company }),
+      ...(validatedData.iceNumber && { iceNumber: validatedData.iceNumber }),
+      ...(validatedData.activitySector && { activitySector: validatedData.activitySector }),
+      ...(validatedData.contactPosition && { contactPosition: validatedData.contactPosition }),
+      ...(validatedData.department && { department: validatedData.department }),
+      ...(validatedData.propertyType && { propertyType: validatedData.propertyType }),
+      ...(validatedData.estimatedSurface && { estimatedSurface: validatedData.estimatedSurface }),
+      ...(validatedData.urgencyLevel && { urgencyLevel: validatedData.urgencyLevel }),
+      ...(validatedData.budgetRange && { budgetRange: validatedData.budgetRange }),
+      ...(validatedData.source && { source: validatedData.source }),
+      ...(validatedData.referrerContact && { referrerContact: validatedData.referrerContact }),
+      ...(validatedData.materials && { materials: validatedData.materials }),
+      ...(validatedData.assignedToId && { 
+        assignedTo: { connect: { id: validatedData.assignedToId } } 
+      }),
     };
 
-    // Remove createdById from leadData as it's not part of Prisma schema
-    const { createdById, ...prismaLeadData } = leadData;
-
-    const newLead = await leadService.createLead(prismaLeadData, user.id);
+    const newLead = await leadService.createLead(leadData, user.id);
 
     // Optional: Trigger Pusher notification if configured
     if (process.env.PUSHER_APP_ID) {
@@ -142,9 +186,9 @@ export async function POST(request: NextRequest) {
         const Pusher = require('pusher');
         const pusher = new Pusher({
           appId: process.env.PUSHER_APP_ID,
-          key: process.env.PUSHER_KEY,
+          key: process.env.NEXT_PUBLIC_PUSHER_KEY,
           secret: process.env.PUSHER_SECRET,
-          cluster: process.env.PUSHER_CLUSTER,
+          cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
           useTLS: true
         });
 
@@ -157,7 +201,6 @@ export async function POST(request: NextRequest) {
         });
       } catch (pusherError) {
         console.warn('Pusher notification failed:', pusherError);
-        // Don't fail the request if Pusher fails
       }
     }
 
@@ -189,26 +232,26 @@ function calculateLeadScore(leadData: any): number {
 
   // Budget range scoring
   if (leadData.budgetRange) {
-    const budgetScores = {
+    const budgetScores: Record<string, number> = {
       'MOINS_5000': 20,
       'ENTRE_5000_15000': 40,
       'ENTRE_15000_30000': 60,
       'ENTRE_30000_50000': 80,
       'PLUS_50000': 100
     };
-    score += budgetScores[leadData.budgetRange as keyof typeof budgetScores] || 0;
+    score += budgetScores[leadData.budgetRange] || 0;
   }
   
   // Urgency level scoring
   if (leadData.urgencyLevel) {
-    const urgencyScores = {
+    const urgencyScores: Record<string, number> = {
       'IMMEDIATE': 30,
-      'THIS_WEEK': 25,
-      'THIS_MONTH': 20,
-      'NEXT_MONTH': 15,
-      'NO_URGENCY': 5
+      'HIGH_URGENT': 25,
+      'URGENT': 20,
+      'NORMAL': 15,
+      'LOW': 5
     };
-    score += urgencyScores[leadData.urgencyLevel as keyof typeof urgencyScores] || 10;
+    score += urgencyScores[leadData.urgencyLevel] || 10;
   }
   
   // Surface area scoring

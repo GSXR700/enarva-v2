@@ -44,7 +44,7 @@ const getMissionsHandler = async (request: NextRequest) => {
 };
 
 const createMissionHandler = async (request: NextRequest) => {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
   if (!session) {
       return new NextResponse('Unauthorized', { status: 401 });
   }

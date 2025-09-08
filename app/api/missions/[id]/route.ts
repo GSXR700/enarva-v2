@@ -1,10 +1,10 @@
-// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/api/missions/[id]/route.ts
+// app/api/missions/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 const prisma = new PrismaClient();
 
-// GET handler to fetch a single mission by its ID
 export async function GET(
   request: Request, 
   { params }: { params: Promise<{ id: string }> }
@@ -12,13 +12,36 @@ export async function GET(
     try {
         const { id } = await params;
         
-        const mission = await prisma.mission.findUnique({
+        const mission = await prisma.mission.findUnique({ 
             where: { id },
-            include: { 
+            include: {
                 lead: true,
+                quote: true,
                 teamLeader: true,
-                teamMembers: { include: { user: true } },
-                tasks: { orderBy: { createdAt: 'asc' } }
+                teamMembers: true,
+                tasks: {
+                    include: {
+                        assignedTo: true
+                    },
+                    orderBy: { createdAt: 'asc' }
+                },
+                qualityChecks: true,
+                inventoryUsed: {
+                    include: {
+                        inventory: true
+                    }
+                },
+                conversation: {
+                    include: {
+                        messages: {
+                            include: {
+                                sender: true
+                            },
+                            orderBy: { createdAt: 'desc' },
+                            take: 10
+                        }
+                    }
+                }
             }
         });
 
@@ -32,7 +55,6 @@ export async function GET(
     }
 }
 
-// PATCH handler to update the mission, team, and tasks
 export async function PATCH(
   request: Request, 
   { params }: { params: Promise<{ id: string }> }
@@ -41,21 +63,21 @@ export async function PATCH(
         const { id } = await params;
         const body = await request.json();
         
-        // Explicitly destructure only the fields we expect from the client
         const { 
-            scheduledDate, estimatedDuration, address, priority, status, accessNotes, 
-            teamLeaderId, teamMemberIds, tasks, coordinates, clientFeedback,
-            clientRating, clientValidated, invoiceGenerated
+            missionNumber, status, priority, type, scheduledDate, estimatedDuration,
+            address, coordinates, accessNotes, clientFeedback, clientRating,
+            clientValidated, invoiceGenerated, teamLeaderId, teamMemberIds, tasks
         } = body;
-        
-        // Build a clean data object for Prisma, preventing any unwanted fields
+
         const dataToUpdate: any = {};
-        
-        if (scheduledDate) dataToUpdate.scheduledDate = new Date(scheduledDate);
-        if (estimatedDuration) dataToUpdate.estimatedDuration = parseInt(estimatedDuration, 10);
-        if (address) dataToUpdate.address = address;
-        if (priority) dataToUpdate.priority = priority;
+
+        if (missionNumber) dataToUpdate.missionNumber = missionNumber;
         if (status) dataToUpdate.status = status;
+        if (priority) dataToUpdate.priority = priority;
+        if (type) dataToUpdate.type = type;
+        if (scheduledDate) dataToUpdate.scheduledDate = new Date(scheduledDate);
+        if (estimatedDuration !== undefined) dataToUpdate.estimatedDuration = parseInt(estimatedDuration, 10);
+        if (address) dataToUpdate.address = address;
         if (accessNotes !== undefined) dataToUpdate.accessNotes = accessNotes;
         if (coordinates !== undefined) dataToUpdate.coordinates = coordinates;
         if (clientFeedback !== undefined) dataToUpdate.clientFeedback = clientFeedback;
@@ -63,8 +85,6 @@ export async function PATCH(
         if (clientValidated !== undefined) dataToUpdate.clientValidated = Boolean(clientValidated);
         if (invoiceGenerated !== undefined) dataToUpdate.invoiceGenerated = Boolean(invoiceGenerated);
 
-
-        // Correctly format relation updates
         if (teamLeaderId) {
             dataToUpdate.teamLeader = { connect: { id: teamLeaderId } };
         } else if (teamLeaderId === null) {
@@ -76,13 +96,11 @@ export async function PATCH(
         }
 
         const updatedMission = await prisma.$transaction(async (tx) => {
-            // 1. Update core mission data and relations
             const mission = await tx.mission.update({
                 where: { id },
                 data: dataToUpdate,
             });
 
-            // 2. If tasks are provided, replace the existing ones
             if (tasks && Array.isArray(tasks)) {
                 await tx.task.deleteMany({ where: { missionId: id } });
                 if (tasks.length > 0) {
@@ -107,7 +125,6 @@ export async function PATCH(
     }
 }
 
-// DELETE handler to remove a mission
 export async function DELETE(
   request: Request, 
   { params }: { params: Promise<{ id: string }> }

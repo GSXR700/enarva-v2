@@ -1,4 +1,4 @@
-// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/api/inventory/[id]/route.ts
+// app/api/inventory/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -11,7 +11,20 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const item = await prisma.inventory.findUnique({ where: { id } });
+    const item = await prisma.inventory.findUnique({ 
+        where: { id },
+        include: {
+            usages: {
+                include: {
+                    mission: {
+                        include: {
+                            lead: true
+                        }
+                    }
+                }
+            }
+        }
+    });
     if (!item) return new NextResponse('Inventory item not found', { status: 404 });
     return NextResponse.json(item);
   } catch (error) {
@@ -28,6 +41,7 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
     const { currentStock, minimumStock, unitPrice, ...rest } = body;
+    
     const updatedItem = await prisma.inventory.update({
       where: { id },
       data: {

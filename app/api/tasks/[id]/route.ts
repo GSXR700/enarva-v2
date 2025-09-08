@@ -1,4 +1,4 @@
-// app/api/tasks/[id]/route.ts - ENHANCED WITH COMPLETE WORKFLOW
+// app/api/tasks/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
@@ -55,7 +55,6 @@ export async function PATCH(
         
         console.log('🔧 Task update request:', { taskId: id, updates: body });
 
-        // Get current task
         const currentTask = await prisma.task.findUnique({
             where: { id },
             include: {
@@ -72,13 +71,11 @@ export async function PATCH(
             return new NextResponse('Task not found', { status: 404 });
         }
 
-        // Prepare update data
         const updateData: any = {
             ...body,
             updatedAt: new Date()
         };
 
-        // Handle status-specific logic
         if (body.status) {
             switch (body.status) {
                 case 'IN_PROGRESS':
@@ -90,64 +87,35 @@ export async function PATCH(
                 case 'COMPLETED':
                     updateData.completedAt = new Date();
                     
-                    // Handle photo uploads
                     if (body.beforePhotos || body.afterPhotos) {
                         updateData.beforePhotos = body.beforePhotos || currentTask.beforePhotos;
                         updateData.afterPhotos = body.afterPhotos || currentTask.afterPhotos;
                     }
                     
-                    // Handle client approval
                     if (body.clientApproved !== undefined) {
-                        updateData.clientApproved = body.clientApproved;
-                        updateData.clientFeedback = body.clientFeedback || null;
+                        updateData.clientApproved = Boolean(body.clientApproved);
                     }
                     break;
 
                 case 'VALIDATED':
-                    updateData.validatedBy = user.id;
                     updateData.validatedAt = new Date();
-                    break;
-
-                case 'REJECTED':
                     updateData.validatedBy = user.id;
-                    updateData.validatedAt = new Date();
-                    // Reset completion data when rejected
-                    updateData.completedAt = null;
-                    updateData.clientApproved = false;
-                    updateData.clientFeedback = null;
                     break;
             }
         }
 
-        // Update the task
         const updatedTask = await prisma.task.update({
             where: { id },
             data: updateData,
             include: {
                 mission: {
                     include: {
-                        tasks: true,
-                        lead: true
+                        lead: true,
+                        tasks: true
                     }
                 },
                 assignedTo: true
             }
-        });
-
-        console.log('✅ Task updated successfully:', updatedTask.status);
-
-        // Check if mission status should be updated
-        await updateMissionStatusIfNeeded(currentTask.missionId);
-
-        // Create activity log
-        await prisma.activity.create({
-            data: {
-                type: 'MISSION_STARTED', // You might want to add more specific activity types
-                title: `Tâche ${body.status === 'COMPLETED' ? 'terminée' : 'mise à jour'}`,
-                description: `Tâche "${currentTask.title}" - ${body.status}`,
-                userId: user.id,
-                leadId: currentTask.mission.leadId,
-            },
         });
 
         return NextResponse.json(updatedTask);
@@ -157,51 +125,19 @@ export async function PATCH(
     }
 }
 
-// Helper function to update mission status based on task progress
-async function updateMissionStatusIfNeeded(missionId: string) {
+export async function DELETE(
+  request: Request, 
+  { params }: { params: Promise<{ id: string }> }
+) {
     try {
-        const mission = await prisma.mission.findUnique({
-            where: { id: missionId },
-            include: { tasks: true }
-        });
-
-        if (!mission) return;
-
-        const tasks = mission.tasks;
-        const totalTasks = tasks.length;
+        const { id } = await params;
         
-        if (totalTasks === 0) return;
-
-        const validatedTasks = tasks.filter(t => t.status === 'VALIDATED').length;
-        const completedTasks = tasks.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length;
-        const inProgressTasks = tasks.filter(t => t.status === 'IN_PROGRESS').length;
-
-        let newStatus = mission.status;
-
-        // Auto-update mission status based on task progress
-        if (mission.status === 'SCHEDULED' && inProgressTasks > 0) {
-            newStatus = 'IN_PROGRESS';
-        } else if (mission.status === 'IN_PROGRESS' && completedTasks === totalTasks) {
-            // All tasks completed, ready for quality check
-            newStatus = 'QUALITY_CHECK';
-        } else if (mission.status === 'QUALITY_CHECK' && validatedTasks === totalTasks) {
-            // All tasks validated, ready for client validation
-            newStatus = 'CLIENT_VALIDATION';
-        }
-
-        // Update mission status if it changed
-        if (newStatus !== mission.status) {
-            await prisma.mission.update({
-                where: { id: missionId },
-                data: { 
-                    status: newStatus,
-                    updatedAt: new Date()
-                }
-            });
-
-            console.log(`✅ Mission ${missionId} status auto-updated: ${mission.status} → ${newStatus}`);
-        }
+        await prisma.task.delete({
+            where: { id },
+        });
+        return new NextResponse(null, { status: 204 });
     } catch (error) {
-        console.error('Failed to update mission status:', error);
+        console.error(`Failed to delete task:`, error);
+        return new NextResponse('Internal Server Error', { status: 500 });
     }
 }

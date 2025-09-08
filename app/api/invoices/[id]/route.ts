@@ -1,4 +1,4 @@
-// app/api/quotes/[id]/route.ts
+// app/api/invoices/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -12,17 +12,20 @@ export async function GET(
     try {
         const { id } = await params;
         
-        const quote = await prisma.quote.findUnique({ 
+        const invoice = await prisma.invoice.findUnique({ 
             where: { id },
-            include: { lead: true, missions: true }
+            include: { 
+                lead: true,
+                mission: true
+            }
         });
 
-        if (!quote) {
-            return new NextResponse('Quote not found', { status: 404 });
+        if (!invoice) {
+            return new NextResponse('Invoice not found', { status: 404 });
         }
-        return NextResponse.json(quote);
+        return NextResponse.json(invoice);
     } catch (error) {
-        console.error(`Failed to fetch quote:`, error);
+        console.error(`Failed to fetch invoice:`, error);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }
@@ -35,30 +38,28 @@ export async function PATCH(
         const { id } = await params;
         const body = await request.json();
         
-        const { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice, status, type, expiresAt } = body;
+        const { status, amount, dueDate, paidAt, paymentMethod, notes } = body;
 
         const dataToUpdate: any = {};
 
-        if (lineItems) dataToUpdate.lineItems = lineItems;
-        if (subTotalHT !== undefined) dataToUpdate.subTotalHT = new Decimal(subTotalHT);
-        if (vatAmount !== undefined) dataToUpdate.vatAmount = new Decimal(vatAmount);
-        if (totalTTC !== undefined) dataToUpdate.totalTTC = new Decimal(totalTTC);
-        if (finalPrice !== undefined) dataToUpdate.finalPrice = new Decimal(finalPrice);
         if (status) dataToUpdate.status = status;
-        if (type) dataToUpdate.type = type;
-        if (expiresAt) dataToUpdate.expiresAt = new Date(expiresAt);
+        if (amount !== undefined) dataToUpdate.amount = new Decimal(amount);
+        if (dueDate) dataToUpdate.dueDate = new Date(dueDate);
+        if (paidAt) dataToUpdate.paidAt = new Date(paidAt);
+        if (paymentMethod) dataToUpdate.paymentMethod = paymentMethod;
+        if (notes !== undefined) dataToUpdate.notes = notes;
 
         if (Object.keys(dataToUpdate).length === 0) {
             return new NextResponse('No update data provided', { status: 400 });
         }
 
-        const updatedQuote = await prisma.quote.update({
+        const updatedInvoice = await prisma.invoice.update({
             where: { id },
             data: dataToUpdate,
         });
-        return NextResponse.json(updatedQuote);
+        return NextResponse.json(updatedInvoice);
     } catch (error) {
-        console.error(`Failed to update quote:`, error);
+        console.error(`Failed to update invoice:`, error);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }
@@ -70,12 +71,12 @@ export async function DELETE(
     try {
         const { id } = await params;
         
-        await prisma.quote.delete({
+        await prisma.invoice.delete({
             where: { id },
         });
         return new NextResponse(null, { status: 204 });
     } catch (error) {
-        console.error(`Failed to delete quote:`, error);
+        console.error(`Failed to delete invoice:`, error);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }

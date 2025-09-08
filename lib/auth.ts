@@ -1,91 +1,91 @@
-import { PrismaAdapter } from '@next-auth/prisma-adapter'
-import { PrismaClient, UserRole } from '@prisma/client'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import GoogleProvider from 'next-auth/providers/google'
-import FacebookProvider from 'next-auth/providers/facebook'
-import bcrypt from 'bcryptjs'
-import { getServerSession } from 'next-auth/next'
-import type { AuthOptions } from 'next-auth'
+// lib/auth.ts - COMPLETE CORRECTED VERSION
+import { NextAuthOptions } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import { PrismaAdapter } from '@next-auth/prisma-adapter';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
-export const authOptions: AuthOptions = {
+export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-    FacebookProvider({
-      clientId: process.env.FACEBOOK_CLIENT_ID!,
-      clientSecret: process.env.FACEBOOK_CLIENT_SECRET!,
-    }),
     CredentialsProvider({
-      name: 'Credentials',
+      name: 'credentials',
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' }
       },
-      async authorize(credentials: any) {
+      async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email et mot de passe requis')
+          return null;
         }
-        
-        const user = await prisma.user.findUnique({ 
-          where: { email: credentials.email }
-        })
-        
-        if (!user || !user.password) {
-          throw new Error('Aucun utilisateur trouvé')
-        }
-        
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password, 
-          user.password
-        )
-        
-        if (!isPasswordValid) {
-          throw new Error('Mot de passe incorrect')
-        }
-        
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          image: user.image,
+
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+            include: {
+              teamMember: true
+            }
+          });
+
+          if (!user || !user.password) {
+            return null;
+          }
+
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+          if (!isPasswordValid) {
+            return null;
+          }
+
+          // Update last seen
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { 
+              lastSeen: new Date(),
+              onlineStatus: 'ONLINE'
+            }
+          });
+
+          return {
+            id: user.id,
+            email: user.email || '',
+            name: user.name || '',
+            role: user.role,
+            image: user.image,
+            teamMember: user.teamMember
+          };
+        } catch (error) {
+          console.error('Auth error:', error);
+          return null;
         }
       }
     })
   ],
   session: {
-    strategy: 'jwt' as const,
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-  pages: {
-    signIn: '/login',
-    error: '/login',
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
-    async session({ session, token }: { session: any; token: any }) {
-      if (token && session.user) {
-        session.user.id = token.id as string
-        session.user.role = token.role as UserRole
-        session.user.image = token.picture
-        session.user.name = token.name
-      }
-      return session
-    },
-    async jwt({ token, user }: { token: any; user?: any }) {
+    async jwt({ token, user }) {
       if (user) {
-        token.id = user.id
-        token.role = user.role
+        token.role = user.role;
+        token.teamMember = user.teamMember;
       }
-      return token
+      return token;
     },
+    async session({ session, token }) {
+      if (token && session.user) {
+        session.user.id = token.sub!;
+        session.user.role = token.role as string;
+        session.user.teamMember = token.teamMember as any;
+      }
+      return session;
+    }
   },
-}
-
-export async function auth() {
-  return await getServerSession(authOptions)
-}
+  pages: {
+    signIn: '/login',
+    error: '/login'
+  },
+  debug: process.env.NODE_ENV === 'development'
+};
