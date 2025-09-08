@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { auth } from '@/lib/auth';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
@@ -26,7 +27,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
+    const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
@@ -87,24 +88,21 @@ export async function POST(request: Request) {
           return NextResponse.json({
             error: 'FOREIGN_KEY_CONSTRAINT',
             message: 'Invalid reference to user, mission, or lead. Please check your data.',
-            details: error
+            details: (error as any).meta
           }, { status: 400 });
         case 'P2002':
           return NextResponse.json({
-            error: 'UNIQUE_CONSTRAINT',
-            message: 'A record with these details already exists.',
+            error: 'UNIQUE_CONSTRAINT_VIOLATION',
+            message: 'A record with this information already exists.'
           }, { status: 409 });
         default:
           return NextResponse.json({
             error: 'DATABASE_ERROR',
-            message: 'Database operation failed.',
-            code: error.code
+            message: 'A database error occurred while creating the expense.'
           }, { status: 500 });
       }
     }
-    
+
     return new NextResponse('Internal Server Error', { status: 500 });
-  } finally {
-    await prisma.$disconnect();
   }
 }
