@@ -7,7 +7,7 @@ import { ChatWindow } from '@/components/chat/ChatWindow';
 import { PopulatedConversation } from '@/types/chat';
 import { ConversationListSkeleton } from '@/components/skeletons/ConversationListSkeleton';
 import { ChatWindowSkeleton } from '@/components/skeletons/ChatWindowSkeleton';
-import { usePusherChannel } from '@/hooks/usePusherClient'; // <-- IMPORT the new hook
+import { usePusherChannel } from '@/hooks/usePusherClient';
 
 export default function ChatPage() {
     const { data: session } = useSession();
@@ -36,7 +36,7 @@ export default function ChatPage() {
         fetchConversations();
     }, []);
 
-    // <-- REFACTORED: Use the centralized hook for presence events
+    // Use the centralized hook for presence events
     usePusherChannel('presence-global', {
         'pusher:subscription_succeeded': (data: any) => {
             const members = Object.keys(data.members);
@@ -57,7 +57,8 @@ export default function ChatPage() {
         setSelectedConversation(conversation);
     };
 
-    const currentUserId = session?.user?.id;
+    // ✅ Fix: Cast session to get id property
+    const currentUserId = (session?.user as any)?.id;
     if (!currentUserId) {
         return <div className="flex items-center justify-center h-full">Veuillez vous connecter pour voir le chat.</div>
     }
