@@ -1,197 +1,281 @@
-// app/api/leads/[id]/route.ts - DELETE method updated with constraint handling
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+// app/api/leads/[id]/route.ts - FIXED WITH TYPE ASSERTIONS
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import { leadService } from '@/services/lead.service';
+import { validateLeadInput } from '@/lib/validation';
+import { withErrorHandler } from '@/lib/error-handler';
+import { LeadStatus } from '@prisma/client';
 
-const prisma = new PrismaClient();
+interface RouteContext {
+  params: { id: string };
+}
 
-/**
- * GET /api/leads/[id]
- * Fetches a single lead by its ID.
- */
-export async function GET(
-  request: Request, 
-  { params }: { params: Promise<{ id: string }> }
-) {
-    try {
-        const { id } = await params; // ✅ Await params for Next.js 15
-        
-        const lead = await prisma.lead.findUnique({ 
-            where: { id },
-            include: { assignedTo: true }
-        });
+export async function GET(request: NextRequest, { params }: RouteContext) {
+  return withErrorHandler(async () => {
+    const session = await getServerSession(authOptions) as any;
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
 
-        if (!lead) {
-            return new NextResponse('Lead not found', { status: 404 });
+    const lead = await leadService.getLeadById(params.id, {
+      assignedTo: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true
         }
-        return NextResponse.json(lead);
-    } catch (error) {
-        console.error(`Failed to fetch lead:`, error);
-        return new NextResponse('Internal Server Error', { status: 500 });
-    }
-}
-
-/**
- * PATCH /api/leads/[id]
- * Updates a specific lead with new data.
- */
-export async function PATCH(
-  request: Request, 
-  { params }: { params: Promise<{ id: string }> }
-) {
-    try {
-        const { id } = await params; // ✅ Await params for Next.js 15
-        const body = await request.json();
-        
-        const updateData = {
-            ...body,
-            // Assurer la bonne conversion des types avant l'envoi à Prisma
-            estimatedSurface: body.estimatedSurface ? parseInt(body.estimatedSurface, 10) : null,
-            score: body.score !== undefined ? parseInt(String(body.score), 10) : undefined,
-            needsProducts: body.needsProducts !== undefined ? Boolean(body.needsProducts) : undefined,
-            needsEquipment: body.needsEquipment !== undefined ? Boolean(body.needsEquipment) : undefined,
-            hasReferrer: body.hasReferrer !== undefined ? Boolean(body.hasReferrer) : undefined,
-            assignedToId: body.assignedToId || null,
-            // Assurer que les enums vides sont envoyés comme null
-            propertyType: body.propertyType || null,
-            urgencyLevel: body.urgencyLevel || null,
-            frequency: body.frequency || null,
-            contractType: body.contractType || null,
-        };
-        
-        delete updateData.id;
-        delete updateData.createdAt; 
-        delete updateData.updatedAt;
-
-        const updatedLead = await prisma.lead.update({
-            where: { id },
-            data: updateData,
-        });
-        return NextResponse.json(updatedLead);
-    } catch (error) {
-        console.error(`Failed to update lead:`, error);
-        return new NextResponse('Internal Server Error', { status: 500 });
-    }
-}
-
-/**
- * DELETE /api/leads/[id]
- * Deletes a specific lead with relationship checking.
- */
-export async function DELETE(
-  request: Request, 
-  { params }: { params: Promise<{ id: string }> }
-) {
-    try {
-        const { id } = await params; // ✅ Await params for Next.js 15
-        
-        console.log('🗑️ Attempting to delete lead:', id);
-
-        // Check if lead exists and get its relationships
-        const leadWithRelationships = await prisma.lead.findUnique({
-            where: { id },
-            include: {
-                missions: {
-                    select: { 
-                        id: true, 
-                        missionNumber: true, 
-                        status: true 
-                    }
-                },
-                quotes: {
-                    select: { 
-                        id: true, 
-                        quoteNumber: true, 
-                        status: true 
-                    }
-                },
-                subscription: {
-                    select: { 
-                        id: true, 
-                        type: true, 
-                        status: true 
-                    }
-                },
-                expenses: {
-                    select: { 
-                        id: true, 
-                        amount: true 
-                    }
-                },
-                activities: {
-                    select: { 
-                        id: true 
-                    }
-                }
+      },
+      activities: {
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        include: {
+          user: {
+            select: {
+              name: true,
+              role: true
             }
-        });
+          }
+        }
+      }
+    });
 
-        if (!leadWithRelationships) {
-            return new NextResponse('Lead not found', { status: 404 });
-        }
-
-        // Check for relationships that prevent deletion
-        const relationships = [];
-        if (leadWithRelationships.missions.length > 0) {
-            relationships.push(`${leadWithRelationships.missions.length} mission(s)`);
-        }
-        if (leadWithRelationships.quotes.length > 0) {
-            relationships.push(`${leadWithRelationships.quotes.length} devis`);
-        }
-        if (leadWithRelationships.subscription) {
-            relationships.push('1 abonnement actif');
-        }
-        if (leadWithRelationships.expenses.length > 0) {
-            relationships.push(`${leadWithRelationships.expenses.length} dépense(s)`);
-        }
-
-        // If there are blocking relationships, return error
-        if (relationships.length > 0) {
-            return NextResponse.json({
-                error: 'CONSTRAINT_VIOLATION',
-                message: `Impossible de supprimer ce lead car il est lié à : ${relationships.join(', ')}.`,
-                leadInfo: {
-                    name: `${leadWithRelationships.firstName} ${leadWithRelationships.lastName}`,
-                    relationships: relationships
-                },
-                suggestion: 'Supprimez d\'abord les données liées (missions, devis, etc.) ou archivez le lead au lieu de le supprimer.',
-                details: {
-                    missions: leadWithRelationships.missions,
-                    quotes: leadWithRelationships.quotes,
-                    subscription: leadWithRelationships.subscription,
-                    expenseCount: leadWithRelationships.expenses.length
-                }
-            }, { status: 409 }); // 409 Conflict
-        }
-
-        // If no blocking relationships, safe to delete
-        // First delete activities (they don't prevent deletion but should be cleaned up)
-        if (leadWithRelationships.activities.length > 0) {
-            await prisma.activity.deleteMany({
-                where: { leadId: id }
-            });
-            console.log('✅ Cleaned up', leadWithRelationships.activities.length, 'activities');
-        }
-
-        // Now delete the lead
-        await prisma.lead.delete({
-            where: { id }
-        });
-
-        console.log('✅ Successfully deleted lead:', id);
-        return new NextResponse(null, { status: 204 }); // No Content
-
-    } catch (error) {
-        console.error(`Failed to delete lead:`, error);
-        
-        // Handle specific Prisma errors
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'P2003') {
-            return NextResponse.json({
-                error: 'FOREIGN_KEY_CONSTRAINT',
-                message: 'Ce lead ne peut pas être supprimé car il est lié à d\'autres données.',
-                suggestion: 'Supprimez d\'abord les missions, devis, abonnements et dépenses liés.'
-            }, { status: 409 });
-        }
-        
-        return new NextResponse('Internal Server Error', { status: 500 });
+    if (!lead) {
+      return NextResponse.json({ error: 'Lead non trouvé' }, { status: 404 });
     }
+
+    if (
+      session.user.role !== 'ADMIN' && 
+      session.user.role !== 'MANAGER' && 
+      lead.assignedToId !== session.user.id
+    ) {
+      return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
+    }
+
+    return NextResponse.json(lead);
+  });
+}
+
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
+  return withErrorHandler(async () => {
+    const session = await getServerSession(authOptions) as any;
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+
+    const leadId = params.id;
+    
+    const existingLead = await leadService.getLeadById(leadId);
+    if (!existingLead) {
+      return NextResponse.json({ error: 'Lead non trouvé' }, { status: 404 });
+    }
+
+    const canEdit = (
+      session.user.role === 'ADMIN' ||
+      session.user.role === 'MANAGER' ||
+      (session.user.role === 'AGENT' && existingLead.assignedToId === session.user.id)
+    );
+
+    if (!canEdit) {
+      return NextResponse.json({ error: 'Permissions insuffisantes' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const isPartialUpdate = Object.keys(body).length <= 3;
+    
+    let updateData = body;
+
+    if (!isPartialUpdate) {
+      const validation = validateLeadInput(body);
+      if (!validation.success) {
+        return NextResponse.json(
+          { 
+            error: 'Données invalides', 
+            details: validation.error.errors.map((e: any) => e.message)
+          },
+          { status: 400 }
+        );
+      }
+      updateData = validation.data;
+    }
+
+    if (!isPartialUpdate || body.budgetRange || body.urgencyLevel || body.estimatedSurface) {
+      const mergedData = { ...existingLead, ...updateData };
+      updateData.score = calculateLeadScore(mergedData);
+    }
+
+    try {
+      const updatedLead = await leadService.updateLead(leadId, updateData);
+
+      if (body.status && body.status !== existingLead.status) {
+        await leadService.logActivity({
+          type: 'LEAD_STATUS_CHANGED',
+          title: 'Statut modifié',
+          description: `Statut changé de ${existingLead.status} vers ${body.status}`,
+          leadId: leadId,
+          userId: session.user.id,
+          metadata: {
+            oldStatus: existingLead.status,
+            newStatus: body.status
+          }
+        });
+      }
+
+      if (body.assignedToId !== undefined && body.assignedToId !== existingLead.assignedToId) {
+        await leadService.logActivity({
+          type: 'LEAD_ASSIGNED',
+          title: 'Assignation modifiée',
+          description: body.assignedToId 
+            ? 'Lead assigné à un nouveau responsable'
+            : 'Assignation du lead supprimée',
+          leadId: leadId,
+          userId: session.user.id,
+          metadata: {
+            oldAssignedToId: existingLead.assignedToId,
+            newAssignedToId: body.assignedToId
+          }
+        });
+      }
+
+      if (body.status && ['QUOTE_ACCEPTED', 'COMPLETED', 'CANCELLED'].includes(body.status)) {
+        if (process.env.PUSHER_APP_ID) {
+          const Pusher = require('pusher');
+          const pusher = new Pusher({
+            appId: process.env.PUSHER_APP_ID,
+            key: process.env.PUSHER_KEY,
+            secret: process.env.PUSHER_SECRET,
+            cluster: process.env.PUSHER_CLUSTER,
+            useTLS: true
+          });
+
+          await pusher.trigger('leads-channel', 'lead-status-changed', {
+            id: updatedLead.id,
+            firstName: updatedLead.firstName,
+            lastName: updatedLead.lastName,
+            status: updatedLead.status,
+            assignedToId: updatedLead.assignedToId
+          });
+        }
+      }
+
+      return NextResponse.json(updatedLead);
+    } catch (error) {
+      console.error('Error updating lead:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de la mise à jour du lead' },
+        { status: 500 }
+      );
+    }
+  });
+}
+
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
+  return withErrorHandler(async () => {
+    const session = await getServerSession(authOptions) as any;
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+
+    if (session.user.role !== 'ADMIN' && session.user.role !== 'MANAGER') {
+      return NextResponse.json({ error: 'Permissions insuffisantes' }, { status: 403 });
+    }
+
+    const leadId = params.id;
+    
+    const existingLead = await leadService.getLeadById(leadId);
+    if (!existingLead) {
+      return NextResponse.json({ error: 'Lead non trouvé' }, { status: 404 });
+    }
+
+    try {
+      const relatedData = await leadService.getLeadRelations(leadId);
+      
+      if (relatedData.quotes.length > 0 || relatedData.missions.length > 0) {
+        return NextResponse.json(
+          { 
+            error: 'Impossible de supprimer ce lead',
+            details: 'Le lead a des devis ou missions associés. Changez son statut vers "Annulé" à la place.'
+          },
+          { status: 400 }
+        );
+      }
+
+      await leadService.deleteLead(leadId);
+
+      await leadService.logActivity({
+        type: 'LEAD_DELETED',
+        title: 'Lead supprimé',
+        description: `Lead ${existingLead.firstName} ${existingLead.lastName} supprimé`,
+        userId: session.user.id,
+        metadata: {
+          deletedLead: {
+            id: existingLead.id,
+            firstName: existingLead.firstName,
+            lastName: existingLead.lastName,
+            company: existingLead.company
+          }
+        }
+      });
+
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      return NextResponse.json(
+        { error: 'Erreur lors de la suppression du lead' },
+        { status: 500 }
+      );
+    }
+  });
+}
+
+function calculateLeadScore(leadData: any): number {
+  let score = 0;
+
+  if (leadData.firstName && leadData.lastName && leadData.phone) {
+    score += 20;
+  }
+
+  if (leadData.email) {
+    score += 10;
+  }
+
+  if (leadData.leadType === 'PROFESSIONNEL' && leadData.company) {
+    score += 15;
+    if (leadData.iceNumber) score += 5;
+  }
+
+  if (leadData.budgetRange) {
+    const budgetScore: Record<string, number> = {
+      'MOINS_1000': 5,
+      'ENTRE_1000_5000': 10,
+      'ENTRE_5000_10000': 15,
+      'ENTRE_10000_25000': 20,
+      'PLUS_25000': 25
+    };
+    score += budgetScore[leadData.budgetRange] || 0;
+  }
+
+  const urgencyScore: Record<string, number> = {
+    'LOW': 5,
+    'NORMAL': 10,
+    'URGENT': 15,
+    'HIGH_URGENT': 20,
+    'IMMEDIATE': 25
+  };
+  score += urgencyScore[leadData.urgencyLevel] || 10;
+
+  if (leadData.estimatedSurface && leadData.estimatedSurface > 0) {
+    score += 10;
+  }
+
+  if (leadData.propertyType) {
+    score += 5;
+  }
+
+  if (leadData.originalMessage && leadData.originalMessage.length > 50) {
+    score += 10;
+  }
+
+  return Math.min(score, 100);
 }

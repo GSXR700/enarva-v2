@@ -1,674 +1,760 @@
-// app/(administration)/leads/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Lead, LeadStatus, User } from '@prisma/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { LeadForm } from '@/components/leads/LeadForm';
-import { Plus, Search, Filter, Eye, Edit, Trash2, Download, Phone, Mail, Building2, MapPin } from 'lucide-react';
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { useOptimisticMutation } from '@/hooks/useOptimisticMutation';
+import { Plus, Search, Filter, Eye, Edit, Trash2, Download, Phone, Mail, Building2, MapPin, MoreVertical, Users, Calendar, AlertTriangle, CheckCircle, Star } from 'lucide-react';
+import { formatDate, formatCurrency, translate } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Table,TableBody,TableCell,TableHead,TableHeader,TableRow} from '@/components/ui/table';
-import {Tabs,TabsContent,TabsList,TabsTrigger} from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CardGridSkeleton } from '@/components/skeletons/CardGridSkeleton';
+import Link from 'next/link';
 
 type LeadWithRelations = Lead & { assignedTo?: User | null };
 
+interface LeadsResponse {
+  leads: LeadWithRelations[];
+  total: number;
+}
+
 export default function LeadsPage() {
- const [leads, setLeads] = useState<LeadWithRelations[]>([]);
- const [filteredLeads, setFilteredLeads] = useState<LeadWithRelations[]>([]);
- const [searchTerm, setSearchTerm] = useState('');
- const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
- const [isFormOpen, setIsFormOpen] = useState(false);
- const [isDetailsOpen, setIsDetailsOpen] = useState(false);
- const [isLoading, setIsLoading] = useState(true);
- const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [page, setPage] = useState(1);
+  const limit = 20;
 
- useEffect(() => {
-   fetchLeads();
- }, []);
+  // Fetch leads with React Query
+  const {
+    data: leadsData,
+    isLoading,
+    error,
+    refetch
+  } = useQuery<LeadsResponse>({
+    queryKey: ['leads', page, limit, statusFilter, searchTerm],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...(statusFilter !== 'ALL' && { status: statusFilter }),
+        ...(searchTerm && { search: searchTerm })
+      });
+      
+      const response = await fetch(`/api/leads?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch leads');
+      return response.json();
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
- useEffect(() => {
-   filterLeads();
- }, [searchTerm, statusFilter, leads]);
+  // Optimistic mutation for status updates
+  const statusUpdateMutation = useOptimisticMutation<LeadWithRelations, { id: string; status: LeadStatus }>({
+    queryKey: ['leads', page, limit, statusFilter, searchTerm],
+    mutationFn: async ({ id, status }) => {
+      const response = await fetch(`/api/leads/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) throw new Error('Failed to update status');
+      return response.json();
+    },
+    optimisticUpdate: (oldData: LeadsResponse, { id, status }) => {
+      if (!oldData) return oldData;
+      return {
+        ...oldData,
+        leads: oldData.leads.map(lead =>
+          lead.id === id ? { ...lead, status } : lead
+        )
+      };
+    },
+    successMessage: 'Statut mis à jour avec succès',
+    errorMessage: 'Erreur lors de la mise à jour du statut'
+  });
 
- const fetchLeads = async () => {
-   setIsLoading(true);
-   try {
-     const response = await fetch('/api/leads');
-     if (!response.ok) throw new Error('Failed to fetch leads');
-     const data = await response.json();
-     setLeads(data);
-     setFilteredLeads(data);
-   } catch (error) {
-     toast.error('Erreur lors du chargement des leads');
-     console.error('Fetch error:', error);
-   } finally {
-     setIsLoading(false);
-   }
- };
+  // Optimistic mutation for lead assignment
+  const assignmentMutation = useOptimisticMutation<LeadWithRelations, { id: string; assignedToId: string | null }>({
+    queryKey: ['leads', page, limit, statusFilter, searchTerm],
+    mutationFn: async ({ id, assignedToId }) => {
+      const response = await fetch(`/api/leads/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignedToId }),
+      });
+      if (!response.ok) throw new Error('Failed to assign lead');
+      return response.json();
+    },
+    optimisticUpdate: (oldData: LeadsResponse, { id, assignedToId }) => {
+      if (!oldData) return oldData;
+      return {
+        ...oldData,
+        leads: oldData.leads.map(lead =>
+          lead.id === id ? { ...lead, assignedToId } : lead
+        )
+      };
+    },
+    successMessage: 'Lead assigné avec succès',
+    errorMessage: 'Erreur lors de l\'assignation'
+  });
 
- const filterLeads = () => {
-   let filtered = leads;
+  // Optimistic mutation for lead deletion
+  const deleteMutation = useOptimisticMutation<void, string>({
+    queryKey: ['leads', page, limit, statusFilter, searchTerm],
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/leads/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete lead');
+    },
+    optimisticUpdate: (oldData: LeadsResponse, id: string) => {
+      if (!oldData) return oldData;
+      return {
+        ...oldData,
+        leads: oldData.leads.filter(lead => lead.id !== id),
+        total: oldData.total - 1
+      };
+    },
+    successMessage: 'Lead supprimé avec succès',
+    errorMessage: 'Erreur lors de la suppression'
+  });
 
-   // Filter by search term
-   if (searchTerm) {
-     filtered = filtered.filter(lead =>
-       lead.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       lead.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       lead.phone.includes(searchTerm) ||
-       lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       lead.company?.toLowerCase().includes(searchTerm.toLowerCase())
-     );
-   }
+  const leads = leadsData?.leads || [];
+  const totalLeads = leadsData?.total || 0;
 
-   // Filter by status
-   if (statusFilter !== 'ALL') {
-     filtered = filtered.filter(lead => lead.status === statusFilter);
-   }
+  // Filter leads locally for search (since API might not support all filters)
+  const filteredLeads = useMemo(() => {
+    if (!searchTerm) return leads;
+    
+    return leads.filter(lead =>
+      lead.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.phone.includes(searchTerm) ||
+      lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.company?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [leads, searchTerm]);
 
-   setFilteredLeads(filtered);
- };
+  const handleStatusUpdate = (leadId: string, newStatus: LeadStatus) => {
+    statusUpdateMutation.mutate({ id: leadId, status: newStatus });
+  };
 
- const handleDelete = async (id: string) => {
-   if (!confirm('Êtes-vous sûr de vouloir supprimer ce lead?')) return;
+  const handleAssignment = (leadId: string, assignedToId: string | null) => {
+    assignmentMutation.mutate({ id: leadId, assignedToId });
+  };
 
-   try {
-     const response = await fetch(`/api/leads/${id}`, { method: 'DELETE' });
-     if (!response.ok) throw new Error('Failed to delete lead');
-     
-     toast.success('Lead supprimé avec succès');
-     fetchLeads();
-   } catch (error) {
-     toast.error('Erreur lors de la suppression');
-     console.error('Delete error:', error);
-   }
- };
+  const handleDelete = (id: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce lead?')) return;
+    deleteMutation.mutate(id);
+  };
 
- const exportToCSV = () => {
-   const headers = [
-     'ID', 'Prénom', 'Nom', 'Téléphone', 'Email', 'Société', 'ICE',
-     'Type', 'Statut', 'Score', 'Surface', 'Budget', 'Canal',
-     'Assigné à', 'Date création'
-   ];
-   
-   const rows = filteredLeads.map(lead => [
-     lead.id,
-     lead.firstName,
-     lead.lastName,
-     lead.phone,
-     lead.email || '',
-     lead.company || '',
-     lead.iceNumber || '',
-     lead.leadType,
-     lead.status,
-     lead.score || '',
-     lead.estimatedSurface || '',
-     lead.budgetRange || '',
-     lead.channel,
-     lead.assignedTo?.name || '',
-     formatDate(lead.createdAt)
-   ]);
+  const exportToCSV = () => {
+    const headers = [
+      'ID', 'Prénom', 'Nom', 'Téléphone', 'Email', 'Société', 'ICE',
+      'Type', 'Statut', 'Score', 'Surface', 'Budget', 'Canal',
+      'Assigné à', 'Date création'
+    ];
+    
+    const rows = filteredLeads.map(lead => [
+      lead.id,
+      lead.firstName,
+      lead.lastName,
+      lead.phone,
+      lead.email || '',
+      lead.company || '',
+      lead.iceNumber || '',
+      lead.leadType,
+      lead.status,
+      lead.score || '',
+      lead.estimatedSurface || '',
+      lead.budgetRange || '',
+      lead.channel,
+      lead.assignedTo?.name || '',
+      formatDate(lead.createdAt)
+    ]);
 
-   const csvContent = [
-     headers.join(','),
-     ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-   ].join('\n');
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
 
-   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-   const link = document.createElement('a');
-   link.href = URL.createObjectURL(blob);
-   link.download = `leads_${new Date().toISOString().split('T')[0]}.csv`;
-   link.click();
- };
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `leads_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
 
- const LeadDetailsModal = ({ lead }: { lead: Lead }) => (
-   <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-     <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-       <DialogHeader>
-         <DialogTitle>Détails du Lead</DialogTitle>
-       </DialogHeader>
-       
-       <Tabs defaultValue="general" className="w-full">
-         <TabsList className="grid w-full grid-cols-5">
-           <TabsTrigger value="general">Général</TabsTrigger>
-           <TabsTrigger value="professional">Pro</TabsTrigger>
-           <TabsTrigger value="request">Demande</TabsTrigger>
-           <TabsTrigger value="origin">Origine</TabsTrigger>
-           <TabsTrigger value="history">Historique</TabsTrigger>
-         </TabsList>
+  const getStatusColor = (status: LeadStatus) => {
+    switch (status) {
+      case 'NEW': return 'bg-blue-100 text-blue-800';
+      case 'QUALIFIED': return 'bg-green-100 text-green-800';
+      case 'QUOTE_SENT': return 'bg-yellow-100 text-yellow-800';
+      case 'QUOTE_ACCEPTED': return 'bg-emerald-100 text-emerald-800';
+      case 'COMPLETED': return 'bg-gray-100 text-gray-800';
+      case 'CANCELLED': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
 
-         <TabsContent value="general" className="space-y-4">
-           <Card>
-             <CardHeader>
-               <CardTitle className="text-lg">Informations Personnelles</CardTitle>
-             </CardHeader>
-             <CardContent className="grid grid-cols-2 gap-4">
-               <div>
-                 <p className="text-sm text-muted-foreground">Nom complet</p>
-                 <p className="font-medium">{lead.firstName} {lead.lastName}</p>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">Téléphone</p>
-                 <p className="font-medium flex items-center gap-2">
-                   <Phone className="h-4 w-4" />
-                   {lead.phone}
-                 </p>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">Email</p>
-                 <p className="font-medium flex items-center gap-2">
-                   <Mail className="h-4 w-4" />
-                   {lead.email || 'Non renseigné'}
-                 </p>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">Adresse</p>
-                 <p className="font-medium flex items-center gap-2">
-                   <MapPin className="h-4 w-4" />
-                   {lead.address || 'Non renseignée'}
-                 </p>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">GPS</p>
-                 <p className="font-medium">{lead.gpsLocation || 'Non renseigné'}</p>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">Score</p>
-                 <div className="flex items-center gap-2">
-                   <div className="w-full bg-gray-200 rounded-full h-2">
-                     <div 
-                       className="bg-green-600 h-2 rounded-full"
-                       style={{ width: `${lead.score || 0}%` }}
-                     />
-                   </div>
-                   <span className="text-sm font-medium">{lead.score || 0}%</span>
-                 </div>
-               </div>
-             </CardContent>
-           </Card>
-         </TabsContent>
+  const getStatusIcon = (status: LeadStatus) => {
+    switch (status) {
+      case 'NEW': return <Star className="w-4 h-4" />;
+      case 'QUALIFIED': return <CheckCircle className="w-4 h-4" />;
+      case 'QUOTE_SENT': return <Mail className="w-4 h-4" />;
+      case 'QUOTE_ACCEPTED': return <CheckCircle className="w-4 h-4" />;
+      case 'COMPLETED': return <CheckCircle className="w-4 h-4" />;
+      case 'CANCELLED': return <AlertTriangle className="w-4 h-4" />;
+      default: return <Star className="w-4 h-4" />;
+    }
+  };
 
-         <TabsContent value="professional" className="space-y-4">
-           <Card>
-             <CardHeader>
-               <CardTitle className="text-lg">Informations Professionnelles</CardTitle>
-             </CardHeader>
-             <CardContent className="grid grid-cols-2 gap-4">
-               <div>
-                 <p className="text-sm text-muted-foreground">Type de Lead</p>
-                 <Badge>{lead.leadType}</Badge>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">Société</p>
-                 <p className="font-medium flex items-center gap-2">
-                   <Building2 className="h-4 w-4" />
-                   {lead.company || 'Non renseignée'}
-                 </p>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">N° ICE</p>
-                 <p className="font-medium">{lead.iceNumber || 'Non renseigné'}</p>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">Secteur</p>
-                 <p className="font-medium">{lead.activitySector || 'Non renseigné'}</p>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">Poste</p>
-                 <p className="font-medium">{lead.contactPosition || 'Non renseigné'}</p>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">Département</p>
-                 <p className="font-medium">{lead.department || 'Non renseigné'}</p>
-               </div>
-             </CardContent>
-           </Card>
-         </TabsContent>
+  const getUrgencyColor = (urgency?: string) => {
+    switch (urgency) {
+      case 'LOW': return 'bg-green-100 text-green-800';
+      case 'NORMAL': return 'bg-yellow-100 text-yellow-800';
+      case 'URGENT': return 'bg-orange-100 text-orange-800';
+      case 'HIGH_URGENT': return 'bg-red-100 text-red-800';
+      case 'IMMEDIATE': return 'bg-red-600 text-white';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
 
-         <TabsContent value="request" className="space-y-4">
-           <Card>
-             <CardHeader>
-               <CardTitle className="text-lg">Détails de la Demande</CardTitle>
-             </CardHeader>
-             <CardContent className="space-y-4">
-               <div className="grid grid-cols-2 gap-4">
-                 <div>
-                   <p className="text-sm text-muted-foreground">Type de Propriété</p>
-                   <Badge variant="outline">{lead.propertyType || 'Non défini'}</Badge>
-                 </div>
-                 <div>
-                   <p className="text-sm text-muted-foreground">Surface</p>
-                   <p className="font-medium">{lead.estimatedSurface ? `${lead.estimatedSurface} m²` : 'Non renseignée'}</p>
-                 </div>
-                 <div>
-                   <p className="text-sm text-muted-foreground">Accessibilité</p>
-                   <Badge variant={lead.accessibility === 'DIFFICULT' ? 'destructive' : 'default'}>
-                     {lead.accessibility || 'EASY'}
-                   </Badge>
-                 </div>
-                 <div>
-                   <p className="text-sm text-muted-foreground">Urgence</p>
-                   <Badge variant={lead.urgencyLevel === 'URGENT' ? 'destructive' : 'secondary'}>
-                     {lead.urgencyLevel || 'Non définie'}
-                   </Badge>
-                 </div>
-                 <div>
-                   <p className="text-sm text-muted-foreground">Budget</p>
-                   <p className="font-medium">{lead.budgetRange || 'Non défini'}</p>
-                 </div>
-                 <div>
-                   <p className="text-sm text-muted-foreground">Fréquence</p>
-                   <Badge>{lead.frequency || 'PONCTUEL'}</Badge>
-                 </div>
-                 <div>
-                   <p className="text-sm text-muted-foreground">Type de Contrat</p>
-                   <Badge>{lead.contractType || 'INTERVENTION_UNIQUE'}</Badge>
-                 </div>
-               </div>
+  const LeadDetailsModal = ({ lead }: { lead: Lead }) => (
+    <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Détails du Lead</DialogTitle>
+        </DialogHeader>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold text-lg mb-2">Informations personnelles</h3>
+              <div className="space-y-2">
+                <p><strong>Nom:</strong> {lead.firstName} {lead.lastName}</p>
+                <p><strong>Téléphone:</strong> {lead.phone}</p>
+                <p><strong>Email:</strong> {lead.email || 'Non renseigné'}</p>
+                <p><strong>Adresse:</strong> {lead.address || 'Non renseignée'}</p>
+              </div>
+            </div>
+            
+            {lead.company && (
+              <div>
+                <h3 className="font-semibold text-lg mb-2">Informations entreprise</h3>
+                <div className="space-y-2">
+                  <p><strong>Société:</strong> {lead.company}</p>
+                  <p><strong>ICE:</strong> {lead.iceNumber || 'Non renseigné'}</p>
+                  <p><strong>Secteur:</strong> {lead.activitySector || 'Non renseigné'}</p>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold text-lg mb-2">Détails du projet</h3>
+              <div className="space-y-2">
+                <p><strong>Type:</strong> {translate(lead.leadType)}</p>
+                <p><strong>Statut:</strong> {translate(lead.status)}</p>
+                <p><strong>Score:</strong> {lead.score || 0}%</p>
+                <p><strong>Surface estimée:</strong> {lead.estimatedSurface || 'Non renseignée'} m²</p>
+                <p><strong>Budget:</strong> {lead.budgetRange || 'Non renseigné'}</p>
+              </div>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold text-lg mb-2">Source et timing</h3>
+              <div className="space-y-2">
+                <p><strong>Canal:</strong> {translate(lead.channel)}</p>
+                <p><strong>Urgence:</strong> {translate(lead.urgencyLevel || 'NORMAL')}</p>
+                <p><strong>Créé le:</strong> {formatDate(lead.createdAt)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {lead.originalMessage && (
+          <div className="mt-6">
+            <h3 className="font-semibold text-lg mb-2">Message original</h3>
+            <p className="bg-gray-50 p-3 rounded-lg">{lead.originalMessage}</p>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
 
-               {lead.materials && Object.keys(lead.materials).length > 0 && (
-                 <div>
-                   <p className="text-sm text-muted-foreground mb-2">Matériaux</p>
-                   <div className="flex flex-wrap gap-2">
-                     {Object.entries(lead.materials as any).map(([key, value]) => {
-                       if (value === true) {
-                         return <Badge key={key} variant="outline">{key}</Badge>;
-                       } else if (key === 'other' && value) {
-                         return <Badge key={key} variant="outline">{value as string}</Badge>;
-                       }
-                       return null;
-                     })}
-                   </div>
-                 </div>
-               )}
+  if (error) {
+    return (
+      <div className="main-content p-6">
+        <div className="text-center py-10">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Erreur de chargement</h2>
+          <p className="text-gray-600 mb-4">Une erreur est survenue lors du chargement des leads.</p>
+          <Button onClick={() => refetch()}>Réessayer</Button>
+        </div>
+      </div>
+    );
+  }
 
-               <div className="grid grid-cols-2 gap-4">
-                 <div className="flex items-center gap-2">
-                   <input type="checkbox" checked={lead.needsProducts || false} disabled />
-                   <label>Besoin de produits</label>
-                 </div>
-                 <div className="flex items-center gap-2">
-                   <input type="checkbox" checked={lead.needsEquipment || false} disabled />
-                   <label>Besoin d'équipement</label>
-                 </div>
-               </div>
+  return (
+    <div className="main-content p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Leads</h1>
+          <p className="text-gray-600">Gérez vos prospects et opportunités commerciales</p>
+        </div>
+        
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={exportToCSV}>
+            <Download className="w-4 h-4 mr-2" />
+            Exporter CSV
+          </Button>
+          <Button onClick={() => setIsFormOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nouveau Lead
+          </Button>
+        </div>
+      </div>
 
-               {(lead.needsProducts || lead.needsEquipment) && (
-                 <div>
-                   <p className="text-sm text-muted-foreground">Fourni par</p>
-                   <Badge>{lead.providedBy || 'ENARVA'}</Badge>
-                 </div>
-               )}
-             </CardContent>
-           </Card>
-         </TabsContent>
+      {/* Filters and Search */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Rechercher par nom, téléphone, email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filtrer par statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Tous les statuts</SelectItem>
+                <SelectItem value="NEW">Nouveaux</SelectItem>
+                <SelectItem value="QUALIFIED">Qualifiés</SelectItem>
+                <SelectItem value="QUOTE_SENT">Devis envoyés</SelectItem>
+                <SelectItem value="QUOTE_ACCEPTED">Devis acceptés</SelectItem>
+                <SelectItem value="COMPLETED">Terminés</SelectItem>
+                <SelectItem value="CANCELLED">Annulés</SelectItem>
+              </SelectContent>
+            </Select>
 
-         <TabsContent value="origin" className="space-y-4">
-           <Card>
-             <CardHeader>
-               <CardTitle className="text-lg">Origine et Acquisition</CardTitle>
-             </CardHeader>
-             <CardContent className="grid grid-cols-2 gap-4">
-               <div>
-                 <p className="text-sm text-muted-foreground">Canal</p>
-                 <Badge>{lead.channel}</Badge>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">Source</p>
-                 <p className="font-medium">{lead.source || 'Non renseignée'}</p>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">Parrain</p>
-                 <p className="font-medium">
-                   {lead.hasReferrer ? (lead.referrerContact || 'Oui') : 'Non'}
-                 </p>
-               </div>
-               <div>
-                 <p className="text-sm text-muted-foreground">Rôle Enarva</p>
-                 <Badge>{lead.enarvaRole || 'PRESTATAIRE_PRINCIPAL'}</Badge>
-               </div>
-             </CardContent>
-           </Card>
+            <div className="flex border rounded-lg p-1">
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('table')}
+              >
+                Table
+              </Button>
+              <Button
+                variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('cards')}
+              >
+                Cartes
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-           <Card>
-             <CardHeader>
-               <CardTitle className="text-lg">Message Original</CardTitle>
-             </CardHeader>
-             <CardContent>
-               <p className="whitespace-pre-wrap">{lead.originalMessage}</p>
-             </CardContent>
-           </Card>
-         </TabsContent>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Leads</p>
+                <p className="text-2xl font-bold">{totalLeads}</p>
+              </div>
+              <Users className="w-8 h-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Nouveaux</p>
+                <p className="text-2xl font-bold">{leads.filter(l => l.status === 'NEW').length}</p>
+              </div>
+              <Star className="w-8 h-8 text-yellow-600" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Qualifiés</p>
+                <p className="text-2xl font-bold">{leads.filter(l => l.status === 'QUALIFIED').length}</p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Conversion</p>
+                <p className="text-2xl font-bold">
+                  {totalLeads > 0 ? Math.round((leads.filter(l => l.status === 'COMPLETED').length / totalLeads) * 100) : 0}%
+                </p>
+              </div>
+              <Calendar className="w-8 h-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-         <TabsContent value="history" className="space-y-4">
-           <Card>
-             <CardHeader>
-               <CardTitle className="text-lg">Historique</CardTitle>
-             </CardHeader>
-             <CardContent className="space-y-2">
-               <div className="flex justify-between items-center py-2 border-b">
-                 <div>
-                   <p className="font-medium">Lead créé</p>
-                   <p className="text-sm text-muted-foreground">
-                     {formatDate(lead.createdAt)}
-                   </p>
-                 </div>
-                 <Badge>{lead.status}</Badge>
-               </div>
-               {lead.assignedToId !== null && (
-                 <div className="flex justify-between items-center py-2">
-                   <div>
-                     <p className="font-medium">Assigné à</p>
-                     <p className="text-sm">{lead.assignedToId}</p>
-                   </div>
-                 </div>
-               )}
-             </CardContent>
-           </Card>
-         </TabsContent>
-       </Tabs>
+      {/* Main Content */}
+      {isLoading ? (
+        <CardGridSkeleton title="Chargement des leads..." description="Veuillez patienter pendant le chargement des données." />
+      ) : viewMode === 'table' ? (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Société</TableHead>
+                  <TableHead>Projet</TableHead>
+                  <TableHead>Canal</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Score</TableHead>
+                  <TableHead>Assigné à</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLeads.map((lead) => (
+                  <TableRow key={lead.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{lead.firstName} {lead.lastName}</p>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Phone className="w-3 h-3" />
+                          {lead.phone}
+                          {lead.email && (
+                            <>
+                              <Mail className="w-3 h-3 ml-2" />
+                              {lead.email}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    
+                    <TableCell>
+                      {lead.company ? (
+                        <div>
+                          <p className="font-medium">{lead.company}</p>
+                          <p className="text-sm text-gray-600">{lead.iceNumber}</p>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">Particulier</span>
+                      )}
+                    </TableCell>
+                    
+                    <TableCell>
+                      <div className="space-y-1">
+                        <Badge variant="outline" className="text-xs">
+                          {translate(lead.leadType)}
+                        </Badge>
+                        {lead.urgencyLevel && lead.urgencyLevel !== 'NORMAL' && (
+                          <Badge 
+                            variant={lead.urgencyLevel === 'IMMEDIATE' || lead.urgencyLevel === 'HIGH_URGENT' ? 'destructive' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {translate(lead.urgencyLevel)}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    
+                    <TableCell>
+                      <Badge variant="outline">{translate(lead.channel)}</Badge>
+                    </TableCell>
+                    
+                    <TableCell>
+                      <Select 
+                        value={lead.status} 
+                        onValueChange={(value) => handleStatusUpdate(lead.id, value as LeadStatus)}
+                      >
+                        <SelectTrigger className="w-40">
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(lead.status)}
+                            <Badge variant="outline" className={getStatusColor(lead.status)}>
+                              {translate(lead.status)}
+                            </Badge>
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="NEW">Nouveau</SelectItem>
+                          <SelectItem value="QUALIFIED">Qualifié</SelectItem>
+                          <SelectItem value="QUOTE_SENT">Devis envoyé</SelectItem>
+                          <SelectItem value="QUOTE_ACCEPTED">Devis accepté</SelectItem>
+                          <SelectItem value="COMPLETED">Terminé</SelectItem>
+                          <SelectItem value="CANCELLED">Annulé</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="w-12 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-green-600 h-2 rounded-full transition-all"
+                            style={{ width: `${lead.score || 0}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium">{lead.score || 0}%</span>
+                      </div>
+                    </TableCell>
+                    
+                    <TableCell>
+                      {lead.assignedTo ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-medium text-blue-600">
+                              {lead.assignedTo.name?.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="text-sm">{lead.assignedTo.name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">Non assigné</span>
+                      )}
+                    </TableCell>
+                    
+                    <TableCell>
+                      <span className="text-sm text-gray-600">{formatDate(lead.createdAt)}</span>
+                    </TableCell>
+                    
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => {
+                            setSelectedLead(lead);
+                            setIsDetailsOpen(true);
+                          }}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            Voir détails
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/leads/${lead.id}/edit`}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Modifier
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(lead.id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Supprimer
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            
+            {filteredLeads.length === 0 && (
+              <div className="text-center py-10">
+                <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun lead trouvé</h3>
+                <p className="text-gray-600">
+                  {searchTerm || statusFilter !== 'ALL' 
+                    ? 'Aucun lead ne correspond à vos critères de recherche.'
+                    : 'Commencez par créer votre premier lead.'
+                  }
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        // Cards view
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredLeads.map((lead) => (
+            <Card key={lead.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">{lead.firstName} {lead.lastName}</CardTitle>
+                    <p className="text-sm text-gray-600">{lead.phone}</p>
+                  </div>
+                  <Badge className={getStatusColor(lead.status)}>
+                    {translate(lead.status)}
+                  </Badge>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                {lead.company && (
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm">{lead.company}</span>
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm">{lead.address || 'Adresse non renseignée'}</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Score de qualification</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-green-600 h-2 rounded-full transition-all"
+                        style={{ width: `${lead.score || 0}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium">{lead.score || 0}%</span>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-xs text-gray-500">{formatDate(lead.createdAt)}</span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedLead(lead);
+                        setIsDetailsOpen(true);
+                      }}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                    >
+                      <Link href={`/leads/${lead.id}/edit`}>
+                        <Edit className="w-4 h-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          
+          {filteredLeads.length === 0 && (
+            <div className="col-span-full text-center py-10">
+              <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun lead trouvé</h3>
+              <p className="text-gray-600">
+                {searchTerm || statusFilter !== 'ALL' 
+                  ? 'Aucun lead ne correspond à vos critères de recherche.'
+                  : 'Commencez par créer votre premier lead.'
+                }
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
-       <div className="flex justify-end gap-2 mt-4">
-         <Button
-           variant="outline"
-           onClick={() => {
-             setSelectedLead(lead);
-             setIsDetailsOpen(false);
-             setIsFormOpen(true);
-           }}
-         >
-           <Edit className="h-4 w-4 mr-2" />
-           Modifier
-         </Button>
-         <Button onClick={() => setIsDetailsOpen(false)}>
-           Fermer
-         </Button>
-       </div>
-     </DialogContent>
-   </Dialog>
- );
+      {/* Pagination */}
+      {totalLeads > limit && (
+        <div className="flex justify-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            Précédent
+          </Button>
+          
+          <div className="flex items-center gap-2">
+            {Array.from({ length: Math.ceil(totalLeads / limit) }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === Math.ceil(totalLeads / limit) || Math.abs(p - page) <= 2)
+              .map((p, index, array) => (
+                <>
+                  {index > 0 && array[index - 1] !== p - 1 && (
+                    <span key={`ellipsis-${p}`} className="px-2">...</span>
+                  )}
+                  <Button
+                    key={p}
+                    variant={page === p ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setPage(p)}
+                  >
+                    {p}
+                  </Button>
+                </>
+              ))}
+          </div>
+          
+          <Button
+            variant="outline"
+            onClick={() => setPage(p => Math.min(Math.ceil(totalLeads / limit), p + 1))}
+            disabled={page >= Math.ceil(totalLeads / limit)}
+          >
+            Suivant
+          </Button>
+        </div>
+      )}
 
- return (
-   <div className="container mx-auto py-6 space-y-6">
-     {/* Header */}
-     <div className="flex justify-between items-center">
-       <div>
-         <h1 className="text-3xl font-bold">Gestion des Leads</h1>
-         <p className="text-muted-foreground">
-           {filteredLeads.length} lead{filteredLeads.length > 1 ? 's' : ''} trouvé{filteredLeads.length > 1 ? 's' : ''}
-         </p>
-       </div>
-       <div className="flex gap-2">
-         <Button onClick={exportToCSV} variant="outline">
-           <Download className="h-4 w-4 mr-2" />
-           Exporter CSV
-         </Button>
-         <Button onClick={() => {
-           setSelectedLead(null);
-           setIsFormOpen(true);
-         }}>
-           <Plus className="h-4 w-4 mr-2" />
-           Nouveau Lead
-         </Button>
-       </div>
-     </div>
+      {/* Dialogs */}
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Créer un nouveau lead</DialogTitle>
+          </DialogHeader>
+          <LeadForm 
+            onSuccess={() => {
+              setIsFormOpen(false);
+              refetch();
+            }}
+            onCancel={() => setIsFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
-     {/* Filters */}
-     <Card>
-       <CardContent className="pt-6">
-         <div className="flex gap-4">
-           <div className="flex-1">
-             <div className="relative">
-               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-               <Input
-                 placeholder="Rechercher par nom, téléphone, email, société..."
-                 value={searchTerm}
-                 onChange={(e) => setSearchTerm(e.target.value)}
-                 className="pl-10"
-               />
-             </div>
-           </div>
-           <select
-             className="px-4 py-2 border rounded-md"
-             value={statusFilter}
-             onChange={(e) => setStatusFilter(e.target.value)}
-           >
-             <option value="ALL">Tous les statuts</option>
-             <option value="NEW">Nouveau</option>
-            <option value="TO_QUALIFY">À qualifier</option>
-            <option value="WAITING_INFO">En attente d'informations</option>
-            <option value="QUALIFIED">Qualifié</option>
-            <option value="VISIT_PLANNED">Visite planifiée</option>
-            <option value="ON_VISIT">En visite</option>
-            <option value="VISIT_DONE">Visite terminée</option>
-            <option value="QUOTE_SENT">Devis envoyé</option>
-            <option value="QUOTE_ACCEPTED">Devis accepté</option>
-            <option value="QUOTE_REFUSED">Devis refusé</option>
-            <option value="MISSION_SCHEDULED">Mission planifiée</option>
-            <option value="IN_PROGRESS">En cours</option>
-            <option value="COMPLETED">Terminé</option>
-            <option value="INTERVENTION_PLANNED">Intervention planifiée</option>
-            <option value="INTERVENTION_IN_PROGRESS">Intervention en cours</option>
-            <option value="INTERVENTION_DONE">Intervention terminée</option>
-            <option value="QUALITY_CONTROL">Contrôle qualité</option>
-            <option value="CLIENT_TO_CONFIRM_END">Client à confirmer la fin</option>
-            <option value="CLIENT_CONFIRMED">Client confirmé</option>
-            <option value="DELIVERY_PLANNED">Livraison planifiée</option>
-            <option value="DELIVERY_DONE">Livraison terminée</option>
-            <option value="SIGNED_DELIVERY_NOTE">Bon de livraison signé</option>
-            <option value="PENDING_PAYMENT">Paiement en attente</option>
-            <option value="PAID_OFFICIAL">Payé officiellement</option>
-            <option value="PAID_CASH">Payé en espèces</option>
-            <option value="REFUNDED">Remboursé</option>
-            <option value="PENDING_REFUND">Remboursement en attente</option>
-            <option value="FOLLOW_UP_SENT">Suivi envoyé</option>
-            <option value="UPSELL_IN_PROGRESS">Upsell en cours</option>
-            <option value="UPSELL_CONVERTED">Upsell converti</option>
-            <option value="REWORK_PLANNED">Retravail planifié</option>
-            <option value="REWORK_DONE">Retravail terminé</option>
-            <option value="UNDER_WARRANTY">Sous garantie</option>
-            <option value="AFTER_SALES_SERVICE">Service après-vente</option>
-            <option value="CLIENT_ISSUE">Problème client</option>
-            <option value="IN_DISPUTE">En litige</option>
-            <option value="CLIENT_PAUSED">Client en pause</option>
-            <option value="LEAD_LOST">Lead perdu</option>
-            <option value="CANCELLED">Annulé</option>
-            <option value="CANCELED_BY_CLIENT">Annulé par le client</option>
-            <option value="CANCELED_BY_ENARVA">Annulé par Enarva</option>
-            <option value="INTERNAL_REVIEW">Revue interne</option>
-            <option value="AWAITING_PARTS">En attente de pièces</option>
-            <option value="CONTRACT_SIGNED">Contrat signé</option>
-            <option value="UNDER_CONTRACT">Sous contrat</option>
-            <option value="SUBCONTRACTED">Sous-traité</option>
-            <option value="OUTSOURCED">Externalisé</option>
-            <option value="WAITING_THIRD_PARTY">En attente d'un tiers</option>
-            <option value="PRODUCT_ONLY">Produit uniquement</option>
-            <option value="PRODUCT_SUPPLIER">Fournisseur de produit</option>
-            <option value="DELIVERY_ONLY">Livraison uniquement</option>
-            <option value="AFFILIATE_LEAD">Lead affilié</option>
-            <option value="SUBCONTRACTOR_LEAD">Lead sous-traitant</option>
-           </select>
-         </div>
-       </CardContent>
-     </Card>
-
-     {/* Leads Table */}
-     <Card>
-       <CardContent className="p-0">
-         {isLoading ? (
-           <div className="p-8 text-center">Chargement...</div>
-         ) : filteredLeads.length === 0 ? (
-           <div className="p-8 text-center text-muted-foreground">
-             Aucun lead trouvé
-           </div>
-         ) : (
-           <div className="overflow-x-auto">
-             <Table>
-               <TableHeader>
-                 <TableRow>
-                   <TableHead>Lead</TableHead>
-                   <TableHead>Contact</TableHead>
-                   <TableHead>Société</TableHead>
-                   <TableHead>Détails Demande</TableHead>
-                   <TableHead>Canal</TableHead>
-                   <TableHead>Statut</TableHead>
-                   <TableHead>Score</TableHead>
-                   <TableHead>Assigné</TableHead>
-                   <TableHead>Date</TableHead>
-                   <TableHead>Actions</TableHead>
-                 </TableRow>
-               </TableHeader>
-               <TableBody>
-                 {filteredLeads.map((lead) => (
-                   <TableRow key={lead.id}>
-                     <TableCell>
-                       <div>
-                         <p className="font-medium">{lead.firstName} {lead.lastName}</p>
-                         <Badge variant="outline" className="text-xs">
-                           {lead.leadType}
-                         </Badge>
-                       </div>
-                     </TableCell>
-                     <TableCell>
-                       <div className="space-y-1">
-                         <p className="text-sm">{lead.phone}</p>
-                         {lead.email && (
-                           <p className="text-xs text-muted-foreground">{lead.email}</p>
-                         )}
-                       </div>
-                     </TableCell>
-                     <TableCell>
-                       {lead.company ? (
-                         <div>
-                           <p className="text-sm font-medium">{lead.company}</p>
-                           {lead.activitySector && (
-                             <p className="text-xs text-muted-foreground">{lead.activitySector}</p>
-                           )}
-                         </div>
-                       ) : (
-                         <span className="text-muted-foreground">-</span>
-                       )}
-                     </TableCell>
-                     <TableCell>
-                       <div className="space-y-1">
-                         {lead.propertyType && (
-                           <Badge variant="outline" className="text-xs">
-                             {lead.propertyType}
-                           </Badge>
-                         )}
-                         {lead.estimatedSurface && (
-                           <p className="text-xs">{lead.estimatedSurface} m²</p>
-                         )}
-                         {lead.urgencyLevel && (
-                           <Badge 
-                             variant={lead.urgencyLevel === 'URGENT' ? 'destructive' : 'secondary'}
-                             className="text-xs"
-                           >
-                             {lead.urgencyLevel}
-                           </Badge>
-                         )}
-                       </div>
-                     </TableCell>
-                     <TableCell>
-                       <Badge variant="outline">{lead.channel}</Badge>
-                     </TableCell>
-                     <TableCell>
-                       <Badge 
-                         variant={
-                           lead.status === LeadStatus.COMPLETED ? 'default' :
-                           lead.status === LeadStatus.CANCELLED ? 'destructive' :
-                           'secondary'
-                         }
-                       >
-                         {lead.status}
-                       </Badge>
-                     </TableCell>
-                     <TableCell>
-                       <div className="flex items-center gap-1">
-                         <div className="w-12 bg-gray-200 rounded-full h-2">
-                           <div 
-                             className="bg-green-600 h-2 rounded-full"
-                             style={{ width: `${lead.score || 0}%` }}
-                           />
-                         </div>
-                         <span className="text-xs">{lead.score || 0}%</span>
-                       </div>
-                     </TableCell>
-                     <TableCell>
-                       {lead.assignedTo ? (
-                         <p className="text-sm">{lead.assignedTo.name}</p>
-                       ) : (
-                         <span className="text-muted-foreground">Non assigné</span>
-                       )}
-                     </TableCell>
-                     <TableCell>
-                       <p className="text-sm">{formatDate(lead.createdAt)}</p>
-                     </TableCell>
-                     <TableCell>
-                       <div className="flex gap-1">
-                         <Button
-                           size="sm"
-                           variant="ghost"
-                           onClick={() => {
-                             setSelectedLead(lead);
-                             setIsDetailsOpen(true);
-                           }}
-                         >
-                           <Eye className="h-4 w-4" />
-                         </Button>
-                         <Button
-                           size="sm"
-                           variant="ghost"
-                           onClick={() => {
-                             setSelectedLead(lead);
-                             setIsFormOpen(true);
-                           }}
-                         >
-                           <Edit className="h-4 w-4" />
-                         </Button>
-                         <Button
-                           size="sm"
-                           variant="ghost"
-                           onClick={() => handleDelete(lead.id)}
-                         >
-                           <Trash2 className="h-4 w-4 text-red-500" />
-                         </Button>
-                       </div>
-                     </TableCell>
-                   </TableRow>
-                 ))}
-               </TableBody>
-             </Table>
-           </div>
-         )}
-       </CardContent>
-     </Card>
-
-     {/* Form Dialog */}
-     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-         <DialogHeader>
-           <DialogTitle>
-             {selectedLead ? 'Modifier le Lead' : 'Nouveau Lead'}
-           </DialogTitle>
-         </DialogHeader>
-         <LeadForm
-           lead={selectedLead || undefined}
-           onSuccess={() => {
-             setIsFormOpen(false);
-             fetchLeads();
-           }}
-           onCancel={() => setIsFormOpen(false)}
-         />
-       </DialogContent>
-     </Dialog>
-
-     {/* Details Modal */}
-     {selectedLead && isDetailsOpen && <LeadDetailsModal lead={selectedLead} />}
-   </div>
- );
+      {selectedLead && <LeadDetailsModal lead={selectedLead} />}
+    </div>
+  );
 }

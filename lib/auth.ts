@@ -1,5 +1,4 @@
-// lib/auth.ts
-import { NextAuthOptions } from 'next-auth';
+// lib/auth.ts - FINAL FIXED VERSION
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import { PrismaClient, UserRole } from '@prisma/client';
 import CredentialsProvider from 'next-auth/providers/credentials';
@@ -9,7 +8,7 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-export const authOptions: NextAuthOptions = {
+export const authOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
@@ -26,7 +25,7 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" }
       },
-      async authorize(credentials) {
+      async authorize(credentials: any) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Email et mot de passe requis');
         }
@@ -43,7 +42,7 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   session: {
-    strategy: 'jwt',
+    strategy: 'jwt' as const,
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
@@ -51,25 +50,21 @@ export const authOptions: NextAuthOptions = {
     error: '/login',
   },
   callbacks: {
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as UserRole;
-        session.user.image = token.picture;
-        session.user.name = token.name;
+        session.user.image = token.picture as string;
+        session.user.name = token.name as string;
       }
       return session;
     },
-    async jwt({ token, user, trigger, session }) {
-      // On initial sign-in, add user details to the token
+    async jwt({ token, user }: any) {
       if (user) {
         token.id = user.id;
-        // @ts-ignore
-        token.role = user.role; 
+        token.role = user.role;
       }
 
-      // This block will run on every session access (including after `updateSession`)
-      // It ensures the token data is always fresh from the database.
       if (token.id) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },

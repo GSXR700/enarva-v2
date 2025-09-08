@@ -1,4 +1,4 @@
-// lib/utils.ts - COMPLETE TRANSLATIONS ADDED
+// lib/utils.ts - FIXED VERSION
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
@@ -160,72 +160,107 @@ export const translations = {
     VALIDATED: "Validée",
     REJECTED: "Rejetée",
   },
-  LeadCanal: { 
-    WHATSAPP: "WhatsApp", 
-    FACEBOOK: "Facebook", 
-    INSTAGRAM: "Instagram", 
-    LINKEDIN: "LinkedIn", 
-    GOOGLE_MAPS: "Google Maps", 
-    GOOGLE_SEARCH: "Recherche Google", 
-    SITE_WEB: "Site Web", 
-    FORMULAIRE_SITE: "Formulaire Site", 
-    MARKETPLACE: "Marketplace", 
-    YOUTUBE: "YouTube", 
-    EMAIL: "Email", 
-    APPORTEUR_AFFAIRES: "Apporteur d'affaires", 
-    COMMERCIAL_TERRAIN: "Commercial Terrain", 
-    SALON_PROFESSIONNEL: "Salon Professionnel", 
-    PARTENARIAT: "Partenariat", 
-    RECOMMANDATION_CLIENT: "Recommandation Client", 
-    VISITE_BUREAU: "Visite Bureau", 
-    EMPLOYE_ENARVA: "Employé Enarva", 
-    APPEL_TELEPHONIQUE: "Appel Téléphonique", 
-    SMS: "SMS", 
-    NUMERO_SUR_PUB: "Numéro sur Pub", 
-    AFFICHE: "Affiche", 
-    FLYER: "Flyer", 
-    ENSEIGNE: "Enseigne", 
-    VOITURE_SIGLEE: "Voiture Siglée", 
-    RADIO: "Radio", 
-    ANNONCE_PRESSE: "Annonce Presse", 
-    TELE: "Télé", 
-    MANUEL: "Manuel", 
-    SOURCING_INTERNE: "Sourcing Interne", 
-    PORTE_A_PORTE: "Porte à Porte", 
-    CHANTIER_EN_COURS: "Chantier en cours" 
+  LeadCanal: {
+    WHATSAPP: "WhatsApp",
+    FACEBOOK: "Facebook",
+    INSTAGRAM: "Instagram",
+    LINKEDIN: "LinkedIn",
+    GOOGLE_MAPS: "Google Maps",
+    GOOGLE_SEARCH: "Recherche Google",
+    SITE_WEB: "Site Web",
+    FORMULAIRE_SITE: "Formulaire Site",
+    MARKETPLACE: "Marketplace",
+    YOUTUBE: "YouTube",
+    EMAIL: "Email",
+    APPORTEUR_AFFAIRES: "Apporteur d'affaires",
+    COMMERCIAL_TERRAIN: "Commercial Terrain",
+    SALON_PROFESSIONNEL: "Salon Professionnel",
+    PARTENARIAT: "Partenariat",
+    RECOMMANDATION_CLIENT: "Recommandation Client",
+    VISITE_BUREAU: "Visite Bureau",
+    EMPLOYE_ENARVA: "Employé Enarva",
+    APPEL_TELEPHONIQUE: "Appel Téléphonique",
+    SMS: "SMS",
+    NUMERO_SUR_PUB: "Numéro sur Pub",
+    AFFICHE: "Affiche",
+    FLYER: "Flyer",
+    ENSEIGNE: "Enseigne",
+    VOITURE_SIGLEE: "Voiture Siglée",
+    RADIO: "Radio",
+    ANNONCE_PRESSE: "Annonce Presse",
+    TELE: "Télé",
+    MANUEL: "Manuel",
+    SOURCING_INTERNE: "Sourcing Interne",
+    PORTE_A_PORTE: "Porte à Porte",
+    CHANTIER_EN_COURS: "Chantier en cours"
   },
-  LeadType: { PARTICULIER: "Particulier", PROFESSIONNEL: "Professionnel", PUBLIC: "Public" },
-  UrgencyLevel: { NORMAL: "Normal", URGENT: "Urgent", HIGH_URGENT: "Très urgent", IMMEDIATE: "Immédiat" },
-  PropertyType: { 
-    APARTMENT_SMALL: "Appartement (Petit)", 
-    APARTMENT_MEDIUM: "Appartement (Moyen)", 
-    APARTMENT_MULTI: "Appartement (Multi-niveaux)", 
-    VILLA_LARGE: "Villa (Grande)", 
-    COMMERCIAL: "Local Commercial", 
-    HOTEL_STANDARD: "Hôtel (Standard)", 
-    HOTEL_LUXURY: "Hôtel (Luxe)", 
-    OFFICE: "Bureau", 
-    RESIDENCE_B2B: "Résidence B2B", 
-    RESTAURANT: "Restaurant" 
+  LeadType: { 
+    PARTICULIER: "Particulier", 
+    PROFESSIONNEL: "Professionnel", 
+    PUBLIC: "Public" 
   },
-  Frequency: { PONCTUEL: "Ponctuel", MENSUEL: "Mensuel", ANNUEL: "Annuel", CONTRAT_CADRE: "Contrat Cadre" },
-  ContractType: { INTERVENTION_UNIQUE: "Intervention Unique", MAINTENANCE: "Maintenance", ABONNEMENT: "Abonnement" },
-  ProviderType: { ENARVA: "Fourni par Enarva", CLIENT: "Fourni par le client" },
-  EnarvaRole: { PRESTATAIRE_PRINCIPAL: "Prestataire Principal", SOUS_TRAITANT: "Sous-traitant" },
-  AccessibilityLevel: { EASY: "Facile", MEDIUM: "Moyenne", DIFFICULT: "Difficile", VERY_DIFFICULT: "Très difficile" },
+  UrgencyLevel: { 
+    LOW: "Faible",
+    NORMAL: "Normal", 
+    URGENT: "Urgent", 
+    HIGH_URGENT: "Très urgent", 
+    IMMEDIATE: "Immédiat" 
+  },
+  PropertyType: {
+    APARTMENT_SMALL: "Appartement (Petit)",
+    APARTMENT_MEDIUM: "Appartement (Moyen)",
+    APARTMENT_MULTI: "Appartement (Multi-niveaux)",
+    VILLA_LARGE: "Villa (Grande)",
+    COMMERCIAL: "Local Commercial",
+    HOTEL_STANDARD: "Hôtel (Standard)",
+    HOTEL_LUXURY: "Hôtel (Luxe)",
+    OFFICE: "Bureau",
+    RESIDENCE_B2B: "Résidence B2B",
+    RESTAURANT: "Restaurant"
+  },
+  Frequency: { 
+    PONCTUEL: "Ponctuel", 
+    MENSUEL: "Mensuel", 
+    ANNUEL: "Annuel", 
+    CONTRAT_CADRE: "Contrat Cadre" 
+  },
+  ContractType: { 
+    INTERVENTION_UNIQUE: "Intervention Unique", 
+    MAINTENANCE: "Maintenance", 
+    ABONNEMENT: "Abonnement" 
+  },
+  ProviderType: { 
+    ENARVA: "Fourni par Enarva", 
+    CLIENT: "Fourni par le client" 
+  },
+  EnarvaRole: { 
+    PRESTATAIRE_PRINCIPAL: "Prestataire Principal", 
+    SOUS_TRAITANT: "Sous-traitant" 
+  },
+  AccessibilityLevel: { 
+    EASY: "Facile", 
+    MEDIUM: "Moyenne", 
+    DIFFICULT: "Difficile", 
+    VERY_DIFFICULT: "Très difficile" 
+  },
 };
 
 /**
- * Traduit une valeur d'enum en chaîne de caractères lisible.
- * @param key Le type de l'enum (ex: 'LeadStatus')
- * @param value La valeur de l'enum (ex: 'IN_PROGRESS')
- * @returns La chaîne traduite (ex: 'En cours')
+ * FIXED: Single parameter translate function
+ * Automatically detects the enum type from value patterns
  */
-export function translate(key: keyof typeof translations, value: string | null | undefined): string {
-    if (!value) return "N/A";
-    // @ts-ignore
-    const translated = translations[key]?.[value] || value;
-    return translated.charAt(0).toUpperCase() + translated.slice(1).toLowerCase();
+export function translate(value: string | null | undefined): string {
+  if (!value) return "N/A";
+  
+  // Try to find the value in any of our translation objects
+  for (const [key, translationObj] of Object.entries(translations)) {
+    if (translationObj[value as keyof typeof translationObj]) {
+      return translationObj[value as keyof typeof translationObj];
+    }
+  }
+  
+  // If no translation found, return a formatted version of the original value
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase().replace(/_/g, ' ');
 }
 
 // --- MOTEUR DE CALCUL DE DEVIS ENARVA V2 ---
@@ -266,14 +301,14 @@ const getBaseRate = (type: ServiceType, totalSurface: number): number => {
             if (totalSurface <= 200) return 14;
             return 12;
         case 'FinDeChantier':
-            if (totalSurface <= 200) return 24; // Simplifié pour l'exemple
+            if (totalSurface <= 200) return 24;
             return 19;
         case 'CristallisationMarbre':
             if (totalSurface <= 100) return 30;
             if (totalSurface <= 300) return 25;
             if (totalSurface <= 600) return 20;
             return 19;
-        default: return 20; // Taux par défaut
+        default: return 20;
     }
 };
 
@@ -295,33 +330,34 @@ export function generateQuote(services: ServiceInput[]): QuoteCalculation {
     let lineItems: QuoteLineItem[] = [];
     let subTotalHT = 0;
 
-    services.forEach((service, index) => {
-        const coeffs = getCoefficients(service);
-        const baseRate = getBaseRate(service.type, service.surface);
-        const totalCoefficient = coeffs.distance * coeffs.etage * coeffs.delai * coeffs.difficulte;
-        const pricePerSquareMeter = baseRate * totalCoefficient;
-        const totalPrice = service.surface * pricePerSquareMeter;
-
+    services.forEach((service) => {
+        const totalSurface = service.surface * service.levels;
+        const baseRate = getBaseRate(service.type, totalSurface);
+        const coefficients = getCoefficients(service);
+        
+        const finalRate = baseRate * coefficients.distance * coefficients.etage * 
+                          coefficients.delai * coefficients.difficulte;
+        const lineTotal = totalSurface * finalRate;
+        
         lineItems.push({
-            id: `${index + 1}`,
-            description: `${service.type} - ${service.surface}m²`,
-            detail: `Surface: ${service.surface}m² | Taux de base: ${baseRate} MAD/m² | Coefficient total: ${totalCoefficient.toFixed(2)}`,
-            amount: Number(totalPrice.toFixed(2)),
-            editable: true,
+            id: `service-${service.id}`,
+            description: `${service.type} - ${totalSurface}m²`,
+            detail: `${service.surface}m² × ${service.levels} niveau(x) @ ${finalRate.toFixed(2)} MAD/m²`,
+            amount: lineTotal,
+            editable: false
         });
-
-        subTotalHT += totalPrice;
+        
+        subTotalHT += lineTotal;
     });
 
     const vatAmount = subTotalHT * 0.20;
     const totalTTC = subTotalHT + vatAmount;
-    const finalPrice = Math.round(totalTTC / 50) * 50;
 
     return {
         lineItems,
-        subTotalHT: Number(subTotalHT.toFixed(2)),
-        vatAmount: Number(vatAmount.toFixed(2)),
-        totalTTC: Number(totalTTC.toFixed(2)),
-        finalPrice,
+        subTotalHT,
+        vatAmount,
+        totalTTC,
+        finalPrice: totalTTC
     };
 }

@@ -1,152 +1,118 @@
-import { NextRequest, NextResponse } from 'next/server';
+// lib/rate-limit.ts - FIXED VERSION
+import { NextRequest } from 'next/server';
 
-type RateLimitStore = Map<string, { count: number; resetTime: number }>;
+interface RateLimitEntry {
+  count: number;
+  resetTime: number;
+}
 
-// In-memory store for rate limiting (consider Redis for production)
-const rateLimitStore: RateLimitStore = new Map();
+const rateLimitStore = new Map<string, RateLimitEntry>();
+
+setInterval(() => {
+  const now = Date.now();
+  const keysToDelete: string[] = [];
+  
+  rateLimitStore.forEach((entry, key) => {
+    if (now > entry.resetTime) {
+      keysToDelete.push(key);
+    }
+  });
+  
+  keysToDelete.forEach(key => rateLimitStore.delete(key));
+}, 5 * 60 * 1000);
 
 interface RateLimitOptions {
-  interval?: number; // Time window in milliseconds
-  uniqueTokenPerInterval?: number; // Max number of unique tokens to track
-  maxRequests?: number; // Max requests per interval
+  maxRequests?: number;
+  windowMs?: number;
+  keyGenerator?: (request: NextRequest) => string;
 }
 
 interface RateLimitResult {
   success: boolean;
   limit: number;
+  current: number;
   remaining: number;
-  reset: number;
+  resetTime: number;
 }
 
-export class RateLimiter {
-  private interval: number;
-  private maxRequests: number;
-  private store: RateLimitStore;
+export async function applyRateLimit(
+  request: NextRequest,
+  options: RateLimitOptions = {}
+): Promise<RateLimitResult> {
+  const {
+    maxRequests = 100,
+    windowMs = 60 * 60 * 1000,
+    keyGenerator = (req) => getClientIP(req) || 'anonymous'
+  } = options;
 
-  constructor(options: RateLimitOptions = {}) {
-    this.interval = options.interval || 60000; // Default: 1 minute
-    this.maxRequests = options.maxRequests || 10; // Default: 10 requests
-    this.store = rateLimitStore;
-    
-    // Clean up old entries periodically
-    setInterval(() => this.cleanup(), this.interval);
-  }
+  const key = keyGenerator(request);
+  const now = Date.now();
+  const resetTime = now + windowMs;
 
-  private cleanup() {
-    const now = Date.now();
-    const entries = Array.from(this.store.entries());
-    for (const [key, value] of entries) {
-      if (value.resetTime <= now) {
-        this.store.delete(key);
-      }
-    }
-  }
+  let entry = rateLimitStore.get(key);
 
-  private getIdentifier(request: NextRequest): string {
-    // Try to get IP from various headers (for proxied requests)
-    const forwarded = request.headers.get('x-forwarded-for');
-    const realIp = request.headers.get('x-real-ip');
-    const ip = forwarded?.split(',')[0] || realIp || 'unknown';
-    
-    // You can also use user ID if authenticated
-    const userId = request.headers.get('x-user-id');
-    
-    return userId || ip;
-  }
-
-  async check(request: NextRequest): Promise<RateLimitResult> {
-    const identifier = this.getIdentifier(request);
-    const now = Date.now();
-    const resetTime = now + this.interval;
-
-    let entry = this.store.get(identifier);
-
-    if (!entry || entry.resetTime <= now) {
-      // Create new entry or reset existing one
-      entry = { count: 1, resetTime };
-      this.store.set(identifier, entry);
-      
-      return {
-        success: true,
-        limit: this.maxRequests,
-        remaining: this.maxRequests - 1,
-        reset: resetTime,
-      };
-    }
-
-    // Increment counter
-    entry.count++;
-    
-    if (entry.count > this.maxRequests) {
-      return {
-        success: false,
-        limit: this.maxRequests,
-        remaining: 0,
-        reset: entry.resetTime,
-      };
-    }
+  if (!entry || now > entry.resetTime) {
+    entry = {
+      count: 1,
+      resetTime
+    };
+    rateLimitStore.set(key, entry);
 
     return {
       success: true,
-      limit: this.maxRequests,
-      remaining: this.maxRequests - entry.count,
-      reset: entry.resetTime,
+      limit: maxRequests,
+      current: 1,
+      remaining: maxRequests - 1,
+      resetTime
     };
   }
+
+  entry.count++;
+
+  if (entry.count > maxRequests) {
+    return {
+      success: false,
+      limit: maxRequests,
+      current: entry.count,
+      remaining: 0,
+      resetTime: entry.resetTime
+    };
+  }
+
+  return {
+    success: true,
+    limit: maxRequests,
+    current: entry.count,
+    remaining: maxRequests - entry.count,
+    resetTime: entry.resetTime
+  };
 }
 
-// Pre-configured rate limiters for different endpoints
-export const rateLimiters = {
-  // Strict limit for public endpoints
-  public: new RateLimiter({
-    interval: 60000, // 1 minute
-    maxRequests: 5,
-  }),
-  
-  // Standard limit for authenticated API calls
-  api: new RateLimiter({
-    interval: 60000, // 1 minute
-    maxRequests: 30,
-  }),
-  
-  // Relaxed limit for read operations
-  read: new RateLimiter({
-    interval: 60000, // 1 minute
-    maxRequests: 100,
-  }),
-  
-  // Strict limit for write operations
-  write: new RateLimiter({
-    interval: 60000, // 1 minute
-    maxRequests: 10,
-  }),
-  
-  // Very strict limit for sensitive operations
-  sensitive: new RateLimiter({
-    interval: 300000, // 5 minutes
-    maxRequests: 5,
-  }),
-};
+function getClientIP(request: NextRequest): string | null {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
 
-// Helper function to create rate limit response
-export function createRateLimitResponse(result: RateLimitResult): NextResponse {
-  const response = new NextResponse(
-    JSON.stringify({
-      error: 'Too Many Requests',
-      message: `Rate limit exceeded. Please try again after ${new Date(result.reset).toISOString()}`,
-      retryAfter: Math.ceil((result.reset - Date.now()) / 1000),
-    }),
-    { 
-      status: 429,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-RateLimit-Limit': result.limit.toString(),
-        'X-RateLimit-Remaining': result.remaining.toString(),
-        'X-RateLimit-Reset': new Date(result.reset).toISOString(),
-        'Retry-After': Math.ceil((result.reset - Date.now()) / 1000).toString(),
-      }
-    }
-  );
-  
-  return response;
+  const realIP = request.headers.get('x-real-ip');
+  if (realIP) {
+    return realIP.trim();
+  }
+
+  const cfConnectingIP = request.headers.get('cf-connecting-ip');
+  if (cfConnectingIP) {
+    return cfConnectingIP.trim();
+  }
+
+  return null;
 }
+
+export function createRateLimiter(maxRequests: number = 50, windowMs: number = 60 * 1000) {
+  return async (request: NextRequest) => {
+    return applyRateLimit(request, { maxRequests, windowMs });
+  };
+}
+
+export const strictRateLimit = createRateLimiter(5, 15 * 60 * 1000);
+export const standardRateLimit = createRateLimiter(100, 60 * 60 * 1000);
+export const lenientRateLimit = createRateLimiter(500, 60 * 60 * 1000);
