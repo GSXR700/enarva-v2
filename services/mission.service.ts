@@ -76,15 +76,18 @@ class MissionService {
       await tx.lead.update({ where: { id: leadId }, data: { status: statusUpdate } });
 
       await tx.activity.create({
-        data: {
-          type: 'MISSION_SCHEDULED',
-          title: `Mission ${missionNumber} programmée`,
-          description: `Mission pour ${lead.firstName} ${lead.lastName} le ${newMission.scheduledDate.toLocaleDateString('fr-FR')}`,
-          userId: teamLeaderId,
-          leadId,
-          metadata: { missionId: newMission.id, type }
+      data: {
+        type: 'MISSION_SCHEDULED',
+        title: `Mission ${missionNumber} programmée`,
+        description: `Mission pour ${lead.firstName} ${lead.lastName} le ${newMission.scheduledDate.toLocaleDateString('fr-FR')}`,
+        userId: teamLeaderId || leadId, // Use leadId as fallback if teamLeaderId is undefined
+        leadId: leadId,
+        metadata: {
+          missionId: newMission.id,
+          type: data.type,
         }
-      });
+      }
+    });
 
       return newMission;
     });
