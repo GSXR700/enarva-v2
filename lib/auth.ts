@@ -1,15 +1,14 @@
-// lib/auth.ts - FINAL CORRECTED VERSION
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import { PrismaClient, UserRole } from '@prisma/client';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
 import FacebookProvider from 'next-auth/providers/facebook';
 import bcrypt from 'bcryptjs';
-import type { AuthOptions } from 'next-auth'; // <-- FIX: Import AuthOptions as a type
+import NextAuth from 'next-auth';
 
 const prisma = new PrismaClient();
 
-export const authOptions: AuthOptions = {
+export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
@@ -46,7 +45,7 @@ export const authOptions: AuthOptions = {
     })
   ],
   session: {
-    strategy: 'jwt' as const,
+    strategy: 'jwt',
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
@@ -54,7 +53,6 @@ export const authOptions: AuthOptions = {
     error: '/login',
   },
   callbacks: {
-    // FIX: Add explicit types to resolve all 'any' type errors
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
@@ -72,4 +70,4 @@ export const authOptions: AuthOptions = {
       return token;
     },
   },
-};
+});

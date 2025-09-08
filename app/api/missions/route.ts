@@ -4,7 +4,7 @@ import Pusher from 'pusher';
 import { withErrorHandler } from '@/lib/error-handler';
 import { missionSchema } from '@/lib/validation';
 import { missionService } from '@/services/mission.service';
-import { getServerSession } from 'next-auth';
+import { auth } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 const pusher = new Pusher({
@@ -53,7 +53,7 @@ const getMissionsHandler = async (request: NextRequest) => {
  * Creates a new mission.
  */
 const createMissionHandler = async (request: NextRequest) => {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session) {
       return new NextResponse('Unauthorized', { status: 401 });
   }
@@ -71,4 +71,4 @@ const createMissionHandler = async (request: NextRequest) => {
 };
 
 export const GET = withErrorHandler(getMissionsHandler);
-export const POST = withErrorHandler(createMissionHandler); 
+export const POST = withErrorHandler(createMissionHandler);
