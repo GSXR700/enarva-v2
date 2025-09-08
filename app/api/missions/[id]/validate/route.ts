@@ -1,8 +1,6 @@
-// app/api/missions/[id]/validate/route.ts - MISSION VALIDATION API
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { auth } from 'next-auth'; 
-import { authOptions } from '@/lib/auth';
+import { auth } from '@/lib/auth';
 import Pusher from 'pusher';
 
 const prisma = new PrismaClient();
@@ -25,7 +23,6 @@ export async function POST(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // Check if user has admin/manager role
     if (!['ADMIN', 'MANAGER'].includes(session.user.role || '')) {
       return new NextResponse('Forbidden - Admin access required', { status: 403 });
     }
@@ -44,7 +41,6 @@ export async function POST(
       status
     } = body;
 
-    // Get current mission
     const mission = await prisma.mission.findUnique({
       where: { id: missionId },
       include: {
@@ -58,7 +54,6 @@ export async function POST(
       return new NextResponse('Mission not found', { status: 404 });
     }
 
-    // Validate that mission is in correct status for validation
     if (!['QUALITY_CHECK', 'CLIENT_VALIDATION'].includes(mission.status)) {
       return new NextResponse('Mission not ready for validation', { status: 400 });
     }
@@ -68,7 +63,6 @@ export async function POST(
     };
 
     if (approved) {
-      // APPROVAL WORKFLOW
       updateData = {
         ...updateData,
         status: 'COMPLETED',
@@ -77,13 +71,12 @@ export async function POST(
         adminValidatedAt: new Date(),
         adminNotes: adminNotes || null,
         qualityScore: qualityScore || null,
-        actualEndTime: mission.actualEndTime || new Date() // Set end time if not already set
+        actualEndTime: mission.actualEndTime || new Date()
       };
 
       console.log('✅ Mission approved by admin:', session.user.name);
 
     } else {
-      // REJECTION WORKFLOW
       updateData = {
         ...updateData,
         status: correctionNeeded ? 'IN_PROGRESS' : 'QUALITY_CHECK',
@@ -96,15 +89,13 @@ export async function POST(
         correctionRequired: correctionNeeded || false
       };
 
-      // If correction needed, reset some task statuses
       if (correctionNeeded) {
         await prisma.task.updateMany({
           where: { 
             missionId: missionId,
-            // Only reset tasks that had issues
           },
           data: {
-            status: 'ASSIGNED', // Reset to assigned for re-work
+            status: 'ASSIGNED',
             validatedBy: null,
             validatedAt: null
           }
@@ -114,7 +105,6 @@ export async function POST(
       console.log('❌ Mission rejected by admin:', session.user.name);
     }
 
-    // Update the mission
     const updatedMission = await prisma.mission.update({
       where: { id: missionId },
       data: updateData,
@@ -125,7 +115,6 @@ export async function POST(
       }
     });
 
-    // Create activity log
     await prisma.activity.create({
       data: {
         type: approved ? 'MISSION_COMPLETED' : 'QUALITY_ISSUE',
@@ -138,7 +127,6 @@ export async function POST(
       },
     });
 
-    // Update lead status if mission completed
     if (approved) {
       await prisma.lead.update({
         where: { id: mission.leadId },
@@ -148,7 +136,6 @@ export async function POST(
       });
     }
 
-    // Send real-time notifications
     try {
       if (mission.teamLeader) {
         const notificationData = {
@@ -171,17 +158,14 @@ export async function POST(
       }
     } catch (pushError) {
       console.error('Failed to send real-time notification:', pushError);
-      // Don't fail the request if notification fails
     }
 
-    // Generate invoice if approved and not already generated
     if (approved && !mission.invoiceGenerated) {
       try {
         await generateInvoiceForMission(missionId);
         console.log('📄 Invoice generated for approved mission');
       } catch (invoiceError) {
         console.error('Failed to generate invoice:', invoiceError);
-        // Don't fail the validation if invoice generation fails
       }
     }
 
@@ -201,7 +185,6 @@ export async function POST(
   }
 }
 
-// Helper function to generate invoice
 async function generateInvoiceForMission(missionId: string) {
   try {
     const mission = await prisma.mission.findUnique({
@@ -217,7 +200,6 @@ async function generateInvoiceForMission(missionId: string) {
       throw new Error('Mission or quote not found for invoice generation');
     }
 
-    // Create invoice record (assuming you have an Invoice model)
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
@@ -225,13 +207,12 @@ async function generateInvoiceForMission(missionId: string) {
         leadId: mission.leadId,
         amount: mission.quote.finalPrice,
         status: 'SENT',
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         description: `Prestation de nettoyage - Mission ${mission.missionNumber}`,
         createdAt: new Date()
       }
     });
 
-    // Update mission to mark invoice as generated
     await prisma.mission.update({
       where: { id: missionId },
       data: { 

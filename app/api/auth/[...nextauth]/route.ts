@@ -1,4 +1,3 @@
-// app/api/auth/[...nextauth]/route.ts - FIXED VERSION FOR NEXTAUTH V5
 import NextAuth from "next-auth"
 import { authOptions } from "@/lib/auth"
 

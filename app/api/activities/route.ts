@@ -1,9 +1,6 @@
-// app/api/activities/route.ts - FINAL FIX
-
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { auth } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { auth } from '@/auth';
 
 const prisma = new PrismaClient();
 

@@ -4,8 +4,7 @@ import Pusher from 'pusher';
 import { withErrorHandler } from '@/lib/error-handler';
 import { missionSchema } from '@/lib/validation';
 import { missionService } from '@/services/mission.service';
-import { auth } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { auth } from '@/lib/auth';
 
 const pusher = new Pusher({
   appId: process.env.PUSHER_APP_ID!,
@@ -15,10 +14,6 @@ const pusher = new Pusher({
   useTLS: true
 });
 
-/**
- * GET /api/missions
- * Fetches a paginated and filtered list of missions.
- */
 const getMissionsHandler = async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get('page') || '1');
@@ -48,10 +43,6 @@ const getMissionsHandler = async (request: NextRequest) => {
   });
 };
 
-/**
- * POST /api/missions
- * Creates a new mission.
- */
 const createMissionHandler = async (request: NextRequest) => {
   const session = await auth();
   if (!session) {
@@ -63,7 +54,6 @@ const createMissionHandler = async (request: NextRequest) => {
 
   const newMission = await missionService.createMission(validatedData);
 
-  // Non-blocking notifications
   pusher.trigger(`user-${newMission.teamLeaderId}`, 'mission-new', newMission)
     .catch(err => console.error('Pusher notification failed:', err));
 

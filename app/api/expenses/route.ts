@@ -1,9 +1,7 @@
-// app/api/expenses/route.ts - FIXED VERSION
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { auth } from 'next-auth';
-import { authOptions } from '@/lib/auth'; 
+import { auth } from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
@@ -39,11 +37,8 @@ export async function POST(request: Request) {
 
     const { amount, date, rentalStartDate, rentalEndDate, missionId, leadId, ...restData } = body;
 
-    // ✅ FIXED: Clean user handling
-    // Remove any userId from the body to prevent conflicts
     const { userId: bodyUserId, ...cleanData } = restData;
 
-    // ✅ FIXED: Verify user exists in database
     const userExists = await prisma.user.findUnique({
       where: { id: session.user.id }
     });
@@ -55,12 +50,11 @@ export async function POST(request: Request) {
 
     console.log('✅ User exists in database:', userExists.name);
 
-    // Sanitize the data: convert empty strings to null for optional relations and dates
     const sanitizedData = {
       ...cleanData,
       amount: new Decimal(amount),
       date: new Date(date),
-      userId: session.user.id, // ✅ FIXED: Use verified session user ID
+      userId: session.user.id,
       rentalStartDate: rentalStartDate ? new Date(rentalStartDate) : null,
       rentalEndDate: rentalEndDate ? new Date(rentalEndDate) : null,
       missionId: missionId || null,
@@ -69,7 +63,7 @@ export async function POST(request: Request) {
 
     console.log('🔧 Final data for creation:', {
       ...sanitizedData,
-      amount: sanitizedData.amount.toString() // Log decimal as string for readability
+      amount: sanitizedData.amount.toString()
     });
 
     const newExpense = await prisma.expense.create({
@@ -87,7 +81,6 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('❌ Failed to create expense:', error);
     
-    // Enhanced error handling
     if (error && typeof error === 'object' && 'code' in error) {
       switch (error.code) {
         case 'P2003':
