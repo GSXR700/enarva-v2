@@ -28,8 +28,10 @@ export default function PlanningPage() {
       try {
         const response = await fetch('/api/missions');
         if (!response.ok) throw new Error('Impossible de charger les missions.');
-        const data: MissionWithDetails[] = await response.json();
-        setAllMissions(data);
+        // FIX: Destructure the response to get the nested 'data' array
+        const responseData = await response.json();
+        const missionsData = responseData.data || []; // Fallback to empty array if data is not present
+        setAllMissions(missionsData);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -40,13 +42,18 @@ export default function PlanningPage() {
   }, []);
 
   useEffect(() => {
-    const missionsForDay = allMissions.filter(mission =>
-      isSameDay(parseISO(mission.scheduledDate as unknown as string), selectedDate)
-    );
-    setFilteredMissions(missionsForDay);
+    // This check ensures we don't try to filter a non-array value during the initial render
+    if (Array.isArray(allMissions)) {
+      const missionsForDay = allMissions.filter(mission =>
+        isSameDay(parseISO(mission.scheduledDate as unknown as string), selectedDate)
+      );
+      setFilteredMissions(missionsForDay);
+    }
   }, [selectedDate, allMissions]);
 
-  const missionDates = allMissions.map(m => parseISO(m.scheduledDate as unknown as string));
+  const missionDates = Array.isArray(allMissions) 
+    ? allMissions.map(m => parseISO(m.scheduledDate as unknown as string))
+    : [];
 
   if (isLoading) {
     return <PlanningSkeleton />;

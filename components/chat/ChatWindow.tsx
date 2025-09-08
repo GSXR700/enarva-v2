@@ -1,5 +1,6 @@
-// components/chat/ChatWindow.tsx
-import { useState, useEffect, useRef } from 'react';
+'use client';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageInput } from './MessageInput';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { PopulatedConversation } from '@/types/chat';
 import { Message, User } from '@prisma/client';
 import { ArrowLeft, Check, CheckCheck } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import Pusher from 'pusher-js';
+import { usePusherChannel } from '@/hooks/usePusherClient'; // <-- IMPORT the new hook
 import { ChatWindowSkeleton } from '../skeletons/ChatWindowSkeleton';
 import { getRelativeTime } from '@/lib/utils';
 
@@ -48,34 +49,20 @@ export function ChatWindow({ currentUserId, conversation, onBack, onlineMembers 
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    useEffect(() => {
-        if (!conversation.id) return;
-
-        const pusherClient = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-            cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-            authEndpoint: '/api/pusher/auth',
-            auth: {
-              headers: {
-                'Content-Type': 'application/json',
-              }
+    // <-- REFACTORED: Use the centralized hook for new messages
+    const handleNewMessage = useCallback((message: PopulatedMessage) => {
+        setMessages((prev) => {
+            // Avoid adding duplicate messages if optimistic update already added it
+            if (prev.find(m => m.id === message.id)) {
+                return prev;
             }
+            return [...prev, message];
         });
+    }, []);
 
-        const channel = pusherClient.subscribe(`conversation-${conversation.id}`);
-
-        const handleNewMessage = (message: PopulatedMessage) => {
-            if (message.senderId !== currentUserId) {
-                setMessages((prev) => [...prev, message]);
-            }
-        };
-
-        channel.bind('new-message', handleNewMessage);
-
-        return () => {
-            channel.unbind('new-message', handleNewMessage);
-            pusherClient.unsubscribe(`conversation-${conversation.id}`);
-        };
-    }, [conversation.id, currentUserId]);
+    usePusherChannel(`conversation-${conversation.id}`, {
+        'new-message': handleNewMessage,
+    });
 
     const handleSendMessage = async (content: string) => {
         const tempId = Date.now().toString();

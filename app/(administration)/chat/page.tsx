@@ -1,4 +1,3 @@
-// app/(administration)/chat/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react';
@@ -8,7 +7,7 @@ import { ChatWindow } from '@/components/chat/ChatWindow';
 import { PopulatedConversation } from '@/types/chat';
 import { ConversationListSkeleton } from '@/components/skeletons/ConversationListSkeleton';
 import { ChatWindowSkeleton } from '@/components/skeletons/ChatWindowSkeleton';
-import Pusher from 'pusher-js';
+import { usePusherChannel } from '@/hooks/usePusherClient'; // <-- IMPORT the new hook
 
 export default function ChatPage() {
     const { data: session } = useSession();
@@ -37,33 +36,19 @@ export default function ChatPage() {
         fetchConversations();
     }, []);
 
-    useEffect(() => {
-        if (!session?.user?.id) return;
-
-        const pusherClient = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-            cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-            authEndpoint: '/api/pusher/auth',
-        });
-
-        const channel = pusherClient.subscribe('presence-global');
-
-        channel.bind('pusher:subscription_succeeded', (data: any) => {
+    // <-- REFACTORED: Use the centralized hook for presence events
+    usePusherChannel('presence-global', {
+        'pusher:subscription_succeeded': (data: any) => {
             const members = Object.keys(data.members);
             setOnlineMembers(members);
-        });
-
-        channel.bind('pusher:member_added', (member: { id: string }) => {
+        },
+        'pusher:member_added': (member: { id: string }) => {
             setOnlineMembers(prev => Array.from(new Set([...prev, member.id])));
-        });
-
-        channel.bind('pusher:member_removed', (member: { id: string }) => {
+        },
+        'pusher:member_removed': (member: { id: string }) => {
             setOnlineMembers(prev => prev.filter(id => id !== member.id));
-        });
-
-        return () => {
-            pusherClient.unsubscribe('presence-global');
-        };
-    }, [session?.user?.id]);
+        },
+    });
 
     const handleSelectConversation = (conversation: PopulatedConversation) => {
         if (!conversations.find(c => c.id === conversation.id)) {
@@ -94,7 +79,7 @@ export default function ChatPage() {
         <div className="flex h-[calc(100vh-4rem)]">
             <div className="w-full md:hidden">
                 {!selectedConversation ? (
-                    <ConversationList 
+                    <ConversationList
                         currentUserId={currentUserId}
                         conversations={conversations}
                         onSelect={setSelectedConversation}
@@ -102,16 +87,16 @@ export default function ChatPage() {
                         onlineMembers={onlineMembers}
                     />
                 ) : (
-                    <ChatWindow 
+                    <ChatWindow
                         currentUserId={currentUserId}
-                        conversation={selectedConversation} 
+                        conversation={selectedConversation}
                         onBack={() => setSelectedConversation(null)}
                         onlineMembers={onlineMembers}
                     />
                 )}
             </div>
             <div className="hidden md:flex w-full h-full">
-                 <ConversationList 
+                 <ConversationList
                     currentUserId={currentUserId}
                     conversations={conversations}
                     selectedConversationId={selectedConversation?.id}
@@ -120,8 +105,8 @@ export default function ChatPage() {
                     onlineMembers={onlineMembers}
                 />
                 {selectedConversation ? (
-                    <ChatWindow 
-                        currentUserId={currentUserId} 
+                    <ChatWindow
+                        currentUserId={currentUserId}
                         conversation={selectedConversation}
                         onlineMembers={onlineMembers}
                     />

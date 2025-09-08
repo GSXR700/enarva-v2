@@ -1,4 +1,3 @@
-// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/(administration)/quotes/new/NewQuoteForm.tsx
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
@@ -27,11 +26,11 @@ export default function NewQuoteForm() {
     date.setDate(date.getDate() + 30);
     return date.toISOString().split('T')[0];
   });
-  
+
   const [services, setServices] = useState<ServiceInputState[]>([
       { id: Date.now(), type: 'GrandMénage', surface: 100, levels: 1, distance: 10, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }
   ]);
-  
+
   const [editableLineItems, setEditableLineItems] = useState<QuoteLineItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -40,11 +39,14 @@ export default function NewQuoteForm() {
       try {
         const response = await fetch('/api/leads');
         if (!response.ok) throw new Error("Impossible de charger les leads.");
-        const data = await response.json();
-        setLeads(data);
+        // FIX: Destructure the response to get the nested 'data' array
+        const responseData = await response.json();
+        const leadsData = responseData.data || [];
+        
+        setLeads(leadsData);
         const leadId = searchParams.get('leadId');
         if (leadId) {
-          const lead = data.find((l: Lead) => l.id === leadId);
+          const lead = leadsData.find((l: Lead) => l.id === leadId);
           if(lead) setSelectedLead(lead);
         }
       } catch (error) {
@@ -67,13 +69,13 @@ export default function NewQuoteForm() {
       currentServices.map(s => s.id === id ? { ...s, [field]: value } : s)
     );
   };
-  
+
   const handleLineItemChange = (id: string, newAmount: number) => {
     setEditableLineItems(currentItems =>
         currentItems.map(item => item.id === id ? { ...item, amount: newAmount } : item)
     );
   };
-  
+
   const finalQuote = useMemo(() => {
     const subTotalHT = editableLineItems.reduce((acc, item) => acc + item.amount, 0);
     const vatAmount = subTotalHT * 0.20;
@@ -98,7 +100,7 @@ export default function NewQuoteForm() {
       return;
     }
     setIsLoading(true);
-    
+
     try {
         const response = await fetch('/api/quotes', {
             method: 'POST',

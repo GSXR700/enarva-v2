@@ -19,7 +19,7 @@ model User {
   role             UserRole       @default(TECHNICIAN)
   onlineStatus     String         @default("OFFLINE")
   lastSeen         DateTime?
-  pushSubscription Json? // Champ ajouté pour les notifications push
+  pushSubscription Json?
   accounts         Account[]
   sessions         Session[]
   leads            Lead[]
@@ -220,6 +220,14 @@ model Mission {
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
 
+  adminValidated     Boolean?
+  adminValidatedBy   String?
+  adminValidatedAt   DateTime?
+  adminNotes         String?
+  qualityScore       Int?
+  issuesFound        String?
+  correctionRequired Boolean?
+
   @@map("missions")
 }
 
@@ -289,8 +297,8 @@ model Task {
   validatedBy          String?
   beforePhotos         String[]
   afterPhotos          String[]
-  clientApproved       Boolean?      // ✅ ADDED: To store client's on-site approval
-  clientFeedback       String?       @db.Text // ✅ ADDED: To store client's feedback for the task
+  clientApproved       Boolean?
+  clientFeedback       String?       @db.Text
   teamLeaderValidated  Boolean?
 }
 
@@ -439,7 +447,32 @@ model Activity {
   @@map("activities")
 }
 
+// --- NEW SYSTEM LOGGING MODEL ---
+model SystemLog {
+  id        String    @id @default(cuid())
+  type      LogType
+  status    LogStatus
+  message   String
+  metadata  Json?
+  createdAt DateTime  @default(now())
+
+  @@map("system_logs")
+}
+
 // --- ENUMS ---
+enum LogType {
+  BACKUP
+  ERROR
+  INFO
+  SECURITY
+}
+
+enum LogStatus {
+  SUCCESS
+  FAILED
+  IN_PROGRESS
+}
+
 enum LeadCanal {
   WHATSAPP
   FACEBOOK
@@ -816,3 +849,4 @@ enum ActivityType {
   QUALITY_ISSUE
   CLIENT_FEEDBACK
 }
+

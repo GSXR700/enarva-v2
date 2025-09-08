@@ -1,4 +1,3 @@
-// app/(administration)/missions/page.tsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -35,7 +34,7 @@ import {
 import {
   Plus, MapPin, Clock, Users, CheckSquare, AlertTriangle, Play, CheckCircle, Calendar, Phone, MessageSquare, Camera, Star, ThumbsUp, ThumbsDown, Edit, Trash2, Shield, User as UserIcon
 } from 'lucide-react'
-import { formatCurrency, formatDate, formatTime, getRelativeTime, translate } from '@/lib/utils'
+import { formatCurrency, formatDate, formatTime, translate } from '@/lib/utils'
 import { Mission, Lead, User, Quote, Task, TeamMember } from '@prisma/client'
 import { CardGridSkeleton } from '@/components/skeletons/CardGridSkeleton'
 import { useSession } from 'next-auth/react'
@@ -49,6 +48,10 @@ type MissionWithDetails = Mission & {
   teamMembers: TeamMemberWithUser[];
   tasks: Task[];
 };
+
+interface PaginationState {
+  total: number;
+}
 
 const getStatusColor = (status: string) => {
     switch (status) {
@@ -97,18 +100,20 @@ export default function MissionsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
+  const [pagination, setPagination] = useState<PaginationState | null>(null);
+
   const [allTeamMembers, setAllTeamMembers] = useState<TeamMemberWithUser[]>([]);
   const [selectedTeamMemberIds, setSelectedTeamMemberIds] = useState<string[]>([]);
   const [isTeamSaving, setIsTeamSaving] = useState(false);
-  
+
   const fetchMissions = useCallback(async () => {
     try {
       const response = await fetch('/api/missions');
       if (!response.ok) throw new Error('Impossible de récupérer les missions.');
-      const data = await response.json();
-      setAllMissions(data);
-      setFilteredMissions(data);
+      const responseData = await response.json(); // <-- Get the structured response
+      setAllMissions(responseData.data || []); // <-- Set the nested data array
+      setFilteredMissions(responseData.data || []);
+      setPagination(responseData.pagination); // <-- Set pagination info
     } catch (err: any) {
       setError(err.message);
     }
@@ -141,7 +146,7 @@ export default function MissionsPage() {
     }
     setFilteredMissions(missions);
   }, [searchQuery, statusFilter, priorityFilter, allMissions]);
-  
+
   const calculateProgress = (tasks: Task[]) => {
       if (tasks.length === 0) return 0;
       const completedTasks = tasks.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length;
@@ -152,7 +157,7 @@ export default function MissionsPage() {
     setSelectedMission(mission);
     setSelectedTeamMemberIds(mission.teamMembers.map(tm => tm.id));
   };
-  
+
   const handleDeleteMission = async (missionId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette mission ? Cette action est irréversible.")) return;
     try {
@@ -196,7 +201,8 @@ export default function MissionsPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Gestion des Missions</h1>
           <p className="text-muted-foreground mt-1">
-            {allMissions.length} missions • {allMissions.filter(m => m.status === 'IN_PROGRESS').length} en cours • {allMissions.filter(m => m.status === 'COMPLETED').length} terminées
+            {/* FIX: Use pagination total or fallback to array length */}
+            {pagination?.total ?? allMissions.length} missions • {allMissions.filter(m => m.status === 'IN_PROGRESS').length} en cours • {allMissions.filter(m => m.status === 'COMPLETED').length} terminées
           </p>
         </div>
         {(userRole === 'ADMIN' || userRole === 'TEAM_LEADER') && (
