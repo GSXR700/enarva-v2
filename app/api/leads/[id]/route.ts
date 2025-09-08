@@ -1,17 +1,17 @@
-// app/api/leads/[id]/route.ts - FIXED FOR NEXT.JS 15
+// app/api/leads/[id]/route.ts - FIXED FOR NEXT.JS 15 WITHOUT withErrorHandler
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { leadService } from '@/services/lead.service';
 import { validateLeadInput } from '@/lib/validation';
-import { withErrorHandler } from '@/lib/error-handler';
+import { errorHandler } from '@/lib/error-handler';
 import { LeadStatus } from '@prisma/client';
 
 export async function GET(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return withErrorHandler(async () => {
+  try {
     const session = await getServerSession(authOptions) as any;
     if (!session?.user) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -56,14 +56,16 @@ export async function GET(
     }
 
     return NextResponse.json(lead);
-  });
+  } catch (error) {
+    return errorHandler(error);
+  }
 }
 
 export async function PATCH(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return withErrorHandler(async () => {
+  try {
     const session = await getServerSession(authOptions) as any;
     if (!session?.user) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
@@ -111,52 +113,50 @@ export async function PATCH(
       updateData.score = calculateLeadScore(mergedData);
     }
 
-    try {
-      const updatedLead = await leadService.updateLead(leadId, updateData);
+    const updatedLead = await leadService.updateLead(leadId, updateData);
 
-      if (body.status && body.status !== existingLead.status) {
-        await leadService.logActivity({
-          type: 'LEAD_STATUS_CHANGED',
-          title: 'Statut modifié',
-          description: `Statut changé de ${existingLead.status} vers ${body.status}`,
-          leadId: leadId,
-          userId: session.user.id,
-          metadata: {
-            oldStatus: existingLead.status,
-            newStatus: body.status
-          }
-        });
-      }
-
-      if (body.assignedToId !== undefined && body.assignedToId !== existingLead.assignedToId) {
-        await leadService.logActivity({
-          type: 'LEAD_ASSIGNED',
-          title: 'Assignation modifiée',
-          description: body.assignedToId 
-            ? `Lead assigné à ${body.assignedToId}`
-            : 'Lead non assigné',
-          leadId: leadId,
-          userId: session.user.id,
-          metadata: {
-            oldAssignee: existingLead.assignedToId,
-            newAssignee: body.assignedToId
-          }
-        });
-      }
-
-      return NextResponse.json(updatedLead);
-    } catch (error) {
-      console.error('Failed to update lead:', error);
-      return NextResponse.json({ error: 'Erreur lors de la mise à jour' }, { status: 500 });
+    if (body.status && body.status !== existingLead.status) {
+      await leadService.logActivity({
+        type: 'LEAD_STATUS_CHANGED',
+        title: 'Statut modifié',
+        description: `Statut changé de ${existingLead.status} vers ${body.status}`,
+        leadId: leadId,
+        userId: session.user.id,
+        metadata: {
+          oldStatus: existingLead.status,
+          newStatus: body.status
+        }
+      });
     }
-  });
+
+    if (body.assignedToId !== undefined && body.assignedToId !== existingLead.assignedToId) {
+      await leadService.logActivity({
+        type: 'LEAD_ASSIGNED',
+        title: 'Assignation modifiée',
+        description: body.assignedToId 
+          ? `Lead assigné à ${body.assignedToId}`
+          : 'Lead non assigné',
+        leadId: leadId,
+        userId: session.user.id,
+        metadata: {
+          oldAssignee: existingLead.assignedToId,
+          newAssignee: body.assignedToId
+        }
+      });
+    }
+
+    return NextResponse.json(updatedLead);
+  } catch (error) {
+    console.error('Failed to update lead:', error);
+    return errorHandler(error);
+  }
 }
 
 export async function DELETE(
   request: NextRequest, 
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return withErrorHandler(async () => {
+  try {
     const session = await getServerSession(authOptions) as any;
     if (!session?.user || (session.user.role !== 'ADMIN' && session.user.role !== 'MANAGER')) {
       return NextResponse.json({ error: 'Permissions insuffisantes' }, { status: 403 });
@@ -188,10 +188,13 @@ export async function DELETE(
     });
 
     return new NextResponse(null, { status: 204 });
-  });
+  } catch (error) {
+    console.error('Failed to delete lead:', error);
+    return errorHandler(error);
+  }
 }
 
-// Helper function for calculating lead score (assuming this exists elsewhere)
+// Helper function for calculating lead score
 function calculateLeadScore(leadData: any): number {
   let score = 0;
   
