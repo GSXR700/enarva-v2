@@ -463,7 +463,7 @@ export default function NewQuoteForm() {
                   {/* Investment Summary */}
                   <div className="text-center py-6 bg-white rounded-lg border border-slate-200">
                     <p className="text-sm text-slate-500 mb-1">Investissement Total TTC</p>
-                    <p className="text-3xl font-bold text-blue-600">{formatCurrency(finalQuote.finalPrice)} MAD</p>
+                    <p className="text-3xl font-bold text-blue-600">{formatCurrency(finalQuote.finalPrice)}</p>
                   </div>
 
                   {/* Pricing Breakdown */}
