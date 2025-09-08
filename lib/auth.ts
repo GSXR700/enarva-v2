@@ -5,10 +5,11 @@ import GoogleProvider from 'next-auth/providers/google'
 import FacebookProvider from 'next-auth/providers/facebook'
 import bcrypt from 'bcryptjs'
 import { getServerSession } from 'next-auth/next'
+import type { AuthOptions } from 'next-auth'
 
 const prisma = new PrismaClient()
 
-export const authOptions = {
+export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
