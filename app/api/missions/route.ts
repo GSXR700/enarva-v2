@@ -71,4 +71,4 @@ const createMissionHandler = async (request: NextRequest) => {
 };
 
 export const GET = withErrorHandler(getMissionsHandler);
-export const POST = withErrorHandler(createMissionHandler);
+export const POST = withErrorHandler(createMissionHandler); 

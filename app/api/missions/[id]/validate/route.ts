@@ -1,7 +1,7 @@
 // app/api/missions/[id]/validate/route.ts - MISSION VALIDATION API
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth'; 
 import { authOptions } from '@/lib/auth';
 import Pusher from 'pusher';
 

@@ -1,6 +1,8 @@
+// app/api/activities/route.ts - FINAL FIX
+
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next'; // <-- CORRECT IMPORT PATH
 import { authOptions } from '@/lib/auth';
 
 const prisma = new PrismaClient();
