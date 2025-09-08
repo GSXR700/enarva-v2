@@ -1,85 +1,54 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Input } from '@/components/ui/input'
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuItem,
-} from '@/components/ui/dropdown-menu'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  Plus, MapPin, Clock, Users, CheckSquare, AlertTriangle, Play, CheckCircle, Calendar, Phone, MessageSquare, Camera, Star, ThumbsUp, ThumbsDown, Edit, Trash2, Shield, User as UserIcon
-} from 'lucide-react'
-import { formatCurrency, formatDate, formatTime, translate } from '@/lib/utils'
-import { Mission, Lead, User, Quote, Task, TeamMember } from '@prisma/client'
-import { CardGridSkeleton } from '@/components/skeletons/CardGridSkeleton'
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu'
+import { Search, Plus, Edit, Trash2, Filter, Calendar, MapPin, Users, Clock, Eye } from 'lucide-react'
+import { Mission, Lead, User, Task, TeamMember, MissionStatus } from '@prisma/client'
+import { formatDate, formatTime, translate } from '@/lib/utils'
 import { toast } from 'sonner'
+import { TableSkeleton } from '@/components/skeletons/TableSkeleton'
 
-type TeamMemberWithUser = TeamMember & { user: User };
-type MissionWithDetails = Mission & {
-  lead: Lead;
-  quote: Quote | null;
-  teamLeader: User | null;
-  teamMembers: TeamMemberWithUser[];
+type MissionWithDetails = Mission & { 
+  lead: Lead; 
   tasks: Task[];
+  teamMembers: TeamMember[];
+  teamLeader?: User;
 };
 
-interface PaginationState {
-  total: number;
-}
+type TeamMemberWithUser = TeamMember & { user: User };
 
-const getStatusColor = (status: string) => {
+type PaginationState = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+const getStatusColor = (status: MissionStatus) => {
     switch (status) {
       case 'SCHEDULED': return 'bg-blue-100 text-blue-800';
-      case 'IN_PROGRESS': return 'bg-orange-100 text-orange-800';
-      case 'QUALITY_CHECK': return 'bg-yellow-100 text-yellow-800';
-      case 'CLIENT_VALIDATION': return 'bg-purple-100 text-purple-800';
+      case 'IN_PROGRESS': return 'bg-yellow-100 text-yellow-800';
+      case 'QUALITY_CHECK': return 'bg-purple-100 text-purple-800';
+      case 'CLIENT_VALIDATION': return 'bg-orange-100 text-orange-800';
       case 'COMPLETED': return 'bg-green-100 text-green-800';
       case 'CANCELLED': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
 };
 
-const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'SCHEDULED': return <Calendar className="w-4 h-4" />;
-      case 'IN_PROGRESS': return <Play className="w-4 h-4" />;
-      case 'QUALITY_CHECK': return <CheckSquare className="w-4 h-4" />;
-      case 'CLIENT_VALIDATION': return <Star className="w-4 h-4" />;
-      case 'COMPLETED': return <CheckCircle className="w-4 h-4" />;
-      case 'CANCELLED': return <AlertTriangle className="w-4 h-4" />;
-      default: return <Clock className="w-4 h-4" />;
-    }
-};
-
 const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'LOW': return 'bg-green-100 text-green-800';
+      case 'LOW': return 'bg-gray-100 text-gray-800';
       case 'NORMAL': return 'bg-blue-100 text-blue-800';
       case 'HIGH': return 'bg-orange-100 text-orange-800';
       case 'CRITICAL': return 'bg-red-100 text-red-800';
@@ -89,7 +58,7 @@ const getPriorityColor = (priority: string) => {
 
 export default function MissionsPage() {
   const { data: session } = useSession();
-  const userRole = session?.user?.role;
+  const userRole = (session?.user as any)?.role;
   const router = useRouter();
 
   const [allMissions, setAllMissions] = useState<MissionWithDetails[]>([]);
@@ -110,10 +79,10 @@ export default function MissionsPage() {
     try {
       const response = await fetch('/api/missions');
       if (!response.ok) throw new Error('Impossible de récupérer les missions.');
-      const responseData = await response.json(); // <-- Get the structured response
-      setAllMissions(responseData.data || []); // <-- Set the nested data array
+      const responseData = await response.json();
+      setAllMissions(responseData.data || []);
       setFilteredMissions(responseData.data || []);
-      setPagination(responseData.pagination); // <-- Set pagination info
+      setPagination(responseData.pagination);
     } catch (err: any) {
       setError(err.message);
     }
@@ -164,95 +133,176 @@ export default function MissionsPage() {
       const res = await fetch(`/api/missions/${missionId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Échec de la suppression');
       toast.success("Mission supprimée avec succès.");
-      setSelectedMission(null);
-      fetchMissions(); // Refresh the list
-    } catch (e: any) {
-      toast.error(e.message);
+      fetchMissions();
+    } catch (error) {
+      toast.error("Erreur lors de la suppression de la mission.");
     }
   };
 
-  const handleTeamUpdate = async () => {
+  const updateTeamMembers = async () => {
     if (!selectedMission) return;
     setIsTeamSaving(true);
     try {
-      const res = await fetch(`/api/missions/${selectedMission.id}`, {
+      const res = await fetch(`/api/missions/${selectedMission.id}/team`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamMemberIds: selectedTeamMemberIds })
+        body: JSON.stringify({ teamMemberIds: selectedTeamMemberIds }),
       });
-      if (!res.ok) throw new Error("Échec de la mise à jour de l'équipe");
-      const updatedMission = await res.json();
-      setSelectedMission(updatedMission); // Update mission state with new team
-      toast.success("Équipe mise à jour !");
-      fetchMissions(); // Refresh the main list
-    } catch(e: any) {
-      toast.error(e.message);
+      if (!res.ok) throw new Error('Échec de la mise à jour');
+      toast.success("Équipe mise à jour avec succès.");
+      fetchMissions();
+    } catch (error) {
+      toast.error("Erreur lors de la mise à jour de l'équipe.");
     } finally {
       setIsTeamSaving(false);
     }
-  }
+  };
 
-  if (isLoading) return <CardGridSkeleton title="Gestion des Missions" description="Chargement des missions..." />;
-  if (error) return <div className="main-content text-center p-10 text-red-500">Erreur: {error}</div>;
+  if (isLoading) return <TableSkeleton title="Missions" />;
+  if (error) return <div className="main-content text-center p-10 text-red-500">{error}</div>;
 
   return (
     <div className="main-content space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Gestion des Missions</h1>
-          <p className="text-muted-foreground mt-1">
-            {/* FIX: Use pagination total or fallback to array length */}
-            {pagination?.total ?? allMissions.length} missions • {allMissions.filter(m => m.status === 'IN_PROGRESS').length} en cours • {allMissions.filter(m => m.status === 'COMPLETED').length} terminées
-          </p>
+          <h1 className="text-2xl md:text-3xl font-bold">Missions</h1>
+          <p className="text-muted-foreground mt-1">Gérez toutes les missions et interventions.</p>
         </div>
-        {(userRole === 'ADMIN' || userRole === 'TEAM_LEADER') && (
-            <Link href="/missions/new"><Button className="gap-2 bg-enarva-gradient rounded-lg"><Plus/>Mission</Button></Link>
+        {userRole && ['ADMIN', 'MANAGER'].includes(userRole) && (
+          <Link href="/missions/new">
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nouvelle Mission
+            </Button>
+          </Link>
         )}
       </div>
 
       <Card className="thread-card">
-        <CardContent className="p-4 flex flex-wrap items-center gap-4">
-            <Input placeholder="Rechercher par client, adresse, numéro..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-background flex-1 min-w-[250px]"/>
-            <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="Statut" /></SelectTrigger><SelectContent><SelectItem value="all">Tous les statuts</SelectItem><SelectItem value="SCHEDULED">Planifiée</SelectItem><SelectItem value="IN_PROGRESS">En cours</SelectItem><SelectItem value="COMPLETED">Terminée</SelectItem></SelectContent></Select>
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}><SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="Priorité" /></SelectTrigger><SelectContent><SelectItem value="all">Toutes priorités</SelectItem><SelectItem value="LOW">Faible</SelectItem><SelectItem value="NORMAL">Normale</SelectItem><SelectItem value="HIGH">Élevée</SelectItem><SelectItem value="CRITICAL">Critique</SelectItem></SelectContent></Select>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="w-5 h-5" />
+            Filtres
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <Label>Recherche</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Nom, mission, adresse..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+          <div>
+            <Label>Statut</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="SCHEDULED">Planifiée</SelectItem>
+                <SelectItem value="IN_PROGRESS">En cours</SelectItem>
+                <SelectItem value="QUALITY_CHECK">Contrôle Qualité</SelectItem>
+                <SelectItem value="CLIENT_VALIDATION">Validation Client</SelectItem>
+                <SelectItem value="COMPLETED">Terminée</SelectItem>
+                <SelectItem value="CANCELLED">Annulée</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Priorité</Label>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les priorités</SelectItem>
+                <SelectItem value="LOW">Faible</SelectItem>
+                <SelectItem value="NORMAL">Normale</SelectItem>
+                <SelectItem value="HIGH">Élevée</SelectItem>
+                <SelectItem value="CRITICAL">Critique</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-end">
+            <Button variant="outline" onClick={() => { setSearchQuery(''); setStatusFilter('all'); setPriorityFilter('all'); }}>
+              Réinitialiser
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredMissions.map((mission) => {
-          const progress = calculateProgress(mission.tasks);
-          return (
-            <Card key={mission.id} onClick={() => handleOpenModal(mission)} className="thread-card cursor-pointer hover:shadow-lg transition-all flex flex-col">
-                <CardContent className="p-6 flex flex-col flex-grow">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h3 className="font-semibold text-foreground text-lg">{mission.missionNumber}</h3>
-                      <p className="text-sm text-muted-foreground">{mission.lead.firstName} {mission.lead.lastName}</p>
-                    </div>
-                    <div className="text-lg font-bold text-enarva-start">{mission.quote ? formatCurrency(Number(mission.quote.finalPrice)) : 'N/A'}</div>
-                  </div>
-                   <div className="flex flex-wrap gap-2 mb-4">
-                        <Badge className={`status-badge ${getStatusColor(mission.status)} flex items-center gap-1`}>{getStatusIcon(mission.status)}{translate('MissionStatus', mission.status)}</Badge>
-                        <Badge className={`status-badge ${getPriorityColor(mission.priority)}`}>{mission.priority}</Badge>
-                   </div>
-                  <div className="text-sm text-muted-foreground space-y-2 mt-auto pt-4 border-t">
-                    <div className="flex items-center gap-2"><MapPin className="w-4 h-4 flex-shrink-0" /><span className="line-clamp-1">{mission.address}</span></div>
-                    <div className="flex items-center gap-2"><Clock className="w-4 h-4 flex-shrink-0" /><span>{formatDate(mission.scheduledDate)} à {formatTime(mission.scheduledDate)}</span></div>
-                  </div>
-                  <div className="mt-4">
-                    <div className="flex justify-between items-center text-sm mb-1">
-                      <span className="text-muted-foreground">Progression</span><span className="font-medium">{progress}%</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2"><div className="bg-enarva-start h-2 rounded-full transition-all" style={{ width: `${progress}%` }} /></div>
-                  </div>
-                </CardContent>
-            </Card>
-          );
-        })}
+        {filteredMissions.map((mission) => (
+          <Card key={mission.id} className="thread-card cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleOpenModal(mission)}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">{mission.missionNumber}</CardTitle>
+                <Badge className={getStatusColor(mission.status)}>
+                  {translate(mission.status)}
+                </Badge>
+              </div>
+              <CardDescription>
+                {mission.lead.firstName} {mission.lead.lastName}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="w-4 h-4" />
+                {formatDate(mission.scheduledDate)} à {formatTime(mission.scheduledDate)}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MapPin className="w-4 h-4" />
+                {mission.address}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Users className="w-4 h-4" />
+                {mission.teamMembers.length} membre(s) assigné(s)
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span>Progression</span>
+                  <span>{calculateProgress(mission.tasks)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${calculateProgress(mission.tasks)}%` }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <Badge className={getPriorityColor(mission.priority)}>
+                  {mission.priority}
+                </Badge>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); router.push(`/missions/${mission.id}/edit`); }}>
+                    <Edit className="w-3 h-3" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenModal(mission); }}>
+                    <Eye className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {selectedMission && (
-        <Dialog open={!!selectedMission} onOpenChange={() => setSelectedMission(null)}>
+      {filteredMissions.length === 0 && (
+        <div className="text-center py-10">
+          <p className="text-muted-foreground">Aucune mission trouvée.</p>
+        </div>
+      )}
+
+      <Dialog open={!!selectedMission} onOpenChange={() => setSelectedMission(null)}>
+        {selectedMission && (
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
             <DialogHeader>
               <DialogTitle className="text-2xl">{selectedMission.missionNumber}</DialogTitle>
@@ -268,7 +318,7 @@ export default function MissionsPage() {
 
               <Card>
                 <CardContent className="p-4 grid grid-cols-2 gap-4 text-sm">
-                   <div><span className="font-semibold">Statut:</span> <Badge className={getStatusColor(selectedMission.status)}>{translate('MissionStatus', selectedMission.status)}</Badge></div>
+                   <div><span className="font-semibold">Statut:</span> <Badge className={getStatusColor(selectedMission.status)}>{translate(selectedMission.status)}</Badge></div>
                    <div><span className="font-semibold">Priorité:</span> <Badge className={getPriorityColor(selectedMission.priority)}>{selectedMission.priority}</Badge></div>
                    <div><span className="font-semibold">Date:</span> {formatDate(selectedMission.scheduledDate)}</div>
                    <div><span className="font-semibold">Heure:</span> {formatTime(selectedMission.scheduledDate)}</div>
@@ -286,29 +336,61 @@ export default function MissionsPage() {
                       <DropdownMenuSeparator />
                       {allTeamMembers.filter(tm => tm.user.role === 'TECHNICIAN').map(member => (
                         <DropdownMenuCheckboxItem key={member.id} checked={selectedTeamMemberIds.includes(member.id)} onCheckedChange={(checked) => {
-                          setSelectedTeamMemberIds(prev => checked ? [...prev, member.id] : prev.filter(id => id !== member.id))
+                          setSelectedTeamMemberIds(prev => checked ? [...prev, member.id] : prev.filter(id => id !== member.id));
                         }}>
                           {member.firstName} {member.lastName}
                         </DropdownMenuCheckboxItem>
                       ))}
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onSelect={handleTeamUpdate} disabled={isTeamSaving}>
-                        {isTeamSaving ? 'Sauvegarde...' : 'Sauvegarder l\'équipe'}
-                      </DropdownMenuItem>
+                      <div className="p-2">
+                        <Button size="sm" onClick={updateTeamMembers} disabled={isTeamSaving} className="w-full">
+                          {isTeamSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+                        </Button>
+                      </div>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                    {selectedMission.teamLeader && <div className="flex items-center gap-3"><Avatar><AvatarImage src={selectedMission.teamLeader.image || undefined} /><AvatarFallback><Shield/></AvatarFallback></Avatar><div><p className="font-semibold">{selectedMission.teamLeader.name}</p><p className="text-xs text-muted-foreground">Chef d'équipe</p></div></div>}
-                    {selectedMission.teamMembers.map(member => (
-                       <div key={member.id} className="flex items-center gap-3"><Avatar><AvatarImage src={member.user.image || undefined} /><AvatarFallback><UserIcon/></AvatarFallback></Avatar><div><p>{member.firstName} {member.lastName}</p><p className="text-xs text-muted-foreground">Technicien</p></div></div>
-                    ))}
+                <CardContent className="p-4">
+                  <div className="space-y-2">
+                    {selectedMission.teamMembers.length > 0 ? (
+                      selectedMission.teamMembers.map(member => (
+                        <div key={member.id} className="flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          <span>{member.firstName} {member.lastName}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground">Aucun membre assigné</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Tâches ({selectedMission.tasks.length})</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="space-y-2">
+                    {selectedMission.tasks.length > 0 ? (
+                      selectedMission.tasks.map((task, index) => (
+                        <div key={task.id} className="flex items-center justify-between">
+                          <span className="text-sm">{index + 1}. {task.title}</span>
+                          <Badge className={task.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : task.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}>
+                            {translate(task.status)}
+                          </Badge>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground">Aucune tâche définie</p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
           </DialogContent>
-        </Dialog>
-      )}
+        )}
+      </Dialog>
     </div>
   )
 }
