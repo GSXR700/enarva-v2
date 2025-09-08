@@ -4,7 +4,8 @@ import Pusher from 'pusher';
 import { withErrorHandler } from '@/lib/error-handler';
 import { missionSchema } from '@/lib/validation';
 import { missionService } from '@/services/mission.service';
-import { auth } from '@/lib/auth';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 
 const pusher = new Pusher({
   appId: process.env.PUSHER_APP_ID!,
