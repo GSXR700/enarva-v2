@@ -7,11 +7,17 @@ import { validateLeadInput } from '@/lib/validation';
 import { errorHandler } from '@/lib/error-handler';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { LeadStatus, Prisma } from '@prisma/client';
+import { ExtendedUser } from '@/types/next-auth';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions) as any;
+    const session = await getServerSession(authOptions);
     if (!session?.user) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+    
+    const user = session.user as ExtendedUser;
+    if (!user.id) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
 
@@ -42,8 +48,8 @@ export async function GET(request: NextRequest) {
       where.assignedToId = assignedToId;
     }
 
-    if (session.user.role === 'AGENT' || session.user.role === 'TECHNICIAN') {
-      where.assignedToId = session.user.id;
+    if (user.role === 'AGENT' || user.role === 'TECHNICIAN') {
+      where.assignedToId = user.id;
     }
 
     const skip = (page - 1) * limit;
@@ -82,8 +88,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions) as any;
+    const session = await getServerSession(authOptions);
     if (!session?.user) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+    
+    const user = session.user as ExtendedUser;
+    if (!user.id) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
 
@@ -95,7 +106,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!['ADMIN', 'MANAGER', 'AGENT'].includes(session.user.role)) {
+    if (!['ADMIN', 'MANAGER', 'AGENT'].includes(user.role)) {
       return NextResponse.json({ error: 'Permissions insuffisantes' }, { status: 403 });
     }
 
@@ -117,13 +128,13 @@ export async function POST(request: NextRequest) {
       ...validation.data,
       score,
       originalMessage: validation.data.originalMessage || 'Lead créé depuis l\'interface',
-      createdById: session.user.id
+      createdById: user.id
     };
 
     // Remove createdById from leadData as it's not part of Prisma schema
     const { createdById, ...prismaLeadData } = leadData;
 
-    const newLead = await leadService.createLead(prismaLeadData, session.user.id);
+    const newLead = await leadService.createLead(prismaLeadData, user.id);
 
     // Optional: Trigger Pusher notification if configured
     if (process.env.PUSHER_APP_ID) {

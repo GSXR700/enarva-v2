@@ -1,13 +1,19 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { auth } from '@/auth';
+import { ExtendedUser } from '@/types/next-auth';
 
 const prisma = new PrismaClient();
 
 export async function GET() {
   try {
     const session = await auth();
-    if (!session?.user?.id) {
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    const user = session.user as ExtendedUser;
+    if (!user.id) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 

@@ -6,14 +6,20 @@ import { leadService } from '@/services/lead.service';
 import { validateLeadInput } from '@/lib/validation';
 import { errorHandler } from '@/lib/error-handler';
 import { LeadStatus } from '@prisma/client';
+import { ExtendedUser } from '@/types/next-auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions) as any;
+    const session = await getServerSession(authOptions);
     if (!session?.user) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+    
+    const user = session.user as ExtendedUser;
+    if (!user.id) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
 
@@ -48,9 +54,9 @@ export async function GET(
     }
 
     if (
-      session.user.role !== 'ADMIN' && 
-      session.user.role !== 'MANAGER' && 
-      lead.assignedToId !== session.user.id
+      user.role !== 'ADMIN' && 
+      user.role !== 'MANAGER' && 
+      lead.assignedToId !== user.id
     ) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
     }
@@ -66,8 +72,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions) as any;
+    const session = await getServerSession(authOptions);
     if (!session?.user) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+    
+    const user = session.user as ExtendedUser;
+    if (!user.id) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
 
@@ -80,9 +91,9 @@ export async function PATCH(
     }
 
     const canEdit = (
-      session.user.role === 'ADMIN' ||
-      session.user.role === 'MANAGER' ||
-      (session.user.role === 'AGENT' && existingLead.assignedToId === session.user.id)
+      user.role === 'ADMIN' ||
+      user.role === 'MANAGER' ||
+      (user.role === 'AGENT' && existingLead.assignedToId === user.id)
     );
 
     if (!canEdit) {
@@ -121,7 +132,7 @@ export async function PATCH(
         title: 'Statut modifié',
         description: `Statut changé de ${existingLead.status} vers ${body.status}`,
         leadId: leadId,
-        userId: session.user.id,
+        userId: user.id,
         metadata: {
           oldStatus: existingLead.status,
           newStatus: body.status
@@ -137,7 +148,7 @@ export async function PATCH(
           ? `Lead assigné à ${body.assignedToId}`
           : 'Lead non assigné',
         leadId: leadId,
-        userId: session.user.id,
+        userId: user.id,
         metadata: {
           oldAssignee: existingLead.assignedToId,
           newAssignee: body.assignedToId
@@ -157,8 +168,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions) as any;
-    if (!session?.user || (session.user.role !== 'ADMIN' && session.user.role !== 'MANAGER')) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+    
+    const user = session.user as ExtendedUser;
+    if (!user.id) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
+    }
+    
+    if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
       return NextResponse.json({ error: 'Permissions insuffisantes' }, { status: 403 });
     }
 

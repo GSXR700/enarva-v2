@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { ExtendedUser } from '@/types/next-auth';
 
 const prisma = new PrismaClient();
 
@@ -40,7 +41,12 @@ export async function PATCH(
 ) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session?.user?.id) {
+        if (!session?.user) {
+            return new NextResponse('Unauthorized', { status: 401 });
+        }
+        
+        const user = session.user as ExtendedUser;
+        if (!user.id) {
             return new NextResponse('Unauthorized', { status: 401 });
         }
 
@@ -98,12 +104,12 @@ export async function PATCH(
                     break;
 
                 case 'VALIDATED':
-                    updateData.validatedBy = session.user.id;
+                    updateData.validatedBy = user.id;
                     updateData.validatedAt = new Date();
                     break;
 
                 case 'REJECTED':
-                    updateData.validatedBy = session.user.id;
+                    updateData.validatedBy = user.id;
                     updateData.validatedAt = new Date();
                     // Reset completion data when rejected
                     updateData.completedAt = null;
@@ -139,7 +145,7 @@ export async function PATCH(
                 type: 'MISSION_STARTED', // You might want to add more specific activity types
                 title: `Tâche ${body.status === 'COMPLETED' ? 'terminée' : 'mise à jour'}`,
                 description: `Tâche "${currentTask.title}" - ${body.status}`,
-                userId: session.user.id,
+                userId: user.id,
                 leadId: currentTask.mission.leadId,
             },
         });

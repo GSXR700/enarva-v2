@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { auth } from '@/lib/auth';
 import Pusher from 'pusher';
+import { ExtendedUser } from '@/types/next-auth';
 
 const prisma = new PrismaClient();
 
@@ -19,11 +20,16 @@ export async function POST(
 ) {
   try {
     const session = await auth();
-    if (!session?.user?.id) {
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+    
+    const user = session.user as ExtendedUser;
+    if (!user.id) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    if (!['ADMIN', 'MANAGER'].includes(session.user.role || '')) {
+    if (!['ADMIN', 'MANAGER'].includes(user.role || '')) {
       return new NextResponse('Forbidden - Admin access required', { status: 403 });
     }
 
@@ -67,21 +73,21 @@ export async function POST(
         ...updateData,
         status: 'COMPLETED',
         adminValidated: true,
-        adminValidatedBy: session.user.id,
+        adminValidatedBy: user.id,
         adminValidatedAt: new Date(),
         adminNotes: adminNotes || null,
         qualityScore: qualityScore || null,
         actualEndTime: mission.actualEndTime || new Date()
       };
 
-      console.log('✅ Mission approved by admin:', session.user.name);
+      console.log('✅ Mission approved by admin:', user.name);
 
     } else {
       updateData = {
         ...updateData,
         status: correctionNeeded ? 'IN_PROGRESS' : 'QUALITY_CHECK',
         adminValidated: false,
-        adminValidatedBy: session.user.id,
+        adminValidatedBy: user.id,
         adminValidatedAt: new Date(),
         adminNotes: adminNotes || null,
         qualityScore: qualityScore || null,
@@ -102,7 +108,7 @@ export async function POST(
         });
       }
 
-      console.log('❌ Mission rejected by admin:', session.user.name);
+      console.log('❌ Mission rejected by admin:', user.name);
     }
 
     const updatedMission = await prisma.mission.update({
@@ -122,7 +128,7 @@ export async function POST(
         description: approved 
           ? `Mission ${mission.missionNumber} approuvée avec score ${qualityScore}/5`
           : `Mission ${mission.missionNumber} rejetée - ${issuesFound}`,
-        userId: session.user.id,
+        userId: user.id,
         leadId: mission.leadId,
       },
     });
