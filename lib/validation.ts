@@ -80,6 +80,7 @@ export function validateLeadInput(data: any) {
 }
 
 // Mission validation schema
+// Mission validation schema
 export const missionSchema = z.object({
   missionNumber: z.string().min(1, 'Numéro de mission requis'),
   status: z.enum(['SCHEDULED', 'IN_PROGRESS', 'QUALITY_CHECK', 'CLIENT_VALIDATION', 'COMPLETED', 'CANCELLED']),
@@ -93,7 +94,11 @@ export const missionSchema = z.object({
   teamLeaderId: z.string().optional(),
   leadId: z.string().min(1, 'Lead ID requis'),
   quoteId: z.string().optional(),
+  taskTemplateId: z.string().optional(), // Add this if your service expects it
 });
+
+// Add this line:
+export type CreateMissionInput = z.infer<typeof missionSchema>;
 
 export function validateMissionInput(data: any) {
   return missionSchema.safeParse(data);
