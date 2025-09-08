@@ -63,6 +63,7 @@ export default function EditMissionPage() {
 
     } catch (error) {
       toast.error("Erreur lors du chargement des données.");
+      console.error(error);
     } finally {
       setIsLoading(false);
     }
@@ -72,171 +73,222 @@ export default function EditMissionPage() {
     fetchData();
   }, [fetchData]);
 
-  const handleMissionChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target;
-    setMission(prev => ({ ...prev, [id]: value }));
+  const handleInputChange = (field: keyof Mission, value: any) => {
+    setMission(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSelectChange = (id: keyof Mission, value: string) => {
-    setMission(prev => ({ ...prev, [id]: value }));
-  };
-  
-  const handleTaskChange = (index: number, field: keyof Task, value: string) => {
-    const newTasks = [...tasks];
-    // @ts-ignore
-    newTasks[index][field] = value;
-    setTasks(newTasks);
+  const handleTaskChange = (index: number, field: keyof Task, value: any) => {
+    setTasks(prev => 
+      prev.map((task, i) => 
+        i === index ? { ...task, [field]: value } : task
+      )
+    );
   };
 
   const addTask = () => {
-    setTasks(prev => [...prev, { title: '', category: 'LIVING_SPACES', status: 'ASSIGNED' }]);
+    setTasks(prev => [...prev, {
+      title: '',
+      category: 'EXTERIOR_FACADE' as TaskCategory,
+      status: 'ASSIGNED' as const,
+      missionId,
+    }]);
   };
 
   const removeTask = (index: number) => {
     setTasks(prev => prev.filter((_, i) => i !== index));
   };
-  
-  const applyTemplate = (templateId: string) => {
+
+  const applyTaskTemplate = (templateId: string) => {
     const template = taskTemplates.find(t => t.id === templateId);
     if (template) {
-        setTasks(template.items.map(item => ({ title: item.title, category: item.category, status: 'ASSIGNED' })));
-        toast.success(`Modèle "${template.name}" appliqué !`);
+      setTasks(prev => [...prev, ...template.items.map(item => ({ ...item, missionId }))]);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    
-    try {
-        const body = {
-            ...mission,
-            tasks: tasks.map(({id, ...task}) => task), // Send tasks without IDs for recreation
-            teamMemberIds: mission.teamMembers?.map(tm => tm.id)
-        }
-        
-        const response = await fetch(`/api/missions/${missionId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
 
-        if (!response.ok) throw new Error("Échec de la mise à jour de la mission.");
-        
-        toast.success("Mission mise à jour avec succès !");
-        router.push('/missions');
-        router.refresh();
-    } catch (err: any) {
-        toast.error(err.message);
+    try {
+      const submissionData = {
+        ...mission,
+        tasks: tasks.filter(task => task.title?.trim()),
+      };
+
+      const response = await fetch(`/api/missions/${missionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submissionData),
+      });
+
+      if (!response.ok) throw new Error('Échec de la mise à jour');
+      
+      toast.success("Mission mise à jour avec succès !");
+      router.push('/missions');
+    } catch (error) {
+      toast.error("Erreur lors de la mise à jour.");
+      console.error(error);
     } finally {
-        setIsSaving(false);
+      setIsSaving(false);
     }
   };
 
   if (isLoading) {
-    return <TableSkeleton title="Chargement de la mission..." />;
+    return (
+      <div className="main-content space-y-6">
+        <div className="text-center py-10">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Chargement de la mission...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="main-content space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/missions"><Button variant="outline" size="icon"><ArrowLeft className="w-4 h-4" /></Button></Link>
+        <Link href="/missions">
+          <Button variant="outline" size="icon">
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+        </Link>
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Modifier la Mission</h1>
-          <p className="text-muted-foreground mt-1">{mission.missionNumber}</p>
+          <h1 className="text-2xl font-bold">Modifier Mission</h1>
+          <p className="text-muted-foreground">Mission #{mission.missionNumber}</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
-            <CardHeader><CardTitle>Informations Générales</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div><Label>Date et Heure</Label><Input type="datetime-local" id="scheduledDate" value={mission.scheduledDate ? new Date(mission.scheduledDate).toISOString().substring(0, 16) : ''} onChange={handleMissionChange} /></div>
-                <div><Label>Durée Estimée (heures)</Label><Input type="number" id="estimatedDuration" value={mission.estimatedDuration} onChange={handleMissionChange} /></div>
-                <div className="md:col-span-2"><Label>Adresse</Label><Input id="address" value={mission.address} onChange={handleMissionChange} /></div>
-                <div><Label>Coordonnées GPS</Label><Input id="coordinates" value={mission.coordinates || ''} onChange={handleMissionChange} /></div>
-                <div><Label>Priorité</Label><Select value={mission.priority || ''} onValueChange={(v) => handleSelectChange('priority', v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="LOW">Faible</SelectItem><SelectItem value="NORMAL">Normale</SelectItem><SelectItem value="HIGH">Élevée</SelectItem><SelectItem value="CRITICAL">Critique</SelectItem></SelectContent></Select></div>
-                <div><Label>Statut</Label><Select value={mission.status || ''} onValueChange={(v) => handleSelectChange('status', v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="SCHEDULED">Planifiée</SelectItem><SelectItem value="IN_PROGRESS">En cours</SelectItem><SelectItem value="COMPLETED">Terminée</SelectItem><SelectItem value="CANCELLED">Annulée</SelectItem></SelectContent></Select></div>
-                <div className="md:col-span-2"><Label>Notes d'accès</Label><Textarea id="accessNotes" value={mission.accessNotes || ''} onChange={handleMissionChange} /></div>
-            </CardContent>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Détails de la Mission
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="missionNumber">Numéro de mission</Label>
+              <Input
+                id="missionNumber"
+                value={mission.missionNumber || ''}
+                onChange={(e) => handleInputChange('missionNumber', e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="status">Statut</Label>
+              <Select value={mission.status || ''} onValueChange={(v) => handleInputChange('status', v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un statut" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SCHEDULED">Planifiée</SelectItem>
+                  <SelectItem value="IN_PROGRESS">En cours</SelectItem>
+                  <SelectItem value="QUALITY_CHECK">Contrôle Qualité</SelectItem>
+                  <SelectItem value="CLIENT_VALIDATION">Validation Client</SelectItem>
+                  <SelectItem value="COMPLETED">Terminée</SelectItem>
+                  <SelectItem value="CANCELLED">Annulée</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="scheduledDate">Date prévue</Label>
+              <Input
+                id="scheduledDate"
+                type="datetime-local"
+                value={mission.scheduledDate ? new Date(mission.scheduledDate).toISOString().slice(0, 16) : ''}
+                onChange={(e) => handleInputChange('scheduledDate', e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="teamLeaderId">Chef d'équipe</Label>
+              <Select value={mission.teamLeaderId || ''} onValueChange={(v) => handleInputChange('teamLeaderId', v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un chef d'équipe" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamLeaders.map(leader => (
+                    <SelectItem key={leader.id} value={leader.id}>
+                      {leader.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
         </Card>
-        
+
         <Card>
-            <CardHeader><CardTitle>Équipe Assignée</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div><Label>Chef d'équipe</Label><Select value={mission.teamLeaderId || ''} onValueChange={(v) => handleSelectChange('teamLeaderId', v)}><SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger><SelectContent>{teamLeaders.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent></Select></div>
-                <div><Label>Membres d'équipe</Label>
-                    <Select value={mission.teamMembers?.map(tm => tm.id).join(',')} onValueChange={(v) => setMission(prev => ({...prev, teamMembers: v.split(',').map(id => allTeamMembers.find(m => m.id === id)).filter(Boolean) as TeamMember[]}))}>
-                         <SelectTrigger><SelectValue placeholder="Ajouter des membres..." /></SelectTrigger>
-                         <SelectContent>
-                             {allTeamMembers.map(member => (
-                                <SelectItem key={member.id} value={member.id}>{member.firstName} {member.lastName}</SelectItem>
-                             ))}
-                         </SelectContent>
-                    </Select>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                        {mission.teamMembers?.map(tm => <Badge key={tm.id}>{tm.firstName}</Badge>)}
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-        
-        <Card>
-            <CardHeader className="flex-row items-center justify-between">
-                <CardTitle>Tâches de la Mission</CardTitle>
-                <Select onValueChange={applyTemplate}><SelectTrigger className="w-64"><SelectValue placeholder="Appliquer un modèle..." /></SelectTrigger><SelectContent>{taskTemplates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>
-            </CardHeader>
-            <CardContent className="space-y-3">
-                 {tasks.map((task, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                        <Input placeholder="Titre de la tâche" value={task.title || ''} onChange={(e) => handleTaskChange(index, 'title', e.target.value)} required/>
-                        <Select value={task.category} onValueChange={(v) => handleTaskChange(index, 'category', v)}><SelectTrigger className="w-56"><SelectValue /></SelectTrigger><SelectContent>{Object.values(TaskCategory).map(cat => <SelectItem key={cat} value={cat}>{translate('TaskCategory', cat)}</SelectItem>)}</SelectContent></Select>
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeTask(index)}><Trash2 className="w-4 h-4 text-red-500"/></Button>
-                    </div>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ListChecks className="w-5 h-5" />
+              Tâches
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {taskTemplates.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                <span className="text-sm font-medium">Modèles :</span>
+                {taskTemplates.map(template => (
+                  <Button
+                    key={template.id}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => applyTaskTemplate(template.id)}
+                  >
+                    {template.name}
+                  </Button>
                 ))}
-                <Button type="button" variant="outline" onClick={addTask} className="w-full mt-2"><Plus className="w-4 h-4 mr-2"/>Ajouter une tâche</Button>
-            </CardContent>
+              </div>
+            )}
+
+            {tasks.map((task, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <Input
+                  placeholder="Titre de la tâche"
+                  value={task.title || ''}
+                  onChange={(e) => handleTaskChange(index, 'title', e.target.value)}
+                  required
+                />
+                <Select value={task.category || ''} onValueChange={(v) => handleTaskChange(index, 'category', v)}>
+                  <SelectTrigger className="w-56">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(TaskCategory).map(cat => (
+                      <SelectItem key={cat} value={cat}>
+                        {translate(cat)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button type="button" variant="ghost" size="icon" onClick={() => removeTask(index)}>
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </Button>
+              </div>
+            ))}
+
+            <Button type="button" variant="outline" onClick={addTask}>
+              <Plus className="w-4 h-4 mr-2" />
+              Ajouter une tâche
+            </Button>
+          </CardContent>
         </Card>
 
-        <Card>
-            <CardHeader><CardTitle>Feedback & Validation</CardTitle></CardHeader>
-            <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <Label htmlFor="clientFeedback">Feedback Client</Label>
-                        <Textarea id="clientFeedback" value={mission.clientFeedback || ''} onChange={handleMissionChange} />
-                    </div>
-                    <div>
-                        <Label htmlFor="clientRating">Note Client (1-5)</Label>
-                        <Input id="clientRating" type="number" min="1" max="5" value={mission.clientRating || ''} onChange={handleMissionChange} />
-                    </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Checkbox 
-                        id="clientValidated" 
-                        checked={mission.clientValidated || false} 
-                        onCheckedChange={(checked) => setMission(prev => ({...prev, clientValidated: !!checked}))}
-                    />
-                    <Label htmlFor="clientValidated">Mission validée par le client</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Checkbox 
-                        id="invoiceGenerated" 
-                        checked={mission.invoiceGenerated || false}
-                        onCheckedChange={(checked) => setMission(prev => ({...prev, invoiceGenerated: !!checked}))}
-                    />
-                    <Label htmlFor="invoiceGenerated">Facture générée</Label>
-                </div>
-            </CardContent>
-        </Card>
-
-        <div className="flex justify-end mt-6">
-          <Button type="submit" className="bg-enarva-gradient rounded-lg px-8" disabled={isSaving}>
-            <Save className="w-4 h-4 mr-2" />
-            {isSaving ? 'Sauvegarde...' : 'Sauvegarder les modifications'}
+        <div className="flex gap-4">
+          <Button type="submit" disabled={isSaving}>
+            {isSaving ? "Sauvegarde..." : "Sauvegarder"}
+            <Save className="w-4 h-4 ml-2" />
           </Button>
+          <Link href="/missions">
+            <Button type="button" variant="outline">
+              Annuler
+            </Button>
+          </Link>
         </div>
       </form>
     </div>
-  )
+  );
 }
