@@ -1,6 +1,8 @@
-// components/ui/badge.tsx
+// components/ui/badge.tsx - FIXED
+
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
+
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
@@ -14,6 +16,9 @@ const badgeVariants = cva(
           "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
+        // Add the 'success' variant
+        success:
+          "border-transparent bg-emerald-500 text-white hover:bg-emerald-500/80",
         outline: "text-foreground",
       },
     },
@@ -24,13 +29,12 @@ const badgeVariants = cva(
 )
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLSpanElement>, // Changed from HTMLDivElement
+  extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
 function Badge({ className, variant, ...props }: BadgeProps) {
-  // Changed from <div> to <span>
   return (
-    <span className={cn(badgeVariants({ variant }), className)} {...props} />
+    <div className={cn(badgeVariants({ variant }), className)} {...props} />
   )
 }
 
