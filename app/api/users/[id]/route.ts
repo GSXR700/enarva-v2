@@ -1,134 +1,158 @@
 // app/api/users/[id]/route.ts
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { ExtendedUser } from '@/types/next-auth';
-import bcrypt from 'bcryptjs';
+import { NextResponse } from 'next/server'
+import { PrismaClient, UserRole } from '@prisma/client'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient()
 
-export async function GET(
+// PUT /api/users/[id] - Update a user
+export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return new NextResponse('Unauthorized', { status: 401 });
-    }
-
-    const { id } = await params;
-    const user = await prisma.user.findUnique({ 
-        where: { id },
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-            role: true,
-            onlineStatus: true,
-            lastSeen: true,
-            createdAt: true,
-            updatedAt: true,
-            teamMember: {
-                include: {
-                    missions: true,
-                    tasks: true
-                }
-            },
-            leads: true,
-            missions: true,
-            activities: true,
-            expenses: true
-        }
-    });
+    const session = await getServerSession(authOptions)
     
-    if (!user) return new NextResponse('User not found', { status: 404 });
-    return NextResponse.json(user);
-  } catch (error) {
-    console.error('Failed to fetch user:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
-  }
-}
-
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return new NextResponse('Unauthorized', { status: 401 });
+    if (!session || session.user.role !== 'ADMIN') {
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    const currentUser = session.user as ExtendedUser;
-    const { id } = await params;
-    const body = await request.json();
-    
-    if (currentUser.role !== 'ADMIN' && currentUser.id !== id) {
-      return new NextResponse('Forbidden', { status: 403 });
+    const { id } = await params
+    const body = await request.json()
+    const { name, email, role } = body
+
+    if (!name || !email || !role) {
+      return NextResponse.json(
+        { message: 'Nom, email et rôle sont requis' }, 
+        { status: 400 }
+      )
     }
 
-    const { password, ...updateData } = body;
-    
-    if (password) {
-      const hashedPassword = await bcrypt.hash(password, 12);
-      updateData.password = hashedPassword;
+    // Check if email is already taken by another user
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email,
+        NOT: { id }
+      }
+    })
+
+    if (existingUser) {
+      return NextResponse.json(
+        { message: 'Cet email est déjà utilisé par un autre utilisateur' }, 
+        { status: 400 }
+      )
     }
 
+    // Update user
     const updatedUser = await prisma.user.update({
       where: { id },
-      data: updateData,
+      data: {
+        name,
+        email,
+        role: role as UserRole,
+        updatedAt: new Date()
+      },
       select: {
         id: true,
         name: true,
         email: true,
-        image: true,
         role: true,
+        image: true,
         onlineStatus: true,
         lastSeen: true,
         createdAt: true,
         updatedAt: true
       }
-    });
+    })
+
+    return NextResponse.json(updatedUser)
+  } catch (error: any) {
+    console.error('Failed to update user:', error)
     
-    return NextResponse.json(updatedUser);
-  } catch (error) {
-    console.error('Failed to update user:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    if (error?.code === 'P2025') {
+      return NextResponse.json(
+        { message: 'Utilisateur non trouvé' }, 
+        { status: 404 }
+      )
+    }
+
+    return new NextResponse('Internal Server Error', { status: 500 })
   }
 }
 
+// DELETE /api/users/[id] - Delete a user
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return new NextResponse('Unauthorized', { status: 401 });
-    }
-
-    const currentUser = session.user as ExtendedUser;
-    if (currentUser.role !== 'ADMIN') {
-      return new NextResponse('Forbidden', { status: 403 });
-    }
-
-    const { id } = await params;
+    const session = await getServerSession(authOptions)
     
-    if (currentUser.id === id) {
-      return new NextResponse('Cannot delete your own account', { status: 400 });
+    if (!session || session.user.role !== 'ADMIN') {
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    await prisma.$transaction([
-      prisma.teamMember.deleteMany({ where: { userId: id } }),
-      prisma.user.delete({ where: { id } })
-    ]);
+    const { id } = await params
+
+    // Prevent admin from deleting themselves
+    if (session.user.id === id) {
+      return NextResponse.json(
+        { message: 'Vous ne pouvez pas supprimer votre propre compte' }, 
+        { status: 400 }
+      )
+    }
+
+    // Check if user exists and get their details
+    const userToDelete = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        leads: true,
+        missions: true,
+        activities: true,
+        expenses: true
+      }
+    })
+
+    if (!userToDelete) {
+      return NextResponse.json(
+        { message: 'Utilisateur non trouvé' }, 
+        { status: 404 }
+      )
+    }
+
+    // Check if user has associated data that would prevent deletion
+    const hasAssociatedData = 
+      userToDelete.leads.length > 0 || 
+      userToDelete.missions.length > 0 || 
+      userToDelete.activities.length > 0 || 
+      userToDelete.expenses.length > 0
+
+    if (hasAssociatedData) {
+      return NextResponse.json(
+        { 
+          message: 'Impossible de supprimer cet utilisateur car il a des données associées (leads, missions, activités ou dépenses)' 
+        }, 
+        { status: 400 }
+      )
+    }
+
+    // Delete the user
+    await prisma.user.delete({
+      where: { id }
+    })
+
+    return new NextResponse(null, { status: 204 })
+  } catch (error: any) {
+    console.error('Failed to delete user:', error)
     
-    return new NextResponse(null, { status: 204 });
-  } catch (error) {
-    console.error('Failed to delete user:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    if (error?.code === 'P2025') {
+      return NextResponse.json(
+        { message: 'Utilisateur non trouvé' }, 
+        { status: 404 }
+      )
+    }
+
+    return new NextResponse('Internal Server Error', { status: 500 })
   }
 }
