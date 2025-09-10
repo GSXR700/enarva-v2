@@ -1,3 +1,4 @@
+// app/api/team-members/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
@@ -5,10 +6,11 @@ const prisma = new PrismaClient();
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // ✅ Await params for Next.js 15
+    
     const teamMember = await prisma.teamMember.findUnique({
       where: { id },
       include: {
@@ -38,10 +40,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // ✅ Await params for Next.js 15
     const body = await request.json();
     const { email, role, name, ...teamMemberData } = body;
 
@@ -77,10 +79,11 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // ✅ Await params for Next.js 15
+    
     const teamMember = await prisma.teamMember.findUnique({ where: { id } });
 
     if (!teamMember) {
