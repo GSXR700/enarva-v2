@@ -6,10 +6,15 @@ import { authOptions } from '@/lib/auth'
 
 const prisma = new PrismaClient()
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: Request, 
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params
+    
     const inventoryUsage = await prisma.inventoryUsage.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         inventory: true,
         mission: {
@@ -31,11 +36,16 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: Request, 
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params
+    
     // Get usage details before deletion to restore stock
     const usage = await prisma.inventoryUsage.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { inventory: true }
     })
 
@@ -47,7 +57,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     await prisma.$transaction(async (tx) => {
       // Delete usage record
       await tx.inventoryUsage.delete({
-        where: { id: params.id }
+        where: { id }
       })
 
       // Restore inventory stock
