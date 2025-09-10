@@ -103,7 +103,6 @@ export async function POST(
           },
           data: {
             status: 'ASSIGNED',
-            validatedBy: null,
             validatedAt: null
           }
         });
