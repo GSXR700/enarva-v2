@@ -15,6 +15,7 @@ import { TableSkeleton } from '@/components/skeletons/TableSkeleton'
 
 type QualityCheckWithDetails = QualityCheck & {
   mission: Mission & { lead: Lead };
+  score: number | null;
 };
 
 export default function QualityChecksPage() {
