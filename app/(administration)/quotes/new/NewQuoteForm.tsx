@@ -1,93 +1,210 @@
+// app/(administration)/quotes/new/NewQuoteForm.tsx
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import { 
-  ArrowLeft, User, Plus, Trash2, Settings, Eye, Save
-} from 'lucide-react'
-import { formatCurrency, generateQuote, ServiceInput, QuoteLineItem, ServiceType } from '@/lib/utils'
-import { Lead, QuoteType } from '@prisma/client'
+import { Search, Plus, Minus, Package, Wrench, User, Calendar, Save } from 'lucide-react'
 import { toast } from 'sonner'
+import { formatCurrency, generateQuote, ServiceInput } from '@/lib/utils'
 
-type ServiceInputState = ServiceInput & { id: number };
+interface Lead {
+  id: string
+  firstName: string
+  lastName: string
+  company?: string
+  email?: string
+  phone: string
+  leadType: string
+  address?: string
+  propertyType?: string
+  status: string
+  displayName: string
+  typeLabel: string
+}
 
-export default function NewQuoteForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [quoteType, setQuoteType] = useState<QuoteType>('STANDARD');
-  const [expiresAt, setExpiresAt] = useState(() => {
-    const date = new Date();
-    date.setDate(date.getDate() + 30);
-    return date.toISOString().split('T')[0];
-  });
+interface ProductItem {
+  id: string
+  name: string
+  qty: number
+  unitPrice: number
+  description?: string
+  reference?: string
+}
 
+interface LineItem {
+  id: string
+  description: string
+  detail?: string
+  amount: number
+  editable: boolean
+}
+
+type ServiceInputState = ServiceInput & { id: number }
+type QuoteBusinessType = 'SERVICE' | 'PRODUCT'
+
+const NewQuoteForm = () => {
+  const router = useRouter()
+  
+  // Core form state
+  const [businessType, setBusinessType] = useState<QuoteBusinessType>('SERVICE')
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [newClientName, setNewClientName] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<Lead[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [searchTimeoutId, setSearchTimeoutId] = useState<NodeJS.Timeout | null>(null)
+
+  // Service-specific state
   const [services, setServices] = useState<ServiceInputState[]>([
-      { id: Date.now(), type: 'GrandMénage', surface: 100, levels: 1, distance: 10, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }
-  ]);
+    { id: Date.now(), type: 'GrandMénage', surface: 50, levels: 1, distance: 5, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }
+  ])
+  const [quoteType, setQuoteType] = useState<'EXPRESS' | 'STANDARD' | 'PREMIUM'>('STANDARD')
+  const [editableLineItems, setEditableLineItems] = useState<LineItem[]>([])
 
-  const [editableLineItems, setEditableLineItems] = useState<QuoteLineItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeStep, setActiveStep] = useState(1);
+  // Product-specific state
+  const [productCategory, setProductCategory] = useState<string>('')
+  const [productItems, setProductItems] = useState<ProductItem[]>([
+    { id: '1', name: '', qty: 1, unitPrice: 0, description: '', reference: '' }
+  ])
+  const [deliveryType, setDeliveryType] = useState<string>('STANDARD_DELIVERY')
+  const [deliveryAddress, setDeliveryAddress] = useState('')
+  const [deliveryNotes, setDeliveryNotes] = useState('')
 
-  useEffect(() => {
-    const fetchLeads = async () => {
-      try {
-        const response = await fetch('/api/leads');
-        if (!response.ok) throw new Error("Impossible de charger les leads.");
-        const responseData = await response.json();
-        const leadsData = responseData.data || [];
-        
-        setLeads(leadsData);
-        const leadId = searchParams.get('leadId');
-        if (leadId) {
-          const lead = leadsData.find((l: Lead) => l.id === leadId);
-          if(lead) setSelectedLead(lead);
-        }
-      } catch (error) {
-        toast.error("Erreur lors du chargement des leads.");
+  // Common quote state
+  const [expiresAt, setExpiresAt] = useState(
+    new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]
+  )
+
+  // Manual debounced search function
+  const performSearch = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setSearchResults([])
+      setShowSearchResults(false)
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const response = await fetch(`/api/leads/search?q=${encodeURIComponent(query)}`)
+      if (response.ok) {
+        const results = await response.json()
+        setSearchResults(results)
+        setShowSearchResults(true)
       }
-    };
-    fetchLeads();
-  }, [searchParams]);
+    } catch (error) {
+      console.error('Erreur de recherche:', error)
+    } finally {
+      setIsSearching(false)
+    }
+  }, [])
 
-  const quoteCalculation = useMemo(() => {
-    return generateQuote(services);
-  }, [services]);
+  // Handle search input changes with manual debouncing
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    
+    // Clear existing timeout
+    if (searchTimeoutId) {
+      clearTimeout(searchTimeoutId)
+    }
+    
+    // Set new timeout for search
+    const timeoutId = setTimeout(() => {
+      performSearch(value)
+    }, 300)
+    
+    setSearchTimeoutId(timeoutId)
+  }
 
+  // Cleanup timeout on unmount
   useEffect(() => {
-    setEditableLineItems(quoteCalculation.lineItems);
-  }, [quoteCalculation]);
+    return () => {
+      if (searchTimeoutId) {
+        clearTimeout(searchTimeoutId)
+      }
+    }
+  }, [searchTimeoutId])
 
+  // Calculate quote for services
+  const serviceQuoteCalculation = useMemo(() => {
+    if (businessType === 'SERVICE') {
+      return generateQuote(services)
+    }
+    return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 }
+  }, [services, businessType])
+
+  // Calculate quote for products
+  const productQuoteCalculation = useMemo(() => {
+    if (businessType === 'PRODUCT') {
+      const subTotalHT = productItems.reduce((acc, item) => acc + (item.qty * item.unitPrice), 0)
+      const vatAmount = subTotalHT * 0.20
+      let totalTTC = subTotalHT + vatAmount
+      if (totalTTC < 500) totalTTC = 500 // Minimum quote amount
+      const finalPrice = Math.round(totalTTC / 10) * 10
+
+      const lineItems: LineItem[] = productItems
+        .filter(item => item.name && item.qty > 0 && item.unitPrice > 0)
+        .map(item => ({
+          id: item.id,
+          description: item.name,
+          detail: `${item.qty} × ${formatCurrency(item.unitPrice)} MAD${item.reference ? ` (Réf: ${item.reference})` : ''}`,
+          amount: item.qty * item.unitPrice,
+          editable: true
+        }))
+
+      return { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice }
+    }
+    return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 }
+  }, [productItems, businessType])
+
+  // Update editable line items when calculations change
+  useEffect(() => {
+    if (businessType === 'SERVICE') {
+      setEditableLineItems(serviceQuoteCalculation.lineItems)
+    } else {
+      setEditableLineItems(productQuoteCalculation.lineItems)
+    }
+  }, [serviceQuoteCalculation, productQuoteCalculation, businessType])
+
+  // Final quote calculation
+  const finalQuote = useMemo(() => {
+    const subTotalHT = editableLineItems.reduce((acc, item) => acc + item.amount, 0)
+    const vatAmount = subTotalHT * 0.20
+    let totalTTC = subTotalHT + vatAmount
+    if (totalTTC < 500) totalTTC = 500
+    const finalPrice = Math.round(totalTTC / 10) * 10
+    return { lineItems: editableLineItems, subTotalHT, vatAmount, totalTTC, finalPrice }
+  }, [editableLineItems])
+
+  // Handle client selection
+  const handleSelectLead = (lead: Lead) => {
+    setSelectedLead(lead)
+    setSearchQuery(lead.displayName)
+    setNewClientName('')
+    setShowSearchResults(false)
+  }
+
+  const handleNewClient = () => {
+    setSelectedLead(null)
+    setNewClientName(searchQuery)
+    setShowSearchResults(false)
+  }
+
+  // Service handlers
   const handleServiceChange = (id: number, field: keyof ServiceInputState, value: string | number) => {
     setServices(currentServices =>
       currentServices.map(s => s.id === id ? { ...s, [field]: value } : s)
-    );
-  };
-
-  const handleLineItemChange = (id: string, newAmount: number) => {
-    setEditableLineItems(currentItems =>
-        currentItems.map(item => item.id === id ? { ...item, amount: newAmount } : item)
-    );
-  };
-
-  const finalQuote = useMemo(() => {
-    const subTotalHT = editableLineItems.reduce((acc, item) => acc + item.amount, 0);
-    const vatAmount = subTotalHT * 0.20;
-    let totalTTC = subTotalHT + vatAmount;
-    if (totalTTC < 500) totalTTC = 500;
-    const finalPrice = Math.round(totalTTC / 10) * 10;
-    return { lineItems: editableLineItems, subTotalHT, vatAmount, totalTTC, finalPrice };
-  }, [editableLineItems]);
+    )
+  }
 
   const addService = () => {
     setServices([...services, { 
@@ -99,458 +216,637 @@ export default function NewQuoteForm() {
       etage: 'RDC', 
       delai: 'STANDARD', 
       difficulte: 'STANDARD' 
-    }]);
-  };
+    }])
+  }
 
   const removeService = (id: number) => {
-    setServices(services.filter(s => s.id !== id));
-  };
+    setServices(services.filter(s => s.id !== id))
+  }
 
+  // Product handlers
+  const handleProductChange = (id: string, field: keyof ProductItem, value: string | number) => {
+    setProductItems(currentItems =>
+      currentItems.map(item => item.id === id ? { ...item, [field]: value } : item)
+    )
+  }
+
+  const addProductItem = () => {
+    setProductItems([...productItems, {
+      id: Date.now().toString(),
+      name: '',
+      qty: 1,
+      unitPrice: 0,
+      description: '',
+      reference: ''
+    }])
+  }
+
+  const removeProductItem = (id: string) => {
+    setProductItems(productItems.filter(item => item.id !== id))
+  }
+
+  // Line item editor
+  const handleLineItemChange = (id: string, newAmount: number) => {
+    setEditableLineItems(currentItems =>
+      currentItems.map(item => item.id === id ? { ...item, amount: newAmount } : item)
+    )
+  }
+
+  // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedLead) {
-      toast.error("Veuillez sélectionner un client.");
-      return;
+    e.preventDefault()
+    
+    if (!selectedLead && !newClientName.trim()) {
+      toast.error("Veuillez sélectionner un client existant ou entrer le nom d'un nouveau client.")
+      return
     }
-    setIsLoading(true);
+
+    if (finalQuote.lineItems.length === 0) {
+      toast.error("Veuillez ajouter au moins un élément au devis.")
+      return
+    }
+
+    setIsLoading(true)
 
     try {
-        const response = await fetch('/api/quotes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                leadId: selectedLead.id,
-                quoteNumber: `DV-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
-                ...finalQuote,
-                expiresAt: expiresAt,
-                type: quoteType,
-                surface: services.reduce((acc, s) => acc + s.surface * s.levels, 0),
-                levels: services.reduce((acc, s) => Math.max(acc, s.levels), 1),
-                propertyType: selectedLead.propertyType
-            }),
-        });
+      const quotePayload: any = {
+        quoteNumber: `DV-${businessType.substring(0, 3)}-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
+        businessType,
+        ...finalQuote,
+        expiresAt,
+      }
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Échec de la création du devis.');
+      // Add client info
+      if (selectedLead) {
+        quotePayload.leadId = selectedLead.id
+      } else {
+        quotePayload.newClientName = newClientName.trim()
+      }
+
+      // Add type-specific data
+      if (businessType === 'SERVICE') {
+        quotePayload.type = quoteType
+        quotePayload.surface = services.reduce((acc, s) => acc + s.surface * s.levels, 0)
+        quotePayload.levels = services.reduce((acc, s) => Math.max(acc, s.levels), 1)
+        quotePayload.propertyType = selectedLead?.propertyType || 'OTHER'
+      } else {
+        quotePayload.productCategory = productCategory
+        quotePayload.productDetails = {
+          items: productItems.filter(item => item.name && item.qty > 0),
+          delivery: {
+            type: deliveryType,
+            address: deliveryAddress,
+            notes: deliveryNotes
+          }
         }
+        quotePayload.deliveryType = deliveryType
+        quotePayload.deliveryAddress = deliveryAddress
+        quotePayload.deliveryNotes = deliveryNotes
+      }
 
-        toast.success("Devis créé avec succès !");
-        router.push('/quotes');
-    } catch (err: any) {
-        toast.error(err.message);
+      const response = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quotePayload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Échec de la création du devis.')
+      }
+
+      const newQuote = await response.json()
+      toast.success(`Devis ${businessType === 'SERVICE' ? 'de service' : 'de produit'} créé avec succès !`)
+      router.push(`/quotes/${newQuote.id}`)
+      
+    } catch (error: any) {
+      console.error('Erreur création devis:', error)
+      toast.error(error.message || 'Erreur lors de la création du devis.')
     } finally {
-        setIsLoading(false);
+      setIsLoading(false)
     }
-  };
-
-  const getServiceIcon = (type: ServiceType) => {
-    const icons = {
-      'GrandMénage': '🏠',
-      'VitresExtérieures': '🪟',
-      'FinDeChantier': '🔨',
-      'CristallisationMarbre': '✨'
-    };
-    return icons[type] || '🔧';
-  };
-
-  const getStepColor = (step: number) => {
-    if (step === activeStep) return 'bg-blue-500 text-white';
-    if (step < activeStep) return 'bg-green-500 text-white';
-    return 'bg-gray-200 text-gray-600';
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Link href="/quotes">
-                <Button variant="ghost" size="sm" className="p-2">
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-lg font-semibold text-slate-900">Générateur de Devis</h1>
-                <p className="text-sm text-slate-500">Simulateur intelligent</p>
-              </div>
-            </div>
-            
-            {/* Progress Steps - Hidden on mobile */}
-            <div className="hidden md:flex items-center gap-2">
-              <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-medium ${getStepColor(1)}`}>
-                1
-              </div>
-              <div className="w-8 h-px bg-slate-300"></div>
-              <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-medium ${getStepColor(2)}`}>
-                2
-              </div>
-              <div className="w-8 h-px bg-slate-300"></div>
-              <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-medium ${getStepColor(3)}`}>
-                3
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="container mx-auto p-6 max-w-7xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Nouveau Devis</h1>
+        <p className="text-gray-600 mt-2">
+          Créez un devis pour services ou produits avec un client existant ou nouveau
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* Left Panel - Configuration */}
-          <div className="lg:col-span-7 space-y-6">
-            
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column - Client & Type Selection */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Business Type Selection */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Type de Devis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setBusinessType('SERVICE')}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      businessType === 'SERVICE'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <Wrench className="h-8 w-8" />
+                      <span className="font-medium">Service</span>
+                      <span className="text-sm text-gray-600">Nettoyage, maintenance, etc.</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBusinessType('PRODUCT')}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      businessType === 'PRODUCT'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <Package className="h-8 w-8" />
+                      <span className="font-medium">Produit</span>
+                      <span className="text-sm text-gray-600">Mobilier, équipements, etc.</span>
+                    </div>
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Client Selection */}
-            <Card className="shadow-sm border-slate-200">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <User className="w-4 h-4 text-blue-600" />
-                  </div>
-                  Informations Client
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Sélection du Client
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700">Client</Label>
-                    <Select 
-                      value={selectedLead?.id} 
-                      onValueChange={(id) => setSelectedLead(leads.find(l => l.id === id) || null)} 
-                      required
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Sélectionner un client..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {leads.map(lead => (
-                          <SelectItem key={lead.id} value={lead.id}>
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                              {lead.firstName} {lead.lastName}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                <div className="relative">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Rechercher un client existant ou entrer un nouveau nom..."
+                      value={searchQuery}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
                   
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700">Type</Label>
-                    <Select value={quoteType} onValueChange={(v) => setQuoteType(v as QuoteType)}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="EXPRESS">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="bg-orange-100 text-orange-700">Express</Badge>
+                  {isSearching && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Search Results */}
+                {showSearchResults && searchResults.length > 0 && (
+                  <div className="border rounded-lg bg-white shadow-lg max-h-60 overflow-y-auto">
+                    {searchResults.map((lead) => (
+                      <button
+                        key={lead.id}
+                        type="button"
+                        onClick={() => handleSelectLead(lead)}
+                        className="w-full p-3 text-left hover:bg-gray-50 border-b last:border-b-0 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-gray-900">{lead.displayName}</p>
+                            <p className="text-sm text-gray-600">
+                              {lead.phone} {lead.email && `• ${lead.email}`}
+                            </p>
                           </div>
-                        </SelectItem>
-                        <SelectItem value="STANDARD">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-700">Standard</Badge>
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge variant={lead.leadType === 'PARTICULIER' ? 'default' : 'secondary'}>
+                              {lead.typeLabel}
+                            </Badge>
+                            <span className="text-xs text-gray-500">{lead.status}</span>
                           </div>
-                        </SelectItem>
-                        <SelectItem value="PREMIUM">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="bg-purple-100 text-purple-700">Premium</Badge>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                </div>
-                
-                <div>
-                  <Label className="text-sm font-medium text-slate-700">Expiration</Label>
-                  <Input 
-                    type="date" 
-                    value={expiresAt} 
-                    onChange={(e) => setExpiresAt(e.target.value)} 
-                    className="mt-1"
-                    required 
-                  />
-                </div>
+                )}
+
+                {/* New Client Option */}
+                {searchQuery && !selectedLead && searchResults.length === 0 && !isSearching && (
+                  <div className="border rounded-lg p-4 bg-blue-50 border-blue-200">
+                    <p className="text-sm text-blue-800 mb-2">Aucun client trouvé.</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleNewClient}
+                      className="text-blue-700 border-blue-300 hover:bg-blue-100"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Créer nouveau client: "{searchQuery}"
+                    </Button>
+                  </div>
+                )}
+
+                {/* Selected Client Display */}
+                {selectedLead && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-green-800">{selectedLead.displayName}</p>
+                        <p className="text-sm text-green-600">Client sélectionné</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedLead(null)
+                          setSearchQuery('')
+                        }}
+                        className="text-green-700 hover:bg-green-100"
+                      >
+                        Changer
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* New Client Display */}
+                {newClientName && !selectedLead && (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-blue-800">Nouveau client: {newClientName}</p>
+                        <p className="text-sm text-blue-600">Sera créé avec le devis</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setNewClientName('')
+                          setSearchQuery('')
+                        }}
+                        className="text-blue-700 hover:bg-blue-100"
+                      >
+                        Annuler
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Services Configuration */}
-            <Card className="shadow-sm border-slate-200">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Settings className="w-4 h-4 text-green-600" />
+            {/* Service Configuration */}
+            {businessType === 'SERVICE' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Wrench className="h-5 w-5" />
+                      Configuration des Services
                     </div>
-                    Services & Paramètres
-                  </CardTitle>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={addService}
-                    className="h-8 gap-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Service
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {services.map((service, index) => (
-                  <div key={service.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{getServiceIcon(service.type)}</span>
-                        <span className="font-medium text-slate-900">Service {index + 1}</span>
-                      </div>
-                      {services.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeService(service.id)}
-                          className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="col-span-2">
-                        <Label className="text-xs font-medium text-slate-600">Type de service</Label>
-                        <Select 
-                          value={service.type} 
-                          onValueChange={(value) => handleServiceChange(service.id, 'type', value)}
-                        >
-                          <SelectTrigger className="mt-1 h-9">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="GrandMénage">🏠 Grand Ménage</SelectItem>
-                            <SelectItem value="VitresExtérieures">🪟 Vitres Extérieures</SelectItem>
-                            <SelectItem value="FinDeChantier">🔨 Fin de Chantier</SelectItem>
-                            <SelectItem value="CristallisationMarbre">✨ Cristallisation Marbre</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div>
-                        <Label className="text-xs font-medium text-slate-600">Surface (m²)</Label>
-                        <Input
-                          type="number"
-                          value={service.surface}
-                          onChange={(e) => handleServiceChange(service.id, 'surface', parseInt(e.target.value))}
-                          className="mt-1 h-9"
-                          min="1"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label className="text-xs font-medium text-slate-600">Niveaux</Label>
-                        <Input
-                          type="number"
-                          value={service.levels}
-                          onChange={(e) => handleServiceChange(service.id, 'levels', parseInt(e.target.value))}
-                          className="mt-1 h-9"
-                          min="1"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label className="text-xs font-medium text-slate-600">Distance (km)</Label>
-                        <Input
-                          type="number"
-                          value={service.distance}
-                          onChange={(e) => handleServiceChange(service.id, 'distance', parseInt(e.target.value))}
-                          className="mt-1 h-9"
-                          min="0"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label className="text-xs font-medium text-slate-600">Étage</Label>
-                        <Select 
-                          value={service.etage} 
-                          onValueChange={(value) => handleServiceChange(service.id, 'etage', value)}
-                        >
-                          <SelectTrigger className="mt-1 h-9">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="RDC">RDC</SelectItem>
-                            <SelectItem value="AvecAscenseur">Avec Ascenseur</SelectItem>
-                            <SelectItem value="SansAscenseur">Sans Ascenseur</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div>
-                        <Label className="text-xs font-medium text-slate-600">Délai</Label>
-                        <Select 
-                          value={service.delai} 
-                          onValueChange={(value) => handleServiceChange(service.id, 'delai', value)}
-                        >
-                          <SelectTrigger className="mt-1 h-9">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="STANDARD">Standard</SelectItem>
-                            <SelectItem value="URGENT">Urgent (+40%)</SelectItem>
-                            <SelectItem value="IMMEDIAT">Immédiat (+80%)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div>
-                        <Label className="text-xs font-medium text-slate-600">Difficulté</Label>
-                        <Select 
-                          value={service.difficulte} 
-                          onValueChange={(value) => handleServiceChange(service.id, 'difficulte', value)}
-                        >
-                          <SelectTrigger className="mt-1 h-9">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="STANDARD">Standard</SelectItem>
-                            <SelectItem value="DIFFICILE">Difficile (+20%)</SelectItem>
-                            <SelectItem value="EXTREME">Extrême (+50%)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Panel - Preview & Summary */}
-          <div className="lg:col-span-5">
-            <div className="sticky top-24 space-y-6">
-              
-              {/* Live Preview */}
-              <Card className="shadow-sm border-slate-200 bg-gradient-to-br from-white to-slate-50">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Eye className="w-4 h-4 text-purple-600" />
-                    </div>
-                    Aperçu du Devis
+                    <Button type="button" onClick={addService} size="sm" variant="outline">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Ajouter Service
+                    </Button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  
-                  {/* Client Info */}
-                  {selectedLead && (
-                    <div className="p-3 bg-white rounded-lg border border-slate-200">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <User className="w-5 h-5 text-blue-600" />
-                        </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <Label htmlFor="quoteType">Type de Devis</Label>
+                      <Select value={quoteType} onValueChange={(value: any) => setQuoteType(value)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="EXPRESS">Express</SelectItem>
+                          <SelectItem value="STANDARD">Standard</SelectItem>
+                          <SelectItem value="PREMIUM">Premium</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {services.map((service, index) => (
+                    <div key={service.id} className="border rounded-lg p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">Service {index + 1}</h4>
+                        {services.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeService(service.id)}
+                            className="text-red-600 hover:bg-red-50"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                          <p className="font-medium text-slate-900">{selectedLead.firstName} {selectedLead.lastName}</p>
-                          <p className="text-sm text-slate-500">{selectedLead.email}</p>
+                          <Label>Type de Service</Label>
+                          <Select 
+                            value={service.type} 
+                            onValueChange={(value) => handleServiceChange(service.id, 'type', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="GrandMénage">Grand Ménage</SelectItem>
+                              <SelectItem value="MénageRégulier">Ménage Régulier</SelectItem>
+                              <SelectItem value="NettoyageVitre">Nettoyage Vitres</SelectItem>
+                              <SelectItem value="NettoyageBureau">Nettoyage Bureau</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
+                        
+                        <div>
+                          <Label>Surface (m²)</Label>
+                          <Input
+                            type="number"
+                            value={service.surface}
+                            onChange={(e) => handleServiceChange(service.id, 'surface', parseInt(e.target.value) || 0)}
+                            min="1"
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label>Niveaux</Label>
+                          <Input
+                            type="number"
+                            value={service.levels}
+                            onChange={(e) => handleServiceChange(service.id, 'levels', parseInt(e.target.value) || 1)}
+                            min="1"
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label>Distance (km)</Label>
+                          <Input
+                            type="number"
+                            value={service.distance}
+                            onChange={(e) => handleServiceChange(service.id, 'distance', parseInt(e.target.value) || 0)}
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Product Configuration */}
+            {businessType === 'PRODUCT' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Configuration des Produits
+                    </div>
+                    <Button type="button" onClick={addProductItem} size="sm" variant="outline">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Ajouter Produit
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <Label htmlFor="productCategory">Catégorie de Produits</Label>
+                      <Select value={productCategory} onValueChange={setProductCategory}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner une catégorie" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="FURNITURE">Mobilier</SelectItem>
+                          <SelectItem value="EQUIPMENT">Équipements</SelectItem>
+                          <SelectItem value="ELECTRONICS">Électronique</SelectItem>
+                          <SelectItem value="DECORATION">Décoration</SelectItem>
+                          <SelectItem value="TEXTILES">Textiles</SelectItem>
+                          <SelectItem value="LIGHTING">Éclairage</SelectItem>
+                          <SelectItem value="STORAGE">Rangement</SelectItem>
+                          <SelectItem value="KITCHEN_ITEMS">Articles de cuisine</SelectItem>
+                          <SelectItem value="BATHROOM_ITEMS">Articles salle de bain</SelectItem>
+                          <SelectItem value="OFFICE_SUPPLIES">Fournitures bureau</SelectItem>
+                          <SelectItem value="OTHER">Autres</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="deliveryType">Type de Livraison</Label>
+                      <Select value={deliveryType} onValueChange={setDeliveryType}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PICKUP">Récupération</SelectItem>
+                          <SelectItem value="STANDARD_DELIVERY">Livraison standard</SelectItem>
+                          <SelectItem value="EXPRESS_DELIVERY">Livraison express</SelectItem>
+                          <SelectItem value="SCHEDULED_DELIVERY">Livraison programmée</SelectItem>
+                          <SelectItem value="WHITE_GLOVE">Service premium</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {deliveryType !== 'PICKUP' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="deliveryAddress">Adresse de Livraison</Label>
+                        <Input
+                          value={deliveryAddress}
+                          onChange={(e) => setDeliveryAddress(e.target.value)}
+                          placeholder="Adresse de livraison"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="deliveryNotes">Notes de Livraison</Label>
+                        <Input
+                          value={deliveryNotes}
+                          onChange={(e) => setDeliveryNotes(e.target.value)}
+                          placeholder="Instructions spéciales..."
+                        />
                       </div>
                     </div>
                   )}
 
-                  {/* Investment Summary */}
-                  <div className="text-center py-6 bg-white rounded-lg border border-slate-200">
-                    <p className="text-sm text-slate-500 mb-1">Investissement Total TTC</p>
-                    <p className="text-3xl font-bold text-blue-600">{formatCurrency(finalQuote.finalPrice)}</p>
-                  </div>
-
-                  {/* Pricing Breakdown */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-slate-900">Détail de la Tarification</h4>
-                    {editableLineItems.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
-                        <div className="flex-1">
-                          <p className="font-medium text-sm text-slate-900">{item.description}</p>
-                          <p className="text-xs text-slate-500">{item.detail}</p>
+                  {productItems.map((item, index) => (
+                    <div key={item.id} className="border rounded-lg p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">Produit {index + 1}</h4>
+                        {productItems.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeProductItem(item.id)}
+                            className="text-red-600 hover:bg-red-50"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                          <Label>Nom du Produit</Label>
+                          <Input
+                            value={item.name}
+                            onChange={(e) => handleProductChange(item.id, 'name', e.target.value)}
+                            placeholder="Ex: Table en bois"
+                          />
                         </div>
-                        <div className="text-right">
+                        
+                        <div>
+                          <Label>Quantité</Label>
                           <Input
                             type="number"
-                            value={item.amount}
-                            onChange={(e) => handleLineItemChange(item.id, parseFloat(e.target.value) || 0)}
-                            className="w-20 h-8 text-right text-sm"
+                            value={item.qty}
+                            onChange={(e) => handleProductChange(item.id, 'qty', parseInt(e.target.value) || 1)}
+                            min="1"
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label>Prix Unitaire (MAD)</Label>
+                          <Input
+                            type="number"
+                            value={item.unitPrice}
+                            onChange={(e) => handleProductChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                            min="0"
                             step="0.01"
                           />
                         </div>
+                        
+                        <div>
+                          <Label>Référence</Label>
+                          <Input
+                            value={item.reference}
+                            onChange={(e) => handleProductChange(item.id, 'reference', e.target.value)}
+                            placeholder="Réf. produit"
+                          />
+                        </div>
                       </div>
-                    ))}
-                    
-                    <Separator />
-                    
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Total HT</span>
-                        <span className="font-medium">{formatCurrency(finalQuote.subTotalHT)} MAD</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">TVA (20%)</span>
-                        <span className="font-medium">{formatCurrency(finalQuote.vatAmount)} MAD</span>
-                      </div>
-                      <div className="flex justify-between text-lg font-bold text-blue-600 pt-2 border-t">
-                        <span>Total TTC</span>
-                        <span>{formatCurrency(finalQuote.finalPrice)} MAD</span>
+                      
+                      <div>
+                        <Label>Description</Label>
+                        <Textarea
+                          value={item.description}
+                          onChange={(e) => handleProductChange(item.id, 'description', e.target.value)}
+                          placeholder="Description détaillée du produit..."
+                          rows={2}
+                        />
                       </div>
                     </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="space-y-3 pt-4">
-                    <Button 
-                      type="submit" 
-                      disabled={isLoading || !selectedLead}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11"
-                    >
-                      {isLoading ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Génération...
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Save className="w-4 h-4" />
-                          Générer et Sauvegarder le Devis
-                        </div>
-                      )}
-                    </Button>
-                    
-                    <div className="text-xs text-center text-slate-500">
-                      Montant arrondi à {formatCurrency(finalQuote.finalPrice)} MAD
-                    </div>
-                  </div>
+                  ))}
                 </CardContent>
               </Card>
+            )}
+          </div>
 
-              {/* Quick Stats */}
-              <div className="grid grid-cols-2 gap-3">
-                <Card className="p-4 text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    {services.reduce((acc, s) => acc + s.surface * s.levels, 0)}
+          {/* Right Column - Quote Summary */}
+          <div className="space-y-6">
+            <Card className="sticky top-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Récapitulatif du Devis
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="expiresAt">Date d'Expiration</Label>
+                  <Input
+                    type="date"
+                    value={expiresAt}
+                    onChange={(e) => setExpiresAt(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  {finalQuote.lineItems.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm text-slate-900">{item.description}</p>
+                        <p className="text-xs text-slate-500">{item.detail}</p>
+                      </div>
+                      <div className="text-right">
+                        <Input
+                          type="number"
+                          value={item.amount}
+                          onChange={(e) => handleLineItemChange(item.id, parseFloat(e.target.value) || 0)}
+                          className="w-20 h-8 text-right text-sm"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <Separator />
+                  
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Total HT</span>
+                      <span className="font-medium">{formatCurrency(finalQuote.subTotalHT)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">TVA (20%)</span>
+                      <span className="font-medium">{formatCurrency(finalQuote.vatAmount)}</span>
+                    </div>
+                    <div className="flex justify-between text-lg font-bold text-blue-600 pt-2 border-t">
+                      <span>Total TTC</span>
+                      <span>{formatCurrency(finalQuote.finalPrice)}</span>
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500">m² Total</div>
-                </Card>
-                <Card className="p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {services.length}
-                  </div>
-                  <div className="text-xs text-slate-500">Service{services.length > 1 ? 's' : ''}</div>
-                </Card>
-              </div>
-            </div>
+                </div>
+
+                <Separator />
+
+                <Button 
+                  type="submit" 
+                  disabled={isLoading || (!selectedLead && !newClientName.trim()) || finalQuote.lineItems.length === 0}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Création en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Créer le Devis {businessType === 'SERVICE' ? 'de Service' : 'de Produit'}
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </form>
     </div>
-  );
+  )
 }
+
+export default NewQuoteForm

@@ -144,6 +144,90 @@ export function validateLeadInput(data: any, isCreation = false) {
   return leadValidationSchema.safeParse(data);
 }
 
+// NOUVEAU: Schema de validation pour les devis flexibles (Services et Produits)
+export const quoteValidationSchema = z.object({
+  leadId: z.string().min(1, 'Lead ID requis').optional(), // Optional si on crée un nouveau lead
+  newClientName: z.string().min(1, 'Nom du client requis').optional(), // Optional si leadId existe
+  quoteNumber: z.string().min(1, 'Numéro de devis requis'),
+  businessType: z.enum(['SERVICE', 'PRODUCT'], { required_error: 'Type de devis requis' }),
+  lineItems: z.array(z.object({
+    id: z.string(),
+    description: z.string().min(1, 'Description requise'),
+    detail: z.string().optional(),
+    amount: z.number().min(0, 'Montant doit être positif'),
+    editable: z.boolean().optional()
+  })).min(1, 'Au moins un élément requis'),
+  subTotalHT: z.number().min(0, 'Sous-total HT doit être positif'),
+  vatAmount: z.number().min(0, 'TVA doit être positive'),
+  totalTTC: z.number().min(0, 'Total TTC doit être positif'),
+  finalPrice: z.number().min(0, 'Prix final doit être positif'),
+  expiresAt: z.string().or(z.date()).optional(),
+  
+  // Champs pour Services
+  type: z.enum(['EXPRESS', 'STANDARD', 'PREMIUM']).optional(),
+  propertyType: z.enum([
+    'APARTMENT_SMALL', 'APARTMENT_MEDIUM', 'APARTMENT_MULTI', 'APARTMENT_LARGE',
+    'VILLA_SMALL', 'VILLA_MEDIUM', 'VILLA_LARGE', 'PENTHOUSE', 'COMMERCIAL',
+    'STORE', 'HOTEL_STANDARD', 'HOTEL_LUXURY', 'OFFICE', 'RESIDENCE_B2B',
+    'BUILDING', 'RESTAURANT', 'WAREHOUSE', 'OTHER'
+  ]).optional(),
+  surface: z.number().min(1, 'Surface doit être positive').optional(),
+  levels: z.number().min(1, 'Nombre de niveaux doit être positif').optional(),
+  
+  // Champs pour Produits
+  productCategory: z.enum([
+    'FURNITURE', 'EQUIPMENT', 'CONSUMABLES', 'ELECTRONICS', 'DECORATION',
+    'TEXTILES', 'LIGHTING', 'STORAGE', 'KITCHEN_ITEMS', 'BATHROOM_ITEMS',
+    'OFFICE_SUPPLIES', 'OTHER'
+  ]).optional(),
+  productDetails: z.object({
+    items: z.array(z.object({
+      name: z.string().min(1, 'Nom du produit requis'),
+      qty: z.number().min(1, 'Quantité doit être positive'),
+      unitPrice: z.number().min(0, 'Prix unitaire doit être positif'),
+      description: z.string().optional(),
+      reference: z.string().optional()
+    })).optional(),
+    delivery: z.object({
+      type: z.enum(['PICKUP', 'STANDARD_DELIVERY', 'EXPRESS_DELIVERY', 'SCHEDULED_DELIVERY', 'WHITE_GLOVE']).optional(),
+      address: z.string().optional(),
+      notes: z.string().optional(),
+      estimatedDate: z.string().or(z.date()).optional()
+    }).optional()
+  }).optional(),
+  deliveryType: z.enum(['PICKUP', 'STANDARD_DELIVERY', 'EXPRESS_DELIVERY', 'SCHEDULED_DELIVERY', 'WHITE_GLOVE']).optional(),
+  deliveryAddress: z.string().optional(),
+  deliveryNotes: z.string().optional()
+}).refine((data) => {
+  // Validation conditionnelle: soit leadId, soit newClientName
+  return data.leadId || data.newClientName;
+}, {
+  message: "Soit un Lead ID existant, soit un nom de nouveau client doit être fourni",
+  path: ["leadId"]
+}).refine((data) => {
+  // Validation pour services: si businessType = SERVICE, certains champs sont requis
+  if (data.businessType === 'SERVICE') {
+    return data.type && data.surface;
+  }
+  return true;
+}, {
+  message: "Pour les devis de service, le type et la surface sont requis",
+  path: ["type"]
+}).refine((data) => {
+  // Validation pour produits: si businessType = PRODUCT, certains champs sont requis
+  if (data.businessType === 'PRODUCT') {
+    return data.productCategory && data.productDetails;
+  }
+  return true;
+}, {
+  message: "Pour les devis de produit, la catégorie et les détails produits sont requis",
+  path: ["productCategory"]
+});
+
+export function validateQuoteInput(data: any) {
+  return quoteValidationSchema.safeParse(data);
+}
+
 export const missionSchema = z.object({
   missionNumber: z.string().min(1, 'Numéro de mission requis'),
   status: z.enum(['SCHEDULED', 'IN_PROGRESS', 'QUALITY_CHECK', 'CLIENT_VALIDATION', 'COMPLETED', 'CANCELLED']),

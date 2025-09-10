@@ -26,6 +26,11 @@ CREATE TYPE "LogType" AS ENUM ('BACKUP', 'ERROR', 'INFO', 'SECURITY');
 -- CreateEnum
 CREATE TYPE "LogStatus" AS ENUM ('SUCCESS', 'FAILED', 'IN_PROGRESS');
 
+-- Create new enums for quote business types and product categories
+CREATE TYPE "QuoteBusinessType" AS ENUM ('SERVICE', 'PRODUCT');
+CREATE TYPE "ProductQuoteCategory" AS ENUM ('FURNITURE', 'EQUIPMENT', 'CONSUMABLES', 'ELECTRONICS', 'DECORATION', 'TEXTILES', 'LIGHTING', 'STORAGE', 'KITCHEN_ITEMS', 'BATHROOM_ITEMS', 'OFFICE_SUPPLIES', 'OTHER');
+CREATE TYPE "DeliveryType" AS ENUM ('PICKUP', 'STANDARD_DELIVERY', 'EXPRESS_DELIVERY', 'SCHEDULED_DELIVERY', 'WHITE_GLOVE');
+
 -- DropIndex
 DROP INDEX "idx_invoices_status_due";
 
@@ -139,3 +144,23 @@ CREATE UNIQUE INDEX "team_members_userId_key" ON "team_members"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+
+-- Add new columns to quotes table
+ALTER TABLE "quotes" ADD COLUMN "businessType" "QuoteBusinessType" NOT NULL DEFAULT 'SERVICE';
+ALTER TABLE "quotes" ADD COLUMN "productCategory" "ProductQuoteCategory";
+ALTER TABLE "quotes" ADD COLUMN "productDetails" JSONB;
+ALTER TABLE "quotes" ADD COLUMN "deliveryType" "DeliveryType";
+ALTER TABLE "quotes" ADD COLUMN "deliveryAddress" TEXT;
+ALTER TABLE "quotes" ADD COLUMN "deliveryNotes" TEXT;
+
+-- Make existing type column nullable since it's only for services
+ALTER TABLE "quotes" ALTER COLUMN "type" DROP NOT NULL;
+
+-- Add indexes for better performance
+CREATE INDEX "quotes_businessType_idx" ON "quotes"("businessType");
+CREATE INDEX "quotes_productCategory_idx" ON "quotes"("productCategory");
+CREATE INDEX "quotes_deliveryType_idx" ON "quotes"("deliveryType");
+CREATE INDEX "quotes_status_businessType_idx" ON "quotes"("status", "businessType");
+
+-- Update existing quotes to have SERVICE business type
+UPDATE "quotes" SET "businessType" = 'SERVICE' WHERE "businessType" IS NULL;
