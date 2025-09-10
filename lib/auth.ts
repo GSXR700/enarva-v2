@@ -25,15 +25,15 @@ export const authOptions: NextAuthOptions = {
           const user = await prisma.user.findUnique({
             where: { email: credentials.email },
             include: {
-              teamMember: true
+              teamMemberships: true
             }
           });
 
-          if (!user || !user.password) {
+          if (!user || !user.hashedPassword) {
             return null;
           }
 
-          const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.hashedPassword);
           if (!isPasswordValid) {
             return null;
           }
@@ -53,7 +53,7 @@ export const authOptions: NextAuthOptions = {
             name: user.name || '',
             role: user.role,
             image: user.image,
-            teamMember: user.teamMember
+            teamMember: user.teamMemberships
           };
         } catch (error) {
           console.error('Auth error:', error);
