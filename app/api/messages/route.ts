@@ -1,10 +1,10 @@
 // app/api/messages/route.ts
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { pusherServer } from '@/lib/pusher';
-import webpush from 'web-push';
+import { NextResponse } from 'next/server'
+import { PrismaClient } from '@prisma/client'
+import { pusherServer } from '@/lib/pusher'
+import webpush from 'web-push'
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient()
 
 // Conditionally configure web-push only if VAPID keys are available
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -12,18 +12,19 @@ if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
     'mailto:contact@enarva.com',
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY
-  );
+  )
 } else {
-  console.warn('VAPID keys not configured. Push notifications are disabled.');
+  console.warn('VAPID keys not configured. Push notifications are disabled.')
 }
 
+// POST /api/messages - Create a new message
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { content, senderId, conversationId } = body;
+    const body = await request.json()
+    const { content, senderId, conversationId } = body
 
     if (!content || !senderId || !conversationId) {
-      return new NextResponse('Missing required fields', { status: 400 });
+      return new NextResponse('Missing required fields', { status: 400 })
     }
 
     const [newMessage, conversation] = await prisma.$transaction([
@@ -32,49 +33,71 @@ export async function POST(request: Request) {
           content,
           senderId,
           conversationId,
-          readByIds: [senderId],
+          readBy: {
+            connect: [{ id: senderId }], // Connect the sender as having read the message
+          },
         },
         include: {
-          sender: true,
+          sender: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          readBy: {
+            select: {
+              id: true,
+            },
+          },
         },
       }),
       prisma.conversation.findUnique({
         where: { id: conversationId },
-        include: { participants: true },
+        include: {
+          participants: {
+            select: {
+              id: true,
+              name: true,
+              pushSubscription: true,
+            },
+          },
+        },
       }),
-    ]);
-    
-    await pusherServer.trigger(
-      `conversation-${conversationId}`,
-      'new-message',
-      newMessage
-    );
+    ])
+
+    if (!conversation) {
+      return new NextResponse('Conversation not found', { status: 404 })
+    }
+
+    await pusherServer.trigger(`conversation-${conversationId}`, 'new-message', newMessage)
 
     // Send push notification only if keys are set
     if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-        const recipients = conversation?.participants.filter(p => p.id !== senderId);
-        if (recipients) {
-          const notificationPayload = JSON.stringify({
-            title: `Nouveau message de ${newMessage.sender.name}`,
-            body: content,
-          });
+      const recipients = conversation.participants.filter(p => p.id !== senderId)
+      if (recipients.length > 0) {
+        const notificationPayload = JSON.stringify({
+          title: `Nouveau message de ${newMessage.sender.name || 'Utilisateur'}`,
+          body: content,
+        })
 
-          for (const recipient of recipients) {
-            if (recipient.pushSubscription) {
-              try {
-                await webpush.sendNotification(recipient.pushSubscription as any, notificationPayload);
-              } catch (error) {
-                console.error(`Failed to send push notification to ${recipient.id}`, error);
-              }
+        for (const recipient of recipients) {
+          if (recipient.pushSubscription) {
+            try {
+              await webpush.sendNotification(recipient.pushSubscription as any, notificationPayload)
+            } catch (error) {
+              console.error(`Failed to send push notification to ${recipient.id}`, error)
             }
           }
         }
+      }
     }
-    
-    return NextResponse.json(newMessage, { status: 201 });
+
+    return NextResponse.json(newMessage, { status: 201 })
 
   } catch (error) {
-    console.error('Message creation error:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    console.error('Message creation error:', error)
+    return new NextResponse('Internal Server Error', { status: 500 })
+  } finally {
+    await prisma.$disconnect()
   }
 }
