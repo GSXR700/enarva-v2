@@ -17,12 +17,23 @@ type LeadWithSubscription = Lead & {
   subscription?: any;
 };
 
+interface FormData {
+  leadId: string;
+  type: SubscriptionType;
+  status: SubscriptionStatus;
+  monthlyPrice: string;
+  discount: string;
+  nextBilling: string;
+  includedServices: string;
+  usedServices: string;
+}
+
 export default function NewSubscriptionPage() {
   const router = useRouter()
   const [leads, setLeads] = useState<LeadWithSubscription[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     leadId: '',
     type: SubscriptionType.BRONZE,
     status: SubscriptionStatus.ACTIVE,
@@ -54,11 +65,9 @@ export default function NewSubscriptionPage() {
   }
 
   const handleSelectChange = (id: keyof typeof formData, value: string) => {
-    setFormData(prev => ({ 
-      ...prev, 
-      [id]: id === 'type' ? value as SubscriptionType : 
-            id === 'status' ? value as SubscriptionStatus : 
-            value 
+    setFormData(prev => ({
+      ...prev,
+      [id]: value
     }))
   }
 
@@ -88,8 +97,8 @@ export default function NewSubscriptionPage() {
     if (formData.type !== SubscriptionType.CUSTOM) {
       setFormData(prev => ({
         ...prev,
-        monthlyPrice: getDefaultPrice(formData.type as SubscriptionType),
-        includedServices: getDefaultServices(formData.type as SubscriptionType)
+        monthlyPrice: getDefaultPrice(formData.type),
+        includedServices: getDefaultServices(formData.type)
       }))
     }
   }, [formData.type])
@@ -270,8 +279,8 @@ export default function NewSubscriptionPage() {
         </Card>
 
         <div className="flex justify-end">
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={isLoading}
             className="bg-enarva-gradient rounded-lg px-8"
           >
