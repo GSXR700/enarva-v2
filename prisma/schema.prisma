@@ -768,6 +768,7 @@ enum Priority {
 }
 
 enum TaskCategory {
+  GENERAL
   EXTERIOR_FACADE
   WALLS_BASEBOARDS
   FLOORS

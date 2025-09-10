@@ -1,111 +1,88 @@
+// app/(administration)/missions/[id]/edit/page.tsx
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react'
 import {
-  ArrowLeft,
-  Save,
-  PlusCircle,
-  Trash2,
-} from 'lucide-react'
-import {
-  Lead,
   Mission,
+  Lead,
   Task,
-  User as TeamMember,
-  TaskTemplate,
+  TaskCategory,
   TaskStatus,
+  TaskType,
   MissionStatus,
   Priority,
   MissionType,
-  TaskCategory,
-  TaskType,
+  TeamMember,
 } from '@prisma/client'
 import { toast } from 'sonner'
-import { DndProvider, useDrag, useDrop, DropTargetMonitor } from 'react-dnd'
+import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
-import { TouchBackend } from 'react-dnd-touch-backend'
+import { useDrag, useDrop } from 'react-dnd'
 
-type TaskWithId = Partial<Task> & { id: string | number };
-type TaskTemplateWithTasks = TaskTemplate & { tasks: Array<{title: string; category: TaskCategory; type: TaskType}> };
+type TaskWithId = Task & { id: string }
+type TaskTemplateWithTasks = {
+  id: string
+  name: string
+  description?: string
+  tasks: any[]
+}
 
 const TaskItem = ({
   task,
   index,
-  moveTask,
   handleTaskChange,
   removeTask,
+  moveTask,
   isClientView,
 }: {
   task: TaskWithId
   index: number
-  moveTask: (dragIndex: number, hoverIndex: number) => void
   handleTaskChange: (
     index: number,
     field: keyof Task,
     value: string | boolean | TaskStatus | TaskType | Date | null
   ) => void
   removeTask: (index: number) => void
-  isClientView?: boolean
+  moveTask: (dragIndex: number, hoverIndex: number) => void
+  isClientView: boolean
 }) => {
-  const ref = useRef<HTMLDivElement>(null)
-  const [{ handlerId }, drop] = useDrop({
-    accept: 'task',
-    collect(monitor) {
-      return {
-        handlerId: monitor.getHandlerId() as string | symbol | null,
-      }
-    },
-    hover(item: unknown, monitor: DropTargetMonitor) {
-      if (!ref.current) {
-        return
-      }
-      const dragIndex = (item as { index: number }).index
-      const hoverIndex = index
-
-      if (dragIndex === hoverIndex) {
-        return
-      }
-      moveTask(dragIndex, hoverIndex)
-      ;(item as { index: number }).index = hoverIndex
-    },
-  })
-
   const [{ isDragging }, drag] = useDrag({
     type: 'task',
-    item: () => ({ id: task.id, index }),
-    collect: (monitor: any) => ({
+    item: { index },
+    collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
   })
 
-  drag(drop(ref))
+  const [, drop] = useDrop({
+    accept: 'task',
+    hover: (draggedItem: { index: number }) => {
+      if (draggedItem.index !== index) {
+        moveTask(draggedItem.index, index)
+        draggedItem.index = index
+      }
+    },
+  })
+
+  const ref = (node: HTMLDivElement) => {
+    drag(drop(node))
+  }
 
   return (
     <div
       ref={ref}
       style={{ opacity: isDragging ? 0.5 : 1 }}
       className="p-4 border rounded-lg bg-card"
-      data-handler-id={handlerId}
     >
       <div className="flex justify-between items-center mb-2">
         <h4 className="font-semibold text-sm">Tâche #{index + 1}</h4>
@@ -188,10 +165,10 @@ const TaskItem = ({
   )
 }
 
-type Props = {
+interface Props {
   params: { id: string };
-  searchParams: { [key: string]: string | string[] | undefined };
-};
+  searchParams?: { [key: string]: string | string[] | undefined };
+}
 
 export default function EditMissionPage({ params, searchParams }: Props) {
   const router = useRouter()
@@ -205,8 +182,12 @@ export default function EditMissionPage({ params, searchParams }: Props) {
   const [isClientView, setIsClientView] = useState(false)
 
   useEffect(() => {
-    const fetchData = async () => {
+    const initializeData = async () => {
       try {
+        if (searchParams?.view === 'client') {
+          setIsClientView(true)
+        }
+
         const [
           missionRes,
           leadsRes,
@@ -218,6 +199,11 @@ export default function EditMissionPage({ params, searchParams }: Props) {
           fetch('/api/users?role=TEAM_LEADER'),
           fetch('/api/task-templates'),
         ])
+
+        if (!missionRes.ok) {
+          throw new Error('Mission introuvable')
+        }
+
         const missionData = await missionRes.json()
         setMission({
           ...missionData,
@@ -234,18 +220,15 @@ export default function EditMissionPage({ params, searchParams }: Props) {
         setTeamLeaders(await teamLeadersRes.json())
         setTaskTemplates(await taskTemplatesRes.json())
       } catch (error) {
+        console.error('Error fetching data:', error)
         toast.error('Erreur lors de la récupération des données.')
       } finally {
         setIsLoading(false)
       }
     }
-    fetchData()
 
-    const urlParams = new URLSearchParams(window.location.search)
-    if (urlParams.get('view') === 'client') {
-      setIsClientView(true)
-    }
-  }, [params.id])
+    initializeData()
+  }, [params.id, searchParams])
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -282,6 +265,15 @@ export default function EditMissionPage({ params, searchParams }: Props) {
         category: TaskCategory.LIVING_SPACES,
         status: TaskStatus.ASSIGNED,
         type: TaskType.CLEANUP,
+        missionId: params.id,
+        estimatedTime: null,
+        actualTime: null,
+        notes: null,
+        completedAt: null,
+        validatedAt: null,
+        assignedToId: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
       },
     ]
     setMission((prev) => ({ ...prev, tasks: newTasks }))
@@ -303,6 +295,15 @@ export default function EditMissionPage({ params, searchParams }: Props) {
         category: item.category,
         type: item.type,
         status: TaskStatus.ASSIGNED,
+        missionId: params.id,
+        estimatedTime: null,
+        actualTime: null,
+        notes: null,
+        completedAt: null,
+        validatedAt: null,
+        assignedToId: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
       }))
       setMission((prev) => ({ ...prev, tasks: newTasks }))
     }
@@ -334,54 +335,130 @@ export default function EditMissionPage({ params, searchParams }: Props) {
         }),
       })
       if (!response.ok) throw new Error("Erreur lors de la mise à jour.")
+
       toast.success('Mission mise à jour avec succès!')
       router.push('/missions')
     } catch (error) {
-      toast.error((error as Error).message)
+      toast.error('Erreur lors de la sauvegarde.')
     } finally {
       setIsLoading(false)
     }
   }
 
   if (isLoading) {
-    return <div>Chargement...</div>
+    return (
+      <div className="container mx-auto p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-96 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="container mx-auto p-4">
-        <div className="flex items-center mb-4">
-          <Link href="/missions">
-            <Button variant="outline" size="icon">
-              <ArrowLeft className="w-4 h-4" />
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Link href="/missions">
+              <Button variant="outline" size="icon">
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-bold">
+              {isClientView ? 'Détails de la Mission' : 'Modifier la Mission'}
+            </h1>
+            {isClientView && <Badge variant="secondary">Vue Client</Badge>}
+          </div>
+          {!isClientView && (
+            <Button onClick={handleSubmit} disabled={isLoading}>
+              <Save className="w-4 h-4 mr-2" />
+              Sauvegarder
             </Button>
-          </Link>
-          <h1 className="text-xl md:text-2xl font-bold ml-4">
-            {isClientView
-              ? `Détails de la Mission #${mission.missionNumber}`
-              : `Modifier la Mission #${mission.missionNumber}`}
-          </h1>
+          )}
         </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Section Informations Générales */}
           <Card>
             <CardHeader>
               <CardTitle>Informations Générales</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* ... form fields for mission details ... */}
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="missionNumber">Numéro de Mission</Label>
+                  <Input
+                    id="missionNumber"
+                    value={mission.missionNumber || ''}
+                    onChange={handleInputChange}
+                    disabled={true} // Usually read-only
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="status">Statut</Label>
+                  <Select
+                    value={mission.status}
+                    onValueChange={(value) => handleSelectChange('status', value as MissionStatus)}
+                    disabled={isClientView}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un statut" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(MissionStatus).map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="scheduledDate">Date Programmée</Label>
+                  <Input
+                    id="scheduledDate"
+                    type="datetime-local"
+                    value={mission.scheduledDate?.toString() || ''}
+                    onChange={handleInputChange}
+                    disabled={isClientView}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="estimatedDuration">Durée Estimée (minutes)</Label>
+                  <Input
+                    id="estimatedDuration"
+                    type="number"
+                    value={mission.estimatedDuration || ''}
+                    onChange={handleInputChange}
+                    disabled={isClientView}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="address">Adresse</Label>
+                <Textarea
+                  id="address"
+                  value={mission.address || ''}
+                  onChange={handleInputChange}
+                  disabled={isClientView}
+                />
+              </div>
             </CardContent>
           </Card>
 
-          {/* Section Tâches */}
           <Card>
             <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>Tâches à effectuer</CardTitle>
+              <CardTitle className="flex justify-between items-center">
+                <span>Tâches</span>
                 {!isClientView && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex gap-2">
                     <Select onValueChange={applyTemplate}>
-                      <SelectTrigger style={{ width: 180 }}>
+                      <SelectTrigger className="w-48">
                         <SelectValue placeholder="Appliquer un modèle" />
                       </SelectTrigger>
                       <SelectContent>
@@ -392,39 +469,35 @@ export default function EditMissionPage({ params, searchParams }: Props) {
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addTask}
-                    >
-                      <PlusCircle className="w-4 h-4 mr-2" />
-                      Ajouter une tâche
+                    <Button type="button" onClick={addTask}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Ajouter
                     </Button>
                   </div>
                 )}
-              </div>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {mission.tasks?.map((task, index) => (
-                <TaskItem
-                  key={task.id}
-                  index={index}
-                  task={task}
-                  moveTask={moveTask}
-                  handleTaskChange={handleTaskChange as any}
-                  removeTask={removeTask}
-                  isClientView={isClientView}
-                />
-              ))}
+            <CardContent>
+              <div className="space-y-4">
+                {mission.tasks?.map((task, index) => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    index={index}
+                    handleTaskChange={handleTaskChange}
+                    removeTask={removeTask}
+                    moveTask={moveTask}
+                    isClientView={isClientView}
+                  />
+                ))}
+                {(!mission.tasks || mission.tasks.length === 0) && (
+                  <p className="text-center text-muted-foreground py-8">
+                    Aucune tâche définie pour cette mission
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
-          <div className="flex justify-end">
-            <Button type="submit" disabled={isLoading}>
-              <Save className="w-4 h-4 mr-2" />
-              {isLoading ? 'Sauvegarde...' : 'Sauvegarder les modifications'}
-            </Button>
-          </div>
         </form>
       </div>
     </DndProvider>

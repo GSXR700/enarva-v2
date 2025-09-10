@@ -1,94 +1,103 @@
-// prisma/seed/task-templates/index.ts - ALTERNATIVE APPROACH
-import { PrismaClient } from '@prisma/client';
+// prisma/seed/task-templates/index.ts
+import { PrismaClient, TaskCategory } from '@prisma/client';
 import { finChantierTemplates } from './fin-chantier';
 import { residentielTemplates } from './residentiel';
 import { bureauxTemplates } from './bureaux';
 import { mobilierTextileTemplates } from './mobilier-textile';
 import { entretienSpecialiseTemplates } from './entretien-specialise';
 
-// Combine all templates from different categories into one array
+// Define types that match the Prisma schema, using the TaskCategory enum
+type TaskItem = {
+  title: string;
+  category: TaskCategory;
+};
+
+type TemplateData = {
+  name: string;
+  description: string | null;
+  tasks: TaskItem[];
+  category: TaskCategory; // Use the TaskCategory enum here
+};
+
+// Helper to validate and cast the category string to the TaskCategory enum
+function toTaskCategory(categoryStr: string): TaskCategory {
+  if (Object.values(TaskCategory).includes(categoryStr as TaskCategory)) {
+    return categoryStr as TaskCategory;
+  }
+  // Fallback for invalid categories to prevent seeding errors
+  console.warn(`Invalid category "${categoryStr}" found. Defaulting to 'GENERAL'.`);
+  return TaskCategory.GENERAL; 
+}
+
+// Transform the raw template data to match the correct schema structure
+const transformTemplate = (template: any): TemplateData => {
+  const tasks = template.items.create;
+  const categoryStr = tasks[0]?.category || 'GENERAL';
+
+  return {
+    name: template.name,
+    description: template.description || null,
+    tasks: tasks.map((task: any) => ({
+        ...task,
+        category: toTaskCategory(task.category) // Ensure each task has a valid category
+    })),
+    category: toTaskCategory(categoryStr), // Use the first item's category for the template
+  };
+};
+
+// Combine and transform all templates from different files
 const allTemplates = [
-    ...residentielTemplates,
-    ...finChantierTemplates,
-    ...bureauxTemplates,
-    ...mobilierTextileTemplates,
-    ...entretienSpecialiseTemplates,
+  ...residentielTemplates.map(transformTemplate),
+  ...finChantierTemplates.map(transformTemplate),
+  ...bureauxTemplates.map(transformTemplate),
+  ...mobilierTextileTemplates.map(transformTemplate),
+  ...entretienSpecialiseTemplates.map(transformTemplate),
 ];
 
 export async function seedTaskTemplates(prisma: PrismaClient) {
-    console.log('Seeding task templates...');
+  console.log('🌱 Starting TaskTemplate seeding...');
+  
+  try {
+    console.log('🧹 Cleaning existing task templates...');
+    await prisma.taskTemplate.deleteMany({});
+    console.log('✅ Existing templates cleaned.');
     
-    // First, clean existing data - use try/catch in case tables are empty
-    console.log('Cleaning existing templates...');
-    try {
-        // Cast to any to bypass TypeScript issues
-        await (prisma as any).taskTemplateItem.deleteMany();
-        await prisma.taskTemplate.deleteMany();
-    } catch (e) {
-        console.log('Tables might be empty, continuing...');
-    }
-    
-    // Process templates one by one instead of transaction to see clearer errors
     let successCount = 0;
+    const totalTemplates = allTemplates.length;
     
+    // Process each template individually for robust error handling
     for (const template of allTemplates) {
-        console.log(`Creating template: ${template.name}`);
+      console.log(`📝 Creating template: ${template.name}`);
+      
+      try {
+        await prisma.taskTemplate.create({
+          data: {
+            name: template.name,
+            description: template.description,
+            // The 'tasks' field in Prisma schema expects JSON.
+            // Prisma client handles the serialization automatically.
+            tasks: template.tasks,
+            category: template.category, // This is now correctly typed as TaskCategory
+            isActive: true
+          }
+        });
         
-        try {
-            // Try the direct approach first (this is what works in the API)
-            await prisma.taskTemplate.create({
-                data: {
-                    name: template.name,
-                    description: template.description || null,
-                    items: {
-                        create: template.items.create.map(item => ({
-                            title: item.title,
-                            category: item.category
-                        }))
-                    }
-                } as any // TypeScript bypass
-            });
-            
-            successCount++;
-            console.log(`✅ Successfully created: ${template.name}`);
-            
-        } catch (error) {
-            console.error(`❌ Failed to create template ${template.name}:`, error);
-            
-            // Try alternative approach - create template then items
-            try {
-                const createdTemplate = await prisma.taskTemplate.create({
-                    data: {
-                        name: template.name + '_retry',
-                        description: template.description || null
-                    }
-                });
-                
-                // Create items individually
-                for (const item of template.items.create) {
-                    await (prisma as any).taskTemplateItem.create({
-                        data: {
-                            title: item.title,
-                            category: item.category,
-                            templateId: createdTemplate.id
-                        }
-                    });
-                }
-                
-                // Update name back to original
-                await prisma.taskTemplate.update({
-                    where: { id: createdTemplate.id },
-                    data: { name: template.name }
-                });
-                
-                successCount++;
-                console.log(`✅ Successfully created (retry): ${template.name}`);
-                
-            } catch (retryError) {
-                console.error(`❌ Retry also failed for ${template.name}:`, retryError);
-            }
-        }
+        successCount++;
+        console.log(`✅ Successfully created: ${template.name}`);
+        
+      } catch (error) {
+        console.error(`❌ Failed to create template "${template.name}":`, error);
+      }
     }
     
-    console.log(`Seeding finished. ${successCount}/${allTemplates.length} templates created successfully.`);
+    console.log(`🎉 TaskTemplate seeding completed: ${successCount}/${totalTemplates} templates created successfully.`);
+    
+    if (successCount < totalTemplates) {
+      console.warn(`⚠️ Warning: ${totalTemplates - successCount} templates failed to create.`);
+    }
+    
+  } catch (error) {
+    console.error('💥 Fatal error during TaskTemplate seeding:', error);
+    throw error; // Re-throw to indicate that the seeding process failed
+  }
 }
