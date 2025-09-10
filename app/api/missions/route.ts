@@ -23,7 +23,11 @@ const getMissionsHandler = async (request: NextRequest) => {
   const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc';
 
   const where: Prisma.MissionWhereInput = {};
-  if (searchParams.get('status')) where.status = searchParams.get('status') as any;
+  const status = searchParams.get('status');
+  if (status) {
+    where.status = { in: status.split(',') as any };
+  }
+  
   if (searchParams.get('teamLeaderId')) where.teamLeaderId = searchParams.get('teamLeaderId');
   if (searchParams.get('dateFrom') || searchParams.get('dateTo')) {
     where.scheduledDate = {};
