@@ -5,10 +5,11 @@ import { Decimal } from '@prisma/client/runtime/library'
 
 const prisma = new PrismaClient()
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const subscription = await prisma.subscription.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         lead: true
       }
@@ -25,8 +26,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const body = await request.json()
     const {
       type,
@@ -39,7 +41,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     } = body
 
     const subscription = await prisma.subscription.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(type && { type }),
         ...(status && { status }),
@@ -61,10 +63,11 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     await prisma.subscription.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     return NextResponse.json({ success: true })
