@@ -1,63 +1,314 @@
-// prisma/schema.prisma
-generator client {
-  provider = "prisma-client-js"
-}
-
+// datasource db defines the database connection details.
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// --- MODÈLE UTILISATEUR (INCHANGÉ) ---
+// generator client specifies that Prisma Client should be generated.
+generator client {
+  provider = "prisma-client-js"
+}
+
+// --- CORE MODELS ---
+
+// EXPLANATION: Represents all individuals in the system, from admins to technicians.
+// This is the central hub for identity and role-based access.
 model User {
-  id               String         @id @default(cuid())
+  id               String          @id @default(cuid())
   name             String?
-  email            String?        @unique
+  email            String?         @unique
   emailVerified    DateTime?
   image            String?
-  password         String?
-  role             UserRole       @default(TECHNICIAN)
-  onlineStatus     String         @default("OFFLINE")
+  hashedPassword   String? // Renamed from 'password' for security clarity
+  role             UserRole        @default(TECHNICIAN)
+  onlineStatus     String          @default("OFFLINE")
   lastSeen         DateTime?
   pushSubscription Json?
+
+  // --- Relationships ---
   accounts         Account[]
   sessions         Session[]
-  leads            Lead[]
-  missions         Mission[]      @relation("AssignedTo")
-  teamMember       TeamMember?
+  leadsAssigned    Lead[]          @relation("LeadAssignments") // Leads this user is directly responsible for.
+  missionsLed      Mission[]       @relation("MissionTeamLead") // Missions where this user is the designated Team Leader.
+  teamMemberships  TeamMember[] // The teams this user is a member of.
   activities       Activity[]
-  messages         Message[]
-  conversations    Conversation[] @relation("ConversationParticipants")
+  sentMessages     Message[]       @relation("MessageSender")
+  conversations    Conversation[]  @relation("ConversationParticipants")
   expenses         Expense[]
   fieldReports     FieldReport[]
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  readMessages     Message[]       @relation("MessageReadBy")
 
-  readMessages   Message[]    @relation("MessageReadBy")
+  // --- Timestamps ---
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   @@map("users")
 }
 
-model FieldReport {
-  id                     String   @id @default(cuid())
-  missionId              String   @unique
-  mission                Mission  @relation(fields: [missionId], references: [id])
-  submittedById          String
-  submittedBy            User     @relation(fields: [submittedById], references: [id])
-  submissionDate         DateTime @default(now())
-  generalObservations    String?  @db.Text
-  clientFeedback         String?  @db.Text
-  issuesEncountered      String?  @db.Text
-  materialsUsed          Json?
-  hoursWorked            Decimal  @db.Decimal(5, 2)
-  beforePhotos           String[]
-  afterPhotos            String[]
-  clientSignatureUrl     String?
-  teamLeadSignatureUrl   String?
-  additionalNotes        String?  @db.Text
+// EXPLANATION: Represents a formal group of users (TeamMembers).
+// A Team is assigned to a Mission.
+model Team {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  
+  // --- Relationships ---
+  members     TeamMember[] // List of members that belong to this team.
+  missions    Mission[]    // List of missions assigned to this team.
+
+  // --- Timestamps ---
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("teams")
 }
 
-// --- MODÈLES NEXT-AUTH (INCHANGÉS) ---
+// EXPLANATION: The junction model connecting a User to a Team.
+// This holds details about a user's role and status within a specific team.
+model TeamMember {
+  id           String          @id @default(cuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id])
+  teamId       String
+  team         Team            @relation(fields: [teamId], references: [id])
+  
+  // --- Member-specific attributes ---
+  specialties  TeamSpecialty[]
+  experience   ExperienceLevel
+  availability TeamAvailability @default(AVAILABLE)
+  hourlyRate   Decimal?
+  joinedAt     DateTime        @default(now())
+  isActive     Boolean         @default(true)
+
+  // --- Relationships ---
+  tasks        Task[] // Tasks directly assigned to this team member.
+
+  @@unique([userId, teamId]) // Ensures a user can only be on a specific team once.
+  @@map("team_members")
+}
+
+// EXPLANATION: Represents a potential customer or job opportunity before it's confirmed.
+model Lead {
+  id                String               @id @default(cuid())
+  firstName         String
+  lastName          String
+  phone             String
+  email             String?
+  address           String?
+  gpsLocation       String?
+  status            LeadStatus           @default(NEW)
+  score             Int?                 @default(0)
+  leadType          LeadType             @default(PARTICULIER)
+  company           String?
+  iceNumber         String?
+  activitySector    String?
+  contactPosition   String?
+  department        String?
+  propertyType      PropertyType?
+  estimatedSurface  Int?
+  accessibility     AccessibilityLevel?  @default(EASY)
+  materials         Json?
+  urgencyLevel      UrgencyLevel?
+  budgetRange       String?
+  frequency         Frequency?           @default(PONCTUEL)
+  contractType      ContractType?        @default(INTERVENTION_UNIQUE)
+  needsProducts     Boolean?             @default(false)
+  needsEquipment    Boolean?             @default(false)
+  providedBy        ProviderType?        @default(ENARVA)
+  channel           LeadCanal
+  source            String?
+  hasReferrer       Boolean?             @default(false)
+  referrerContact   String?
+  enarvaRole        EnarvaRole?          @default(PRESTATAIRE_PRINCIPAL)
+  originalMessage   String
+  
+  // --- Relationships ---
+  assignedToId      String?
+  assignedTo        User?                @relation("LeadAssignments", fields: [assignedToId], references: [id])
+  quotes            Quote[]
+  missions          Mission[]
+  activities        Activity[]
+  subscription      Subscription?
+  expenses          Expense[]
+  invoices          Invoice[]
+
+  // --- Timestamps ---
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@map("leads")
+}
+
+// EXPLANATION: A formal offer or price estimation sent to a Lead.
+// Can be for either services or products.
+model Quote {
+  id                String               @id @default(cuid())
+  quoteNumber       String               @unique
+  status            QuoteStatus          @default(DRAFT)
+  businessType      QuoteBusinessType    @default(SERVICE)
+  lineItems         Json // Detailed list of items/services in the quote.
+  subTotalHT        Decimal              @default(0)
+  vatAmount         Decimal              @default(0)
+  totalTTC          Decimal              @default(0)
+  finalPrice        Decimal
+  
+  // --- Relationships ---
+  leadId            String
+  lead              Lead                 @relation(fields: [leadId], references: [id])
+  missions          Mission[]
+
+  // --- Timestamps & Details ---
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  expiresAt         DateTime
+  type              QuoteType?
+  propertyType      PropertyType?
+  surface           Int?
+  levels            Int?                 @default(1)
+  productCategory   ProductQuoteCategory?
+  productDetails    Json?
+  deliveryType      DeliveryType?
+  deliveryAddress   String?
+  deliveryNotes     String?
+  validatedAt       DateTime?
+
+  @@map("quotes")
+}
+
+// EXPLANATION: A confirmed and scheduled job, created from a Lead (and optionally a Quote).
+model Mission {
+  id                   String           @id @default(cuid())
+  missionNumber        String           @unique
+  status               MissionStatus    @default(SCHEDULED)
+  priority             Priority         @default(NORMAL)
+  type                 MissionType      @default(SERVICE)
+  technicalVisitReport Json?
+  scheduledDate        DateTime
+  estimatedDuration    Int
+  actualStartTime      DateTime?
+  actualEndTime        DateTime?
+  address              String
+  coordinates          String?
+  accessNotes          String?
+  
+  // --- Relationships ---
+  teamLeaderId         String?
+  teamLeader           User?            @relation("MissionTeamLead", fields: [teamLeaderId], references: [id])
+  teamId               String?
+  team                 Team?            @relation(fields: [teamId], references: [id]) // The team assigned to this mission.
+  leadId               String
+  lead                 Lead             @relation(fields: [leadId], references: [id])
+  quoteId              String?
+  quote                Quote?           @relation(fields: [quoteId], references: [id])
+  tasks                Task[]
+  qualityChecks        QualityCheck[]
+  inventoryUsed        InventoryUsage[]
+  expenses             Expense[]
+  invoice              Invoice?
+  conversation         Conversation?
+  fieldReport          FieldReport?
+  
+  // --- Validation & Feedback ---
+  clientValidated      Boolean          @default(false)
+  clientFeedback       String?
+  clientRating         Int?
+  invoiceGenerated     Boolean          @default(false)
+  invoiceId            String?          @unique
+  adminValidated       Boolean?
+  adminValidatedBy     String?
+  adminValidatedAt     DateTime?
+  adminNotes           String?
+  qualityScore         Int?
+  issuesFound          String?
+  correctionRequired   Boolean?
+  
+  // --- Timestamps ---
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@map("missions")
+}
+
+// EXPLANATION: An individual action item or checklist item within a Mission.
+model Task {
+  id            String       @id @default(cuid())
+  title         String
+  description   String?
+  category      TaskCategory
+  type          TaskType
+  status        TaskStatus   @default(ASSIGNED)
+  
+  // --- Relationships ---
+  missionId     String
+  mission       Mission      @relation(fields: [missionId], references: [id])
+  assignedToId  String?
+  assignedTo    TeamMember?  @relation(fields: [assignedToId], references: [id]) // Assigned to a specific team member.
+
+  // --- Time & Tracking ---
+  estimatedTime Int?
+  actualTime    Int?
+  notes         String?
+  completedAt   DateTime?
+  validatedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("tasks")
+}
+
+// EXPLANATION: A dedicated chat/conversation thread for a specific Mission.
+model Conversation {
+  id           String    @id @default(cuid())
+  missionId    String    @unique
+  mission      Mission   @relation(fields: [missionId], references: [id])
+  participants User[]    @relation("ConversationParticipants")
+  messages     Message[]
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("conversations")
+}
+
+// EXPLANATION: An individual message within a Mission's Conversation.
+model Message {
+  id             String       @id @default(cuid())
+  content        String
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  senderId       String
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id])
+  isRead         Boolean      @default(false)
+  readBy         User[]       @relation("MessageReadBy")
+  attachments    String[]
+  createdAt      DateTime     @default(now())
+
+  @@map("messages")
+}
+
+// --- OTHER MODELS (CLEANED AND STANDARDIZED) ---
+
+// EXPLANATION: A report submitted from the field for a specific mission.
+model FieldReport {
+  id                   String   @id @default(cuid())
+  missionId            String   @unique
+  mission              Mission  @relation(fields: [missionId], references: [id])
+  submittedById        String
+  submittedBy          User     @relation(fields: [submittedById], references: [id])
+  submissionDate       DateTime @default(now())
+  generalObservations  String?  @db.Text
+  clientFeedback       String?  @db.Text
+  issuesEncountered    String?  @db.Text
+  materialsUsed        Json?
+  hoursWorked          Decimal  @db.Decimal(5, 2)
+  beforePhotos         String[]
+  afterPhotos          String[]
+  clientSignatureUrl   String?
+  teamLeadSignatureUrl String?
+  additionalNotes      String?  @db.Text
+}
+
+// EXPLANATION: Next-Auth model for OAuth providers.
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -76,6 +327,7 @@ model Account {
   @@unique([provider, providerAccountId])
 }
 
+// EXPLANATION: Next-Auth model for user sessions.
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
@@ -84,6 +336,7 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// EXPLANATION: Next-Auth model for verification tokens (e.g., email verification).
 model VerificationToken {
   identifier String
   token      String   @unique
@@ -92,202 +345,12 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// --- MODÈLE LEAD (ENTIÈREMENT MIS À JOUR) ---
-model Lead {
-  id String @id @default(cuid())
-
-  // 1. Informations Générales
-  firstName   String
-  lastName    String
-  phone       String
-  email       String?
-  address     String?
-  gpsLocation String?
-  status      LeadStatus @default(NEW)
-  score       Int?       @default(0)
-
-  // 2. Détails Professionnels
-  leadType        LeadType @default(PARTICULIER)
-  company         String?
-  iceNumber       String?
-  activitySector  String?
-  contactPosition String?
-  department      String?
-
-  // 3. Détails de la Demande
-  propertyType     PropertyType?
-  estimatedSurface Int?
-  accessibility    AccessibilityLevel?   @default(EASY)
-  materials        Json? // Stockera les sélections de matériaux
-  urgencyLevel     UrgencyLevel?
-  budgetRange      String?
-  frequency        Frequency?            @default(PONCTUEL)
-  contractType     ContractType?         @default(INTERVENTION_UNIQUE)
-
-  // 4. Produits & Équipements
-  needsProducts  Boolean? @default(false)
-  needsEquipment Boolean? @default(false)
-  providedBy     ProviderType?           @default(ENARVA)
-
-  // 5. Origine du Lead
-  channel         LeadCanal
-  source          String? // Source précise
-  hasReferrer     Boolean?     @default(false)
-  referrerContact String?
-  enarvaRole      EnarvaRole?  @default(PRESTATAIRE_PRINCIPAL)
-
-  // 6. Suivi et Planification (Champs existants)
-  originalMessage String
-  assignedToId    String?
-  assignedTo      User?      @relation(fields: [assignedToId], references: [id])
-
-  // Relations
-  quotes       Quote[]
-  missions     Mission[]
-  activities   Activity[]
-  subscription Subscription?
-  expenses     Expense[]
-  invoices     Invoice[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-
-  @@map("leads")
-}
-
-// --- MODÈLE DEVIS (MIS À JOUR MAJEURE POUR SERVICES ET PRODUITS) ---
-model Quote {
-  id          String      @id @default(cuid())
-  quoteNumber String      @unique
-  status      QuoteStatus @default(DRAFT)
-
-  // NOUVEAU: Type de devis - Service ou Produit
-  businessType QuoteBusinessType @default(SERVICE) // SERVICE ou PRODUCT
-
-  // Champs pour devis détaillés et éditables
-  lineItems  Json // [{"id": 1, "type": "base", "description": "Forfait de base...", "detail": "170m² x 14 DH/m²", "amount": 2380, "editable": true}, {...}]
-  subTotalHT Decimal     @default(0)
-  vatAmount  Decimal     @default(0)
-  totalTTC   Decimal     @default(0)
-  finalPrice Decimal // Le montant final arrondi présenté au client
-
-  // Relations
-  leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id])
-  missions Mission[]
-
-  // Métadonnées
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  expiresAt DateTime
-
-  // SERVICES: Champs pour devis de services (nettoyage, etc.)
-  type         QuoteType?    // EXPRESS, STANDARD, PREMIUM
-  propertyType PropertyType?
-  surface      Int?
-  levels       Int?         @default(1)
-
-  // PRODUCTS: Nouveaux champs pour devis de produits
-  productCategory ProductQuoteCategory? // FURNITURE, EQUIPMENT, CONSUMABLES, etc.
-  productDetails  Json? // Détails spécifiques des produits: {"items": [{"name": "Table", "qty": 2, "unitPrice": 500}], "delivery": {...}}
-  deliveryType    DeliveryType? // PICKUP, STANDARD_DELIVERY, EXPRESS_DELIVERY
-  deliveryAddress String? // Adresse de livraison si différente
-  deliveryNotes   String? // Notes spéciales pour la livraison
-
-  validatedAt DateTime?
-
-  @@map("quotes")
-}
-
-model Mission {
-  id                   String         @id @default(cuid())
-  missionNumber        String         @unique
-  status               MissionStatus  @default(SCHEDULED)
-  priority             Priority       @default(NORMAL)
-  type                 MissionType    @default(SERVICE)
-  technicalVisitReport Json?
-  scheduledDate        DateTime
-  estimatedDuration    Int
-  actualStartTime      DateTime?
-  actualEndTime        DateTime?
-  address              String
-  coordinates          String?
-  accessNotes          String?
-  teamLeaderId         String?
-  teamLeader           User?          @relation("AssignedTo", fields: [teamLeaderId], references: [id])
-  teamMembers          TeamMember[]   @relation("MissionToTeamMember")
-  leadId               String
-  lead                 Lead           @relation(fields: [leadId], references: [id])
-  quoteId              String?
-  quote                Quote?         @relation(fields: [quoteId], references: [id])
-  tasks                Task[]
-  qualityChecks        QualityCheck[]
-  inventoryUsed        InventoryUsage[]
-  expenses             Expense[]
-  clientValidated      Boolean        @default(false)
-  clientFeedback       String?
-  clientRating         Int?
-  invoiceGenerated     Boolean         @default(false)
-  invoiceId            String?         @unique
-  invoice              Invoice?
-  conversation         Conversation?
-  fieldReport          FieldReport?
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
-
-  adminValidated     Boolean?
-  adminValidatedBy   String?
-  adminValidatedAt   DateTime?
-  adminNotes         String?
-  qualityScore       Int?
-  issuesFound        String?
-  correctionRequired Boolean?
-
-  @@map("missions")
-}
-
-model TeamMember {
-  id           String           @id @default(cuid())
-  userId       String           @unique
-  user         User             @relation(fields: [userId], references: [id])
-  specialties  TeamSpecialty[]
-  experience   ExperienceLevel
-  availability TeamAvailability @default(AVAILABLE)
-  missions     Mission[]        @relation("MissionToTeamMember")
-  tasks        Task[]
-  hourlyRate   Decimal?
-  joinedAt     DateTime         @default(now())
-  isActive     Boolean          @default(true)
-
-  @@map("team_members")
-}
-
-model Task {
-  id            String       @id @default(cuid())
-  title         String
-  description   String?
-  category      TaskCategory
-  type          TaskType
-  status        TaskStatus   @default(ASSIGNED)
-  missionId     String
-  mission       Mission      @relation(fields: [missionId], references: [id])
-  assignedToId  String?
-  assignedTo    TeamMember?  @relation(fields: [assignedToId], references: [id])
-  estimatedTime Int? // en minutes
-  actualTime    Int? // en minutes
-  notes         String?
-  completedAt   DateTime?
-  validatedAt   DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-
-  @@map("tasks")
-}
-
+// EXPLANATION: A reusable template for creating a set of Tasks.
 model TaskTemplate {
   id          String       @id @default(cuid())
   name        String
   description String?
-  tasks       Json // Array of task objects
+  tasks       Json
   category    TaskCategory
   isActive    Boolean      @default(true)
   createdAt   DateTime     @default(now())
@@ -296,50 +359,24 @@ model TaskTemplate {
   @@map("task_templates")
 }
 
-model Conversation {
-  id           String    @id @default(cuid())
-  missionId    String    @unique
-  mission      Mission   @relation(fields: [missionId], references: [id])
-  participants User[]    @relation("ConversationParticipants")
-  messages     Message[]
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  @@map("conversations")
-}
-
-model Message {
-  id             String       @id @default(cuid())
-  content        String
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
-  senderId       String
-  sender         User         @relation(fields: [senderId], references: [id])
-  isRead         Boolean      @default(false)
-  readBy         User[]       @relation("MessageReadBy")
-  attachments    String[]
-  createdAt      DateTime     @default(now())
-
-  @@map("messages")
-}
-
+// EXPLANATION: A quality control check performed on a Mission.
 model QualityCheck {
-  id          String             @id @default(cuid())
+  id          String           @id @default(cuid())
   missionId   String
-  mission     Mission            @relation(fields: [missionId], references: [id])
+  mission     Mission          @relation(fields: [missionId], references: [id])
   type        QualityCheckType
-  status      QualityStatus      @default(PENDING)
+  status      QualityStatus    @default(PENDING)
   checkedBy   String?
   checkedAt   DateTime?
   notes       String?
   photos      String[]
-  issues      Json? // Array of issues found
+  issues      Json?
   validatedAt DateTime?
 
   @@map("quality_checks")
 }
 
+// EXPLANATION: Represents a physical inventory item (product, equipment).
 model Inventory {
   id           String           @id @default(cuid())
   name         String
@@ -356,6 +393,7 @@ model Inventory {
   @@map("inventory")
 }
 
+// EXPLANATION: Records the usage of an Inventory item for a specific Mission.
 model InventoryUsage {
   id          String    @id @default(cuid())
   quantity    Decimal
@@ -369,6 +407,7 @@ model InventoryUsage {
   @@map("inventory_usage")
 }
 
+// EXPLANATION: Represents a recurring service subscription for a Lead.
 model Subscription {
   id               String             @id @default(cuid())
   type             SubscriptionType
@@ -386,6 +425,7 @@ model Subscription {
   @@map("subscriptions")
 }
 
+// EXPLANATION: A log of significant events or actions within the application.
 model Activity {
   id          String       @id @default(cuid())
   type        ActivityType
@@ -401,7 +441,7 @@ model Activity {
   @@map("activities")
 }
 
-// --- NEW SYSTEM LOGGING MODEL ---
+// EXPLANATION: Logs for system-level events, like backups or errors.
 model SystemLog {
   id        String    @id @default(cuid())
   type      LogType
@@ -413,22 +453,24 @@ model SystemLog {
   @@map("system_logs")
 }
 
+// EXPLANATION: Represents a financial invoice for a Mission.
 model Invoice {
-  id              String        @id @default(cuid())
-  invoiceNumber   String        @unique
-  amount          Decimal       @db.Decimal(10, 2)
-  status          InvoiceStatus @default(DRAFT)
-  issueDate       DateTime      @default(now())
-  dueDate         DateTime
-  missionId       String        @unique
-  mission         Mission       @relation(fields: [missionId], references: [id])
-  leadId          String
-  lead            Lead          @relation(fields: [leadId], references: [id])
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  description     String?
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  amount        Decimal       @db.Decimal(10, 2)
+  status        InvoiceStatus @default(DRAFT)
+  issueDate     DateTime      @default(now())
+  dueDate       DateTime
+  missionId     String        @unique
+  mission       Mission       @relation(fields: [missionId], references: [id])
+  leadId        String
+  lead          Lead          @relation(fields: [leadId], references: [id])
+  description   String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
+// EXPLANATION: Records expenses related to a Mission, Lead, or general operations.
 model Expense {
   id              String          @id @default(cuid())
   date            DateTime
@@ -453,18 +495,79 @@ model Expense {
   @@map("expenses")
 }
 
-// --- ENUMS ---
-enum LogType {
-  BACKUP
-  ERROR
-  INFO
-  SECURITY
+// --- ENUMS (Consolidated and Organized) ---
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  AGENT
+  TEAM_LEADER
+  TECHNICIAN
 }
 
-enum LogStatus {
-  SUCCESS
-  FAILED
+enum LeadStatus {
+  NEW
+  TO_QUALIFY
+  WAITING_INFO
+  QUALIFIED
+  VISIT_PLANNED
+  ON_VISIT
+  VISIT_DONE
+  QUOTE_SENT
+  QUOTE_ACCEPTED
+  QUOTE_REFUSED
+  MISSION_SCHEDULED
   IN_PROGRESS
+  COMPLETED
+  INTERVENTION_PLANNED
+  INTERVENTION_IN_PROGRESS
+  INTERVENTION_DONE
+  QUALITY_CONTROL
+  CLIENT_TO_CONFIRM_END
+  CLIENT_CONFIRMED
+  DELIVERY_PLANNED
+  DELIVERY_DONE
+  SIGNED_DELIVERY_NOTE
+  PENDING_PAYMENT
+  PAID_OFFICIAL
+  PAID_CASH
+  REFUNDED
+  PENDING_REFUND
+  FOLLOW_UP_SENT
+  UPSELL_IN_PROGRESS
+  UPSELL_CONVERTED
+  REWORK_PLANNED
+  REWORK_DONE
+  UNDER_WARRANTY
+  AFTER_SALES_SERVICE
+  CLIENT_ISSUE
+  IN_DISPUTE
+  CLIENT_PAUSED
+  LEAD_LOST
+  CANCELLED
+  CANCELED_BY_CLIENT
+  CANCELED_BY_ENARVA
+  INTERNAL_REVIEW
+  AWAITING_PARTS
+  CONTRACT_SIGNED
+  UNDER_CONTRACT
+  SUBCONTRACTED
+  OUTSOURCED
+  WAITING_THIRD_PARTY
+  PRODUCT_ONLY
+  PRODUCT_SUPPLIER
+  DELIVERY_ONLY
+  AFFILIATE_LEAD
+  SUBCONTRACTOR_LEAD
+}
+
+enum LeadType {
+  PARTICULIER
+  PROFESSIONNEL
+  PUBLIC
+  NGO
+  SYNDIC
+  OTHER
 }
 
 enum LeadCanal {
@@ -502,167 +605,6 @@ enum LeadCanal {
   CHANTIER_EN_COURS
 }
 
-enum Frequency {
-  PONCTUEL
-  HEBDOMADAIRE
-  MENSUEL
-  BIMENSUEL
-  TRIMESTRIEL
-  QUARTANNE
-  SEMESTRIEL
-  ANNUEL
-  CONTRAT_CADRE
-  RECURRING // Ajouté pour les services récurrents
-  AUTRE // Pour les fréquences non standard
-}
-
-enum ContractType {
-  INTERVENTION_UNIQUE
-  MAINTENANCE
-  ABONNEMENT
-  CONTRAT_CADRE
-  RECURRING // Ajouté pour les services récurrents
-  AUTRE // Pour les types de contrat non standard
-}
-
-enum MissionType {
-  SERVICE
-  TECHNICAL_VISIT
-  DELIVERY
-  INTERNAL
-  RECURRING // Ajouté pour les services récurrents
-}
-
-enum ProviderType {
-  ENARVA
-  CLIENT
-  MIXTE
-}
-
-enum EnarvaRole {
-  PRESTATAIRE_PRINCIPAL
-  SOUS_TRAITANT
-  CO_TRAITANT
-  AUTRE
-}
-
-enum ExpenseCategory {
-  OPERATIONS
-  REVENTE_NEGOCE
-  RESSOURCES_HUMAINES
-  ADMINISTRATIF_FINANCIER
-  MARKETING_COMMERCIAL
-  LOGISTIQUE_MOBILITE
-  INFRASTRUCTURES_LOCAUX
-  LOCATIONS
-  EXCEPTIONNELLES_DIVERSES
-}
-
-enum PaymentMethod {
-  CASH
-  VIREMENT
-  CARTE
-  CHEQUE
-  MOBILE
-  AUTRE
-}
-
-enum LeadType {
-  PARTICULIER
-  PROFESSIONNEL
-  PUBLIC
-  NGO
-  SYNDIC
-  OTHER
-}
-
-enum InvoiceStatus {
-  DRAFT
-  SENT
-  PAID
-  OVERDUE
-  CANCELLED
-}
-
-enum UserRole {
-  ADMIN
-  MANAGER
-  AGENT
-  TEAM_LEADER
-  TECHNICIAN
-}
-
-enum LeadStatus {
-  // PHASE 1: Acquisition & Qualification
-  NEW
-  TO_QUALIFY
-  WAITING_INFO
-  QUALIFIED
-
-  // PHASE 2: Pré-vente / Devis
-  VISIT_PLANNED
-  ON_VISIT
-  VISIT_DONE
-  QUOTE_SENT
-  QUOTE_ACCEPTED
-  QUOTE_REFUSED
-
-  // PHASE 3: Intervention & Livraison
-  MISSION_SCHEDULED
-  IN_PROGRESS
-  COMPLETED
-  INTERVENTION_PLANNED
-  INTERVENTION_IN_PROGRESS
-  INTERVENTION_DONE
-  QUALITY_CONTROL
-  CLIENT_TO_CONFIRM_END
-  CLIENT_CONFIRMED
-  DELIVERY_PLANNED
-  DELIVERY_DONE
-  SIGNED_DELIVERY_NOTE
-
-  // PHASE 4: Paiement
-  PENDING_PAYMENT
-  PAID_OFFICIAL
-  PAID_CASH
-  REFUNDED
-  PENDING_REFUND
-
-  // PHASE 5: Suivi / SAV / Upsell
-  FOLLOW_UP_SENT
-  UPSELL_IN_PROGRESS
-  UPSELL_CONVERTED
-  REWORK_PLANNED
-  REWORK_DONE
-  UNDER_WARRANTY
-  AFTER_SALES_SERVICE
-
-  // PHASE 6: Problèmes / Anomalies
-  CLIENT_ISSUE
-  IN_DISPUTE
-  CLIENT_PAUSED
-  LEAD_LOST
-  CANCELLED
-  CANCELED_BY_CLIENT
-  CANCELED_BY_ENARVA
-  INTERNAL_REVIEW
-  AWAITING_PARTS
-
-  // PHASE 7: Contrats / Sous-traitance
-  CONTRACT_SIGNED
-  UNDER_CONTRACT
-  SUBCONTRACTED
-  OUTSOURCED
-  WAITING_THIRD_PARTY
-
-  // PHASE 8: Produits / Leads externes
-  PRODUCT_ONLY
-  PRODUCT_SUPPLIER
-  DELIVERY_ONLY
-  AFFILIATE_LEAD
-  SUBCONTRACTOR_LEAD
-}
-
 enum PropertyType {
   APARTMENT_SMALL
   APARTMENT_MEDIUM
@@ -684,14 +626,6 @@ enum PropertyType {
   OTHER
 }
 
-enum MaterialType {
-  STANDARD
-  MARBLE
-  PARQUET
-  LUXURY
-  MIXED
-}
-
 enum AccessibilityLevel {
   EASY
   MEDIUM
@@ -708,10 +642,40 @@ enum UrgencyLevel {
   IMMEDIATE
 }
 
-enum QuoteType {
-  EXPRESS
-  STANDARD
-  PREMIUM
+enum Frequency {
+  PONCTUEL
+  HEBDOMADAIRE
+  MENSUEL
+  BIMENSUEL
+  TRIMESTRIEL
+  QUARTANNE
+  SEMESTRIEL
+  ANNUEL
+  CONTRAT_CADRE
+  RECURRING
+  AUTRE
+}
+
+enum ContractType {
+  INTERVENTION_UNIQUE
+  MAINTENANCE
+  ABONNEMENT
+  CONTRAT_CADRE
+  RECURRING
+  AUTRE
+}
+
+enum ProviderType {
+  ENARVA
+  CLIENT
+  MIXTE
+}
+
+enum EnarvaRole {
+  PRESTATAIRE_PRINCIPAL
+  SOUS_TRAITANT
+  CO_TRAITANT
+  AUTRE
 }
 
 enum QuoteStatus {
@@ -723,35 +687,38 @@ enum QuoteStatus {
   EXPIRED
 }
 
-// NOUVEAU: Enum pour distinguer Services vs Produits
+enum QuoteType {
+  EXPRESS
+  STANDARD
+  PREMIUM
+}
+
 enum QuoteBusinessType {
-  SERVICE   // Devis pour services (nettoyage, maintenance, etc.)
-  PRODUCT   // Devis pour produits (mobilier, équipements, etc.)
+  SERVICE
+  PRODUCT
 }
 
-// NOUVEAU: Categories pour les devis produits
 enum ProductQuoteCategory {
-  FURNITURE        // Mobilier
-  EQUIPMENT        // Équipements 
-  CONSUMABLES      // Consommables
-  ELECTRONICS      // Électronique
-  DECORATION       // Décoration
-  TEXTILES         // Textiles (rideaux, tapis, etc.)
-  LIGHTING         // Éclairage
-  STORAGE          // Rangement
-  KITCHEN_ITEMS    // Articles de cuisine
-  BATHROOM_ITEMS   // Articles salle de bain
-  OFFICE_SUPPLIES  // Fournitures de bureau
-  OTHER           // Autres
+  FURNITURE
+  EQUIPMENT
+  CONSUMABLES
+  ELECTRONICS
+  DECORATION
+  TEXTILES
+  LIGHTING
+  STORAGE
+  KITCHEN_ITEMS
+  BATHROOM_ITEMS
+  OFFICE_SUPPLIES
+  OTHER
 }
 
-// NOUVEAU: Types de livraison pour les produits
 enum DeliveryType {
-  PICKUP             // Récupération en magasin/entrepôt
-  STANDARD_DELIVERY  // Livraison standard (3-5 jours)
-  EXPRESS_DELIVERY   // Livraison express (24-48h)
-  SCHEDULED_DELIVERY // Livraison programmée
-  WHITE_GLOVE       // Service livraison premium avec installation
+  PICKUP
+  STANDARD_DELIVERY
+  EXPRESS_DELIVERY
+  SCHEDULED_DELIVERY
+  WHITE_GLOVE
 }
 
 enum MissionStatus {
@@ -761,6 +728,14 @@ enum MissionStatus {
   CLIENT_VALIDATION
   COMPLETED
   CANCELLED
+}
+
+enum MissionType {
+  SERVICE
+  TECHNICAL_VISIT
+  DELIVERY
+  INTERNAL
+  RECURRING
 }
 
 enum Priority {
@@ -851,7 +826,7 @@ enum SubscriptionType {
   SILVER
   GOLD
   PLATINUM
-  CUSTOM // Ajouté pour les contrats sur mesure
+  CUSTOM
 }
 
 enum SubscriptionStatus {
@@ -874,3 +849,46 @@ enum ActivityType {
   QUALITY_ISSUE
   CLIENT_FEEDBACK
 }
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum ExpenseCategory {
+  OPERATIONS
+  REVENTE_NEGOCE
+  RESSOURCES_HUMAINES
+  ADMINISTRATIF_FINANCIER
+  MARKETING_COMMERCIAL
+  LOGISTIQUE_MOBILITE
+  INFRASTRUCTURES_LOCAUX
+  LOCATIONS
+  EXCEPTIONNELLES_DIVERSES
+}
+
+enum PaymentMethod {
+  CASH
+  VIREMENT
+  CARTE
+  CHEQUE
+  MOBILE
+  AUTRE
+}
+
+enum LogType {
+  BACKUP
+  ERROR
+  INFO
+  SECURITY
+}
+
+enum LogStatus {
+  SUCCESS
+  FAILED
+  IN_PROGRESS
+}
+

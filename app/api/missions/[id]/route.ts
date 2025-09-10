@@ -1,146 +1,150 @@
-// app/api/missions/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import { z } from 'zod';
 
 const prisma = new PrismaClient();
 
-export async function GET(
-  request: Request, 
-  { params }: { params: Promise<{ id: string }> }
-) {
-    try {
-        const { id } = await params;
-        
-        const mission = await prisma.mission.findUnique({ 
-            where: { id },
-            include: {
-                lead: true,
-                quote: true,
-                teamLeader: true,
-                teamMembers: true,
-                tasks: {
-                    include: {
-                        assignedTo: true
-                    },
-                    orderBy: { createdAt: 'asc' }
-                },
-                qualityChecks: true,
-                inventoryUsed: {
-                    include: {
-                        inventory: true
-                    }
-                },
-                conversation: {
-                    include: {
-                        messages: {
-                            include: {
-                                sender: true
-                            },
-                            orderBy: { createdAt: 'desc' },
-                            take: 10
-                        }
-                    }
-                }
-            }
-        });
+const missionUpdateSchema = z.object({
+  name: z.string().min(1, 'Mission name is required'),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  status: z.string().optional(),
+  teamId: z.string().optional().nullable(),
+  tasks: z.array(z.object({
+    id: z.string().optional(),
+    title: z.string(),
+    category: z.string(),
+    type: z.string(),
+    status: z.string().optional(),
+    estimatedTime: z.number().optional(),
+  })).optional(),
+});
 
-        if (!mission) {
-            return new NextResponse('Mission not found', { status: 404 });
-        }
-        return NextResponse.json(mission);
-    } catch (error) {
-        console.error(`Failed to fetch mission:`, error);
-        return new NextResponse('Internal Server Error', { status: 500 });
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const mission = await prisma.mission.findUnique({
+      where: { id: params.id },
+      include: {
+        tasks: true,
+        team: {
+          select: {
+            id: true,
+            name: true,
+            members: {
+              select: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    image: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        quote: {
+          include: {
+            lead: true,
+          },
+        },
+      },
+    });
+
+    if (!mission) {
+      return NextResponse.json({ error: 'Mission not found' }, { status: 404 });
     }
+
+    return NextResponse.json(mission);
+  } catch (error) {
+    console.error('Failed to retrieve mission:', error);
+    return NextResponse.json({ error: 'Failed to retrieve mission' }, { status: 500 });
+  }
 }
 
-export async function PATCH(
-  request: Request, 
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: Request, { params }: { params: { id: string } }) {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
-        const { id } = await params;
         const body = await request.json();
-        
-        const { 
-            missionNumber, status, priority, type, scheduledDate, estimatedDuration,
-            address, coordinates, accessNotes, clientFeedback, clientRating,
-            clientValidated, invoiceGenerated, teamLeaderId, teamMemberIds, tasks
-        } = body;
-
-        const dataToUpdate: any = {};
-
-        if (missionNumber) dataToUpdate.missionNumber = missionNumber;
-        if (status) dataToUpdate.status = status;
-        if (priority) dataToUpdate.priority = priority;
-        if (type) dataToUpdate.type = type;
-        if (scheduledDate) dataToUpdate.scheduledDate = new Date(scheduledDate);
-        if (estimatedDuration !== undefined) dataToUpdate.estimatedDuration = parseInt(estimatedDuration, 10);
-        if (address) dataToUpdate.address = address;
-        if (accessNotes !== undefined) dataToUpdate.accessNotes = accessNotes;
-        if (coordinates !== undefined) dataToUpdate.coordinates = coordinates;
-        if (clientFeedback !== undefined) dataToUpdate.clientFeedback = clientFeedback;
-        if (clientRating !== undefined) dataToUpdate.clientRating = parseInt(clientRating, 10) || null;
-        if (clientValidated !== undefined) dataToUpdate.clientValidated = Boolean(clientValidated);
-        if (invoiceGenerated !== undefined) dataToUpdate.invoiceGenerated = Boolean(invoiceGenerated);
-
-        if (teamLeaderId) {
-            dataToUpdate.teamLeader = { connect: { id: teamLeaderId } };
-        } else if (teamLeaderId === null) {
-            dataToUpdate.teamLeader = { disconnect: true };
-        }
-        
-        if (teamMemberIds && Array.isArray(teamMemberIds)) {
-            dataToUpdate.teamMembers = { set: teamMemberIds.map((memberId: string) => ({ id: memberId })) };
-        }
+        const { name, startDate, endDate, status, teamId, tasks = [] } = missionUpdateSchema.parse(body);
 
         const updatedMission = await prisma.$transaction(async (tx) => {
-            const mission = await tx.mission.update({
-                where: { id },
-                data: dataToUpdate,
+            const missionUpdateData: any = {
+                name,
+                status,
+            };
+
+            if (startDate) missionUpdateData.startDate = new Date(startDate);
+            if (endDate) missionUpdateData.endDate = new Date(endDate);
+            if (teamId) {
+                missionUpdateData.team = { connect: { id: teamId } };
+            } else {
+                missionUpdateData.team = { disconnect: true };
+            }
+
+            const updatedMission = await tx.mission.update({
+                where: { id: params.id },
+                data: missionUpdateData,
             });
 
-            if (tasks && Array.isArray(tasks)) {
-                await tx.task.deleteMany({ where: { missionId: id } });
-                if (tasks.length > 0) {
-                    await tx.task.createMany({
-                        data: tasks.map((task: any) => ({
-                            title: task.title,
-                            category: task.category,
-                            status: task.status || 'ASSIGNED',
-                            estimatedTime: task.estimatedTime || 0,
-                            missionId: id,
-                        })),
-                    });
-                }
+            // Delete all existing tasks for this mission to replace them with the new list
+            await tx.task.deleteMany({
+                where: { missionId: params.id },
+            });
+
+            // Create new tasks from the provided list
+            if (tasks.length > 0) {
+                await tx.task.createMany({
+                    data: tasks.map((task: any) => ({
+                        title: task.title,
+                        type: task.type,
+                        category: task.category,
+                        status: task.status || 'PENDING',
+                        estimatedTime: task.estimatedTime,
+                        missionId: updatedMission.id,
+                    })),
+                });
             }
-            return mission;
+
+            return updatedMission;
         });
 
         return NextResponse.json(updatedMission);
     } catch (error) {
-        console.error(`Failed to update mission:`, error);
-        return new NextResponse('Internal Server Error', { status: 500 });
+        if (error instanceof z.ZodError) {
+            return NextResponse.json({ error: error.errors }, { status: 400 });
+        }
+        console.error('Failed to update mission:', error);
+        return NextResponse.json({ error: 'Failed to update mission' }, { status: 500 });
     }
 }
 
-export async function DELETE(
-  request: Request, 
-  { params }: { params: Promise<{ id: string }> }
-) {
+
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
-        const { id } = await params;
+        await prisma.mission.delete({
+            where: { id: params.id },
+        });
 
-        await prisma.$transaction([
-            prisma.task.deleteMany({ where: { missionId: id } }),
-            prisma.expense.updateMany({ where: { missionId: id }, data: { missionId: null } }),
-            prisma.mission.delete({ where: { id } }),
-        ]);
-
-        return new NextResponse(null, { status: 204 });
+        return NextResponse.json({ message: 'Mission deleted successfully' }, { status: 200 });
     } catch (error) {
-        console.error(`Failed to delete mission:`, error);
-        return new NextResponse('Internal Server Error', { status: 500 });
+        console.error('Failed to delete mission:', error);
+        return NextResponse.json({ error: 'Failed to delete mission' }, { status: 500 });
     }
 }
