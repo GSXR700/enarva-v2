@@ -59,16 +59,6 @@ export async function GET(request: NextRequest) {
               createdAt: true,
             },
           },
-          missions: {
-            select: {
-              id: true,
-              missionNumber: true,
-              status: true,
-              scheduledDate: true,
-            },
-            orderBy: { scheduledDate: 'desc' },
-            take: 5,
-          },
           tasks: {
             select: {
               id: true,
@@ -88,7 +78,6 @@ export async function GET(request: NextRequest) {
           },
           _count: {
             select: {
-              missions: true,
               tasks: true,
             },
           },
@@ -130,18 +119,19 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
-      name, // Changed from firstName, lastName to name
+      name,
       email,
       phone,
       role,
       password,
+      teamId, // Added teamId
       specialties,
       experienceLevel,
       availability,
     } = body;
 
     // Validate required fields
-    if (!name || !email || !phone || !role || !password) {
+    if (!name || !email || !phone || !role || !password || !teamId) {
       return new NextResponse('Missing required fields', { status: 400 });
     }
 
@@ -164,7 +154,7 @@ export async function POST(request: NextRequest) {
         data: {
           name,
           email,
-          password: hashedPassword,
+          hashedPassword: hashedPassword, // Corrected field name
           role,
           onlineStatus: 'OFFLINE',
         },
@@ -174,10 +164,10 @@ export async function POST(request: NextRequest) {
       const teamMember = await tx.teamMember.create({
         data: {
           userId: newUser.id,
+          teamId: teamId, // Added missing teamId
           specialties: specialties || [],
-          experience: experienceLevel || 'JUNIOR', // Changed to experience
+          experience: experienceLevel || 'JUNIOR',
           availability: availability || 'AVAILABLE',
-         
         },
         include: {
           user: {

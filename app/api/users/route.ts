@@ -1,30 +1,40 @@
 // app/api/users/route.ts
 import { NextResponse } from 'next/server'
-import { PrismaClient, UserRole } from '@prisma/client'
-import bcrypt from 'bcryptjs'
+import { PrismaClient, UserRole, Prisma } from '@prisma/client' // Import de Prisma
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-
-export const dynamic = 'force-dynamic'
+import bcrypt from 'bcryptjs'
+import { ExtendedUser } from '@/types/next-auth'
 
 const prisma = new PrismaClient()
 
-// GET /api/users - Fetch all users
+// GET /api/users - Get all users with pagination and search
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions)
-    
-    if (!session || session.user.role !== 'ADMIN') {
+    if (!session || (session.user as ExtendedUser).role !== 'ADMIN') {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
-    const role = searchParams.get('role')
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const limit = parseInt(searchParams.get('limit') || '10', 10)
+    const search = searchParams.get('search') || ''
 
-    const whereClause = role ? { role: role as UserRole } : {}
+    const where: Prisma.UserWhereInput = search // Typage explicite de la clause where
+      ? {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+          ],
+        }
+      : {}
 
     const users = await prisma.user.findMany({
-      where: whereClause,
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         name: true,
@@ -34,15 +44,22 @@ export async function GET(request: Request) {
         onlineStatus: true,
         lastSeen: true,
         createdAt: true,
-        updatedAt: true
+        updatedAt: true,
+        _count: {
+          select: { leadsAssigned: true, missionsLed: true },
+        },
       },
-      orderBy: [
-        { role: 'asc' },
-        { name: 'asc' }
-      ]
     })
 
-    return NextResponse.json(users)
+    const total = await prisma.user.count({ where })
+
+    return NextResponse.json({
+      users,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    })
   } catch (error) {
     console.error('Failed to fetch users:', error)
     return new NextResponse('Internal Server Error', { status: 500 })
@@ -53,8 +70,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
-    
-    if (!session || session.user.role !== 'ADMIN') {
+    if (!session || (session.user as ExtendedUser).role !== 'ADMIN') {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
@@ -63,46 +79,38 @@ export async function POST(request: Request) {
 
     if (!name || !email || !password || !role) {
       return NextResponse.json(
-        { message: 'Tous les champs sont requis' }, 
+        { message: 'Nom, email, mot de passe et rôle sont requis' },
         { status: 400 }
       )
     }
 
-    // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
     })
 
     if (existingUser) {
       return NextResponse.json(
-        { message: 'Un utilisateur avec cet email existe déjà' }, 
+        { message: 'Cet email est déjà utilisé' },
         { status: 400 }
       )
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    // Create user
     const newUser = await prisma.user.create({
       data: {
         name,
         email,
-        password: hashedPassword,
+        hashedPassword: hashedPassword,
         role: role as UserRole,
-        onlineStatus: 'OFFLINE'
       },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
-        image: true,
-        onlineStatus: true,
-        lastSeen: true,
         createdAt: true,
-        updatedAt: true
-      }
+      },
     })
 
     return NextResponse.json(newUser, { status: 201 })

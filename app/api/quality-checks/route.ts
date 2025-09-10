@@ -1,80 +1,86 @@
-// app/api/quality-checks/route.ts
-import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
+import { ExtendedUser } from '@/types/next-auth';
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !['ADMIN', 'MANAGER', 'TEAM_LEADER'].includes((session.user as ExtendedUser).role || '')) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const missionId = searchParams.get('missionId');
+
     const qualityChecks = await prisma.qualityCheck.findMany({
+      where: {
+        ...(missionId && { missionId }),
+      },
       include: {
         mission: {
-          include: {
-            lead: true
-          }
-        }
+          select: { missionNumber: true, status: true },
+        },
       },
       orderBy: {
-        checkedAt: 'desc'
-      }
-    })
-    
-    return NextResponse.json(qualityChecks)
+        checkedAt: 'desc',
+      },
+    });
+
+    return NextResponse.json(qualityChecks);
   } catch (error) {
-    console.error('Failed to fetch quality checks:', error)
-    return new NextResponse('Internal Server Error', { status: 500 })
+    console.error('Error fetching quality checks:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return new NextResponse('Unauthorized', { status: 401 })
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
+    const user = session.user as ExtendedUser;
 
-    const body = await request.json()
+    const body = await request.json();
     const {
       missionId,
       type,
       status,
-      score,
       notes,
       photos,
       issues,
-      corrections
-    } = body
+    } = body;
 
-    if (!missionId || !type) {
-      return new NextResponse('Missing required fields', { status: 400 })
+    if (!missionId || !type || !status) {
+      return new NextResponse('Missing required fields', { status: 400 });
     }
 
-    const qualityCheck = await prisma.qualityCheck.create({
+    const newQualityCheck = await prisma.qualityCheck.create({
       data: {
         missionId,
         type,
-        status: status || 'PENDING',
-        score: score ? parseInt(score) : null,
+        status,
+        checkedBy: user.id,
+        checkedAt: new Date(),
         notes,
-        photos: photos || null,
-        issues: issues || null,
-        corrections: corrections || null,
-        checkedBy: session.user.id
+        photos,
+        issues,
       },
-      include: {
-        mission: {
-          include: {
-            lead: true
-          }
-        }
-      }
-    })
+    });
 
-    return NextResponse.json(qualityCheck, { status: 201 })
+    // Also update the mission status
+    await prisma.mission.update({
+        where: { id: missionId },
+        data: { status: 'QUALITY_CHECK' },
+    });
+
+    return NextResponse.json(newQualityCheck, { status: 201 });
   } catch (error) {
-    console.error('Failed to create quality check:', error)
-    return new NextResponse('Internal Server Error', { status: 500 })
+    console.error('Error creating quality check:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

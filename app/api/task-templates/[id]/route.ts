@@ -1,71 +1,59 @@
-// app/api/task-templates/[id]/route.ts - COMPLETE FIXED VERSION
 import { NextResponse } from 'next/server';
-import { PrismaClient, TaskCategory } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// PUT /api/task-templates/[id] - Updates an existing checklist template
-export async function PUT(
-  request: Request, 
-  { params }: { params: Promise<{ id: string }> }
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
 ) {
-    try {
-        const { id } = await params; // ✅ Await params for Next.js 15
-        const body = await request.json();
-        const { name, description, items } = body;
+  try {
+    const { id } = params;
+    const taskTemplate = await prisma.taskTemplate.findUnique({
+      where: { id },
+    });
 
-        if (!name || !items || !Array.isArray(items)) {
-            return NextResponse.json({ message: 'Invalid data provided.' }, { status: 400 });
-        }
-
-        // Use a transaction to ensure data integrity: update the template, delete old items, and create new ones.
-        const updatedTemplate = await prisma.$transaction(async (tx) => {
-            const template = await tx.taskTemplate.update({
-                where: { id },
-                data: { name, description },
-            });
-
-            await tx.taskTemplateItem.deleteMany({
-                where: { templateId: id },
-            });
-
-            if (items.length > 0) {
-                await tx.taskTemplateItem.createMany({
-                    data: items.map((item: { title: string; category: TaskCategory }) => ({
-                        title: item.title,
-                        category: item.category,
-                        templateId: id,
-                    })),
-                });
-            }
-            
-            return template;
-        });
-
-        return NextResponse.json(updatedTemplate);
-
-    } catch (error) {
-        console.error(`Failed to update template:`, error);
-        return new NextResponse('Internal Server Error', { status: 500 });
+    if (!taskTemplate) {
+      return new NextResponse('Task template not found', { status: 404 });
     }
+
+    return NextResponse.json(taskTemplate);
+  } catch (error) {
+    console.error('Error fetching task template:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
+  }
 }
 
-// DELETE /api/task-templates/[id] - Deletes a checklist template
-export async function DELETE(
-  request: Request, 
-  { params }: { params: Promise<{ id: string }> }
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
 ) {
-    try {
-        const { id } = await params; // ✅ Await params for Next.js 15
+  try {
+    const { id } = params;
+    const body = await request.json();
+    const updatedTaskTemplate = await prisma.taskTemplate.update({
+      where: { id },
+      data: body,
+    });
+    return NextResponse.json(updatedTaskTemplate);
+  } catch (error) {
+    console.error('Error updating task template:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
+  }
+}
 
-        await prisma.taskTemplate.delete({
-            where: { id },
-        });
-
-        return new NextResponse(null, { status: 204 }); // 204 No Content signifies successful deletion
-
-    } catch (error) {
-        console.error(`Failed to delete template:`, error);
-        return new NextResponse('Internal Server Error', { status: 500 });
-    }
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    await prisma.taskTemplate.delete({
+      where: { id },
+    });
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error('Error deleting task template:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
+  }
 }

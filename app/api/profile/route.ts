@@ -1,4 +1,4 @@
-// app/api/profile/route.ts - COMPLETE CORRECTED VERSION
+// app/api/profile/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -34,18 +34,22 @@ async function handleProfileGet(request: NextRequest) {
         lastSeen: true,
         createdAt: true,
         updatedAt: true,
-        teamMember: {
+        teamMemberships: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
             specialties: true,
-            experienceLevel: true,
+            experience: true,
             availability: true,
-            completedTasks: true,
-            averageRating: true,
-            efficiency: true
+            hourlyRate: true,
+            joinedAt: true,
+            isActive: true,
+            team: {
+              select: {
+                id: true,
+                name: true,
+                description: true
+              }
+            }
           }
         }
       }
@@ -88,7 +92,7 @@ async function handleProfileUpdate(request: NextRequest) {
         name: true,
         email: true,
         image: true,
-        password: true,
+        hashedPassword: true,
         role: true
       }
     });
@@ -134,8 +138,8 @@ async function handleProfileUpdate(request: NextRequest) {
       }
 
       // Verify current password
-      if (existingUser.password) {
-        const isValidPassword = await bcrypt.compare(currentPassword, existingUser.password);
+      if (existingUser.hashedPassword) {
+        const isValidPassword = await bcrypt.compare(currentPassword, existingUser.hashedPassword);
         if (!isValidPassword) {
           return NextResponse.json({ error: 'Mot de passe actuel incorrect' }, { status: 400 });
         }
@@ -143,7 +147,7 @@ async function handleProfileUpdate(request: NextRequest) {
 
       // Hash new password
       const hashedPassword = await bcrypt.hash(newPassword, 12);
-      updateData.password = hashedPassword;
+      updateData.hashedPassword = hashedPassword;
     }
 
     // If no updates, return current user
@@ -170,18 +174,22 @@ async function handleProfileUpdate(request: NextRequest) {
         lastSeen: true,
         createdAt: true,
         updatedAt: true,
-        teamMember: {
+        teamMemberships: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
             specialties: true,
-            experienceLevel: true,
+            experience: true,
             availability: true,
-            completedTasks: true,
-            averageRating: true,
-            efficiency: true
+            hourlyRate: true,
+            joinedAt: true,
+            isActive: true,
+            team: {
+              select: {
+                id: true,
+                name: true,
+                description: true
+              }
+            }
           }
         }
       }

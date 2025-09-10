@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { PrismaClient, UserRole } from '@prisma/client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { ExtendedUser } from '@/types/next-auth';
 
 const prisma = new PrismaClient()
 
@@ -12,10 +13,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions);
+    const loggedInUser = session?.user as ExtendedUser;
     
-    if (!session || session.user.role !== 'ADMIN') {
-      return new NextResponse('Unauthorized', { status: 401 })
+    if (!loggedInUser || loggedInUser.role !== 'ADMIN') {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const { id } = await params
@@ -87,16 +89,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions);
+    const loggedInUser = session?.user as ExtendedUser;
     
-    if (!session || session.user.role !== 'ADMIN') {
-      return new NextResponse('Unauthorized', { status: 401 })
+    if (!loggedInUser || loggedInUser.role !== 'ADMIN') {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const { id } = await params
 
     // Prevent admin from deleting themselves
-    if (session.user.id === id) {
+    if (loggedInUser.id === id) {
       return NextResponse.json(
         { message: 'Vous ne pouvez pas supprimer votre propre compte' }, 
         { status: 400 }
@@ -107,8 +110,8 @@ export async function DELETE(
     const userToDelete = await prisma.user.findUnique({
       where: { id },
       include: {
-        leads: true,
-        missions: true,
+        leadsAssigned: true,
+        missionsLed: true,
         activities: true,
         expenses: true
       }
@@ -123,8 +126,8 @@ export async function DELETE(
 
     // Check if user has associated data that would prevent deletion
     const hasAssociatedData = 
-      userToDelete.leads.length > 0 || 
-      userToDelete.missions.length > 0 || 
+      userToDelete.leadsAssigned.length > 0 || 
+      userToDelete.missionsLed.length > 0 || 
       userToDelete.activities.length > 0 || 
       userToDelete.expenses.length > 0
 
