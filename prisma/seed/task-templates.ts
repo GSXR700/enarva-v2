@@ -11,7 +11,9 @@ type TemplateItem = {
 type Template = {
     name: string;
     description: string;
-    items: { create: TemplateItem[] };
+    category: TaskCategory;
+    tasks: TemplateItem[];
+    isActive: boolean;
 };
 
 // This is the array of all your detailed checklist templates
@@ -20,97 +22,127 @@ const templates: Template[] = [
     {
         name: 'Visite Technique - Fin de Chantier (Villa Luxe)',
         description: 'Checklist d\'évaluation pour un nettoyage complet post-construction dans une villa de haut standing.',
-        items: {
-            create: [
-                { category: 'EXTERIOR_FACADE', title: 'État général des façades (pierre, crépi, etc.)' },
-                { category: 'EXTERIOR_FACADE', title: 'Présence de taches de peinture, ciment, poussière' },
-                { category: 'WINDOWS_JOINERY', title: 'État des vitres extérieures et cadres' },
-                { category: 'FLOORS', title: 'Inspection du Marbre (rayures, taches, besoin de cristallisation ?)' },
-                { category: 'FLOORS', title: 'Inspection du Parquet (humidité, traces)' },
-                { category: 'BATHROOM_SANITARY', title: 'Vérification des joints et traces de calcaire' },
-                { category: 'LOGISTICS_ACCESS', title: 'Noter les points d\'accès à l\'eau et électricité' },
-                { category: 'LOGISTICS_ACCESS', title: 'Estimer le volume des gravats et déchets de chantier à évacuer' },
-            ]
-        }
+        category: TaskCategory.GENERAL,
+        isActive: true,
+        tasks: [
+            { category: TaskCategory.EXTERIOR_FACADE, title: 'État général des façades (pierre, crépi, etc.)' },
+            { category: TaskCategory.EXTERIOR_FACADE, title: 'Présence de taches de peinture, ciment, poussière' },
+            { category: TaskCategory.WINDOWS_JOINERY, title: 'État des vitres extérieures et cadres' },
+            { category: TaskCategory.FLOORS, title: 'Inspection du Marbre (rayures, taches, besoin de cristallisation ?)' },
+            { category: TaskCategory.FLOORS, title: 'Inspection du Parquet (humidité, traces)' },
+            { category: TaskCategory.BATHROOM_SANITARY, title: 'Vérification des joints et traces de calcaire' },
+            { category: TaskCategory.LOGISTICS_ACCESS, title: 'Noter les points d\'accès à l\'eau et électricité' },
+            { category: TaskCategory.LOGISTICS_ACCESS, title: 'Estimer le volume des gravats et déchets de chantier à évacuer' },
+        ]
     },
     {
         name: 'Opération - Fin de Chantier (Villa Luxe)',
         description: 'Plan d\'action détaillé pour l\'exécution du nettoyage fin de chantier.',
-        items: {
-            create: [
-                { category: 'LOGISTICS_ACCESS', title: 'Protéger les surfaces fragiles (prises, interrupteurs)' },
-                { category: 'EXTERIOR_FACADE', title: 'Grattage et nettoyage des taches sur les façades' },
-                { category: 'WINDOWS_JOINERY', title: 'Nettoyage complet des vitres, cadres et rails' },
-                { category: 'WALLS_BASEBOARDS', title: 'Dépoussiérage et nettoyage humide des murs et plinthes' },
-                { category: 'FLOORS', title: 'Aspiration industrielle de toutes les surfaces' },
-                { category: 'FLOORS', title: 'Décapage et lavage du carrelage (retrait voile de ciment)' },
-                { category: 'FLOORS', title: 'Traitement spécifique du marbre (selon devis)' },
-                { category: 'KITCHEN', title: 'Nettoyage et désinfection intérieur/extérieur des placards' },
-                { category: 'BATHROOM_SANITARY', title: 'Détartrage et désinfection des sanitaires et douches' },
-                { category: 'LIVING_SPACES', title: 'Nettoyage des poignées, interrupteurs et luminaires' },
-                { category: 'LOGISTICS_ACCESS', title: 'Évacuation de tous les déchets de chantier' },
-            ]
-        }
+        category: TaskCategory.GENERAL,
+        isActive: true,
+        tasks: [
+            { category: TaskCategory.LOGISTICS_ACCESS, title: 'Installer les équipements de protection (bâches, protections)' },
+            { category: TaskCategory.LOGISTICS_ACCESS, title: 'Évacuer les gros déchets et gravats' },
+            { category: TaskCategory.EXTERIOR_FACADE, title: 'Nettoyer les façades (haute pression si nécessaire)' },
+            { category: TaskCategory.WINDOWS_JOINERY, title: 'Décoller les films de protection des vitres' },
+            { category: TaskCategory.WINDOWS_JOINERY, title: 'Nettoyer l\'ensemble des vitres (intérieur/extérieur)' },
+            { category: TaskCategory.FLOORS, title: 'Cristallisation du marbre et lustrage' },
+            { category: TaskCategory.FLOORS, title: 'Nettoyage et traitement du parquet' },
+            { category: TaskCategory.WALLS_BASEBOARDS, title: 'Lessivage des murs et plafonds' },
+            { category: TaskCategory.BATHROOM_SANITARY, title: 'Détartrage complet des sanitaires' },
+            { category: TaskCategory.KITCHEN, title: 'Nettoyage de la cuisine et électroménager' },
+        ]
     },
-    // --- TEMPLATES FOR: Traitement des Sols ---
+    // --- TEMPLATES FOR: Résidentiel / Particuliers ---
     {
-        name: 'Visite Technique - Cristallisation Marbre',
-        description: 'Évaluation de l\'état d\'un sol en marbre avant traitement.',
-        items: {
-            create: [
-                { category: 'FLOORS', title: 'Mesurer la surface exacte du marbre à traiter (en m²)' },
-                { category: 'FLOORS', title: 'Évaluer la porosité et l\'état (rayures, taches, brillance)' },
-                { category: 'FLOORS', title: 'Identifier le type de marbre pour le choix des produits' },
-                { category: 'LOGISTICS_ACCESS', title: 'Vérifier si la zone peut être isolée pendant le traitement' },
-                { category: 'LOGISTICS_ACCESS', title: 'Confirmer l\'accès à l\'électricité pour la monobrosse' },
-                { category: 'LIVING_SPACES', title: 'Noter la présence de meubles à déplacer' },
-            ]
-        }
+        name: 'Visite Technique - Appartement Standard',
+        description: 'Évaluation des besoins de nettoyage pour un appartement de particulier.',
+        category: TaskCategory.LIVING_SPACES,
+        isActive: true,
+        tasks: [
+            { category: TaskCategory.LIVING_SPACES, title: 'État général des pièces à vivre' },
+            { category: TaskCategory.KITCHEN, title: 'Inspection de la cuisine (graisse, calcaire, électroménager)' },
+            { category: TaskCategory.BATHROOM_SANITARY, title: 'État des salles de bain (calcaire, moisissures)' },
+            { category: TaskCategory.FLOORS, title: 'Type et état des sols (carrelage, parquet, moquette)' },
+            { category: TaskCategory.WINDOWS_JOINERY, title: 'État des vitres et encadrements' },
+            { category: TaskCategory.LOGISTICS_ACCESS, title: 'Points d\'eau et électricité disponibles' },
+            { category: TaskCategory.LOGISTICS_ACCESS, title: 'Accès (ascenseur, escaliers, parking)' },
+        ]
     },
     {
-        name: 'Opération - Cristallisation Marbre',
-        description: 'Processus d\'exécution pour la cristallisation d\'un sol en marbre.',
-        items: {
-            create: [
-                { category: 'LIVING_SPACES', title: 'Déplacer et protéger le mobilier' },
-                { category: 'WALLS_BASEBOARDS', title: 'Protéger les plinthes et les bas de murs' },
-                { category: 'FLOORS', title: 'Décaper le sol avec une monobrosse et un disque adapté' },
-                { category: 'FLOORS', title: 'Rincer abondamment et aspirer l\'eau résiduelle' },
-                { category: 'FLOORS', title: 'Appliquer le produit de cristallisation par pulvérisation' },
-                { category: 'FLOORS', title: 'Polir avec la monobrosse et disque en laine d\'acier' },
-                { category: 'FLOORS', title: 'Dépoussiérer la surface avec un balai trapèze' },
-                { category: 'LIVING_SPACES', title: 'Replacer le mobilier' },
-            ]
-        }
+        name: 'Opération - Nettoyage Appartement Standard',
+        description: 'Processus de nettoyage complet pour un appartement particulier.',
+        category: TaskCategory.LIVING_SPACES,
+        isActive: true,
+        tasks: [
+            { category: TaskCategory.LIVING_SPACES, title: 'Dépoussiérage de tous les meubles et surfaces' },
+            { category: TaskCategory.LIVING_SPACES, title: 'Aspirateur sur tous les sols textiles' },
+            { category: TaskCategory.FLOORS, title: 'Lavage des sols durs (carrelage, parquet)' },
+            { category: TaskCategory.KITCHEN, title: 'Nettoyage complet de la cuisine et électroménager' },
+            { category: TaskCategory.BATHROOM_SANITARY, title: 'Détartrage et désinfection des sanitaires' },
+            { category: TaskCategory.WINDOWS_JOINERY, title: 'Nettoyage des vitres intérieures' },
+            { category: TaskCategory.LIVING_SPACES, title: 'Vider les poubelles et remplacer les sacs' },
+        ]
     },
-    // --- TEMPLATES FOR: Nettoyage des Canapés & Tapis ---
+    // --- TEMPLATES FOR: Bureaux et Espaces Professionnels ---
     {
-        name: 'Visite Technique - Nettoyage Canapé Tissu',
-        description: 'Inspection d\'un canapé avant nettoyage par injection-extraction.',
-        items: {
-            create: [
-                { category: 'LIVING_SPACES', title: 'Identifier le type de tissu (microfibre, coton, velours, etc.)' },
-                { category: 'LIVING_SPACES', title: 'Noter le nombre de places du canapé (3 places, angle, etc.)' },
-                { category: 'LIVING_SPACES', title: 'Identifier la nature des taches (alimentaire, encre, graisse)' },
-                { category: 'LIVING_SPACES', title: 'Vérifier la présence d\'odeurs (animaux, humidité)' },
-                { category: 'LOGISTICS_ACCESS', title: 'S\'assurer de la présence d\'une prise électrique à proximité' },
-            ]
-        }
+        name: 'Visite Technique - Bureau (PME)',
+        description: 'Évaluation pour un nettoyage d\'espaces de bureaux PME.',
+        category: TaskCategory.LIVING_SPACES,
+        isActive: true,
+        tasks: [
+            { category: TaskCategory.LIVING_SPACES, title: 'Superficie totale et nombre de postes de travail' },
+            { category: TaskCategory.LIVING_SPACES, title: 'État général des bureaux et espaces communs' },
+            { category: TaskCategory.KITCHEN, title: 'Présence et état de l\'espace kitchenette/pause' },
+            { category: TaskCategory.BATHROOM_SANITARY, title: 'Nombre et état des sanitaires' },
+            { category: TaskCategory.FLOORS, title: 'Types de revêtements de sol' },
+            { category: TaskCategory.LOGISTICS_ACCESS, title: 'Fréquence souhaitée (quotidien, hebdomadaire)' },
+            { category: TaskCategory.LOGISTICS_ACCESS, title: 'Heures d\'intervention possibles' },
+        ]
+    },
+    {
+        name: 'Opération - Nettoyage Bureau Quotidien',
+        description: 'Routine de nettoyage quotidien pour espaces de bureaux.',
+        category: TaskCategory.LIVING_SPACES,
+        isActive: true,
+        tasks: [
+            { category: TaskCategory.LIVING_SPACES, title: 'Vider et désinfecter les poubelles' },
+            { category: TaskCategory.LIVING_SPACES, title: 'Dépoussiérer les bureaux et claviers' },
+            { category: TaskCategory.FLOORS, title: 'Aspirer les tapis et moquettes' },
+            { category: TaskCategory.FLOORS, title: 'Laver les sols durs' },
+            { category: TaskCategory.BATHROOM_SANITARY, title: 'Nettoyage et réapprovisionnement des sanitaires' },
+            { category: TaskCategory.KITCHEN, title: 'Nettoyage de l\'espace kitchenette' },
+            { category: TaskCategory.WINDOWS_JOINERY, title: 'Nettoyage des vitres (si planifié)' },
+        ]
+    },
+    // --- TEMPLATES FOR: Mobilier et Textile ---
+    {
+        name: 'Visite Technique - Canapé en Tissu',
+        description: 'Évaluation d\'un canapé en tissu avant nettoyage par injection-extraction.',
+        category: TaskCategory.LIVING_SPACES,
+        isActive: true,
+        tasks: [
+            { category: TaskCategory.LIVING_SPACES, title: 'Type et composition du tissu (coton, polyester, mélange)' },
+            { category: TaskCategory.LIVING_SPACES, title: 'État général du canapé (usure, décoloration)' },
+            { category: TaskCategory.LIVING_SPACES, title: 'Identifier la nature des taches (alimentaire, encre, graisse)' },
+            { category: TaskCategory.LIVING_SPACES, title: 'Vérifier la présence d\'odeurs (animaux, humidité)' },
+            { category: TaskCategory.LOGISTICS_ACCESS, title: 'S\'assurer de la présence d\'une prise électrique à proximité' },
+        ]
     },
     {
         name: 'Opération - Nettoyage Canapé Tissu',
         description: 'Processus de nettoyage d\'un canapé par injection-extraction.',
-        items: {
-            create: [
-                { category: 'LOGISTICS_ACCESS', title: 'Protéger le sol autour du canapé' },
-                { category: 'LIVING_SPACES', title: 'Aspirer en profondeur toute la surface du canapé' },
-                { category: 'LIVING_SPACES', title: 'Appliquer un détachant spécifique sur les taches tenaces' },
-                { category: 'LIVING_SPACES', title: 'Procéder au nettoyage par injection-extraction' },
-                { category: 'LIVING_SPACES', title: 'Répéter l\'extraction avec de l\'eau claire pour rincer' },
-                { category: 'LIVING_SPACES', title: 'Brosser les fibres pour un séchage uniforme' },
-                { category: 'LIVING_SPACES', title: 'Informer le client sur le temps de séchage (4-6h)' },
-            ]
-        }
+        category: TaskCategory.LIVING_SPACES,
+        isActive: true,
+        tasks: [
+            { category: TaskCategory.LOGISTICS_ACCESS, title: 'Protéger le sol autour du canapé' },
+            { category: TaskCategory.LIVING_SPACES, title: 'Aspirer en profondeur toute la surface du canapé' },
+            { category: TaskCategory.LIVING_SPACES, title: 'Appliquer un détachant spécifique sur les taches tenaces' },
+            { category: TaskCategory.LIVING_SPACES, title: 'Procéder au nettoyage par injection-extraction' },
+            { category: TaskCategory.LIVING_SPACES, title: 'Répéter l\'extraction avec de l\'eau claire pour rincer' },
+            { category: TaskCategory.LIVING_SPACES, title: 'Brosser les fibres pour un séchage uniforme' },
+            { category: TaskCategory.LIVING_SPACES, title: 'Informer le client sur le temps de séchage (4-6h)' },
+        ]
     },
 ];
 
@@ -120,9 +152,15 @@ export async function seedTaskTemplates(prisma: PrismaClient) {
     await prisma.$transaction(async (tx) => {
         for (const template of templates) {
             await tx.taskTemplate.upsert({
-                where: { name: template.name },
+                where: { id: 'dummy-id-that-will-never-exist' }, // Use a dummy ID since name is not unique in schema
                 update: {}, // Do nothing if it exists
-                create: template,
+                create: {
+                    name: template.name,
+                    description: template.description,
+                    tasks: template.tasks,
+                    category: template.category,
+                    isActive: template.isActive,
+                },
             });
         }
     });
