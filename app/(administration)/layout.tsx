@@ -38,7 +38,7 @@ export default function AdministrationLayout({
   children: React.ReactNode
 }) {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
-  
+
   // Initialize push notification logic
   usePushNotifications();
 
@@ -46,10 +46,10 @@ export default function AdministrationLayout({
     <QueryClientProvider client={queryClient}>
       <div className="flex h-screen bg-background">
         <Sidebar isOpen={isSidebarOpen} setOpen={setSidebarOpen} />
-        
+
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar onMenuClick={() => setSidebarOpen(true)} />
-          
+
           <main className="flex-1 overflow-y-auto custom-scrollbar bg-background">
             {children}
           </main>

@@ -1,12 +1,13 @@
-// components/navigation/Sidebar.tsx - Updated Navigation
+'use client'
+
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { 
-  Users, 
-  FileText, 
-  DollarSign, 
-  Settings, 
+import {
+  Users,
+  FileText,
+  DollarSign,
+  Settings,
   BarChart3,
   Package,
   Calendar,
@@ -18,6 +19,7 @@ import {
   AlertTriangle,
   FileBarChart
 } from 'lucide-react'
+import { Dispatch, SetStateAction } from 'react'
 
 const navigation = [
   {
@@ -102,21 +104,37 @@ const navigation = [
   },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  setOpen: Dispatch<SetStateAction<boolean>>;
+}
+
+export function Sidebar({ isOpen, setOpen }: SidebarProps) {
   const pathname = usePathname()
 
   return (
-    <div className="flex h-full w-64 flex-col fixed inset-y-0 z-50 bg-white border-r">
-      <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto">
-        <div className="flex items-center flex-shrink-0 px-4">
+    <div
+      className={cn(
+        'fixed inset-y-0 left-0 z-50 w-64 flex-col bg-white border-r transition-transform duration-300 ease-in-out md:relative md:translate-x-0',
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      )}
+    >
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between h-16 flex-shrink-0 px-4 border-b">
           <h1 className="text-xl font-bold text-blue-600">Enarva OS</h1>
+          <button onClick={() => setOpen(false)} className="md:hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        
-        <nav className="mt-8 flex-1 px-2 space-y-1">
+
+        <nav className="mt-8 flex-1 px-2 space-y-1 overflow-y-auto">
           {navigation.map((item) => (
             <Link
               key={item.name}
               href={item.href}
+              onClick={() => setOpen(false)}
               className={cn(
                 pathname === item.href
                   ? 'bg-blue-100 text-blue-900'
