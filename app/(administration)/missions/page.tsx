@@ -335,10 +335,14 @@ export default function MissionsPage() {
                       <DropdownMenuLabel>Ajouter/Retirer des membres</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       {allTeamMembers.filter(tm => tm.user.role === 'TECHNICIAN').map(member => (
-                        <DropdownMenuCheckboxItem key={member.id} checked={selectedTeamMemberIds.includes(member.id)} onCheckedChange={(checked) => {
-                          setSelectedTeamMemberIds(prev => checked ? [...prev, member.id] : prev.filter(id => id !== member.id));
-                        }}>
-                          {member.firstName} {member.lastName}
+                        <DropdownMenuCheckboxItem 
+                          key={member.id} 
+                          checked={selectedTeamMemberIds.includes(member.id)} 
+                          onCheckedChange={(checked) => {
+                            setSelectedTeamMemberIds(prev => checked ? [...prev, member.id] : prev.filter(id => id !== member.id));
+                          }}
+                        >
+                          {member.user.name || 'Sans nom'}
                         </DropdownMenuCheckboxItem>
                       ))}
                       <DropdownMenuSeparator />
@@ -356,7 +360,7 @@ export default function MissionsPage() {
                       selectedMission.teamMembers.map(member => (
                         <div key={member.id} className="flex items-center gap-2">
                           <Users className="w-4 h-4" />
-                          <span>{member.firstName} {member.lastName}</span>
+                          <span>{(member as TeamMember & { user: User }).user.name || 'Sans nom'}</span>
                         </div>
                       ))
                     ) : (

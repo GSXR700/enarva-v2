@@ -1,4 +1,3 @@
-// app/api/team-members/route.ts - COMPLETE CORRECTED VERSION
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -34,12 +33,9 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       where = {
-        OR: [
-          { firstName: { contains: search, mode: 'insensitive' } },
-          { lastName: { contains: search, mode: 'insensitive' } },
-          { email: { contains: search, mode: 'insensitive' } },
-          { user: { name: { contains: search, mode: 'insensitive' } } }
-        ]
+        user: {
+          name: { contains: search, mode: 'insensitive' },
+        },
       };
     }
 
@@ -60,18 +56,18 @@ export async function GET(request: NextRequest) {
               image: true,
               onlineStatus: true,
               lastSeen: true,
-              createdAt: true
-            }
+              createdAt: true,
+            },
           },
           missions: {
             select: {
               id: true,
               missionNumber: true,
               status: true,
-              scheduledDate: true
+              scheduledDate: true,
             },
             orderBy: { scheduledDate: 'desc' },
-            take: 5
+            take: 5,
           },
           tasks: {
             select: {
@@ -81,25 +77,25 @@ export async function GET(request: NextRequest) {
               mission: {
                 select: {
                   id: true,
-                  missionNumber: true
-                }
-              }
+                  missionNumber: true,
+                },
+              },
             },
             where: {
-              status: { in: ['ASSIGNED', 'IN_PROGRESS'] }
+              status: { in: ['ASSIGNED', 'IN_PROGRESS'] },
             },
-            take: 10
+            take: 10,
           },
           _count: {
             select: {
               missions: true,
-              tasks: true
-            }
-          }
+              tasks: true,
+            },
+          },
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { joinedAt: 'desc' }, // Changed from createdAt to joinedAt
       }),
-      prisma.teamMember.count({ where })
+      prisma.teamMember.count({ where }),
     ]);
 
     return NextResponse.json({
@@ -107,7 +103,7 @@ export async function GET(request: NextRequest) {
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
     console.error('Failed to fetch team members:', error);
@@ -134,25 +130,24 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
-      firstName,
-      lastName,
+      name, // Changed from firstName, lastName to name
       email,
       phone,
       role,
       password,
       specialties,
       experienceLevel,
-      availability
+      availability,
     } = body;
 
     // Validate required fields
-    if (!firstName || !lastName || !email || !phone || !role || !password) {
+    if (!name || !email || !phone || !role || !password) {
       return new NextResponse('Missing required fields', { status: 400 });
     }
 
     // Check if email already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
     });
 
     if (existingUser) {
@@ -167,25 +162,22 @@ export async function POST(request: NextRequest) {
       // Create user
       const newUser = await tx.user.create({
         data: {
-          name: `${firstName} ${lastName}`,
+          name,
           email,
           password: hashedPassword,
           role,
-          onlineStatus: 'OFFLINE'
-        }
+          onlineStatus: 'OFFLINE',
+        },
       });
 
       // Create team member
       const teamMember = await tx.teamMember.create({
         data: {
-          firstName,
-          lastName,
-          email,
-          phone,
+          userId: newUser.id,
           specialties: specialties || [],
-          experienceLevel: experienceLevel || 'JUNIOR',
+          experience: experienceLevel || 'JUNIOR', // Changed to experience
           availability: availability || 'AVAILABLE',
-          userId: newUser.id
+         
         },
         include: {
           user: {
@@ -197,10 +189,10 @@ export async function POST(request: NextRequest) {
               image: true,
               onlineStatus: true,
               lastSeen: true,
-              createdAt: true
-            }
-          }
-        }
+              createdAt: true,
+            },
+          },
+        },
       });
 
       return teamMember;
