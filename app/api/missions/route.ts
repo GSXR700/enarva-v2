@@ -1,69 +1,107 @@
-import { NextResponse, NextRequest } from 'next/server';
-import { Prisma } from '@prisma/client';
-import Pusher from 'pusher';
-import { withErrorHandler } from '@/lib/error-handler';
-import { missionSchema } from '@/lib/validation';
-import { missionService } from '@/services/mission.service';
+// app/api/missions/route.ts - COMPLETE CORRECTED VERSION
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { missionService } from '@/services/mission.service';
+import { errorHandler } from '@/lib/error-handler';
+import { validateMissionInput } from '@/lib/validation';
+import { ExtendedUser } from '@/types/next-auth';
 
-const pusher = new Pusher({
-  appId: process.env.PUSHER_APP_ID!,
-  key: process.env.PUSHER_KEY!,
-  secret: process.env.PUSHER_SECRET!,
-  cluster: process.env.PUSHER_CLUSTER!,
-  useTLS: true
-});
-
-const getMissionsHandler = async (request: NextRequest) => {
-  const { searchParams } = new URL(request.url);
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '20');
-  const sortBy = searchParams.get('sortBy') || 'scheduledDate';
-  const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc';
-
-  const where: Prisma.MissionWhereInput = {};
-  const status = searchParams.get('status');
-  if (status) {
-    where.status = { in: status.split(',') as any };
-  }
-  
-  if (searchParams.get('teamLeaderId')) where.teamLeaderId = searchParams.get('teamLeaderId');
-  if (searchParams.get('dateFrom') || searchParams.get('dateTo')) {
-    where.scheduledDate = {};
-    if (searchParams.get('dateFrom')) where.scheduledDate.gte = new Date(searchParams.get('dateFrom')!);
-    if (searchParams.get('dateTo')) where.scheduledDate.lte = new Date(searchParams.get('dateTo')!);
-  }
-
-  const { missions, totalCount } = await missionService.getMissions(where, page, limit, sortBy, sortOrder);
-
-  return NextResponse.json({
-    data: missions,
-    pagination: {
-      page,
-      limit,
-      total: totalCount,
-      totalPages: Math.ceil(totalCount / limit),
+// GET /api/missions - Fetch all missions with optional filtering and sorting
+export async function GET(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-  });
-};
 
-const createMissionHandler = async (request: NextRequest) => {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-      return new NextResponse('Unauthorized', { status: 401 });
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const sortBy = searchParams.get('sortBy') || 'scheduledDate';
+    const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc';
+    const status = searchParams.get('status');
+    const priority = searchParams.get('priority');
+    const teamLeaderId = searchParams.get('teamLeaderId');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+
+    // Build where clause for filtering
+    const where: any = {};
+
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+
+    if (priority && priority !== 'all') {
+      where.priority = priority;
+    }
+
+    if (teamLeaderId && teamLeaderId !== 'all') {
+      where.teamLeaderId = teamLeaderId;
+    }
+
+    if (startDate || endDate) {
+      where.scheduledDate = {};
+      if (startDate) {
+        where.scheduledDate.gte = new Date(startDate);
+      }
+      if (endDate) {
+        where.scheduledDate.lte = new Date(endDate);
+      }
+    }
+
+    const { missions, totalCount } = await missionService.getMissions(where, page, limit, sortBy, sortOrder);
+
+    return NextResponse.json({
+      missions,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Failed to fetch missions:', error);
+    return errorHandler(error);
   }
+}
 
-  const body = await request.json();
-  const validatedData = missionSchema.parse(body);
+// POST /api/missions - Create a new mission
+export async function POST(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  const newMission = await missionService.createMission(validatedData);
+    const user = session.user as ExtendedUser;
+    if (!user.id) {
+      return NextResponse.json({ error: 'User ID missing' }, { status: 401 });
+    }
 
-  pusher.trigger(`user-${newMission.teamLeaderId}`, 'mission-new', newMission)
-    .catch(err => console.error('Pusher notification failed:', err));
+    // Only admins and managers can create missions
+    if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
-  return NextResponse.json(newMission, { status: 201 });
-};
+    const body = await request.json();
 
-export const GET = withErrorHandler(getMissionsHandler);
-export const POST = withErrorHandler(createMissionHandler);
+    // Validate the input
+    const validationResult = validateMissionInput(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validationResult.error.errors },
+        { status: 400 }
+      );
+    }
+
+    const newMission = await missionService.createMission(validationResult.data);
+
+    return NextResponse.json(newMission, { status: 201 });
+  } catch (error) {
+    console.error('Failed to create mission:', error);
+    return errorHandler(error);
+  }
+}

@@ -125,7 +125,15 @@ export class LeadService {
        include: { 
          lead: true, 
          teamLeader: true,
-         teamMembers: true,
+         team: {
+           include: {
+             members: {
+               include: {
+                 user: true
+               }
+             }
+           }
+         },
          tasks: true,
          quote: true
        },
