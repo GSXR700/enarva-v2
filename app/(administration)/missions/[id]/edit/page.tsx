@@ -189,12 +189,11 @@ const TaskItem = ({
 }
 
 type Props = {
-  params: {
-    id: string;
-  };
+  params: { id: string };
+  searchParams: { [key: string]: string | string[] | undefined };
 };
 
-export default function EditMissionPage({ params }: Props) {
+export default function EditMissionPage({ params, searchParams }: Props) {
   const router = useRouter()
   const [mission, setMission] = useState<
     Partial<Mission & { tasks: TaskWithId[] }>
