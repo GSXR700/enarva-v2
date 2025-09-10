@@ -4,15 +4,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageInput } from './MessageInput';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PopulatedConversation } from '@/types/chat';
-import { Message, User } from '@prisma/client';
+import { PopulatedConversation, PopulatedMessage } from '@/types/chat';
+import { User } from '@prisma/client';
 import { ArrowLeft, Check, CheckCheck } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { usePusherChannel } from '@/hooks/usePusherClient'; // <-- IMPORT the new hook
+import { usePusherChannel } from '@/hooks/usePusherClient';
 import { ChatWindowSkeleton } from '../skeletons/ChatWindowSkeleton';
 import { getRelativeTime } from '@/lib/utils';
-
-type PopulatedMessage = Message & { sender: User };
 
 interface ChatWindowProps {
     currentUserId: string;
@@ -49,7 +47,6 @@ export function ChatWindow({ currentUserId, conversation, onBack, onlineMembers 
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    // <-- REFACTORED: Use the centralized hook for new messages
     const handleNewMessage = useCallback((message: PopulatedMessage) => {
         setMessages((prev) => {
             // Avoid adding duplicate messages if optimistic update already added it
@@ -66,23 +63,42 @@ export function ChatWindow({ currentUserId, conversation, onBack, onlineMembers 
 
     const handleSendMessage = async (content: string) => {
         const tempId = Date.now().toString();
+        // ✅ Fixed: Updated to match current Prisma schema
         const newMessage: PopulatedMessage = {
-            id: tempId, content, createdAt: new Date(), senderId: currentUserId,
-            conversationId: conversation.id, readByIds: [currentUserId], type: 'TEXT',
+            id: tempId,
+            content,
+            createdAt: new Date(),
+            senderId: currentUserId,
+            conversationId: conversation.id,
+            isRead: false, // ✅ Use isRead instead of readByIds
+            attachments: [], // ✅ Include attachments field from schema
             sender: { id: currentUserId, name: 'Vous' } as User,
+            readBy: [{ id: currentUserId, name: 'Vous' } as User], // ✅ Use readBy relation
         };
 
         setMessages((prev) => [...prev, newMessage]);
 
-        const response = await fetch('/api/messages', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content, senderId: currentUserId, conversationId: conversation.id }),
-        });
-        
-        const savedMessage = await response.json();
-        
-        setMessages(prev => prev.map(m => m.id === tempId ? savedMessage : m));
+        try {
+            const response = await fetch('/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content, senderId: currentUserId, conversationId: conversation.id }),
+            });
+            
+            if (response.ok) {
+                const savedMessage = await response.json();
+                
+                setMessages(prev => prev.map(m => m.id === tempId ? savedMessage : m));
+            } else {
+                // Remove the optimistic message if the request failed
+                setMessages(prev => prev.filter(m => m.id !== tempId));
+                console.error('Failed to send message');
+            }
+        } catch (error) {
+            // Remove the optimistic message if the request failed
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+            console.error('Failed to send message:', error);
+        }
     };
 
     if (isLoading) {
@@ -106,7 +122,9 @@ export function ChatWindow({ currentUserId, conversation, onBack, onlineMembers 
                 <AnimatePresence>
                     {messages.map(msg => {
                         const isSelf = msg.senderId === currentUserId;
-                        const isRead = msg.readByIds.length > 1;
+                        // ✅ Fixed: Check if message is read by someone other than sender
+                        const isRead = msg.readBy ? msg.readBy.some(user => user.id !== msg.senderId) : false;
+                        
                         return (
                             <motion.div
                                 key={msg.id}

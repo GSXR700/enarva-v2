@@ -22,6 +22,7 @@ export async function GET(
       },
       include: {
         sender: true,
+        readBy: true, // ✅ Add this line to include readBy relation
       },
       orderBy: {
         createdAt: 'asc',
