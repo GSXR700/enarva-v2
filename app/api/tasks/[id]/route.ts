@@ -8,10 +8,10 @@ const prisma = new PrismaClient();
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const task = await prisma.task.findUnique({
       where: { id },
       include: {
@@ -42,7 +42,7 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -50,7 +50,7 @@ export async function PUT(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { status, notes, actualTime } = body;
 
@@ -109,7 +109,7 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -117,7 +117,7 @@ export async function DELETE(
       return new NextResponse('Forbidden', { status: 403 });
     }
     
-    const { id } = params;
+    const { id } = await params;
     await prisma.task.delete({
       where: { id },
     });
