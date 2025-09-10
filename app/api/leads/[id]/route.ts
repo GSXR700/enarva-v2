@@ -1,4 +1,4 @@
-// app/api/leads/[id]/route.ts - COMPLETE CORRECTED VERSION
+// app/api/leads/[id]/route.ts - COMPLETE CORRECTED VERSION WITH calculateLeadScore
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -247,6 +247,11 @@ export async function DELETE(
   }
 }
 
+/**
+ * Clean and transform lead data from the request body
+ * @param data Raw data from request body
+ * @returns Cleaned and transformed data
+ */
 function cleanLeadData(data: any) {
   const cleaned: any = {};
   
@@ -302,44 +307,92 @@ function cleanLeadData(data: any) {
   return cleaned;
 }
 
+/**
+ * Calculate lead score based on various factors
+ * @param leadData The lead data to calculate score for
+ * @returns Score from 0-100
+ */
 function calculateLeadScore(leadData: any): number {
   let score = 0;
   
-  // Base score
+  // Base score for having a lead
   score += 10;
   
-  // Budget range scoring
+  // Budget range scoring (40 points max)
   if (leadData.budgetRange) {
-    const budgetRanges: Record<string, number> = {
-      'MOINS_5000': 20,
-      'ENTRE_5000_15000': 40,
-      'ENTRE_15000_30000': 60,
-      'ENTRE_30000_50000': 80,
-      'PLUS_50000': 100
+    const budgetScores: Record<string, number> = {
+      'MOINS_1000': 5,
+      'ENTRE_1000_5000': 15,
+      'ENTRE_5000_15000': 25,
+      'ENTRE_15000_30000': 35,
+      'ENTRE_30000_50000': 40,
+      'PLUS_50000': 40
     };
-    score += budgetRanges[leadData.budgetRange] || 0;
+    score += budgetScores[leadData.budgetRange] || 0;
   }
   
-  // Urgency level scoring
+  // Urgency level scoring (25 points max)
   if (leadData.urgencyLevel) {
     const urgencyScores: Record<string, number> = {
-      'IMMEDIATE': 30,
-      'HIGH_URGENT': 25,
-      'URGENT': 20,
-      'NORMAL': 15,
+      'IMMEDIATE': 25,
+      'HIGH_URGENT': 20,
+      'URGENT': 15,
+      'NORMAL': 10,
       'LOW': 5
     };
     score += urgencyScores[leadData.urgencyLevel] || 0;
   }
   
-  // Surface area scoring
+  // Surface area scoring (20 points max)
   if (leadData.estimatedSurface) {
     const surface = parseInt(leadData.estimatedSurface);
-    if (surface >= 500) score += 30;
-    else if (surface >= 200) score += 20;
-    else if (surface >= 100) score += 15;
-    else score += 10;
+    if (surface >= 500) score += 20;
+    else if (surface >= 200) score += 15;
+    else if (surface >= 100) score += 10;
+    else score += 5;
   }
   
+  // Lead type scoring (10 points max)
+  if (leadData.leadType) {
+    const typeScores: Record<string, number> = {
+      'PROFESSIONNEL': 10,
+      'PUBLIC': 8,
+      'SYNDIC': 7,
+      'PARTICULIER': 5,
+      'NGO': 3,
+      'OTHER': 2
+    };
+    score += typeScores[leadData.leadType] || 0;
+  }
+  
+  // Contact completeness bonus (5 points max)
+  if (leadData.email) score += 2;
+  if (leadData.address) score += 2;
+  if (leadData.company && leadData.leadType === 'PROFESSIONNEL') score += 1;
+  
+  // Frequency bonus (for recurring business potential)
+  if (leadData.frequency && leadData.frequency !== 'PONCTUEL') {
+    score += 5;
+  }
+  
+  // Property type bonus (certain types are more valuable)
+  if (leadData.propertyType) {
+    const propertyScores: Record<string, number> = {
+      'HOTEL_LUXURY': 5,
+      'COMMERCIAL': 4,
+      'OFFICE': 4,
+      'HOTEL_STANDARD': 3,
+      'RESIDENCE_B2B': 3,
+      'BUILDING': 3,
+      'RESTAURANT': 2,
+      'WAREHOUSE': 2,
+      'VILLA_LARGE': 2,
+      'APARTMENT_LARGE': 1,
+      'APARTMENT_MULTI': 1
+    };
+    score += propertyScores[leadData.propertyType] || 0;
+  }
+  
+  // Ensure score doesn't exceed 100
   return Math.min(score, 100);
 }

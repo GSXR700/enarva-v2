@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       data: {
         name,
         email,
-        password: hashedPassword,
+        hashedPassword: hashedPassword,
         role: 'ADMIN', // Par défaut, le premier utilisateur est Admin
       },
     });
