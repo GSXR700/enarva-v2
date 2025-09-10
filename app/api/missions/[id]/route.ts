@@ -34,27 +34,19 @@ export async function GET(request: Request, { params }: { params: { id: string }
       include: {
         tasks: true,
         team: {
-          select: {
-            id: true,
-            name: true,
-            members: {
-              select: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    image: true,
-                  },
-                },
-              },
-            },
-          },
+            include: {
+                members: {
+                    include: {
+                        user: true
+                    }
+                }
+            }
         },
         quote: {
-          include: {
-            lead: true,
-          },
-        },
+            include: {
+                lead: true
+            }
+        }
       },
     });
 
@@ -87,10 +79,14 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
             if (startDate) missionUpdateData.startDate = new Date(startDate);
             if (endDate) missionUpdateData.endDate = new Date(endDate);
+            
             if (teamId) {
                 missionUpdateData.team = { connect: { id: teamId } };
             } else {
-                missionUpdateData.team = { disconnect: true };
+                const existingMission = await tx.mission.findUnique({ where: { id: params.id }, select: { teamId: true } });
+                if (existingMission?.teamId) {
+                    missionUpdateData.team = { disconnect: true };
+                }
             }
 
             const updatedMission = await tx.mission.update({
@@ -98,19 +94,17 @@ export async function PUT(request: Request, { params }: { params: { id: string }
                 data: missionUpdateData,
             });
 
-            // Delete all existing tasks for this mission to replace them with the new list
             await tx.task.deleteMany({
                 where: { missionId: params.id },
             });
 
-            // Create new tasks from the provided list
             if (tasks.length > 0) {
                 await tx.task.createMany({
                     data: tasks.map((task: any) => ({
                         title: task.title,
                         type: task.type,
                         category: task.category,
-                        status: task.status || 'PENDING',
+                        status: task.status || 'ASSIGNED',
                         estimatedTime: task.estimatedTime,
                         missionId: updatedMission.id,
                     })),
