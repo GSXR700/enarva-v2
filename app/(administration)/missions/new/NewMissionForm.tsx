@@ -1,4 +1,4 @@
-// gsxr700/enarva-v2/enarva-v2-6ca61289d3a555c270f0a2db9f078e282ccd8664/app/(administration)/missions/new/NewMissionForm.tsx
+//app/(administration)/missions/new/NewMissionForm.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, ListChecks } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { Quote, User as TeamMember, Lead, Priority } from '@prisma/client'
 import { toast } from 'sonner'
 
@@ -40,6 +40,9 @@ export default function NewMissionForm() {
     accessNotes: '',
     type: missionType,
     taskTemplateId: '',
+    adminNotes: '',
+    qualityScore: '',
+    issuesFound: '',
   });
 
   // State for dropdown options
@@ -397,6 +400,46 @@ export default function NewMissionForm() {
                   placeholder="Code d'entrée, contact sur place, instructions spéciales..." 
                 />
               </div>
+
+              {/* Admin Fields - Only show for admin users */}
+              <div className="md:col-span-2 border-t pt-4">
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Validation Administrative</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="qualityScore">Score Qualité (/5)</Label>
+                    <Input
+                      id="qualityScore"
+                      type="number"
+                      min="1"
+                      max="5"
+                      value={formData.qualityScore || ''}
+                      onChange={handleChange}
+                      placeholder="1-5"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="adminNotes">Notes Admin</Label>
+                    <Textarea
+                      id="adminNotes"
+                      value={formData.adminNotes || ''}
+                      onChange={handleChange}
+                      placeholder="Notes de validation..."
+                      rows={2}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="issuesFound">Problèmes identifiés</Label>
+                    <Textarea
+                      id="issuesFound"
+                      value={formData.issuesFound || ''}
+                      onChange={handleChange}
+                      placeholder="Description des problèmes..."
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              </div>
+
             </div>
 
             {error && <p className="text-red-500 text-sm bg-red-50 p-3 rounded-md border border-red-200">{error}</p>}

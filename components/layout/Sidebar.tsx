@@ -1,114 +1,143 @@
-// components/layout/Sidebar.tsx
-'use client'
-
+// components/navigation/Sidebar.tsx - Updated Navigation
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import {
-  Home,
-  Users,
-  FileText,
-  Calendar,
-  CheckSquare,
-  Package,
-  CreditCard,
-  Settings,
-  UserCheck,
+import { 
+  Users, 
+  FileText, 
+  DollarSign, 
+  Settings, 
   BarChart3,
-  Star,
+  Package,
+  Calendar,
   MessageSquare,
-  Receipt,
-  X,
+  ClipboardCheck,
+  TrendingDown,
+  CreditCard,
+  Activity,
+  AlertTriangle,
+  FileBarChart
 } from 'lucide-react'
 
-const navigationItems = [
-  { title: 'Dashboard', href: '/', icon: Home },
-  { title: 'Leads', href: '/leads', icon: UserCheck },
-  { title: 'Devis', href: '/quotes', icon: FileText },
-  { title: 'Missions', href: '/missions', icon: CheckSquare },
-  { title: 'Équipes', href: '/teams', icon: Users },
-  { title: 'Planning', href: '/planning', icon: Calendar },
-  { title: 'Inventaire', href: '/inventory', icon: Package },
-  { title: 'Facturation', href: '/billing', icon: CreditCard },
-  { title: 'Analytics', href: '/analytics', icon: BarChart3 },
-  { title: 'Dépenses', href: '/expenses', icon: Receipt }, // LIGNE AJOUTÉE
-  { title: 'Fidélisation', href: '/loyalty', icon: Star },
-  { title: 'Communications', href: '/chat', icon: MessageSquare },
-  { title: 'Paramètres', href: '/settings', icon: Settings },
+const navigation = [
+  {
+    name: 'Tableau de Bord',
+    href: '/dashboard',
+    icon: BarChart3,
+  },
+  {
+    name: 'Leads',
+    href: '/leads',
+    icon: Users,
+  },
+  {
+    name: 'Devis',
+    href: '/quotes',
+    icon: FileText,
+  },
+  {
+    name: 'Missions',
+    href: '/missions',
+    icon: Calendar,
+  },
+  {
+    name: 'Équipes',
+    href: '/teams',
+    icon: Users,
+  },
+  {
+    name: 'Facturation',
+    href: '/billing',
+    icon: DollarSign,
+  },
+  {
+    name: 'Dépenses',
+    href: '/expenses',
+    icon: DollarSign,
+  },
+  {
+    name: 'Inventaire',
+    href: '/inventory',
+    icon: Package,
+  },
+  {
+    name: 'Utilisation Inventaire',
+    href: '/inventory-usage',
+    icon: TrendingDown,
+  },
+  {
+    name: 'Abonnements',
+    href: '/subscriptions',
+    icon: CreditCard,
+  },
+  {
+    name: 'Rapports Terrain',
+    href: '/field-reports',
+    icon: FileBarChart,
+  },
+  {
+    name: 'Contrôles Qualité',
+    href: '/quality-checks',
+    icon: ClipboardCheck,
+  },
+  {
+    name: 'Messages',
+    href: '/chat',
+    icon: MessageSquare,
+  },
+  {
+    name: 'Activités',
+    href: '/activities',
+    icon: Activity,
+  },
+  {
+    name: 'Logs Système',
+    href: '/system-logs',
+    icon: AlertTriangle,
+  },
+  {
+    name: 'Paramètres',
+    href: '/settings',
+    icon: Settings,
+  },
 ]
 
-interface SidebarProps {
-  isOpen: boolean;
-  setOpen: (isOpen: boolean) => void;
-}
-
-export function Sidebar({ isOpen, setOpen }: SidebarProps) {
+export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <>
-      {/* Overlay for mobile to close sidebar on click outside */}
-      <div 
-        className={cn(
-          "fixed inset-0 bg-black/60 z-30 transition-opacity lg:hidden",
-          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        )}
-        onClick={() => setOpen(false)}
-      />
-
-      {/* Sidebar container */}
-      <aside
-        className={cn(
-          "fixed top-0 left-0 h-full bg-card border-r border-border z-40 transition-transform duration-300 ease-in-out flex flex-col",
-          "w-64", // Standard width
-          "lg:translate-x-0", // Always visible and in place on desktop
-          isOpen ? "translate-x-0" : "-translate-x-full" // Controls mobile visibility
-        )}
-      >
-        {/* Logo Section - Centered with original size */}
-        <div className="relative flex items-center justify-center h-16 border-b border-border flex-shrink-0">
-          <Link href="/">
-              <Image src="/images/enarva-logo.svg" alt="Enarva Logo" width={140} height={60} priority />
-          </Link>
-          <button 
-            onClick={() => setOpen(false)} 
-            className="lg:hidden absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-secondary"
-          >
-            <X className="w-5 h-5" />
-          </button>
+    <div className="flex h-full w-64 flex-col fixed inset-y-0 z-50 bg-white border-r">
+      <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto">
+        <div className="flex items-center flex-shrink-0 px-4">
+          <h1 className="text-xl font-bold text-blue-600">Enarva OS</h1>
         </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4 overflow-y-auto custom-scrollbar">
-          <ul className="space-y-2">
-            {navigationItems.map((item) => {
-              const isActive = pathname === item.href
-              const Icon = item.icon
-              
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={() => { if (isOpen) setOpen(false) }} // Close on mobile navigation
-                    className={cn(
-                      "flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors text-sm font-medium",
-                      isActive 
-                        ? "bg-enarva-gradient text-white shadow-md" 
-                        : "text-foreground hover:bg-secondary/50"
-                    )}
-                  >
-                    <Icon className="w-5 h-5 flex-shrink-0" />
-                    <span>{item.title}</span>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
+        
+        <nav className="mt-8 flex-1 px-2 space-y-1">
+          {navigation.map((item) => (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={cn(
+                pathname === item.href
+                  ? 'bg-blue-100 text-blue-900'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                'group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+              )}
+            >
+              <item.icon
+                className={cn(
+                  pathname === item.href
+                    ? 'text-blue-500'
+                    : 'text-gray-400 group-hover:text-gray-500',
+                  'mr-3 flex-shrink-0 h-5 w-5'
+                )}
+                aria-hidden="true"
+              />
+              {item.name}
+            </Link>
+          ))}
         </nav>
-      </aside>
-       {/* Pusher element for desktop layout to prevent content from going under the fixed sidebar */}
-       <div className="w-0 lg:w-64 flex-shrink-0" />
-    </>
+      </div>
+    </div>
   )
 }
