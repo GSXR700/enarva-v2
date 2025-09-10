@@ -6,10 +6,15 @@ import { authOptions } from '@/lib/auth'
 
 const prisma = new PrismaClient()
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: Request, 
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params
+    
     const qualityCheck = await prisma.qualityCheck.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         mission: {
           include: {
@@ -30,8 +35,13 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(
+  request: Request, 
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params
+    
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return new NextResponse('Unauthorized', { status: 401 })
@@ -62,7 +72,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     }
 
     const qualityCheck = await prisma.qualityCheck.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         mission: {
