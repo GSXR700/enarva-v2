@@ -713,3 +713,5 @@ export function formatValidationErrors(errors: z.ZodIssue[]): string[] {
     return `${path}: ${error.message}`
   })
 }
+
+export type CreateMissionInput = CompleteMissionInput;
