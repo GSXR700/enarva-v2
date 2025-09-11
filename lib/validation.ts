@@ -80,10 +80,11 @@ const completeLeadObjectSchema = z.object({
 
   // Property Information
   propertyType: z.enum([
-    'APPARTMENT', 'HOUSE', 'VILLA', 'STUDIO', 'LOFT', 'DUPLEX', 'RIAD', 'OFFICE_SMALL',
-    'OFFICE_MEDIUM', 'OFFICE_LARGE', 'COWORKING', 'COMMERCIAL', 'STORE', 'HOTEL_STANDARD',
-    'HOTEL_LUXURY', 'OFFICE', 'RESIDENCE_B2B', 'BUILDING', 'RESTAURANT', 'WAREHOUSE', 'OTHER'
-  ]).optional().nullable(),
+  'APARTMENT_SMALL', 'APARTMENT_MEDIUM', 'APARTMENT_MULTI', 'APARTMENT_LARGE',
+  'VILLA_SMALL', 'VILLA_MEDIUM', 'VILLA_LARGE', 'PENTHOUSE',
+  'COMMERCIAL', 'STORE', 'HOTEL_STANDARD', 'HOTEL_LUXURY', 'OFFICE',
+  'RESIDENCE_B2B', 'BUILDING', 'RESTAURANT', 'WAREHOUSE', 'OTHER'
+]).optional().nullable(),
 
   estimatedSurface: z.number()
     .min(1, 'Surface estimée doit être positive')
