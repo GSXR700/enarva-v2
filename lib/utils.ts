@@ -207,25 +207,25 @@ export const translations = {
     IMMEDIATE: "Immédiat" 
   },
   PropertyType: {
-    APARTMENT_SMALL: "Appartement (Petit)",
+  APARTMENT_SMALL: "Appartement (Petit)",
   APARTMENT_MEDIUM: "Appartement (Moyen)",
   APARTMENT_MULTI: "Appartement (Multi-niveaux)",
-  APARTMENT_LARGE: "Appartement (Grand)",              // ✅ ADDED
-  VILLA_SMALL: "Villa (Petite)",                       // ✅ ADDED
-  VILLA_MEDIUM: "Villa (Moyenne)",                     // ✅ ADDED
+  APARTMENT_LARGE: "Appartement (Grand)",
+  VILLA_SMALL: "Villa (Petite)",
+  VILLA_MEDIUM: "Villa (Moyenne)",
   VILLA_LARGE: "Villa (Grande)",
-  PENTHOUSE: "Penthouse",                              // ✅ ADDED
+  PENTHOUSE: "Penthouse",
   COMMERCIAL: "Local Commercial",
-  STORE: "Magasin",                                    // ✅ ADDED
+  STORE: "Magasin",
   HOTEL_STANDARD: "Hôtel (Standard)",
   HOTEL_LUXURY: "Hôtel (Luxe)",
   OFFICE: "Bureau",
   RESIDENCE_B2B: "Résidence B2B",
-  BUILDING: "Immeuble",                                // ✅ ADDED
+  BUILDING: "Immeuble",
   RESTAURANT: "Restaurant",
-  WAREHOUSE: "Entrepôt",                               // ✅ ADDED
-  OTHER: "Autre" ,                                     
-  },
+  WAREHOUSE: "Entrepôt",
+  OTHER: "Autre"
+},
   Frequency: { 
     PONCTUEL: "Ponctuel", 
     MENSUEL: "Mensuel", 

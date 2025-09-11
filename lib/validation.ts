@@ -405,10 +405,11 @@ export const completeQuoteValidationSchema = z.object({
   leadUpdates: z.object({
     estimatedSurface: z.number().min(1).max(10000).optional(),
     propertyType: z.enum([
-      'APPARTMENT', 'HOUSE', 'VILLA', 'STUDIO', 'LOFT', 'DUPLEX', 'RIAD', 'OFFICE_SMALL',
-      'OFFICE_MEDIUM', 'OFFICE_LARGE', 'COWORKING', 'COMMERCIAL', 'STORE', 'HOTEL_STANDARD',
-      'HOTEL_LUXURY', 'OFFICE', 'RESIDENCE_B2B', 'BUILDING', 'RESTAURANT', 'WAREHOUSE', 'OTHER'
-    ]).optional(),
+    'APARTMENT_SMALL', 'APARTMENT_MEDIUM', 'APARTMENT_MULTI', 'APARTMENT_LARGE',
+    'VILLA_SMALL', 'VILLA_MEDIUM', 'VILLA_LARGE', 'PENTHOUSE',
+    'COMMERCIAL', 'STORE', 'HOTEL_STANDARD', 'HOTEL_LUXURY', 'OFFICE',
+    'RESIDENCE_B2B', 'BUILDING', 'RESTAURANT', 'WAREHOUSE', 'OTHER'
+     ]).optional(),
     address: z.string().max(200).optional(),
     urgencyLevel: z.enum(['LOW', 'NORMAL', 'URGENT', 'HIGH_URGENT', 'IMMEDIATE']).optional(),
     budgetRange: z.string().max(50).optional()
