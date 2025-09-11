@@ -1,16 +1,21 @@
 import { useEffect, useRef } from 'react';
 import Pusher, { Channel } from 'pusher-js';
 
-// Module-level variable to hold the single Pusher client instance.
+// Variable au niveau du module pour conserver l'instance unique du client Pusher.
 let pusherClient: Pusher | null = null;
 
-// Function to initialize and/or retrieve the singleton Pusher client.
-const getPusherClient = (): Pusher => {
+// Fonction pour initialiser et/ou récupérer le client Pusher unique (singleton).
+const getPusherClient = (): Pusher | null => {
+  // S'assurer que ce code ne s'exécute que côté client.
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  
   if (!pusherClient) {
-    // Only create a new instance if one doesn't already exist.
+    // Créer une nouvelle instance seulement si elle n'existe pas déjà.
     pusherClient = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-      authEndpoint: '/api/pusher/auth',
+      authEndpoint: '/api/pusher/auth', // Endpoint d'authentification
       forceTLS: true,
       enabledTransports: ['ws', 'wss'],
       activityTimeout: 10000,
@@ -22,11 +27,11 @@ const getPusherClient = (): Pusher => {
 };
 
 /**
- * A custom React hook to subscribe to a Pusher channel and handle events.
- * This hook ensures that components correctly subscribe and clean up listeners,
- * preventing memory leaks and redundant subscriptions.
- * * @param channelName - The name of the channel to subscribe to. Can be null to prevent subscription.
- * @param eventHandlers - An object where keys are event names and values are the handler functions.
+ * Hook React personnalisé pour s'abonner à un canal Pusher et gérer les événements.
+ * Ce hook garantit que les composants s'abonnent et nettoient correctement les écouteurs,
+ * prévenant les fuites de mémoire et les abonnements redondants.
+ * @param channelName - Le nom du canal auquel s'abonner. Peut être null pour empêcher l'abonnement.
+ * @param eventHandlers - Un objet où les clés sont les noms d'événements et les valeurs sont les fonctions de gestion.
  */
 export function usePusherChannel(
   channelName: string | null,
@@ -36,33 +41,32 @@ export function usePusherChannel(
   const channelRef = useRef<Channel | null>(null);
 
   useEffect(() => {
-    // Do nothing if the channel name is not provided.
-    if (!channelName) {
+    // Ne rien faire si le client n'est pas initialisé ou si le nom du canal n'est pas fourni.
+    if (!client || !channelName) {
       return;
     }
 
-    // Subscribe to the channel.
+    // S'abonner au canal.
     channelRef.current = client.subscribe(channelName);
 
-    // Bind all provided event handlers to the channel.
+    // Lier tous les gestionnaires d'événements fournis au canal.
     Object.entries(eventHandlers).forEach(([event, handler]) => {
       channelRef.current!.bind(event, handler);
     });
 
-    // Cleanup function: This is critical for preventing memory leaks.
-    // It runs when the component unmounts or when the channelName changes.
+    // Fonction de nettoyage : essentielle pour éviter les fuites de mémoire.
+    // Elle s'exécute lorsque le composant est démonté ou lorsque channelName change.
     return () => {
       if (channelRef.current) {
-        // Unbind all event handlers before unsubscribing.
+        // Détacher tous les gestionnaires d'événements avant de se désabonner.
         Object.keys(eventHandlers).forEach(event => {
           channelRef.current!.unbind(event);
         });
         
-        // Unsubscribe from the channel.
+        // Se désabonner du canal.
         client.unsubscribe(channelName);
         channelRef.current = null;
       }
     };
-    // The hook re-runs only if the channelName changes.
   }, [channelName, client, eventHandlers]);
 }

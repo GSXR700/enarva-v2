@@ -518,7 +518,7 @@ const NewQuoteForm = () => {
                     </div>
                     <Button type="button" onClick={addService} size="sm" variant="outline">
                       <Plus className="h-4 w-4 mr-2" />
-                      Ajouter Service
+                      Service
                     </Button>
                   </CardTitle>
                 </CardHeader>
@@ -622,7 +622,7 @@ const NewQuoteForm = () => {
                     </div>
                     <Button type="button" onClick={addProductItem} size="sm" variant="outline">
                       <Plus className="h-4 w-4 mr-2" />
-                      Ajouter Produit
+                      Produit
                     </Button>
                   </CardTitle>
                 </CardHeader>
