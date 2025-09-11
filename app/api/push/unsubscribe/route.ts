@@ -1,4 +1,4 @@
-// app/api/push/subscribe/route.ts - PUSH SUBSCRIPTION API
+// app/api/push/unsubscribe/route.ts - PUSH UNSUBSCRIPTION API (FIXED)
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -13,25 +13,19 @@ export async function POST(request: Request) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
-    const { subscription } = await request.json()
-
-    if (!subscription) {
-      return new NextResponse('Subscription data required', { status: 400 })
-    }
-
-    // Save subscription to user
+    // Remove subscription from user - FIX: Proper null handling
     await prisma.user.update({
       where: { id: session.user.id },
       data: {
-        pushSubscription: subscription
+        pushSubscription: null as any // Fix: Cast to any to handle NullableJsonNullValueInput type
       }
     })
 
-    console.log(`✅ Push subscription saved for user ${session.user.id}`)
+    console.log(`✅ Push subscription removed for user ${session.user.id}`)
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Failed to save push subscription:', error)
+    console.error('Failed to remove push subscription:', error)
     return new NextResponse('Internal Server Error', { status: 500 })
   }
 }

@@ -19,7 +19,7 @@ model User {
   email            String?         @unique
   emailVerified    DateTime?
   image            String?
-  hashedPassword   String? // Renamed from 'password' for security clarity
+  hashedPassword   String?         // Updated field name
   role             UserRole        @default(TECHNICIAN)
   onlineStatus     String          @default("OFFLINE")
   lastSeen         DateTime?
@@ -28,9 +28,9 @@ model User {
   // --- Relationships ---
   accounts         Account[]
   sessions         Session[]
-  leadsAssigned    Lead[]          @relation("LeadAssignments") // Leads this user is directly responsible for.
-  missionsLed      Mission[]       @relation("MissionTeamLead") // Missions where this user is the designated Team Leader.
-  teamMemberships  TeamMember[] // The teams this user is a member of.
+  leadsAssigned    Lead[]          @relation("LeadAssignments")
+  missionsLed      Mission[]       @relation("MissionTeamLead")
+  teamMemberships  TeamMember[]    // Add this relationship
   activities       Activity[]
   sentMessages     Message[]       @relation("MessageSender")
   conversations    Conversation[]  @relation("ConversationParticipants")
@@ -49,12 +49,12 @@ model User {
 // A Team is assigned to a Mission.
 model Team {
   id          String       @id @default(cuid())
-  name        String
+  name        String       @unique
   description String?
   
   // --- Relationships ---
-  members     TeamMember[] // List of members that belong to this team.
-  missions    Mission[]    // List of missions assigned to this team.
+  members     TeamMember[] // List of members that belong to this team
+  missions    Mission[]    // List of missions assigned to this team
 
   // --- Timestamps ---
   createdAt   DateTime     @default(now())
@@ -67,23 +67,23 @@ model Team {
 // This holds details about a user's role and status within a specific team.
 model TeamMember {
   id           String          @id @default(cuid())
-  userId       String
+  userId       String          @unique
   user         User            @relation(fields: [userId], references: [id])
-  teamId       String
-  team         Team            @relation(fields: [teamId], references: [id])
+  teamId       String          // This field is MISSING in your current schema
+  team         Team            @relation(fields: [teamId], references: [id]) // This relation is MISSING
   
   // --- Member-specific attributes ---
   specialties  TeamSpecialty[]
   experience   ExperienceLevel
   availability TeamAvailability @default(AVAILABLE)
-  hourlyRate   Decimal?
+  hourlyRate   Decimal?        // This field exists but may need proper handling
   joinedAt     DateTime        @default(now())
   isActive     Boolean         @default(true)
 
   // --- Relationships ---
-  tasks        Task[] // Tasks directly assigned to this team member.
+  tasks        Task[]          // Tasks directly assigned to this team member
 
-  @@unique([userId, teamId]) // Ensures a user can only be on a specific team once.
+  @@unique([userId, teamId])   // Ensures a user can only be on a specific team once
   @@map("team_members")
 }
 
@@ -685,6 +685,7 @@ enum QuoteStatus {
   ACCEPTED
   REJECTED
   EXPIRED
+  CANCELLED
 }
 
 enum QuoteType {
@@ -848,6 +849,9 @@ enum ActivityType {
   SUBSCRIPTION_CREATED
   QUALITY_ISSUE
   CLIENT_FEEDBACK
+  USER_CREATED
+  USER_DELETED
+  SYSTEM_MAINTENANCE
 }
 
 enum InvoiceStatus {

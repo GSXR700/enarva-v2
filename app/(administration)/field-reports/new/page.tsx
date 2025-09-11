@@ -1,6 +1,4 @@
-'use client'
-
-import { useState, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,18 +7,166 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Save, X } from 'lucide-react'
-import { Mission, Lead } from '@prisma/client'
+import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, Camera, Upload, Save, Trash2, PenTool, RotateCcw, Check } from 'lucide-react'
 import { toast } from 'sonner'
 
-type MissionWithLead = Mission & { lead: Lead; fieldReport?: any };
+interface SignaturePadProps {
+  onSignature: (signature: string) => void
+  label: string
+  existingSignature?: string
+}
 
-export default function NewFieldReportPage() {
+const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existingSignature }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [hasSignature, setHasSignature] = useState(!!existingSignature)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    // Set canvas size
+    canvas.width = 400
+    canvas.height = 200
+
+    // Set drawing styles
+    ctx.strokeStyle = '#000000'
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+
+    // Clear canvas with white background
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    // Load existing signature if provided
+    if (existingSignature) {
+      const img = new Image()
+      img.onload = () => ctx.drawImage(img, 0, 0)
+      img.src = existingSignature
+    }
+  }, [existingSignature])
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    setIsDrawing(true)
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const rect = canvas.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+  }
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return
+
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const rect = canvas.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    ctx.lineTo(x, y)
+    ctx.stroke()
+  }
+
+  const stopDrawing = () => {
+    if (!isDrawing) return
+    setIsDrawing(false)
+    setHasSignature(true)
+    
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    // Convert to base64 and notify parent
+    const signatureData = canvas.toDataURL('image/png')
+    onSignature(signatureData)
+  }
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    setHasSignature(false)
+    onSignature('')
+  }
+
+  return (
+    <div className="space-y-3">
+      <Label className="text-sm font-medium">{label}</Label>
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+        <canvas
+          ref={canvasRef}
+          className="border border-gray-200 rounded cursor-crosshair bg-white"
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={stopDrawing}
+          onMouseLeave={stopDrawing}
+        />
+        <div className="flex justify-between items-center mt-3">
+          <p className="text-xs text-gray-500">
+            Cliquez et glissez pour signer
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={clearSignature}
+              className="text-red-600 hover:text-red-700"
+            >
+              <RotateCcw className="w-4 h-4 mr-1" />
+              Effacer
+            </Button>
+            {hasSignature && (
+              <Badge variant="default" className="bg-green-100 text-green-800">
+                <Check className="w-3 h-3 mr-1" />
+                Signé
+              </Badge>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface Mission {
+  id: string
+  missionNumber: string
+  lead: {
+    firstName: string
+    lastName: string
+  }
+}
+
+export default function EnhancedFieldReportForm() {
   const router = useRouter()
-  const [missions, setMissions] = useState<MissionWithLead[]>([])
+  const [missions, setMissions] = useState<Mission[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [beforePhotos, setBeforePhotos] = useState<File[]>([])
   const [afterPhotos, setAfterPhotos] = useState<File[]>([])
+  const [clientSignature, setClientSignature] = useState('')
+  const [teamLeadSignature, setTeamLeadSignature] = useState('')
 
   const [formData, setFormData] = useState({
     missionId: '',
@@ -29,8 +175,6 @@ export default function NewFieldReportPage() {
     issuesEncountered: '',
     materialsUsed: '',
     hoursWorked: '',
-    clientSignatureUrl: '',
-    teamLeadSignatureUrl: '',
     additionalNotes: ''
   })
 
@@ -40,7 +184,7 @@ export default function NewFieldReportPage() {
         const response = await fetch('/api/missions?status=COMPLETED')
         if (!response.ok) throw new Error('Failed to fetch missions')
         const data = await response.json()
-        setMissions(data.filter((m: MissionWithLead) => !m.fieldReport))
+        setMissions(data.filter((m: any) => !m.fieldReport))
       } catch (error) {
         toast.error('Impossible de charger les missions')
       }
@@ -93,12 +237,50 @@ export default function NewFieldReportPage() {
     return await Promise.all(uploadPromises)
   }
 
+  const uploadSignature = async (signatureData: string): Promise<string> => {
+    if (!signatureData) return ''
+    
+    // Convert base64 to blob
+    const response = await fetch(signatureData)
+    const blob = await response.blob()
+    
+    const formData = new FormData()
+    formData.append('file', blob, 'signature.png')
+    
+    const uploadResponse = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData
+    })
+    
+    if (!uploadResponse.ok) throw new Error('Signature upload failed')
+    const result = await uploadResponse.json()
+    return result.url
+  }
+
+  const validateForm = (): boolean => {
+    if (!formData.missionId) {
+      toast.error('Veuillez sélectionner une mission')
+      return false
+    }
+    if (!formData.hoursWorked || parseFloat(formData.hoursWorked) <= 0) {
+      toast.error('Veuillez indiquer le nombre d\'heures travaillées')
+      return false
+    }
+    if (!clientSignature) {
+      toast.error('La signature du client est requise')
+      return false
+    }
+    if (!teamLeadSignature) {
+      toast.error('La signature du chef d\'équipe est requise')
+      return false
+    }
+    return true
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.missionId || !formData.hoursWorked) {
-      toast.error('Veuillez remplir tous les champs obligatoires')
-      return
-    }
+    
+    if (!validateForm()) return
 
     setIsLoading(true)
 
@@ -106,13 +288,19 @@ export default function NewFieldReportPage() {
       // Upload photos
       const beforePhotosUrls = beforePhotos.length > 0 ? await uploadPhotos(beforePhotos) : []
       const afterPhotosUrls = afterPhotos.length > 0 ? await uploadPhotos(afterPhotos) : []
+      
+      // Upload signatures
+      const clientSignatureUrl = await uploadSignature(clientSignature)
+      const teamLeadSignatureUrl = await uploadSignature(teamLeadSignature)
 
       const reportData = {
         ...formData,
         hoursWorked: parseFloat(formData.hoursWorked),
         materialsUsed: formData.materialsUsed ? JSON.parse(formData.materialsUsed) : null,
         beforePhotos: beforePhotosUrls,
-        afterPhotos: afterPhotosUrls
+        afterPhotos: afterPhotosUrls,
+        clientSignatureUrl,
+        teamLeadSignatureUrl
       }
 
       const response = await fetch('/api/field-reports', {
@@ -127,6 +315,7 @@ export default function NewFieldReportPage() {
       router.push('/field-reports')
     } catch (error) {
       toast.error('Erreur lors de la création du rapport')
+      console.error(error)
     } finally {
       setIsLoading(false)
     }
@@ -145,12 +334,13 @@ export default function NewFieldReportPage() {
             Nouveau Rapport de Terrain
           </h1>
           <p className="text-muted-foreground mt-1">
-            Créez un rapport détaillé pour une mission terminée
+            Créez un rapport détaillé avec signatures et photos
           </p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Mission Selection */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle>Sélection de la Mission</CardTitle>
@@ -174,6 +364,7 @@ export default function NewFieldReportPage() {
           </CardContent>
         </Card>
 
+        {/* General Information */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle>Informations Générales</CardTitle>
@@ -185,9 +376,11 @@ export default function NewFieldReportPage() {
                 id="hoursWorked"
                 type="number"
                 step="0.5"
+                min="0"
                 value={formData.hoursWorked}
                 onChange={handleChange}
                 required
+                placeholder="Ex: 4.5"
               />
             </div>
             
@@ -198,6 +391,7 @@ export default function NewFieldReportPage() {
                 value={formData.generalObservations}
                 onChange={handleChange}
                 rows={4}
+                placeholder="Décrivez le déroulement de la mission..."
               />
             </div>
 
@@ -207,13 +401,17 @@ export default function NewFieldReportPage() {
                 id="materialsUsed"
                 value={formData.materialsUsed}
                 onChange={handleChange}
-                placeholder='{"produit1": "5L", "produit2": "2 unités"}'
+                placeholder='{"produit_vitres": "5L", "chiffons_microfibre": "10 unités"}'
                 rows={3}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Format JSON pour les matériaux utilisés
+              </p>
             </div>
           </CardContent>
         </Card>
 
+        {/* Client Feedback */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle>Retour Client</CardTitle>
@@ -226,21 +424,132 @@ export default function NewFieldReportPage() {
                 value={formData.clientFeedback}
                 onChange={handleChange}
                 rows={3}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="clientSignatureUrl">URL Signature Client</Label>
-              <Input
-                id="clientSignatureUrl"
-                value={formData.clientSignatureUrl}
-                onChange={handleChange}
-                placeholder="https://..."
+                placeholder="Retours, suggestions ou remarques du client..."
               />
             </div>
           </CardContent>
         </Card>
 
+        {/* Photos Section */}
+        <Card className="thread-card">
+          <CardHeader>
+            <CardTitle>Photos Avant/Après</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Before Photos */}
+            <div>
+              <Label>Photos avant intervention</Label>
+              <div className="mt-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handlePhotoChange(e, 'before')}
+                  className="hidden"
+                  id="before-photos"
+                />
+                <label
+                  htmlFor="before-photos"
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Ajouter des photos
+                </label>
+              </div>
+              
+              {beforePhotos.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                  {beforePhotos.map((photo, index) => (
+                    <div key={index} className="relative">
+                      <img
+                        src={URL.createObjectURL(photo)}
+                        alt={`Avant ${index + 1}`}
+                        className="w-full h-24 object-cover rounded border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute top-1 right-1 h-6 w-6 p-0"
+                        onClick={() => removePhoto(index, 'before')}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* After Photos */}
+            <div>
+              <Label>Photos après intervention</Label>
+              <div className="mt-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handlePhotoChange(e, 'after')}
+                  className="hidden"
+                  id="after-photos"
+                />
+                <label
+                  htmlFor="after-photos"
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Ajouter des photos
+                </label>
+              </div>
+              
+              {afterPhotos.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                  {afterPhotos.map((photo, index) => (
+                    <div key={index} className="relative">
+                      <img
+                        src={URL.createObjectURL(photo)}
+                        alt={`Après ${index + 1}`}
+                        className="w-full h-24 object-cover rounded border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute top-1 right-1 h-6 w-6 p-0"
+                        onClick={() => removePhoto(index, 'after')}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Signatures Section */}
+        <Card className="thread-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PenTool className="w-5 h-5" />
+              Signatures Obligatoires
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <SignaturePad
+              onSignature={setClientSignature}
+              label="Signature du client *"
+            />
+            
+            <SignaturePad
+              onSignature={setTeamLeadSignature}
+              label="Signature du chef d'équipe *"
+            />
+          </CardContent>
+        </Card>
+
+        {/* Issues and Notes */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle>Problèmes et Notes</CardTitle>
@@ -253,6 +562,7 @@ export default function NewFieldReportPage() {
                 value={formData.issuesEncountered}
                 onChange={handleChange}
                 rows={3}
+                placeholder="Décrivez les difficultés ou problèmes rencontrés..."
               />
             </div>
 
@@ -263,102 +573,33 @@ export default function NewFieldReportPage() {
                 value={formData.additionalNotes}
                 onChange={handleChange}
                 rows={3}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="teamLeadSignatureUrl">URL Signature Chef d'équipe</Label>
-              <Input
-                id="teamLeadSignatureUrl"
-                value={formData.teamLeadSignatureUrl}
-                onChange={handleChange}
-                placeholder="https://..."
+                placeholder="Toute information supplémentaire pertinente..."
               />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="thread-card">
-          <CardHeader>
-            <CardTitle>Photos</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <Label>Photos Avant</Label>
-              <div className="mt-2">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => handlePhotoChange(e, 'before')}
-                  className="mb-3"
-                />
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  {beforePhotos.map((photo, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={URL.createObjectURL(photo)}
-                        alt={`Before ${index + 1}`}
-                        className="w-full h-24 object-cover rounded"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-1 right-1 h-6 w-6 p-0"
-                        onClick={() => removePhoto(index, 'before')}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <Label>Photos Après</Label>
-              <div className="mt-2">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => handlePhotoChange(e, 'after')}
-                  className="mb-3"
-                />
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  {afterPhotos.map((photo, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={URL.createObjectURL(photo)}
-                        alt={`After ${index + 1}`}
-                        className="w-full h-24 object-cover rounded"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-1 right-1 h-6 w-6 p-0"
-                        onClick={() => removePhoto(index, 'after')}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex justify-end">
+        {/* Submit Section */}
+        <div className="flex justify-end gap-4">
+          <Button type="button" variant="outline" onClick={() => router.back()}>
+            Annuler
+          </Button>
           <Button 
             type="submit" 
-            disabled={isLoading}
-            className="bg-enarva-gradient rounded-lg px-8"
+            disabled={isLoading || !formData.missionId || !formData.hoursWorked || !clientSignature || !teamLeadSignature}
+            className="bg-green-600 hover:bg-green-700"
           >
-            <Save className="w-4 h-4 mr-2" />
-            {isLoading ? 'Création...' : 'Créer le Rapport'}
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Création en cours...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Créer le Rapport
+              </>
+            )}
           </Button>
         </div>
       </form>

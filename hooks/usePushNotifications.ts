@@ -1,65 +1,138 @@
-//hooks/usePushNotifications.ts
-'use client';
-
-import { useEffect } from 'react';
-import { toast } from 'sonner';
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding)
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
+// hooks/usePushNotifications.ts - COMPLETE PUSH NOTIFICATION HOOK
+import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
+import { toast } from 'sonner'
 
 export function usePushNotifications() {
+  const { data: session } = useSession()
+  const [isSubscribed, setIsSubscribed] = useState(false)
+  const [subscription, setSubscription] = useState<PushSubscription | null>(null)
+  const [supportsPush, setSupportsPush] = useState(false)
+
   useEffect(() => {
     if ('serviceWorker' in navigator && 'PushManager' in window) {
-      const askPermissionAndSubscribe = async () => {
-        try {
-          const permissionResult = await Notification.requestPermission();
-          if (permissionResult !== 'granted') {
-            console.log('User denied notification permission.');
-            return;
-          }
-
-          const swRegistration = await navigator.serviceWorker.register('/sw.js');
-          let subscription = await swRegistration.pushManager.getSubscription();
-
-          if (subscription === null) {
-            const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-            if (!vapidPublicKey) {
-              throw new Error('VAPID public key not found.');
-            }
-            subscription = await swRegistration.pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-            });
-          }
-
-          // Send subscription to the backend
-          await fetch('/api/push/subscribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(subscription),
-          });
-          toast.success('Notifications activées !');
-        } catch (error) {
-          console.error('Failed to subscribe to push notifications:', error);
-          toast.error('Impossible d\'activer les notifications.');
-        }
-      };
-      
-      // We can trigger this based on a user action, e.g., a button click.
-      // For now, let's create a function that can be called from a component.
-      (window as any).enablePushNotifications = askPermissionAndSubscribe;
+      setSupportsPush(true)
+      initializePushNotifications()
     }
-  }, []);
+  }, [session])
+
+  const initializePushNotifications = async () => {
+    try {
+      // Register service worker
+      const registration = await navigator.serviceWorker.register('/sw.js')
+      console.log('Service Worker registered:', registration)
+
+      // Check if already subscribed
+      const existingSubscription = await registration.pushManager.getSubscription()
+      if (existingSubscription) {
+        setSubscription(existingSubscription)
+        setIsSubscribed(true)
+        console.log('Already subscribed to push notifications')
+        return
+      }
+
+      // Auto-subscribe for logged in users
+      if (session?.user) {
+        await subscribeToPush()
+      }
+    } catch (error) {
+      console.error('Failed to initialize push notifications:', error)
+    }
+  }
+
+  const subscribeToPush = async () => {
+    try {
+      if (!supportsPush) {
+        toast.error('Les notifications push ne sont pas supportées sur ce navigateur')
+        return
+      }
+
+      // Request notification permission
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        toast.error('Permission de notification refusée')
+        return
+      }
+
+      // Get service worker registration
+      const registration = await navigator.serviceWorker.ready
+
+      // Subscribe to push notifications
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!)
+      })
+
+      // Send subscription to server
+      const response = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subscription: subscription.toJSON()
+        })
+      })
+
+      if (response.ok) {
+        setSubscription(subscription)
+        setIsSubscribed(true)
+        toast.success('Notifications activées avec succès!')
+      } else {
+        throw new Error('Failed to save subscription')
+      }
+    } catch (error) {
+      console.error('Failed to subscribe to push notifications:', error)
+      toast.error('Erreur lors de l\'activation des notifications')
+    }
+  }
+
+  const unsubscribeFromPush = async () => {
+    try {
+      if (subscription) {
+        await subscription.unsubscribe()
+        
+        // Remove subscription from server
+        await fetch('/api/push/unsubscribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            subscription: subscription.toJSON()
+          })
+        })
+
+        setSubscription(null)
+        setIsSubscribed(false)
+        toast.success('Notifications désactivées')
+      }
+    } catch (error) {
+      console.error('Failed to unsubscribe from push notifications:', error)
+      toast.error('Erreur lors de la désactivation des notifications')
+    }
+  }
+
+  return {
+    isSubscribed,
+    supportsPush,
+    subscribeToPush,
+    unsubscribeFromPush
+  }
+}
+
+// Utility function to convert VAPID key
+function urlB64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray
 }
