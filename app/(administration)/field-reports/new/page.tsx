@@ -1,3 +1,6 @@
+// app/(administration)/field-reports/new/page.tsx
+"use client"
+
 import React, { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'

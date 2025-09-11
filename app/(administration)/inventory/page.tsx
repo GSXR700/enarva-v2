@@ -1,11 +1,13 @@
-// app/(administration)/inventory/page.tsx - FIXED VERSION
+// app/(administration)/inventory/page.tsx
+"use client"
+
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/Alert'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Search, 
   Plus, 
