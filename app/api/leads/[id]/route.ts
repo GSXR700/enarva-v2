@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { leadService } from '@/services/lead.service';
-import { validateLeadInput } from '@/lib/validation';
+import { validateCompleteLeadInput } from '@/lib/validation';
 import { errorHandler } from '@/lib/error-handler';
 import { LeadStatus } from '@prisma/client';
 import { ExtendedUser } from '@/types/next-auth';
@@ -116,7 +116,7 @@ export async function PATCH(
 
     // Only validate for full updates, not partial ones
     if (!isPartialUpdate) {
-      const validation = validateLeadInput(cleanedData, false);
+      const validation = validateCompleteLeadInput(cleanedData, false);
       if (!validation.success) {
         console.error('Validation errors:', validation.error.errors);
         return NextResponse.json(

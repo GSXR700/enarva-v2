@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { missionService } from '@/services/mission.service';
 import { errorHandler } from '@/lib/error-handler';
-import { validateMissionInput } from '@/lib/validation';
+import { validateCompleteMissionInput } from '@/lib/validation';
 import { ExtendedUser } from '@/types/next-auth';
 
 // GET /api/missions - Fetch all missions with optional filtering and sorting
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     // Validate the input
-    const validationResult = validateMissionInput(body);
+    const validationResult = validateCompleteMissionInput(body);
     if (!validationResult.success) {
       return NextResponse.json(
         { error: 'Validation failed', details: validationResult.error.errors },

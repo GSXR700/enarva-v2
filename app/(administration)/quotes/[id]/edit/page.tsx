@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, FileText, Save, AlertCircle, Search, Plus } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { validateQuoteInput } from '@/lib/validation'
+import { validateCompleteQuoteInput  } from '@/lib/validation'
 import { Quote, Lead, QuoteStatus, QuoteType, PropertyType, UrgencyLevel } from '@prisma/client'
 import { toast } from 'sonner'
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton'
@@ -258,7 +258,7 @@ export default function EditQuotePage() {
         }
       };
 
-      const validation = validateQuoteInput(quoteData);
+      const validation = validateCompleteQuoteInput (quoteData);
       
       if (!validation.success) {
         const errors = validation.error.errors.map(error => `${error.path.join('.')}: ${error.message}`);
