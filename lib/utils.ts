@@ -361,3 +361,29 @@ export function generateQuote(services: ServiceInput[]): QuoteCalculation {
         finalPrice: totalTTC
     };
 }
+
+// Dans lib/utils.ts - Ajouter à la fonction generateQuote
+export const SERVICE_TYPES = [
+  'Grand Ménage',
+  'Nettoyage Standard', 
+  'Nettoyage Express',
+  'Nettoyage Vitres',
+  'Nettoyage Post-Travaux',
+  'Fin de chantier', // ← Service ajouté
+  'Nettoyage Bureaux',
+  'Nettoyage Commercial',
+  'Entretien Régulier'
+] as const;
+
+// Pricing pour le service "Fin de chantier"
+const SERVICE_PRICING = {
+  'Grand Ménage': { base: 200, perM2: 8 },
+  'Nettoyage Standard': { base: 150, perM2: 6 },
+  'Nettoyage Express': { base: 100, perM2: 4 },
+  'Nettoyage Vitres': { base: 80, perM2: 3 },
+  'Nettoyage Post-Travaux': { base: 300, perM2: 12 },
+  'Fin de chantier': { base: 350, perM2: 15 }, // ← Pricing ajouté
+  'Nettoyage Bureaux': { base: 120, perM2: 5 },
+  'Nettoyage Commercial': { base: 180, perM2: 7 },
+  'Entretien Régulier': { base: 100, perM2: 4 }
+};

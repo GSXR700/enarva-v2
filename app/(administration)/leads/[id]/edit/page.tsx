@@ -1,4 +1,3 @@
-// app/(administration)/leads/[id]/edit/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react';
@@ -64,63 +63,89 @@ export default function EditLeadPage() {
             if (!leadResponse.ok) throw new Error("Lead non trouvé.");
             if (!usersResponse.ok) throw new Error("Impossible de charger les utilisateurs.");
 
-            const leadData = await leadResponse.json();
-            const usersData = await usersResponse.json();
-            
-            setAssignableUsers(usersData);
+            const [leadData, usersData] = await Promise.all([
+                leadResponse.json(),
+                usersResponse.json()
+            ]);
 
-            const cleanedData: any = {};
-            for (const key in initialFormData) {
-                if (leadData.hasOwnProperty(key)) {
-                    // @ts-ignore
-                    cleanedData[key] = leadData[key] === null ? '' : leadData[key];
-                }
+            // Handle both response formats: {users: [...]} and [...]
+            const userList = usersData.users || usersData;
+            if (Array.isArray(userList)) {
+                setAssignableUsers(userList);
+            } else {
+                console.error('Users data is not an array:', usersData);
+                setAssignableUsers([]);
             }
-            setFormData(cleanedData);
 
-            if (leadData.materials && Array.isArray(leadData.materials) && leadData.materials.length > 0) {
+            // Map lead data to form structure
+            setFormData({
+                ...leadData,
+                score: leadData.score || 0,
+                estimatedSurface: leadData.estimatedSurface || '',
+                materials: leadData.materials || null,
+            });
+
+            // Set request type based on lead data
+            if (leadData.needsProducts && !leadData.propertyType) {
                 setRequestType('PRODUCTS');
-                setProductRequests(leadData.materials);
+                if (leadData.materials && Array.isArray(leadData.materials)) {
+                    setProductRequests(leadData.materials);
+                }
             } else {
                 setRequestType('SERVICE');
             }
-        } catch (err: any) {
-            toast.error(err.message);
+
+        } catch (error: any) {
+            console.error("Error fetching data:", error);
+            toast.error(error.message);
+            router.push('/leads');
         } finally {
             setIsLoading(false);
         }
       };
+
       fetchLeadAndUsers();
     }
-  }, [leadId]);
+  }, [leadId, router]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value, type } = e.target;
-    // @ts-ignore
-    const checked = e.target.checked;
-    setFormData(prev => ({ ...prev, [id]: type === 'checkbox' ? checked : value }));
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value
+    }));
   };
 
-  const handleSelectChange = (id: keyof FormDataType, value: string) => {
-    setFormData(prev => ({ ...prev, [id]: value === 'null' ? null : value }));
+  const handleSelectChange = (name: keyof FormDataType, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value === 'null' || value === '' ? null : value
+    }));
   };
 
-  const handleRadioChange = (id: keyof FormDataType, value: string) => {
-    setFormData(prev => ({ ...prev, [id]: value as any }));
+  const handleCheckboxChange = (name: keyof FormDataType, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: checked
+    }));
   };
 
-  const handleProductChange = (index: number, field: keyof ProductRequest, value: string | number) => {
-    const updatedProducts = [...productRequests];
-    // @ts-ignore
-    updatedProducts[index][field] = value;
-    setProductRequests(updatedProducts);
+  const handleProductRequestChange = (index: number, field: keyof ProductRequest, value: string | number) => {
+    setProductRequests(prev => prev.map((req, i) => 
+      i === index ? { ...req, [field]: value } : req
+    ));
   };
-  const addProductRequest = () => setProductRequests([...productRequests, { name: '', category: '', quantity: 1, unit: '' }]);
-  const removeProductRequest = (index: number) => setProductRequests(productRequests.filter((_, i) => i !== index));
+
+  const addProductRequest = () => {
+    setProductRequests(prev => [...prev, { name: '', category: '', quantity: 1, unit: '' }]);
+  };
+
+  const removeProductRequest = (index: number) => {
+    setProductRequests(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
 
     const submissionData = {
         ...formData,
@@ -147,163 +172,500 @@ export default function EditLeadPage() {
       
       toast.success("Lead mis à jour avec succès !");
       router.push('/leads');
-      router.refresh();
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setIsLoading(false);
+    } catch (error: any) {
+      toast.error(error.message || "Une erreur est survenue.");
     }
   };
-  
-  if (isLoading) return <div className="main-content p-10 text-center">Chargement du lead...</div>
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-96 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="main-content space-y-6">
-        <div className="flex items-center gap-4">
-            <Link href="/leads"><Button variant="outline" size="icon"><ArrowLeft className="w-4 h-4" /></Button></Link>
-            <div>
-                <h1 className="text-2xl md:text-3xl font-bold">Modifier le Lead</h1>
-                <p className="text-muted-foreground mt-1">Mise à jour de {formData.firstName} {formData.lastName}.</p>
-            </div>
+    <div className="container mx-auto p-6 max-w-4xl">
+      <div className="flex items-center gap-4 mb-6">
+        <Link href="/leads">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Retour aux leads
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold">Modifier le lead</h1>
+          <p className="text-gray-600">ID: {leadId}</p>
         </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* La structure du formulaire est identique à celle de la page de création */}
-        <Card className="thread-card">
-            <CardHeader><CardTitle className="flex items-center gap-2"><User />Informations Générales & Statut</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div><Label htmlFor="firstName">Prénom</Label><Input id="firstName" value={formData.firstName || ''} onChange={handleChange} required /></div>
-                <div><Label htmlFor="lastName">Nom</Label><Input id="lastName" value={formData.lastName || ''} onChange={handleChange} required /></div>
-                <div><Label htmlFor="phone">Téléphone</Label><Input id="phone" type="tel" value={formData.phone || ''} onChange={handleChange} required /></div>
-                <div><Label htmlFor="email">Email</Label><Input id="email" type="email" value={formData.email || ''} onChange={handleChange} /></div>
-                <div className="md:col-span-2"><Label htmlFor="address">Adresse complète</Label><Input id="address" value={formData.address || ''} onChange={handleChange} /></div>
-                <div className="md:col-span-2"><Label htmlFor="gpsLocation">Localisation GPS</Label><Input id="gpsLocation" value={formData.gpsLocation || ''} onChange={handleChange} /></div>
-                <div><Label htmlFor="status">Statut du Lead</Label><Select value={formData.status || ''} onValueChange={(v) => handleSelectChange('status', v as LeadStatus)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{Object.entries(translations.LeadStatus).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
-                <div><Label htmlFor="score">Score du Lead (0-10)</Label><Input id="score" type="number" value={formData.score || 0} onChange={handleChange} /></div>
-            </CardContent>
-        </Card>
-        
-        <Card className="thread-card">
-            <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase />Détails du Client</CardTitle></CardHeader>
-            <CardContent>
-                <RadioGroup value={formData.leadType || 'PARTICULIER'} onValueChange={(v) => handleRadioChange('leadType', v)} className="flex flex-wrap gap-4 mb-6">
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="PARTICULIER" id="r1_edit" /><Label htmlFor="r1_edit">Particulier</Label></div>
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="PROFESSIONNEL" id="r2_edit" /><Label htmlFor="r2_edit">Entreprise</Label></div>
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="PUBLIC" id="r3_edit" /><Label htmlFor="r3_edit">Organisme Public</Label></div>
-                </RadioGroup>
-                
-                {formData.leadType === 'PROFESSIONNEL' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div><Label htmlFor="company">Raison sociale</Label><Input id="company" value={formData.company || ''} onChange={handleChange} required /></div>
-                        <div><Label htmlFor="iceNumber">Numéro ICE</Label><Input id="iceNumber" value={formData.iceNumber || ''} onChange={handleChange} required /></div>
-                        <div><Label htmlFor="activitySector">Secteur d'activité</Label><Input id="activitySector" value={formData.activitySector || ''} onChange={handleChange} /></div>
-                        <div><Label htmlFor="contactPosition">Fonction du contact</Label><Input id="contactPosition" value={formData.contactPosition || ''} onChange={handleChange} /></div>
-                        <div className="md:col-span-2"><Label htmlFor="department">Département / Service</Label><Input id="department" value={formData.department || ''} onChange={handleChange} /></div>
-                    </div>
-                )}
-                {formData.leadType === 'PUBLIC' && (
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div><Label htmlFor="company">Dénomination officielle</Label><Input id="company" value={formData.company || ''} onChange={handleChange} required /></div>
-                        <div><Label htmlFor="iceNumber">Référence interne / ICE</Label><Input id="iceNumber" value={formData.iceNumber || ''} onChange={handleChange} /></div>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-
-        <Card className="thread-card">
-            <CardHeader><CardTitle className="flex items-center gap-2"><Package />Détails de la Demande</CardTitle></CardHeader>
-            <CardContent>
-                <RadioGroup value={requestType} onValueChange={(v) => setRequestType(v as any)} className="flex flex-wrap gap-4 mb-6">
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="SERVICE" id="req_service_edit" /><Label htmlFor="req_service_edit">Prestation de Service</Label></div>
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="PRODUCTS" id="req_products_edit" /><Label htmlFor="req_products_edit">Produits / Équipements</Label></div>
-                </RadioGroup>
-
-                {requestType === 'SERVICE' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <Label htmlFor="propertyType">Type de propriété</Label>
-                            <Select value={formData.propertyType || ''} onValueChange={(v) => handleSelectChange('propertyType', v as PropertyType)}>
-                                <SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
-                                <SelectContent>{Object.entries(translations.PropertyType).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-                            </Select>
-                        </div>
-                        <div><Label htmlFor="urgencyLevel">Urgence</Label><Select value={formData.urgencyLevel || 'NORMAL'} onValueChange={(v) => handleSelectChange('urgencyLevel', v as UrgencyLevel)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{Object.entries(translations.UrgencyLevel).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
-                        <div><Label htmlFor="budgetRange">Budget estimé</Label><Input id="budgetRange" value={formData.budgetRange || ''} onChange={handleChange} /></div>
-                        <div><Label htmlFor="frequency">Fréquence</Label><Select value={formData.frequency || 'PONCTUEL'} onValueChange={(v) => handleSelectChange('frequency', v as Frequency)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{Object.entries(translations.Frequency).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
-                        <div className="md:col-span-2"><Label htmlFor="originalMessage">Service(s) demandé(s)</Label><Textarea id="originalMessage" value={formData.originalMessage || ''} onChange={handleChange} /></div>
-                    </div>
-                )}
-
-                {requestType === 'PRODUCTS' && (
-                     <div className="space-y-4">
-                        {productRequests.map((product, index) => (
-                            <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-4 border-b pb-4 last:border-b-0 last:pb-0">
-                                <Input placeholder="Nom / Référence" value={product.name} onChange={(e) => handleProductChange(index, 'name', e.target.value)} className="md:col-span-2"/>
-                                <Select value={product.category} onValueChange={(value) => handleProductChange(index, 'category', value)}>
-                                    <SelectTrigger><SelectValue placeholder="Catégorie..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="CLEANING_PRODUCTS">Produits nettoyage</SelectItem>
-                                        <SelectItem value="EQUIPMENT">Machines</SelectItem>
-                                        <SelectItem value="GARDENING">Jardinage</SelectItem>
-                                        <SelectItem value="POOL">Piscine</SelectItem>
-                                        <SelectItem value="PEST_CONTROL">Hygiène 3D</SelectItem>
-                                        <SelectItem value="PPE">EPI</SelectItem>
-                                        <SelectItem value="MISC">Divers</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Input type="number" placeholder="Qté" value={product.quantity} onChange={(e) => handleProductChange(index, 'quantity', parseInt(e.target.value) || 1)}/>
-                                <div className="flex items-center gap-2">
-                                    <Input placeholder="Unité" value={product.unit} onChange={(e) => handleProductChange(index, 'unit', e.target.value)}/>
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeProductRequest(index)} className="text-red-500 shrink-0"><Trash2 className="w-4 h-4" /></Button>
-                                </div>
-                            </div>
-                        ))}
-                        <Button type="button" variant="outline" onClick={addProductRequest} className="mt-2"><Plus className="w-4 h-4 mr-2" />Ajouter une ligne</Button>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-        
-        <Card className="thread-card">
-            <CardHeader><CardTitle className="flex items-center gap-2"><Search/>Origine du Lead</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <div><Label htmlFor="channel">Canal d’entrée</Label><Select value={formData.channel || ''} onValueChange={(v) => handleSelectChange('channel', v as LeadCanal)} required><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger><SelectContent>{Object.entries(translations.LeadCanal).map(([key, value]) => <SelectItem key={key} value={key}>{value}</SelectItem>)}</SelectContent></Select></div>
-                <div><Label htmlFor="source">Source précise</Label><Input id="source" value={formData.source || ''} onChange={handleChange} /></div>
-                <div className="md:col-span-2 space-y-2">
-                    <div className="flex items-center space-x-2">
-                        <Checkbox id="hasReferrer" checked={!!formData.hasReferrer} onCheckedChange={(checked) => setFormData(prev => ({...prev, hasReferrer: !!checked}))} />
-                        <Label htmlFor="hasReferrer">Apporteur d’affaires / Médiateur ?</Label>
-                    </div>
-                    {formData.hasReferrer && <Input id="referrerContact" value={formData.referrerContact || ''} onChange={handleChange} placeholder="Coordonnées et % commission"/>}
-                </div>
-            </CardContent>
+        {/* Section 1: Informations Générales */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Informations Générales
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="firstName">Prénom *</Label>
+              <Input
+                id="firstName"
+                name="firstName"
+                value={formData.firstName || ''}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="lastName">Nom *</Label>
+              <Input
+                id="lastName"
+                name="lastName"
+                value={formData.lastName || ''}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="phone">Téléphone *</Label>
+              <Input
+                id="phone"
+                name="phone"
+                value={formData.phone || ''}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email || ''}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label htmlFor="address">Adresse</Label>
+              <Input
+                id="address"
+                name="address"
+                value={formData.address || ''}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div>
+              <Label htmlFor="gpsLocation">Localisation GPS</Label>
+              <Input
+                id="gpsLocation"
+                name="gpsLocation"
+                value={formData.gpsLocation || ''}
+                onChange={handleInputChange}
+                placeholder="33.5731, -7.5898"
+              />
+            </div>
+            <div>
+              <Label htmlFor="status">Statut</Label>
+              <Select
+                value={formData.status || 'NEW'}
+                onValueChange={(value) => handleSelectChange('status', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NEW">Nouveau</SelectItem>
+                  <SelectItem value="QUALIFIED">Qualifié</SelectItem>
+                  <SelectItem value="IN_PROGRESS">En cours</SelectItem>
+                  <SelectItem value="COMPLETED">Terminé</SelectItem>
+                  <SelectItem value="LOST">Perdu</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
         </Card>
 
-        <Card className="thread-card">
-            <CardHeader><CardTitle className="flex items-center gap-2"><UsersIcon />Suivi et Planification</CardTitle></CardHeader>
-            <CardContent>
+        {/* Section 2: Détails Professionnels */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5" />
+              Détails Professionnels
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="leadType">Type de Lead *</Label>
+              <Select
+                value={formData.leadType || 'PARTICULIER'}
+                onValueChange={(value) => handleSelectChange('leadType', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PARTICULIER">Particulier</SelectItem>
+                  <SelectItem value="PROFESSIONNEL">Professionnel</SelectItem>
+                  <SelectItem value="SYNDIC">Syndic</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(formData.leadType === 'PROFESSIONNEL' || formData.leadType === 'SYNDIC') && (
+              <>
                 <div>
-                    <Label htmlFor="assignedToId">Assigner à</Label>
-                    <Select value={formData.assignedToId || ''} onValueChange={(v) => handleSelectChange('assignedToId', v)}>
-                        <SelectTrigger><SelectValue placeholder="Choisir un agent..." /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="null">Non assigné</SelectItem>
-                            {assignableUsers.map(user => (
-                                <SelectItem key={user.id} value={user.id}>{user.name} ({user.role})</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                  <Label htmlFor="company">Société</Label>
+                  <Input
+                    id="company"
+                    name="company"
+                    value={formData.company || ''}
+                    onChange={handleInputChange}
+                  />
                 </div>
-            </CardContent>
+                <div>
+                  <Label htmlFor="iceNumber">N° ICE</Label>
+                  <Input
+                    id="iceNumber"
+                    name="iceNumber"
+                    value={formData.iceNumber || ''}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="activitySector">Secteur d'Activité</Label>
+                  <Input
+                    id="activitySector"
+                    name="activitySector"
+                    value={formData.activitySector || ''}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="contactPosition">Poste du Contact</Label>
+                  <Input
+                    id="contactPosition"
+                    name="contactPosition"
+                    value={formData.contactPosition || ''}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="department">Département</Label>
+                  <Input
+                    id="department"
+                    name="department"
+                    value={formData.department || ''}
+                    onChange={handleInputChange}
+                  />
+                </div>
+              </>
+            )}
+          </CardContent>
         </Card>
 
-        <div className="flex justify-end mt-6">
-          <Button type="submit" className="bg-enarva-gradient rounded-lg px-8" disabled={isLoading}>
-            <Save className="w-4 h-4 mr-2" />
-            {isLoading ? 'Sauvegarde...' : 'Sauvegarder les modifications'}
+        {/* Section 3: Type de Demande */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Type de Demande</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RadioGroup
+              value={requestType}
+              onValueChange={(value: 'SERVICE' | 'PRODUCTS') => setRequestType(value)}
+              className="grid grid-cols-2 gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="SERVICE" id="service" />
+                <Label htmlFor="service" className="flex items-center gap-2">
+                  <Search className="h-4 w-4" />
+                  Prestation de Service
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="PRODUCTS" id="products" />
+                <Label htmlFor="products" className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Demande de Produits
+                </Label>
+              </div>
+            </RadioGroup>
+          </CardContent>
+        </Card>
+
+        {/* Section 4: Détails selon le type */}
+        {requestType === 'SERVICE' ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Détails de la Prestation</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="propertyType">Type de Propriété</Label>
+                <Select
+                  value={formData.propertyType || ''}
+                  onValueChange={(value) => handleSelectChange('propertyType', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="APARTMENT_SMALL">Appartement Petit</SelectItem>
+                    <SelectItem value="APARTMENT_MEDIUM">Appartement Moyen</SelectItem>
+                    <SelectItem value="APARTMENT_LARGE">Appartement Grand</SelectItem>
+                    <SelectItem value="VILLA_SMALL">Villa Petite</SelectItem>
+                    <SelectItem value="VILLA_MEDIUM">Villa Moyenne</SelectItem>
+                    <SelectItem value="VILLA_LARGE">Villa Grande</SelectItem>
+                    <SelectItem value="COMMERCIAL">Commercial</SelectItem>
+                    <SelectItem value="OFFICE">Bureau</SelectItem>
+                    <SelectItem value="OTHER">Autre</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="estimatedSurface">Surface Estimée (m²)</Label>
+                <Input
+                  id="estimatedSurface"
+                  name="estimatedSurface"
+                  type="number"
+                  value={formData.estimatedSurface || ''}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div>
+                <Label htmlFor="accessibility">Accessibilité</Label>
+                <Select
+                  value={formData.accessibility || 'EASY'}
+                  onValueChange={(value) => handleSelectChange('accessibility', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EASY">Facile</SelectItem>
+                    <SelectItem value="MODERATE">Modérée</SelectItem>
+                    <SelectItem value="DIFFICULT">Difficile</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="urgencyLevel">Niveau d'Urgence</Label>
+                <Select
+                  value={formData.urgencyLevel || 'NORMAL'}
+                  onValueChange={(value) => handleSelectChange('urgencyLevel', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="LOW">Faible</SelectItem>
+                    <SelectItem value="NORMAL">Normal</SelectItem>
+                    <SelectItem value="URGENT">Urgent</SelectItem>
+                    <SelectItem value="HIGH_URGENT">Très Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="budgetRange">Budget</Label>
+                <Input
+                  id="budgetRange"
+                  name="budgetRange"
+                  value={formData.budgetRange || ''}
+                  onChange={handleInputChange}
+                  placeholder="1000-5000 DH"
+                />
+              </div>
+              <div>
+                <Label htmlFor="frequency">Fréquence</Label>
+                <Select
+                  value={formData.frequency || 'PONCTUEL'}
+                  onValueChange={(value) => handleSelectChange('frequency', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PONCTUEL">Ponctuel</SelectItem>
+                    <SelectItem value="HEBDOMADAIRE">Hebdomadaire</SelectItem>
+                    <SelectItem value="MENSUEL">Mensuel</SelectItem>
+                    <SelectItem value="TRIMESTRIEL">Trimestriel</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Demandes de Produits</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {productRequests.map((request, index) => (
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg">
+                    <div>
+                      <Label htmlFor={`product-name-${index}`}>Nom du Produit</Label>
+                      <Input
+                        id={`product-name-${index}`}
+                        value={request.name}
+                        onChange={(e) => handleProductRequestChange(index, 'name', e.target.value)}
+                        placeholder="Ex: Table en bois"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`product-category-${index}`}>Catégorie</Label>
+                      <Input
+                        id={`product-category-${index}`}
+                        value={request.category}
+                        onChange={(e) => handleProductRequestChange(index, 'category', e.target.value)}
+                        placeholder="Ex: Mobilier"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`product-quantity-${index}`}>Quantité</Label>
+                      <Input
+                        id={`product-quantity-${index}`}
+                        type="number"
+                        value={request.quantity}
+                        onChange={(e) => handleProductRequestChange(index, 'quantity', parseInt(e.target.value) || 1)}
+                        min="1"
+                      />
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <Label htmlFor={`product-unit-${index}`}>Unité</Label>
+                        <Input
+                          id={`product-unit-${index}`}
+                          value={request.unit}
+                          onChange={(e) => handleProductRequestChange(index, 'unit', e.target.value)}
+                          placeholder="Ex: pcs, kg"
+                        />
+                      </div>
+                      {productRequests.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeProductRequest(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addProductRequest}
+                  className="w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter un produit
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Section 5: Canal et Source */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Canal et Source</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="channel">Canal d'Acquisition *</Label>
+              <Select
+                value={formData.channel || 'MANUEL'}
+                onValueChange={(value) => handleSelectChange('channel', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
+                  <SelectItem value="FACEBOOK">Facebook</SelectItem>
+                  <SelectItem value="GOOGLE_SEARCH">Google</SelectItem>
+                  <SelectItem value="APPEL_TELEPHONIQUE">Téléphone</SelectItem>
+                  <SelectItem value="RECOMMANDATION_CLIENT">Recommandation</SelectItem>
+                  <SelectItem value="MANUEL">Manuel</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="source">Source Détaillée</Label>
+              <Input
+                id="source"
+                name="source"
+                value={formData.source || ''}
+                onChange={handleInputChange}
+                placeholder="Ex: Google Ads, Page Facebook"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Section 6: Message et Attribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Message et Attribution</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="originalMessage">Message Original *</Label>
+              <Textarea
+                id="originalMessage"
+                name="originalMessage"
+                value={formData.originalMessage || ''}
+                onChange={handleInputChange}
+                rows={4}
+                placeholder="Description de la demande du client..."
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="assignedToId">Assigné à</Label>
+              <Select
+                value={formData.assignedToId || 'null'}
+                onValueChange={(value) => handleSelectChange('assignedToId', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un utilisateur..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="null">Non assigné</SelectItem>
+                  {Array.isArray(assignableUsers) && assignableUsers.map(user => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name} ({user.role})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Bouton de Soumission */}
+        <div className="flex justify-end gap-4">
+          <Link href="/leads">
+            <Button type="button" variant="outline">
+              Annuler
+            </Button>
+          </Link>
+          <Button type="submit" disabled={isLoading}>
+            <Save className="h-4 w-4 mr-2" />
+            Sauvegarder les modifications
           </Button>
         </div>
       </form>
     </div>
-  )
+  );
 }

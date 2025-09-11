@@ -35,7 +35,33 @@ export default function LeadsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [page, setPage] = useState(1);
+  const [users, setUsers] = useState<Array<{id: string, name: string}>>([]);
   const limit = 20;
+
+  // Fetch users for the LeadForm
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('/api/users');
+        if (response.ok) {
+          const data = await response.json();
+          // Handle both response formats: {users: [...]} and [...]
+          const userList = data.users || data;
+          if (Array.isArray(userList)) {
+            setUsers(userList.map((user: User) => ({
+              id: user.id,
+              name: user.name || user.email || 'Utilisateur sans nom'
+            })));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+        setUsers([]);
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   // Fetch leads with React Query
   const {
@@ -745,6 +771,7 @@ export default function LeadsPage() {
             <DialogTitle>Créer un nouveau lead</DialogTitle>
           </DialogHeader>
           <LeadForm 
+            users={users}
             onSuccess={() => {
               setIsFormOpen(false);
               refetch();
