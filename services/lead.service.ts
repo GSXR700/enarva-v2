@@ -1,4 +1,4 @@
-// services/lead.service.ts - COMPLETE CORRECTED VERSION
+// services/lead.service.ts - UPDATED TO HANDLE WEBSITE SYSTEM LEADS
 import { PrismaClient, Prisma, Lead, LeadStatus, ActivityType } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -45,21 +45,59 @@ export class LeadService {
      }
    });
 
-   try {
-     await this.logActivity({
-       type: 'LEAD_CREATED',
-       title: 'Lead créé',
-       description: `Nouveau lead créé: ${lead.firstName} ${lead.lastName}`,
-       leadId: lead.id,
-       userId: creatorId,
-       metadata: {
-         leadType: lead.leadType,
-         channel: lead.channel,
-         score: lead.score
+   // Handle activity logging - special case for website-system
+   if (creatorId === 'website-system') {
+     try {
+       // Try to find a system user or admin to log the activity
+       const systemUser = await prisma.user.findFirst({
+         where: { 
+           OR: [
+             { email: 'system@enarva.com' },
+             { role: 'ADMIN' }
+           ]
+         },
+         select: { id: true }
+       });
+
+       if (systemUser) {
+         await this.logActivity({
+           type: 'LEAD_CREATED',
+           title: 'Lead créé automatiquement',
+           description: `Nouveau lead depuis le site web: ${lead.firstName} ${lead.lastName}`,
+           leadId: lead.id,
+           userId: systemUser.id,
+           metadata: {
+             leadType: lead.leadType,
+             channel: lead.channel,
+             score: lead.score,
+             automated: true,
+             source: 'website'
+           }
+         });
+       } else {
+         console.log('No system user found, skipping activity log for website lead');
        }
-     });
-   } catch (activityError) {
-     console.warn('Failed to log lead creation activity:', activityError);
+     } catch (activityError) {
+       console.warn('Failed to log website lead creation activity:', activityError);
+     }
+   } else {
+     // Regular user-created lead
+     try {
+       await this.logActivity({
+         type: 'LEAD_CREATED',
+         title: 'Lead créé',
+         description: `Nouveau lead créé: ${lead.firstName} ${lead.lastName}`,
+         leadId: lead.id,
+         userId: creatorId,
+         metadata: {
+           leadType: lead.leadType,
+           channel: lead.channel,
+           score: lead.score
+         }
+       });
+     } catch (activityError) {
+       console.warn('Failed to log lead creation activity:', activityError);
+     }
    }
 
    return lead;
