@@ -68,20 +68,36 @@ export function UserManagement() {
   }, [page, limit, debouncedSearch])
 
   const fetchUsers = async () => {
-    setIsLoading(true)
-    try {
-      const response = await fetch(`/api/users?page=${page}&limit=${limit}&search=${debouncedSearch}`)
-      if (!response.ok) throw new Error('Impossible de charger les utilisateurs')
-      const data = await response.json()
-      setUsers(data.users) // Correctly access the 'users' array
+  setIsLoading(true)
+  try {
+    const response = await fetch(`/api/users?page=${page}&limit=${limit}&search=${debouncedSearch}`)
+    if (!response.ok) throw new Error('Impossible de charger les utilisateurs')
+    
+    const data = await response.json()
+    console.log('API Response:', data) // Debug log
+    
+    // FIX: Handle both response formats
+    // API returns users directly as array, not wrapped in {users: []}
+    const usersList = Array.isArray(data) ? data : (data.users || [])
+    
+    setUsers(usersList)
+    
+    // Handle pagination headers
+    const totalPagesHeader = response.headers.get('X-Total-Pages')
+    if (totalPagesHeader) {
+      setTotalPages(parseInt(totalPagesHeader))
+    } else if (data.totalPages) {
       setTotalPages(data.totalPages)
-    } catch (error: any) {
-      toast.error(error.message)
-      setUsers([]); // Ensure users is an array on error
-    } finally {
-      setIsLoading(false)
     }
+    
+  } catch (error: any) {
+    console.error('Failed to fetch users:', error)
+    toast.error(error.message)
+    setUsers([]) // Ensure users is an array on error
+  } finally {
+    setIsLoading(false)
   }
+}
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

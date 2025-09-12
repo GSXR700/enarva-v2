@@ -30,7 +30,7 @@ model User {
   sessions         Session[]
   leadsAssigned    Lead[]          @relation("LeadAssignments")
   missionsLed      Mission[]       @relation("MissionTeamLead")
-  teamMemberships  TeamMember[]    // Add this relationship
+  teamMemberships  TeamMember[]    // Fixed relationship
   activities       Activity[]
   sentMessages     Message[]       @relation("MessageSender")
   conversations    Conversation[]  @relation("ConversationParticipants")
@@ -66,22 +66,22 @@ model Team {
 // EXPLANATION: The junction model connecting a User to a Team.
 // This holds details about a user's role and status within a specific team.
 model TeamMember {
-  id           String          @id @default(cuid())
-  userId       String          @unique
-  user         User            @relation(fields: [userId], references: [id])
-  teamId       String          // This field is MISSING in your current schema
-  team         Team            @relation(fields: [teamId], references: [id]) // This relation is MISSING
+  id           String            @id @default(cuid())
+  userId       String            @unique
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId       String            // FIXED: Added this required field
+  team         Team              @relation(fields: [teamId], references: [id], onDelete: Cascade) // FIXED: Added this relation
   
   // --- Member-specific attributes ---
   specialties  TeamSpecialty[]
-  experience   ExperienceLevel
-  availability TeamAvailability @default(AVAILABLE)
-  hourlyRate   Decimal?        // This field exists but may need proper handling
-  joinedAt     DateTime        @default(now())
-  isActive     Boolean         @default(true)
+  experience   ExperienceLevel   @default(JUNIOR)
+  availability TeamAvailability  @default(AVAILABLE)
+  hourlyRate   Decimal?          @db.Decimal(10, 2) // FIXED: Added proper precision
+  joinedAt     DateTime          @default(now())
+  isActive     Boolean           @default(true)
 
   // --- Relationships ---
-  tasks        Task[]          // Tasks directly assigned to this team member
+  tasks        Task[]            // Tasks directly assigned to this team member
 
   @@unique([userId, teamId])   // Ensures a user can only be on a specific team once
   @@map("team_members")
@@ -849,8 +849,11 @@ enum ActivityType {
   SUBSCRIPTION_CREATED
   QUALITY_ISSUE
   CLIENT_FEEDBACK
-  USER_CREATED
-  USER_DELETED
+  USER_CREATED          // FIXED: Added missing enum value
+  USER_DELETED          // FIXED: Added missing enum value
+  TEAM_MEMBER_CREATED   // FIXED: Added missing enum value
+  TEAM_MEMBER_UPDATED   // FIXED: Added missing enum value
+  TEAM_MEMBER_DELETED   // FIXED: Added missing enum value
   SYSTEM_MAINTENANCE
 }
 
@@ -895,4 +898,3 @@ enum LogStatus {
   FAILED
   IN_PROGRESS
 }
-
