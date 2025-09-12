@@ -1,4 +1,3 @@
-//app/(administration)/missions/new/NewMissionForm.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -10,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, AlertCircle } from 'lucide-react'
 import { Quote, User as TeamMember, Lead, Priority } from '@prisma/client'
 import { toast } from 'sonner'
 
@@ -45,7 +44,7 @@ export default function NewMissionForm() {
     issuesFound: '',
   });
 
-  // State for dropdown options
+  // State for dropdown options - ALWAYS INITIALIZE AS ARRAYS
   const [teamLeaders, setTeamLeaders] = useState<TeamMember[]>([]);
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
   const [quotes, setQuotes] = useState<QuoteWithLead[]>([]);
@@ -54,6 +53,21 @@ export default function NewMissionForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Safe array handler to ensure we always get arrays
+  const ensureArray = (data: any): any[] => {
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object') {
+      // Check common API response formats
+      if (Array.isArray(data.data)) return data.data;
+      if (Array.isArray(data.users)) return data.users;
+      if (Array.isArray(data.teamLeaders)) return data.teamLeaders;
+      if (Array.isArray(data.templates)) return data.templates;
+      if (Array.isArray(data.quotes)) return data.quotes;
+    }
+    console.warn('Expected array but got:', typeof data, data);
+    return []; // Always return empty array as fallback
+  };
 
   // Fetch specific lead data directly
   const fetchSpecificLead = async (leadId: string) => {
@@ -75,7 +89,7 @@ export default function NewMissionForm() {
       
       return lead;
     } catch (error) {
-      console.error('❌ Error fetching lead:', error);
+      console.error('Error fetching lead:', error);
       throw error;
     }
   };
@@ -101,8 +115,23 @@ export default function NewMissionForm() {
       
       return quote;
     } catch (error) {
-      console.error('❌ Error fetching quote:', error);
+      console.error('Error fetching quote:', error);
       throw error;
+    }
+  };
+
+  // Safe fetch function that properly handles errors
+  const safeFetch = async (url: string): Promise<{ success: boolean; data?: any; error?: string }> => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        return { success: false, error: `HTTP ${response.status}` };
+      }
+      const data = await response.json();
+      return { success: true, data };
+    } catch (error) {
+      console.error(`Failed to fetch ${url}:`, error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
 
@@ -113,44 +142,61 @@ export default function NewMissionForm() {
       setError(null);
 
       try {
+        console.log('Initializing form with type:', missionType);
+
         // Always fetch team leaders and templates (these are needed for dropdowns)
-        const [usersRes, templatesRes] = await Promise.all([
-          fetch('/api/users?role=TEAM_LEADER'),
-          fetch('/api/task-templates')
+        const [usersResult, templatesResult] = await Promise.all([
+          safeFetch('/api/users?role=TEAM_LEADER'),
+          safeFetch('/api/task-templates')
         ]);
 
-        if (!usersRes.ok || !templatesRes.ok) {
-          throw new Error('Failed to fetch required data');
+        // Handle team leaders response
+        if (usersResult.success && usersResult.data) {
+          const leaders = ensureArray(usersResult.data);
+          console.log('Team leaders loaded:', leaders.length);
+          setTeamLeaders(leaders);
+        } else {
+          console.warn('Failed to fetch team leaders:', usersResult.error);
+          setTeamLeaders([]);
         }
 
-        const [usersData, templatesData] = await Promise.all([
-          usersRes.json(),
-          templatesRes.json()
-        ]);
-
-        setTeamLeaders(usersData);
-        setTaskTemplates(templatesData);
+        // Handle task templates response
+        if (templatesResult.success && templatesResult.data) {
+          const templates = ensureArray(templatesResult.data);
+          console.log('Task templates loaded:', templates.length);
+          setTaskTemplates(templates);
+        } else {
+          console.warn('Failed to fetch task templates:', templatesResult.error);
+          setTaskTemplates([]);
+        }
 
         // Handle different initialization scenarios
         if (missionType === 'TECHNICAL_VISIT' && leadIdFromParams) {
           // For technical visits, fetch the specific lead
+          console.log('Fetching lead for technical visit:', leadIdFromParams);
           await fetchSpecificLead(leadIdFromParams);
           
         } else if (missionType === 'SERVICE') {
           // For service missions, we need quotes
-          const quotesRes = await fetch('/api/quotes?status=ACCEPTED');
-          if (quotesRes.ok) {
-            const quotesData = await quotesRes.json();
-            setQuotes(quotesData);
+          const quotesResult = await safeFetch('/api/quotes?status=ACCEPTED');
+          if (quotesResult.success && quotesResult.data) {
+            const quotesArray = ensureArray(quotesResult.data);
+            console.log('Quotes loaded:', quotesArray.length);
+            setQuotes(quotesArray);
             
             // If a specific quote is provided, fetch it
             if (quoteIdFromParams) {
+              console.log('Fetching specific quote:', quoteIdFromParams);
               await fetchSpecificQuote(quoteIdFromParams);
             }
+          } else {
+            console.warn('Failed to fetch quotes:', quotesResult.error);
+            setQuotes([]);
           }
         }
         
       } catch (err: any) {
+        console.error('Failed to initialize form:', err);
         setError(`Failed to load form data: ${err.message}`);
         toast.error(`Failed to load form data: ${err.message}`);
       } finally {
@@ -228,11 +274,11 @@ export default function NewMissionForm() {
         throw new Error(responseData.message || "Échec de la création de la mission.");
       }
       
-      toast.success(`Mission de type "${missionType === 'TECHNICAL_VISIT' ? 'Visite Technique' : 'Service'}" planifiée avec succès !`);
+      toast.success(`Mission de type "${missionType === 'TECHNICAL_VISIT' ? 'Visite Technique' : 'Service'}" créée avec succès !`);
       router.push('/missions');
-      router.refresh();
-
+      
     } catch (err: any) {
+      console.error('Mission creation error:', err);
       setError(err.message);
       toast.error(err.message);
     } finally {
@@ -240,44 +286,31 @@ export default function NewMissionForm() {
     }
   };
 
-  // Show loading state during initialization
+  // Show loading state while initializing
   if (isInitializing) {
     return (
-      <div className="main-content flex items-center justify-center p-10">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground mt-2">Chargement des données de la mission...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state if initialization failed
-  if (error && !formData.leadId) {
-    return (
-      <div className="main-content space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/missions">
-            <Button variant="outline" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Erreur de Chargement</h1>
-            <p className="text-red-500">{error}</p>
-          </div>
-        </div>
-        <div className="flex justify-center">
-          <Button onClick={() => window.location.reload()}>Réessayer</Button>
+      <div className="container mx-auto p-6 max-w-4xl">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-64 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-96 mb-8"></div>
+          <div className="h-96 bg-gray-200 rounded"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="main-content space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/missions">
-          <Button variant="outline" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
-        </Link>
+    <div className="container mx-auto p-6 max-w-4xl">
+      <div className="mb-8">
+        <div className="flex items-center gap-4 mb-4">
+          <Link href="/missions">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour aux Missions
+            </Button>
+          </Link>
+        </div>
+        
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
             {missionType === 'TECHNICAL_VISIT' ? "Planifier une Visite Technique" : "Planifier une Nouvelle Mission"}
@@ -301,11 +334,17 @@ export default function NewMissionForm() {
                   <Select value={formData.quoteId} onValueChange={(value) => handleSelectChange('quoteId', value)} required>
                     <SelectTrigger><SelectValue placeholder="Sélectionner un devis..." /></SelectTrigger>
                     <SelectContent>
-                      {quotes.map(quote => (
-                        <SelectItem key={quote.id} value={quote.id}>
-                          {quote.quoteNumber} - {quote.lead.firstName} {quote.lead.lastName}
+                      {quotes.length > 0 ? (
+                        quotes.map(quote => (
+                          <SelectItem key={quote.id} value={quote.id}>
+                            {quote.quoteNumber} - {quote.lead.firstName} {quote.lead.lastName}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-quotes" disabled>
+                          Aucun devis accepté disponible
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -332,36 +371,51 @@ export default function NewMissionForm() {
                   className={formData.address ? "text-foreground" : "text-muted-foreground"}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="coordinates">Coordonnées GPS</Label>
                 <Input 
                   id="coordinates" 
                   value={formData.coordinates} 
-                  onChange={handleChange} 
-                  placeholder="Lien Google Maps, Lat/Lon..."
+                  onChange={handleChange}
+                  placeholder="Automatique ou manuel..."
                 />
               </div>
 
               <div>
-                <Label htmlFor="scheduledDate">Date et Heure Planifiées *</Label>
-                <Input id="scheduledDate" type="datetime-local" value={formData.scheduledDate} onChange={handleChange} required />
+                <Label htmlFor="scheduledDate">Date et Heure *</Label>
+                <Input 
+                  id="scheduledDate" 
+                  type="datetime-local" 
+                  value={formData.scheduledDate} 
+                  onChange={handleChange} 
+                  required 
+                />
               </div>
-              
+
               <div>
                 <Label htmlFor="estimatedDuration">Durée Estimée (heures) *</Label>
-                <Input id="estimatedDuration" type="number" min="0.5" step="0.5" value={formData.estimatedDuration} onChange={handleChange} required />
+                <Input 
+                  id="estimatedDuration" 
+                  type="number" 
+                  min="0.5" 
+                  step="0.5"
+                  value={formData.estimatedDuration} 
+                  onChange={handleChange} 
+                  required 
+                  placeholder="Ex: 2.5"
+                />
               </div>
-              
+
               <div>
-                <Label htmlFor="priority">Priorité *</Label>
-                <Select value={formData.priority} onValueChange={(value) => handleSelectChange('priority', value)} required>
-                  <SelectTrigger><SelectValue/></SelectTrigger>
+                <Label htmlFor="priority">Priorité</Label>
+                <Select value={formData.priority} onValueChange={(value) => handleSelectChange('priority', value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={Priority.LOW}>Faible</SelectItem>
-                    <SelectItem value={Priority.NORMAL}>Normale</SelectItem>
-                    <SelectItem value={Priority.HIGH}>Élevée</SelectItem>
-                    <SelectItem value={Priority.CRITICAL}>Critique</SelectItem>
+                    <SelectItem value="LOW">Basse</SelectItem>
+                    <SelectItem value="NORMAL">Normale</SelectItem>
+                    <SelectItem value="HIGH">Élevée</SelectItem>
+                    <SelectItem value="CRITICAL">Critique</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -369,85 +423,70 @@ export default function NewMissionForm() {
               <div>
                 <Label htmlFor="teamLeaderId">Chef d'Équipe *</Label>
                 <Select value={formData.teamLeaderId} onValueChange={(value) => handleSelectChange('teamLeaderId', value)} required>
-                  <SelectTrigger><SelectValue placeholder="Assigner un chef d'équipe..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner un chef d'équipe..." /></SelectTrigger>
                   <SelectContent>
-                    {teamLeaders.map(leader => (
-                      <SelectItem key={leader.id} value={leader.id}>{leader.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="md:col-span-2">
-                <Label htmlFor="taskTemplateId">Modèle de Checklist</Label>
-                <Select value={formData.taskTemplateId || 'none'} onValueChange={(value) => handleSelectChange('taskTemplateId', value)}>
-                  <SelectTrigger><SelectValue placeholder="Choisir une checklist..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Aucune (Tâches manuelles)</SelectItem>
-                    {taskTemplates.map(template => (
-                      <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
-                    ))}
+                    {teamLeaders.length > 0 ? (
+                      teamLeaders.map(leader => (
+                        <SelectItem key={leader.id} value={leader.id}>
+                          {leader.name || leader.email}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-leaders" disabled>
+                        Aucun chef d'équipe disponible
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="md:col-span-2">
-                <Label htmlFor="accessNotes">Notes d'accès</Label>
-                <Textarea 
-                  id="accessNotes" 
-                  value={formData.accessNotes} 
-                  onChange={handleChange} 
-                  placeholder="Code d'entrée, contact sur place, instructions spéciales..." 
-                />
+              <div>
+                <Label htmlFor="taskTemplateId">Modèle de Tâches</Label>
+                <Select value={formData.taskTemplateId} onValueChange={(value) => handleSelectChange('taskTemplateId', value)}>
+                  <SelectTrigger><SelectValue placeholder="Optionnel..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Aucun modèle</SelectItem>
+                    {taskTemplates.length > 0 ? (
+                      taskTemplates.map(template => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="no-templates" disabled>
+                        Aucun modèle disponible
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
-
-              {/* Admin Fields - Only show for admin users */}
-              <div className="md:col-span-2 border-t pt-4">
-                <h3 className="text-sm font-medium text-muted-foreground mb-3">Validation Administrative</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="qualityScore">Score Qualité (/5)</Label>
-                    <Input
-                      id="qualityScore"
-                      type="number"
-                      min="1"
-                      max="5"
-                      value={formData.qualityScore || ''}
-                      onChange={handleChange}
-                      placeholder="1-5"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="adminNotes">Notes Admin</Label>
-                    <Textarea
-                      id="adminNotes"
-                      value={formData.adminNotes || ''}
-                      onChange={handleChange}
-                      placeholder="Notes de validation..."
-                      rows={2}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label htmlFor="issuesFound">Problèmes identifiés</Label>
-                    <Textarea
-                      id="issuesFound"
-                      value={formData.issuesFound || ''}
-                      onChange={handleChange}
-                      placeholder="Description des problèmes..."
-                      rows={2}
-                    />
-                  </div>
-                </div>
-              </div>
-
             </div>
 
-            {error && <p className="text-red-500 text-sm bg-red-50 p-3 rounded-md border border-red-200">{error}</p>}
+            <div>
+              <Label htmlFor="accessNotes">Notes d'Accès</Label>
+              <Textarea 
+                id="accessNotes" 
+                value={formData.accessNotes} 
+                onChange={handleChange}
+                placeholder="Informations d'accès, codes, étage, etc..."
+                rows={3}
+              />
+            </div>
 
-            <div className="flex justify-end mt-6">
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-md flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-red-800 font-medium">Erreur</p>
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-6">
               <Button 
                 type="submit" 
-                className="bg-enarva-gradient rounded-lg px-8" 
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8" 
                 disabled={isLoading || !formData.leadName || !formData.address}
               >
                 {isLoading ? 'Planification...' : (missionType === 'TECHNICAL_VISIT' ? 'Planifier la Visite' : 'Planifier la Mission')}
