@@ -1,9 +1,8 @@
-// app/api/leads/ingest/route.ts - VERSION SIMPLIFIEE QUI MARCHE
+// app/api/leads/ingest/route.ts - CORRECTED VERSION
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { leadService } from '@/services/lead.service';
 import { pusherServer } from '@/lib/pusher';
-
-const prisma = new PrismaClient();
+import { Prisma } from '@prisma/client';
 
 const splitFullName = (fullName: string) => {
   const parts = fullName.trim().split(' ');
@@ -15,77 +14,113 @@ const splitFullName = (fullName: string) => {
   return { firstName, lastName };
 };
 
-const calculateScore = (data: any): number => {
-  let score = 25;
-  if (data.email && data.email.trim()) score += 20;
-  if (data.service && data.service !== 'Non spécifié') score += 30;
-  if (data.date_prestation && data.date_prestation !== 'Non spécifiée') score += 25;
+const calculateWebsiteLeadScore = (data: any): number => {
+  let score = 25; // Base score for website submission
+  
+  if (data.email && data.email.trim() !== '') {
+    score += 20;
+  }
+  
+  if (data.service && data.service !== 'Non spécifié' && data.service.trim() !== '') {
+    score += 30;
+  }
+  
+  if (data.date_prestation && data.date_prestation !== 'Non spécifiée' && data.date_prestation.trim() !== '') {
+    score += 25;
+  }
+  
   return Math.min(score, 100);
 };
 
 export async function POST(request: Request) {
   try {
-    console.log('INGESTION: Request received');
+    console.log('Lead ingestion request received');
     
     const apiKey = request.headers.get('x-api-key');
     if (apiKey !== process.env.WEBSITE_API_KEY) {
-      console.log('INGESTION: Invalid API key');
+      console.error('Invalid API key provided');
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const body = await request.json();
-    console.log('INGESTION: Body received:', body);
+    console.log('Request body:', body);
     
     const { nom_complet, telephone, email, service, date_prestation, source_url } = body;
 
     if (!nom_complet || !telephone) {
-      console.log('INGESTION: Missing required fields');
-      return new NextResponse('Nom complet et téléphone requis', { status: 400 });
+      console.error('Missing required fields:', { nom_complet, telephone });
+      return new NextResponse('Nom complet et téléphone sont requis', { status: 400 });
     }
 
     const { firstName, lastName } = splitFullName(nom_complet);
-    const score = calculateScore({ email, service, date_prestation });
 
-    const message = `Nouvelle réservation depuis le site web.\n\n` +
-                   `Service demandé : ${service || 'Non spécifié'}\n` +
-                   `Date souhaitée : ${date_prestation || 'Non spécifiée'}\n` +
-                   `Source : ${source_url || 'Non spécifiée'}`;
+    let message = `Nouvelle réservation depuis le site web Enarva.\n\n` +
+                  `Service demandé : ${service || 'Non spécifié'}\n` +
+                  `Date de prestation souhaitée : ${date_prestation || 'Non spécifiée'}\n` +
+                  `Source URL : ${source_url || 'Non spécifiée'}`;
 
-    // CREATION DIRECTE AVEC PRISMA (comme avant)
-    const newLead = await prisma.lead.create({
-      data: {
-        firstName,
-        lastName,
-        phone: telephone,
-        email: email || null,
-        originalMessage: message,
-        channel: 'SITE_WEB',
-        status: 'NEW',
-        score,
-        leadType: 'PARTICULIER',
-        source: source_url || 'Site Web Enarva',
-        updatedAt: new Date()
-      }
+    const score = calculateWebsiteLeadScore({
+      email,
+      service,
+      date_prestation
     });
 
-    console.log('INGESTION: Lead created:', newLead.id);
+    const leadData: Prisma.LeadCreateInput = {
+      firstName: firstName,
+      lastName: lastName,
+      phone: telephone,
+      email: email || null,
+      originalMessage: message,
+      channel: 'SITE_WEB',
+      status: 'NEW',
+      score: score,
+      leadType: 'PARTICULIER',
+      source: source_url || 'Site Web Enarva',
+      updatedAt: new Date()
+    };
 
-    // Pusher notification
+    console.log('Creating lead with data:', leadData);
+
+    // Create lead using leadService but catch any errors and fallback to direct Prisma
+    let newLead;
+    try {
+      newLead = await leadService.createLead(leadData, 'website-system');
+      console.log('Lead created via leadService:', newLead.id);
+    } catch (leadServiceError) {
+      console.error('leadService failed, using direct Prisma:', leadServiceError);
+      
+      // Fallback to direct Prisma creation
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+      
+      newLead = await prisma.lead.create({
+        data: leadData
+      });
+      
+      console.log('Lead created via direct Prisma:', newLead.id);
+    }
+
+    // Real-time notification with Pusher
     try {
       await pusherServer.trigger('leads-channel', 'new-lead', {
         id: newLead.id,
         firstName: newLead.firstName,
         lastName: newLead.lastName,
         phone: newLead.phone,
+        email: newLead.email,
         score: newLead.score,
         status: newLead.status,
         channel: newLead.channel,
+        leadType: newLead.leadType,
         createdAt: newLead.createdAt,
-        message: `Nouvelle réservation: ${firstName} ${lastName}`
+        message: `Nouvelle réservation: ${firstName} ${lastName}`,
+        serviceRequested: service,
+        preferredDate: date_prestation
       });
-      console.log('INGESTION: Pusher notification sent');
+      console.log('Pusher notification sent successfully');
     } catch (pusherError) {
-      console.warn('INGESTION: Pusher failed:', pusherError);
+      console.error('Pusher notification failed:', pusherError);
+      // Don't fail the request if Pusher fails
     }
 
     return NextResponse.json({
@@ -95,10 +130,12 @@ export async function POST(request: Request) {
     }, { status: 201 });
 
   } catch (error) {
-    console.error('INGESTION: Error:', error);
+    console.error('Lead Ingestion Error:', error);
+    
     return NextResponse.json({
       success: false,
-      error: 'Internal Server Error'
+      error: 'Internal Server Error',
+      message: 'Erreur lors de la création du lead'
     }, { status: 500 });
   }
 }
