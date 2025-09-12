@@ -1,4 +1,4 @@
-// lib/validation.ts - ENHANCED LEAD VALIDATION WITH ALL MISSING FIELDS
+// lib/validation.ts - ENHANCED VALIDATION WITH ALL MISSING FIELDS AND FIXES
 import { z } from 'zod'
 
 // Base schema for the lead object, without refinements.
@@ -335,14 +335,16 @@ export function validateCompleteMissionInput(data: any) {
   return completeMissionValidationSchema.safeParse(data)
 }
 
-// Enhanced Quote Validation
+// FIXED Enhanced Quote Validation - Main fix here
 export const completeQuoteValidationSchema = z.object({
   quoteNumber: z.string()
     .min(1, 'Numéro de devis requis')
-    .max(50, 'Numéro de devis trop long'),
+    .max(50, 'Numéro de devis trop long')
+    .optional(), // Made optional for editing
 
   leadId: z.string()
-    .min(1, 'Lead ID requis'),
+    .min(1, 'Lead ID requis')
+    .optional(), // Made optional for editing
 
   status: z.enum(['DRAFT', 'SENT', 'VIEWED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'CANCELLED'])
     .default('DRAFT'),
@@ -352,11 +354,14 @@ export const completeQuoteValidationSchema = z.object({
   lineItems: z.array(z.object({
     id: z.string().optional(),
     description: z.string().min(1, 'Description requise').max(200, 'Description trop longue'),
+    detail: z.string().optional(),
+    amount: z.number().min(0, 'Montant doit être positif').optional(),
     quantity: z.number().min(0.1, 'Quantité minimale: 0.1').max(1000, 'Quantité trop élevée'),
     unitPrice: z.number().min(0, 'Prix unitaire doit être positif').max(10000, 'Prix unitaire trop élevé'),
     totalPrice: z.number().min(0, 'Prix total doit être positif'),
     unit: z.string().max(20, 'Unité trop longue').optional(),
-    serviceType: z.string().max(100, 'Type de service trop long').optional()
+    serviceType: z.string().max(100, 'Type de service trop long').optional(),
+    editable: z.boolean().optional()
   })).min(1, 'Au moins un article requis'),
 
   subTotalHT: z.number().min(0, 'Sous-total HT doit être positif'),
@@ -364,24 +369,25 @@ export const completeQuoteValidationSchema = z.object({
   totalTTC: z.number().min(0, 'Total TTC doit être positif'),
   finalPrice: z.number().min(0, 'Prix final doit être positif'),
 
-  expiresAt: z.string()
-    .refine((date) => {
-        try {
-            const expiryDate = new Date(date);
-            const now = new Date();
-            return !isNaN(expiryDate.getTime()) && expiryDate > now;
-        } catch (error) {
-            return false;
-        }
-    }, {
-        message: "La date d'expiration doit être dans le futur et valide"
-    })
-    .optional(),
+  expiresAt: z.union([
+    z.string(),
+    z.date()
+  ]).refine((date) => {
+      try {
+          const expiryDate = new Date(date);
+          const now = new Date();
+          return !isNaN(expiryDate.getTime()) && expiryDate > now;
+      } catch (error) {
+          return false;
+      }
+  }, {
+      message: "La date d'expiration doit être dans le futur et valide"
+  }).optional(),
 
+  type: z.enum(['STANDARD', 'EXPRESS', 'PREMIUM', 'CUSTOM']).default('STANDARD').optional(),
+  surface: z.number().min(0).optional(),
 
-  type: z.enum(['STANDARD', 'EXPRESS', 'PREMIUM', 'CUSTOM']).default('STANDARD'),
-
-  // Service-specific fields
+  // Service-specific fields (OPTIONAL for editing)
   services: z.array(z.object({
     type: z.string().min(1, 'Type de service requis'),
     surface: z.number().min(1, 'Surface requise'),
@@ -415,22 +421,22 @@ export const completeQuoteValidationSchema = z.object({
     budgetRange: z.string().max(50).optional()
   }).optional()
 }).refine((data) => {
-  // Custom validation for service quotes
+  // FIXED: Check lineItems instead of services for SERVICE business type
   if (data.businessType === 'SERVICE') {
-    return data.services && data.services.length > 0
+    return data.lineItems && data.lineItems.length > 0
   }
   return true
 }, {
-  message: "Les services sont requis pour un devis de service",
-  path: ["services"]
+  message: "Au moins un élément de service est requis pour un devis de service",
+  path: ["lineItems"] // Changed from "services" to "lineItems"
 }).refine((data) => {
   // Custom validation for product quotes
   if (data.businessType === 'PRODUCT') {
-    return data.productCategory && data.productDetails
+    return data.productCategory && data.lineItems && data.lineItems.length > 0
   }
   return true
 }, {
-  message: "La catégorie et les détails produits sont requis pour un devis de produit",
+  message: "La catégorie produit et les articles sont requis pour un devis de produit",
   path: ["productCategory"]
 }).refine((data) => {
   // Validate line items total matches calculated totals
@@ -707,6 +713,84 @@ export function cleanMissionData(data: any): any {
   return cleaned
 }
 
+export function cleanQuoteData(data: any): any {
+  const cleaned = { ...data }
+
+  // Convert string numbers to actual numbers
+  if (cleaned.surface) {
+    const surface = parseFloat(cleaned.surface);
+    cleaned.surface = isNaN(surface) ? null : surface;
+  }
+
+  if (cleaned.finalPrice) {
+    const price = parseFloat(cleaned.finalPrice);
+    cleaned.finalPrice = isNaN(price) ? 0 : price;
+  }
+
+  if (cleaned.subTotalHT) {
+    const subtotal = parseFloat(cleaned.subTotalHT);
+    cleaned.subTotalHT = isNaN(subtotal) ? 0 : subtotal;
+  }
+
+  if (cleaned.vatAmount) {
+    const vat = parseFloat(cleaned.vatAmount);
+    cleaned.vatAmount = isNaN(vat) ? 0 : vat;
+  }
+
+  if (cleaned.totalTTC) {
+    const total = parseFloat(cleaned.totalTTC);
+    cleaned.totalTTC = isNaN(total) ? 0 : total;
+  }
+
+  // Handle lineItems array
+  if (cleaned.lineItems && Array.isArray(cleaned.lineItems)) {
+    cleaned.lineItems = cleaned.lineItems.map((item: any) => ({
+      ...item,
+      quantity: parseFloat(item.quantity) || 1,
+      unitPrice: parseFloat(item.unitPrice) || 0,
+      totalPrice: parseFloat(item.totalPrice) || 0,
+      amount: parseFloat(item.amount) || parseFloat(item.totalPrice) || 0
+    }));
+  }
+
+  // Convert empty strings to null for optional fields
+  const optionalFields = [
+    'productDetails', 'deliveryAddress', 'deliveryNotes'
+  ]
+
+  optionalFields.forEach(field => {
+    if (cleaned[field] === '') {
+      cleaned[field] = null
+    }
+  })
+
+  return cleaned
+}
+
+export function cleanTeamMemberData(data: any): any {
+  const cleaned = { ...data }
+
+  // Convert string numbers to actual numbers
+  if (cleaned.hourlyRate) {
+    const rate = parseFloat(cleaned.hourlyRate);
+    cleaned.hourlyRate = isNaN(rate) ? null : rate;
+  }
+
+  // Handle boolean fields
+  ['isActive'].forEach(field => {
+    if (typeof cleaned[field] === 'string') {
+      cleaned[field] = cleaned[field].toLowerCase() === 'true'
+    }
+  })
+
+  // Ensure specialties is an array
+  if (cleaned.specialties && !Array.isArray(cleaned.specialties)) {
+    cleaned.specialties = [];
+  }
+
+  return cleaned
+}
+
 // Error formatting utility
 export function formatValidationErrors(errors: z.ZodIssue[]): string[] {
   return errors.map(error => {
@@ -715,4 +799,32 @@ export function formatValidationErrors(errors: z.ZodIssue[]): string[] {
   })
 }
 
+// Additional validation helpers
+export function validateEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+export function validatePhoneNumber(phone: string): boolean {
+  const phoneRegex = /^[+]?[\d\s\-().]+$/;
+  return phoneRegex.test(phone) && phone.length >= 10;
+}
+
+export function validateDateNotInPast(date: string | Date): boolean {
+  try {
+    const inputDate = new Date(date);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return !isNaN(inputDate.getTime()) && inputDate >= now;
+  } catch {
+    return false;
+  }
+}
+
+// Type exports for convenience
 export type CreateMissionInput = CompleteMissionInput;
+export type CreateQuoteInput = CompleteQuoteInput;
+export type CreateLeadInput = CompleteLeadInput;
+export type CreateTeamMemberInput = CompleteTeamMemberInput;
+export type CreateFieldReportInput = CompleteFieldReportInput;
+export type CreateSubscriptionInput = CompleteSubscriptionInput;

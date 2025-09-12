@@ -218,114 +218,128 @@ export default function EditQuotePage() {
     };
   }, [editableLineItems]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    setValidationErrors([]);
-    
-    try {
-      const formattedLineItems = editableLineItems.map(item => ({
-        id: item.id,
-        description: item.description,
-        detail: item.detail || '',
-        amount: item.totalPrice,
-        serviceType: item.serviceType,
-        editable: item.editable
-      }));
+  // Fix for the handleSubmit function in app/(administration)/quotes/[id]/edit/page.tsx
+// Replace the handleSubmit function with this corrected version:
 
-      // Calculate surface from quote or lead
-      const surfaceValue = quote?.surface || parseInt(leadUpdates.estimatedSurface) || undefined;
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsSaving(true);
+  setValidationErrors([]);
+  
+  try {
+    // FIX: Include ALL required fields for lineItems validation
+    const formattedLineItems = editableLineItems.map(item => ({
+      id: item.id,
+      description: item.description,
+      detail: item.detail || '',
+      amount: item.totalPrice,
+      serviceType: item.serviceType,
+      editable: item.editable,
+      // FIX: Add missing required fields
+      quantity: item.quantity || 1,
+      unitPrice: item.unitPrice || 0,
+      totalPrice: item.totalPrice || 0
+    }));
 
-      const quoteData = {
-        leadId: quote?.leadId,
-        quoteNumber: quote?.quoteNumber,
-        businessType: quote?.businessType || 'SERVICE',
-        lineItems: formattedLineItems,
-        subTotalHT: finalQuote.subTotalHT,
-        vatAmount: finalQuote.vatAmount,
-        totalTTC: finalQuote.totalTTC,
-        finalPrice: finalQuote.finalPrice,
-        status,
-        type,
-        surface: surfaceValue,
-        expiresAt,
-        leadUpdates: {
-          estimatedSurface: parseInt(leadUpdates.estimatedSurface) || undefined,
-          propertyType: leadUpdates.propertyType || undefined,
-          address: leadUpdates.address || undefined,
-          urgencyLevel: leadUpdates.urgencyLevel || undefined,
-          budgetRange: leadUpdates.budgetRange || undefined
-        }
-      };
+    // Calculate surface from quote or lead
+    const surfaceValue = quote?.surface || parseInt(leadUpdates.estimatedSurface) || undefined;
 
-      const validation = validateCompleteQuoteInput (quoteData);
-      
-      if (!validation.success) {
-        const errors = validation.error.errors.map(error => `${error.path.join('.')}: ${error.message}`);
-        setValidationErrors(errors);
-        toast.error('Données invalides. Veuillez corriger les erreurs.');
-        return;
-      }
-
-      // Separate quote and lead updates
-      const quotePayload = {
-        lineItems: editableLineItems.map(item => ({
-          id: item.id,
-          designation: item.description,
-          description: item.detail,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          totalPrice: item.totalPrice,
-          serviceType: item.serviceType
-        })),
-        subTotalHT: finalQuote.subTotalHT,
-        vatAmount: finalQuote.vatAmount,
-        totalTTC: finalQuote.totalTTC,
-        finalPrice: finalQuote.finalPrice,
-        status,
-        type,
-        surface: surfaceValue,
-        expiresAt: new Date(expiresAt).toISOString()
-      };
-
-      const leadPayload = {
+    const quoteData = {
+      leadId: quote?.leadId,
+      quoteNumber: quote?.quoteNumber,
+      businessType: quote?.businessType || 'SERVICE',
+      lineItems: formattedLineItems, // Now includes all required fields
+      subTotalHT: finalQuote.subTotalHT,
+      vatAmount: finalQuote.vatAmount,
+      totalTTC: finalQuote.totalTTC,
+      finalPrice: finalQuote.finalPrice,
+      status,
+      type,
+      surface: surfaceValue,
+      expiresAt,
+      leadUpdates: {
         estimatedSurface: parseInt(leadUpdates.estimatedSurface) || undefined,
         propertyType: leadUpdates.propertyType || undefined,
         address: leadUpdates.address || undefined,
         urgencyLevel: leadUpdates.urgencyLevel || undefined,
         budgetRange: leadUpdates.budgetRange || undefined
-      };
+      }
+    };
 
-      // Update quote
-      const response = await fetch(`/api/quotes/${quoteId}`, {
+    const validation = validateCompleteQuoteInput(quoteData);
+    
+    if (!validation.success) {
+      const errors = validation.error.errors.map(error => `${error.path.join('.')}: ${error.message}`);
+      setValidationErrors(errors);
+      toast.error('Données invalides. Veuillez corriger les erreurs.');
+      return;
+    }
+
+    // Create the final payload for the API (matching what the API expects)
+    const quotePayload = {
+      lineItems: editableLineItems.map(item => ({
+        id: item.id,
+        designation: item.description,
+        description: item.detail,
+        quantity: item.quantity || 1,
+        unitPrice: item.unitPrice || 0,
+        totalPrice: item.totalPrice || 0,
+        serviceType: item.serviceType
+      })),
+      subTotalHT: finalQuote.subTotalHT,
+      vatAmount: finalQuote.vatAmount,
+      totalTTC: finalQuote.totalTTC,
+      finalPrice: finalQuote.finalPrice,
+      status,
+      type,
+      surface: surfaceValue,
+      expiresAt: new Date(expiresAt).toISOString()
+    };
+
+    const leadPayload = {
+      estimatedSurface: parseInt(leadUpdates.estimatedSurface) || undefined,
+      propertyType: leadUpdates.propertyType || undefined,
+      address: leadUpdates.address || undefined,
+      urgencyLevel: leadUpdates.urgencyLevel || undefined,
+      budgetRange: leadUpdates.budgetRange || undefined
+    };
+
+    // Update quote
+    const response = await fetch(`/api/quotes/${quoteId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(quotePayload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Échec de la mise à jour du devis.');
+    }
+
+    // Update lead if there are changes
+    const hasLeadChanges = Object.values(leadPayload).some(value => value !== undefined);
+    if (hasLeadChanges && quote?.leadId) {
+      const leadResponse = await fetch(`/api/leads/${quote.leadId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(quotePayload),
+        body: JSON.stringify(leadPayload),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Échec de la mise à jour du devis.');
+      if (!leadResponse.ok) {
+        console.warn('Lead update failed, but quote was updated successfully');
       }
-
-      // Update lead if there are changes
-      const hasLeadUpdates = Object.values(leadPayload).some(value => value !== undefined && value !== '');
-      if (hasLeadUpdates && quote?.leadId) {
-        await fetch(`/api/leads/${quote.leadId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(leadPayload),
-        });
-      }
-      
-      toast.success("Devis et lead mis à jour avec succès !");
-      router.push(`/quotes/${quoteId}`);
-    } catch (error: any) {
-      toast.error(error.message || "Erreur lors de la sauvegarde des modifications.");
-    } finally {
-      setIsSaving(false);
     }
-  };
+
+    toast.success('Devis mis à jour avec succès !');
+    router.push('/quotes');
+
+  } catch (error: any) {
+    console.error('Quote update error:', error);
+    toast.error(error.message || 'Erreur lors de la mise à jour du devis.');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   if (isLoading) {
     return (
