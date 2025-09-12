@@ -252,10 +252,11 @@ const NewQuoteForm = () => {
     )
   }
 
-  // Form submission
+  // IMPROVED Form submission with better error handling
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Validation initiale
     if (!selectedLead && !newClientName.trim()) {
       toast.error("Veuillez sélectionner un client existant ou entrer le nom d'un nouveau client.")
       return
@@ -267,28 +268,41 @@ const NewQuoteForm = () => {
     }
 
     setIsLoading(true)
+    console.log('🚀 Starting quote creation process...')
 
     try {
+      // Préparation du payload de base
       const quotePayload: any = {
-        quoteNumber: `DV-${businessType.substring(0, 3)}-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
+        quoteNumber: `DV-${businessType.substring(0, 3)}-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
         businessType,
-        ...finalQuote,
-        expiresAt,
+        lineItems: finalQuote.lineItems,
+        subTotalHT: finalQuote.subTotalHT,
+        vatAmount: finalQuote.vatAmount,
+        totalTTC: finalQuote.totalTTC,
+        finalPrice: finalQuote.finalPrice,
+        expiresAt: expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 jours par défaut
       }
 
-      // Add client info
+      // Gestion client existant vs nouveau client
       if (selectedLead) {
         quotePayload.leadId = selectedLead.id
+        console.log('📋 Using existing lead:', selectedLead.id)
       } else {
         quotePayload.newClientName = newClientName.trim()
+        console.log('👤 Creating new client:', newClientName.trim())
       }
 
-      // Add type-specific data
+      // Données spécifiques au type de business
       if (businessType === 'SERVICE') {
         quotePayload.type = quoteType
-        quotePayload.surface = services.reduce((acc, s) => acc + s.surface * s.levels, 0)
+        quotePayload.surface = services.reduce((acc, s) => acc + (s.surface * s.levels), 0)
         quotePayload.levels = services.reduce((acc, s) => Math.max(acc, s.levels), 1)
         quotePayload.propertyType = selectedLead?.propertyType || 'OTHER'
+        console.log('🔧 Service quote configuration:', {
+          type: quoteType,
+          surface: quotePayload.surface,
+          levels: quotePayload.levels
+        })
       } else {
         quotePayload.productCategory = productCategory
         quotePayload.productDetails = {
@@ -302,26 +316,97 @@ const NewQuoteForm = () => {
         quotePayload.deliveryType = deliveryType
         quotePayload.deliveryAddress = deliveryAddress
         quotePayload.deliveryNotes = deliveryNotes
+        console.log('📦 Product quote configuration:', {
+          category: productCategory,
+          itemsCount: quotePayload.productDetails.items.length,
+          deliveryType
+        })
       }
 
+      console.log('📤 Sending quote payload:', JSON.stringify(quotePayload, null, 2))
+
+      // Appel API
       const response = await fetch('/api/quotes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify(quotePayload),
       })
 
+      console.log('📨 API Response status:', response.status)
+      console.log('📨 API Response headers:', Object.fromEntries(response.headers.entries()))
+
+      // Gestion des erreurs HTTP
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Échec de la création du devis.')
+        let errorMessage = `Erreur HTTP ${response.status}`
+        
+        try {
+          const errorData = await response.text()
+          console.error('❌ API Error response:', errorData)
+          
+          // Tenter de parser le JSON si possible
+          try {
+            const parsedError = JSON.parse(errorData)
+            errorMessage = parsedError.message || parsedError.error || errorMessage
+          } catch {
+            // Si ce n'est pas du JSON, utiliser le texte brut
+            errorMessage = errorData || errorMessage
+          }
+        } catch (parseError) {
+          console.error('❌ Failed to parse error response:', parseError)
+        }
+        
+        throw new Error(errorMessage)
       }
 
-      const newQuote = await response.json()
-      toast.success(`Devis ${businessType === 'SERVICE' ? 'de service' : 'de produit'} créé avec succès !`)
-      router.push(`/quotes/${newQuote.id}`)
+      // Traitement de la réponse de succès
+      const responseText = await response.text()
+      console.log('✅ API Success response:', responseText)
       
-    } catch (error: any) {
-      console.error('Erreur création devis:', error)
-      toast.error(error.message || 'Erreur lors de la création du devis.')
+      let newQuote
+      try {
+        newQuote = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error('❌ Failed to parse success response:', parseError)
+        throw new Error('Réponse invalide du serveur')
+      }
+
+      // Succès
+      const successMessage = businessType === 'SERVICE' 
+        ? `Devis de service ${newQuote.quoteNumber} créé avec succès!`
+        : `Devis de produit ${newQuote.quoteNumber} créé avec succès!`
+      
+      toast.success(successMessage, {
+        description: newClientName ? `Client "${newClientName}" créé automatiquement` : undefined,
+        duration: 4000
+      })
+      console.log('✅ Quote created successfully:', newQuote)
+
+      // Redirection vers le devis créé
+      setTimeout(() => {
+        router.push(`/quotes/${newQuote.id}`)
+      }, 1000)
+
+    } catch (error) {
+      console.error('❌ Quote creation failed:', error)
+      
+      // Gestion d'erreur détaillée
+      let errorMessage = 'Échec de la création du devis'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      }
+
+      // Affichage de l'erreur à l'utilisateur
+      toast.error(errorMessage, {
+        description: 'Vérifiez vos données et réessayez. Si le problème persiste, contactez le support.',
+        duration: 5000
+      })
+
     } finally {
       setIsLoading(false)
     }

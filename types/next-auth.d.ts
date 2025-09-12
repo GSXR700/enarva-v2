@@ -1,4 +1,4 @@
-// types/next-auth.d.ts - COMPLETE CORRECTED VERSION
+// types/next-auth.d.ts - COMPLETE CORRECTED VERSION FOR NEXTAUTH V4
 import NextAuth, { DefaultSession } from 'next-auth';
 
 declare module 'next-auth' {
@@ -22,6 +22,7 @@ declare module 'next-auth' {
 
 declare module 'next-auth/jwt' {
   interface JWT {
+    id?: string;  // Add this missing field
     role?: string;
     teamMember?: any;
   }
