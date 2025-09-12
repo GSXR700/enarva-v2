@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Lead, LeadStatus, User } from '@prisma/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { LeadForm } from '@/components/leads/LeadForm';
 import { useOptimisticMutation } from '@/hooks/useOptimisticMutation';
+import { usePusherChannel } from '@/hooks/usePusherClient';
 import { Plus, Search, Filter, Eye, Edit, Trash2, Download, Phone, Mail, Building2, MapPin, MoreVertical, Users, Calendar, AlertTriangle, CheckCircle, Star } from 'lucide-react';
 import { formatDate, formatCurrency, translate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -38,6 +39,8 @@ export default function LeadsPage() {
   const [users, setUsers] = useState<Array<{id: string, name: string}>>([]);
   const limit = 20;
 
+  const queryClient = useQueryClient();
+
   // Fetch users for the LeadForm
   useEffect(() => {
     const fetchUsers = async () => {
@@ -45,7 +48,6 @@ export default function LeadsPage() {
         const response = await fetch('/api/users');
         if (response.ok) {
           const data = await response.json();
-          // Handle both response formats: {users: [...]} and [...]
           const userList = data.users || data;
           if (Array.isArray(userList)) {
             setUsers(userList.map((user: User) => ({
@@ -62,6 +64,30 @@ export default function LeadsPage() {
 
     fetchUsers();
   }, []);
+
+  // Real-time updates with Pusher
+  usePusherChannel('leads-channel', {
+    'new-lead': (newLead: any) => {
+      console.log('Leads page: New lead received via Pusher:', newLead);
+      
+      toast.success(`Nouveau lead reçu de ${newLead.firstName} ${newLead.lastName}!`);
+      
+      // Update the query cache to show the new lead
+      queryClient.setQueryData(['leads', page, limit, statusFilter, searchTerm], (oldData: LeadsResponse | undefined) => {
+        if (!oldData) return oldData;
+        
+        return {
+          ...oldData,
+          leads: [newLead, ...oldData.leads],
+          total: oldData.total + 1,
+          totalPages: Math.ceil((oldData.total + 1) / limit)
+        };
+      });
+
+      // If we're on a different page or filter, also invalidate to refresh counts
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    }
+  });
 
   // Fetch leads with React Query
   const {
@@ -158,7 +184,7 @@ export default function LeadsPage() {
   const leads = leadsData?.leads || [];
   const totalLeads = leadsData?.total || 0;
 
-  // Filter leads locally for search (since API might not support all filters)
+  // Filter leads locally for search
   const filteredLeads = useMemo(() => {
     if (!searchTerm) return leads;
     
@@ -242,17 +268,6 @@ export default function LeadsPage() {
       case 'COMPLETED': return <CheckCircle className="w-4 h-4" />;
       case 'CANCELLED': return <AlertTriangle className="w-4 h-4" />;
       default: return <Star className="w-4 h-4" />;
-    }
-  };
-
-  const getUrgencyColor = (urgency?: string) => {
-    switch (urgency) {
-      case 'LOW': return 'bg-green-100 text-green-800';
-      case 'NORMAL': return 'bg-yellow-100 text-yellow-800';
-      case 'URGENT': return 'bg-orange-100 text-orange-800';
-      case 'HIGH_URGENT': return 'bg-red-100 text-red-800';
-      case 'IMMEDIATE': return 'bg-red-600 text-white';
-      default: return 'bg-gray-100 text-gray-800';
     }
   };
 

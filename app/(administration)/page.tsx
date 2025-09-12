@@ -1,5 +1,4 @@
-// app/(administration)/page.tsx - FIXED
-
+// Dashboard page for administration area
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -24,7 +23,7 @@ import {
 import { Lead, Mission, User, LeadStatus } from '@prisma/client'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { toast } from 'sonner'
-import Pusher from 'pusher-js'
+import { usePusherChannel } from '@/hooks/usePusherClient'
 import ClientOnly from '@/components/providers/ClientOnly'
 
 type LeadWithAssignee = Lead & { assignedTo?: User | null };
@@ -46,21 +45,19 @@ type DashboardData = {
 };
 
 const getStatusColor = (status: LeadStatus) => {
-    const colors: Record<string, string> = {
-        // ... (status colors remain the same)
-        NEW: 'bg-blue-100 text-blue-800',
-        CONTACTED: 'bg-blue-300 text-blue-900',
-        QUALIFIED: 'bg-green-100 text-green-800',
-        VISIT_PLANNED: 'bg-indigo-200 text-indigo-900',
-        QUOTE_SENT: 'bg-cyan-300 text-cyan-900',
-        QUOTE_ACCEPTED: 'bg-emerald-100 text-emerald-800',
-        MISSION_SCHEDULED: 'bg-sky-100 text-sky-800',
-        LEAD_LOST: 'bg-red-400 text-white',
-        COMPLETED: 'bg-green-500 text-white',
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+  const colors: Record<string, string> = {
+    NEW: 'bg-blue-100 text-blue-800',
+    CONTACTED: 'bg-blue-300 text-blue-900',
+    QUALIFIED: 'bg-green-100 text-green-800',
+    VISIT_PLANNED: 'bg-indigo-200 text-indigo-900',
+    QUOTE_SENT: 'bg-cyan-300 text-cyan-900',
+    QUOTE_ACCEPTED: 'bg-emerald-100 text-emerald-800',
+    MISSION_SCHEDULED: 'bg-sky-100 text-sky-800',
+    LEAD_LOST: 'bg-red-400 text-white',
+    COMPLETED: 'bg-green-500 text-white',
+  };
+  return colors[status] || 'bg-gray-100 text-gray-800';
 };
-
 
 export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -85,14 +82,12 @@ export default function Dashboard() {
       }
     };
     fetchDashboardData();
+  }, []);
 
-    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-    });
-
-    const channel = pusher.subscribe('leads-channel');
-
-    channel.bind('new-lead', (newLead: Lead) => {
+  // Real-time updates with Pusher using centralized hook
+  usePusherChannel('leads-channel', {
+    'new-lead': (newLead: Lead) => {
+      console.log('Dashboard: New lead received via Pusher:', newLead);
       toast.success(`Nouveau lead reçu de ${newLead.firstName} ${newLead.lastName}!`);
       setDashboardData(prevData => {
         if (!prevData) return null;
@@ -106,13 +101,8 @@ export default function Dashboard() {
           recentLeads: updatedLeads,
         };
       });
-    });
-
-    return () => {
-      pusher.unsubscribe('leads-channel');
-      pusher.disconnect();
-    };
-  }, []);
+    }
+  });
 
   const getChannelIcon = (channel: string) => {
     switch (channel) {
@@ -132,10 +122,10 @@ export default function Dashboard() {
   }
   
   const statsCards = [
-      { title: 'Leads Actifs', value: dashboardData?.stats.totalLeads.toString() || '0', icon: Users, href: '/leads' },
-      { title: 'Missions en Cours', value: dashboardData?.stats.activeMissions.toString() || '0', icon: Clock, href: '/missions' },
-      { title: 'CA du Mois (Terminé)', value: formatCurrency(dashboardData?.stats.totalRevenue || 0), icon: DollarSign, href: '/billing' },
-      { title: 'Taux de Conversion', value: `${dashboardData?.stats.conversionRate || '0'}%`, icon: TrendingUp, href: '/analytics' },
+    { title: 'Leads Actifs', value: dashboardData?.stats.totalLeads.toString() || '0', icon: Users, href: '/leads' },
+    { title: 'Missions en Cours', value: dashboardData?.stats.activeMissions.toString() || '0', icon: Clock, href: '/missions' },
+    { title: 'CA du Mois (Terminé)', value: formatCurrency(dashboardData?.stats.totalRevenue || 0), icon: DollarSign, href: '/billing' },
+    { title: 'Taux de Conversion', value: `${dashboardData?.stats.conversionRate || '0'}%`, icon: TrendingUp, href: '/analytics' },
   ];
 
   return (
@@ -215,7 +205,6 @@ export default function Dashboard() {
             <h3 className="text-lg font-semibold mb-4">Missions Actives</h3>
             <div className="space-y-4">
               {dashboardData?.activeMissions.map((mission) => {
-                // ✅ FIX: Safeguard against missions with no tasks array
                 const tasks = mission.tasks || [];
                 const completedTasks = tasks.filter(task => task.status === 'COMPLETED' || task.status === 'VALIDATED').length;
                 const progress = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
@@ -259,7 +248,17 @@ export default function Dashboard() {
           {selectedLead && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                {/* ... Lead details remain the same ... */}
+                <div>
+                  <h4 className="font-semibold">Contact</h4>
+                  <p>{selectedLead.phone}</p>
+                  <p>{selectedLead.email}</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold">Statut</h4>
+                  <Badge className={getStatusColor(selectedLead.status)}>
+                    {translate(selectedLead.status)}
+                  </Badge>
+                </div>
               </div>
             </div>
           )}
@@ -277,7 +276,16 @@ export default function Dashboard() {
           </DialogHeader>
           {selectedMission && (
             <div className="space-y-4">
-              {/* ... Mission details remain the same ... */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-semibold">Client</h4>
+                  <p>{selectedMission.lead.firstName} {selectedMission.lead.lastName}</p>
+                </div>
+                <div>
+                  <h4 className="font-semibold">Adresse</h4>
+                  <p>{selectedMission.lead.address}</p>
+                </div>
+              </div>
             </div>
           )}
         </DialogContent>
