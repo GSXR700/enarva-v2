@@ -69,21 +69,26 @@ model TeamMember {
   id           String            @id @default(cuid())
   userId       String            @unique
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  teamId       String            // FIXED: Added this required field
-  team         Team              @relation(fields: [teamId], references: [id], onDelete: Cascade) // FIXED: Added this relation
+  teamId       String
+  team         Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
   
   // --- Member-specific attributes ---
   specialties  TeamSpecialty[]
   experience   ExperienceLevel   @default(JUNIOR)
   availability TeamAvailability  @default(AVAILABLE)
-  hourlyRate   Decimal?          @db.Decimal(10, 2) // FIXED: Added proper precision
-  joinedAt     DateTime          @default(now())
+  hourlyRate   Decimal?          @db.Decimal(8, 2)
+  
+  // --- AJOUTEZ CES CHAMPS ---
   isActive     Boolean           @default(true)
-
+  joinedAt     DateTime          @default(now())
+  
   // --- Relationships ---
-  tasks        Task[]            // Tasks directly assigned to this team member
+  tasks        Task[]
+  
+  // --- Timestamps ---
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
-  @@unique([userId, teamId])   // Ensures a user can only be on a specific team once
   @@map("team_members")
 }
 

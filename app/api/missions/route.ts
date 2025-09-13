@@ -1,4 +1,4 @@
-// app/api/missions/route.ts - COMPLETE FIXED MISSION CREATION WITH TEAM LEADER VALIDATION
+// app/api/missions/route.ts - COMPLETE CORRECTED VERSION WITH PROPER TEAM LEADER VALIDATION
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -135,6 +135,7 @@ export async function GET(request: NextRequest) {
             name: true,
             description: true,
             members: {
+              where: { isActive: true }, // FIX: Now properly filtering active members
               select: {
                 id: true,
                 user: {
@@ -271,13 +272,14 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 3. Enhanced team leader validation
+      // 3. FIXED: Enhanced team leader validation with proper isActive check
       let teamLeader = null;
       if (validatedData.teamLeaderId) {
         teamLeader = await tx.user.findUnique({
           where: { id: validatedData.teamLeaderId },
           include: {
             teamMemberships: {
+              where: { isActive: true }, // FIX: Now properly checking isActive field
               include: {
                 team: true
               }
@@ -294,21 +296,21 @@ export async function POST(request: NextRequest) {
           throw new Error('Selected user is not a team leader');
         }
 
-        // Check if team leader is active team member
-        const activeTeamMembership = teamLeader.teamMemberships.find(tm => tm.isActive);
+        // FIX: Check if team leader is active team member with proper field validation
+        const activeTeamMembership = teamLeader.teamMemberships.find(tm => tm.isActive === true);
         if (!activeTeamMembership) {
           throw new Error('Team leader is not an active team member');
         }
       }
 
-      // 4. Verify the team exists if provided
+      // 4. FIXED: Verify the team exists if provided with proper isActive validation
       let team = null;
       if (validatedData.teamId) {
         team = await tx.team.findUnique({
           where: { id: validatedData.teamId },
           include: {
             members: {
-              where: { isActive: true },
+              where: { isActive: true }, // FIX: Use correct isActive field
               include: {
                 user: true
               }
@@ -323,7 +325,9 @@ export async function POST(request: NextRequest) {
         // If teamLeaderId is not provided but teamId is, try to find a team leader in the team
         if (!validatedData.teamLeaderId) {
           const teamLeaderInTeam = team.members.find(member => 
-            member.user.role === 'TEAM_LEADER' && member.availability === 'AVAILABLE'
+            member.user.role === 'TEAM_LEADER' && 
+            member.availability === 'AVAILABLE' &&
+            member.isActive === true  // FIX: Explicit isActive check
           );
 
           if (teamLeaderInTeam) {
@@ -333,21 +337,21 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 5. If still no team leader, suggest available team leaders
+      // 5. FIXED: If still no team leader, find available team leaders with proper query
       if (!validatedData.teamLeaderId) {
         const availableTeamLeaders = await tx.user.findMany({
           where: {
             role: 'TEAM_LEADER',
             teamMemberships: {
               some: {
-                isActive: true,
+                isActive: true, // FIX: Use correct isActive field
                 availability: 'AVAILABLE'
               }
             }
           },
           include: {
             teamMemberships: {
-              where: { isActive: true },
+              where: { isActive: true }, // FIX: Use correct isActive field
               include: {
                 team: true
               }
@@ -356,7 +360,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (availableTeamLeaders.length === 0) {
-          throw new Error('No available team leaders found. Please create a team leader first.');
+          throw new Error('No available team leaders found. Please ensure you have created team leaders and assigned them to teams with active status.');
         }
 
         // Auto-assign the first available team leader
@@ -485,7 +489,7 @@ export async function POST(request: NextRequest) {
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     
-    // Handle specific errors with helpful messages
+    // Enhanced error handling with more specific messages
     if (errorMessage.includes('Team leader not found')) {
       return NextResponse.json(
         { 
@@ -497,14 +501,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (errorMessage.includes('Team leader is not an active team member')) {
+      return NextResponse.json(
+        { 
+          error: 'Team leader is not an active team member', 
+          details: 'The selected team leader is not currently active in any team.',
+          suggestion: 'Please ensure the team leader is properly assigned to an active team. Check the Teams page to verify team membership status.'
+        },
+        { status: 400 }
+      );
+    }
+
     if (errorMessage.includes('No available team leaders found')) {
       return NextResponse.json(
         { 
           error: 'No team leaders available', 
           details: 'There are no active team leaders in the system.',
-          suggestion: 'Please create a team leader before creating missions.'
+          suggestion: 'Please create a team leader and assign them to a team before creating missions. Go to Teams → New Member to add a team leader.'
         },
         { status: 400 }
+      );
+    }
+
+    if (errorMessage.includes('Quote not found')) {
+      return NextResponse.json(
+        { 
+          error: 'Quote not found', 
+          details: 'The specified quote does not exist.',
+          suggestion: 'Please select a valid quote or create a new one.'
+        },
+        { status: 404 }
+      );
+    }
+
+    if (errorMessage.includes('Lead not found')) {
+      return NextResponse.json(
+        { 
+          error: 'Lead not found', 
+          details: 'The specified lead does not exist.',
+          suggestion: 'Please select a valid lead.'
+        },
+        { status: 404 }
       );
     }
 
@@ -523,6 +560,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: 'Invalid reference - lead, quote, team leader, or team not found' },
           { status: 400 }
+        );
+      }
+
+      if (prismaError.code === 'P2025') {
+        return NextResponse.json(
+          { error: 'Record not found during mission creation' },
+          { status: 404 }
         );
       }
     }
@@ -582,14 +626,23 @@ export async function PUT(request: NextRequest) {
         throw new Error('Not authorized to update this mission');
       }
 
-      // Validate team leader if being updated
+      // FIXED: Validate team leader if being updated with proper isActive check
       if (body.teamLeaderId && body.teamLeaderId !== existingMission.teamLeaderId) {
         const newTeamLeader = await tx.user.findUnique({
-          where: { id: body.teamLeaderId }
+          where: { id: body.teamLeaderId },
+          include: {
+            teamMemberships: {
+              where: { isActive: true } // FIX: Proper isActive validation
+            }
+          }
         });
 
         if (!newTeamLeader || newTeamLeader.role !== 'TEAM_LEADER') {
           throw new Error('Invalid team leader specified');
+        }
+
+        if (newTeamLeader.teamMemberships.length === 0) {
+          throw new Error('Team leader is not an active team member');
         }
       }
 
@@ -616,7 +669,16 @@ export async function PUT(request: NextRequest) {
           lead: true,
           quote: true,
           teamLeader: true,
-          team: true,
+          team: {
+            include: {
+              members: {
+                where: { isActive: true }, // FIX: Filter active members
+                include: {
+                  user: true
+                }
+              }
+            }
+          },
           tasks: true
         }
       });
@@ -658,6 +720,17 @@ export async function PUT(request: NextRequest) {
 
     if (errorMessage.includes('Not authorized')) {
       return new NextResponse('Not authorized to update this mission', { status: 403 });
+    }
+
+    if (errorMessage.includes('Team leader is not an active team member')) {
+      return NextResponse.json(
+        { 
+          error: 'Team leader is not an active team member', 
+          details: 'The selected team leader is not currently active in any team.',
+          suggestion: 'Please ensure the team leader is properly assigned to an active team.'
+        },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json(
