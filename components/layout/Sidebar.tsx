@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
@@ -17,7 +18,8 @@ import {
   CreditCard,
   Activity,
   AlertTriangle,
-  FileBarChart
+  FileBarChart,
+  CalendarDays
 } from 'lucide-react'
 import { Dispatch, SetStateAction } from 'react'
 
@@ -41,6 +43,11 @@ const navigation = [
     name: 'Missions',
     href: '/missions',
     icon: Calendar,
+  },
+  {
+    name: 'Planning',
+    href: '/planning',
+    icon: CalendarDays,
   },
   {
     name: 'Équipes',
@@ -121,7 +128,16 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
     >
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between h-16 flex-shrink-0 px-4 border-b">
-          <h1 className="text-xl font-bold text-blue-600">Enarva OS</h1>
+          <div className="flex items-center gap-3">
+            <Image
+              src="/images/light-logo.png"
+              alt="Enarva OS"
+              width={32}
+              height={32}
+              className="object-contain"
+            />
+            <h1 className="text-xl font-bold text-blue-600">Enarva OS</h1>
+          </div>
           <button onClick={() => setOpen(false)} className="md:hidden">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
