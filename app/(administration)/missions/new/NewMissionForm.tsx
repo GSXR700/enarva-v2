@@ -1,3 +1,4 @@
+// app/(administration)/missions/new/NewMissionForm.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -25,7 +26,7 @@ export default function NewMissionForm() {
   const quoteIdFromParams = searchParams.get('quoteId');
   const leadIdFromParams = searchParams.get('leadId');
 
-  // State for form data
+  // State for form data - Fix: estimatedDuration as number, not string
   const [formData, setFormData] = useState({
     quoteId: quoteIdFromParams || '',
     leadId: leadIdFromParams || '',
@@ -33,7 +34,7 @@ export default function NewMissionForm() {
     address: '',
     coordinates: '',
     scheduledDate: '',
-    estimatedDuration: missionType === 'TECHNICAL_VISIT' ? '1' : '',
+    estimatedDuration: missionType === 'TECHNICAL_VISIT' ? 1 : 2,
     priority: Priority.NORMAL,
     teamLeaderId: '',
     accessNotes: '',
@@ -209,7 +210,15 @@ export default function NewMissionForm() {
 
   const handleSelectChange = (id: keyof typeof formData, value: string) => {
     const finalValue = value === 'none' ? '' : value;
-    setFormData(prev => ({ ...prev, [id]: finalValue as any }));
+    
+    // Fix: Proper type conversion for numeric fields
+    let processedValue: any = finalValue;
+    
+    if (id === 'estimatedDuration') {
+      processedValue = parseFloat(value) || 0;
+    }
+
+    setFormData(prev => ({ ...prev, [id]: processedValue as any }));
 
     // Handle quote selection for service missions
     if (id === 'quoteId' && value !== 'none') {
@@ -229,7 +238,15 @@ export default function NewMissionForm() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
-    setFormData(prev => ({ ...prev, [id]: value }));
+    
+    // Fix: Proper handling of numeric inputs
+    let processedValue: any = value;
+    
+    if (id === 'estimatedDuration') {
+      processedValue = parseFloat(value) || 0;
+    }
+    
+    setFormData(prev => ({ ...prev, [id]: processedValue }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -244,7 +261,9 @@ export default function NewMissionForm() {
     if (!formData.teamLeaderId) validationErrors.push('Chef d\'équipe non sélectionné');
     if (!formData.address) validationErrors.push('Adresse manquante');
     if (!formData.scheduledDate) validationErrors.push('Date/heure manquante');
-    if (!formData.estimatedDuration) validationErrors.push('Durée estimée manquante');
+    if (!formData.estimatedDuration || formData.estimatedDuration <= 0) {
+      validationErrors.push('Durée estimée manquante ou invalide');
+    }
 
     // For service missions, quote is required
     if (missionType === 'SERVICE' && !formData.quoteId) {
@@ -259,19 +278,31 @@ export default function NewMissionForm() {
     }
 
     try {
+      // Fix: Ensure proper datetime format with seconds
+      const scheduledDateTime = formData.scheduledDate.includes(':00') 
+        ? formData.scheduledDate 
+        : `${formData.scheduledDate}:00`;
+
+      const payload = {
+        ...formData,
+        scheduledDate: scheduledDateTime,
+        estimatedDuration: Number(formData.estimatedDuration), // Ensure it's a number
+        quoteId: formData.quoteId || undefined,
+        taskTemplateId: formData.taskTemplateId || undefined,
+      };
+
+      console.log('Submitting payload:', payload);
+
       const response = await fetch('/api/missions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          quoteId: formData.quoteId || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const responseData = await response.json();
       
       if (!response.ok) {
-        throw new Error(responseData.message || "Échec de la création de la mission.");
+        throw new Error(responseData.details || responseData.error || "Échec de la création de la mission.");
       }
       
       toast.success(`Mission de type "${missionType === 'TECHNICAL_VISIT' ? 'Visite Technique' : 'Service'}" créée avec succès !`);

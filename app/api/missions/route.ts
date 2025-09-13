@@ -8,21 +8,55 @@ import { z } from 'zod';
 
 const prisma = new PrismaClient();
 
-// Enhanced validation schema for mission creation
+// Enhanced validation schema for mission creation with flexible datetime and number handling
 const createMissionSchema = z.object({
   leadId: z.string().min(1, 'Lead ID is required'),
   quoteId: z.string().optional().nullable(),
   teamLeaderId: z.string().optional().nullable(),
   teamId: z.string().optional().nullable(),
-  scheduledDate: z.string().datetime('Invalid scheduled date'),
-  estimatedDuration: z.number().min(1, 'Duration must be at least 1 minute').max(1440, 'Duration cannot exceed 24 hours'),
+  // Fix: More flexible datetime validation that handles various formats
+  scheduledDate: z.string().min(1, 'Scheduled date is required').refine((date) => {
+    try {
+      // Handle datetime-local format (without seconds) and full datetime
+      const dateToValidate = date.includes('T') && !date.includes(':00') ? `${date}:00` : date;
+      const parsedDate = new Date(dateToValidate);
+      return !isNaN(parsedDate.getTime());
+    } catch {
+      return false;
+    }
+  }, {
+    message: "Invalid scheduled date format"
+  }),
+  // Fix: Convert string to number with proper validation
+  estimatedDuration: z.union([
+    z.number(),
+    z.string().transform((val) => {
+      const num = parseFloat(val);
+      if (isNaN(num)) throw new Error('Invalid number');
+      return num;
+    })
+  ]).refine((val) => val >= 0.5 && val <= 24, {
+    message: 'Duration must be between 0.5 and 24 hours'
+  }),
   address: z.string().min(1, 'Address is required'),
   coordinates: z.string().optional().nullable(),
   accessNotes: z.string().optional().nullable(),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).default('NORMAL'),
   type: z.enum(['SERVICE', 'TECHNICAL_VISIT', 'DELIVERY', 'INTERNAL', 'RECURRING']).default('SERVICE'),
+  taskTemplateId: z.string().optional().nullable(),
+  adminNotes: z.string().optional().nullable(),
+  qualityScore: z.union([
+    z.number(),
+    z.string().transform((val) => {
+      if (val === '' || val === null) return null;
+      const num = parseFloat(val);
+      if (isNaN(num)) return null;
+      return num;
+    })
+  ]).optional().nullable(),
+  issuesFound: z.string().optional().nullable(),
 }).refine((data) => {
-  // Either teamLeaderId OR teamId must be provided, but not necessarily both
+  // Either teamLeaderId OR teamId must be provided
   if (!data.teamLeaderId && !data.teamId) {
     return false;
   }
@@ -201,6 +235,14 @@ export async function POST(request: NextRequest) {
 
     const validatedData = validationResult.data;
 
+    // Fix: Ensure scheduledDate has seconds for proper datetime parsing
+    const scheduledDateString = validatedData.scheduledDate.includes('T') && 
+      !validatedData.scheduledDate.includes(':00') ? 
+      `${validatedData.scheduledDate}:00` : validatedData.scheduledDate;
+
+    // Convert estimatedDuration from hours to minutes for database storage
+    const estimatedDurationMinutes = Math.round(validatedData.estimatedDuration * 60);
+
     // Create mission in a robust transaction with proper validations
     const result = await prisma.$transaction(async (tx) => {
       // 1. Verify the lead exists
@@ -339,8 +381,8 @@ export async function POST(request: NextRequest) {
           quoteId: validatedData.quoteId || null,
           teamLeaderId: validatedData.teamLeaderId,
           teamId: validatedData.teamId || null,
-          scheduledDate: new Date(validatedData.scheduledDate),
-          estimatedDuration: validatedData.estimatedDuration,
+          scheduledDate: new Date(scheduledDateString),
+          estimatedDuration: estimatedDurationMinutes,
           address: validatedData.address,
           coordinates: validatedData.coordinates || null,
           accessNotes: validatedData.accessNotes || null,
@@ -409,7 +451,7 @@ export async function POST(request: NextRequest) {
             missionId: newMission.id,
             teamLeaderId: validatedData.teamLeaderId,
             teamId: validatedData.teamId,
-            scheduledDate: validatedData.scheduledDate,
+            scheduledDate: scheduledDateString,
             estimatedDuration: validatedData.estimatedDuration
           }
         }
