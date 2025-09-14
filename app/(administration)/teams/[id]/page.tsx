@@ -26,7 +26,7 @@ import {
   Award
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { TeamDetailSkeleton } from '@/components/skeletons/TeamsSkeleton';
 
 // Types
 interface TeamMember {
@@ -203,13 +203,7 @@ export default function TeamViewPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="container mx-auto p-4 md:p-6">
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      </div>
-    );
+    return <TeamDetailSkeleton />;
   }
 
   if (error || !team) {
