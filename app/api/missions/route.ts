@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
     // Get total count for pagination
     const total = await prisma.mission.count({ where });
 
-    // Fetch missions with full related data
+    // Fetch missions with full related data - FIXED to include tasks for progress calculation
     const missions = await prisma.mission.findMany({
       where,
       skip,
@@ -126,7 +126,8 @@ export async function GET(request: NextRequest) {
             name: true,
             email: true,
             role: true,
-            onlineStatus: true
+            onlineStatus: true,
+            image: true
           }
         },
         team: {
@@ -143,7 +144,8 @@ export async function GET(request: NextRequest) {
                     id: true,
                     name: true,
                     email: true,
-                    role: true
+                    role: true,
+                    image: true
                   }
                 },
                 availability: true
@@ -156,16 +158,37 @@ export async function GET(request: NextRequest) {
             id: true,
             title: true,
             status: true,
+            description: true,
+            category: true,
+            type: true,
+            estimatedTime: true,
+            actualTime: true,
+            completedAt: true,
             assignedTo: {
               select: {
                 id: true,
                 user: {
                   select: {
-                    name: true
+                    id: true,
+                    name: true,
+                    email: true,
+                    image: true
                   }
                 }
               }
             }
+          },
+          orderBy: {
+            createdAt: 'asc'
+          }
+        },
+        expenses: {
+          select: {
+            id: true,
+            amount: true,
+            category: true,
+            description: true,
+            date: true
           }
         },
         _count: {
@@ -182,8 +205,9 @@ export async function GET(request: NextRequest) {
       ]
     });
 
+    // FIXED: Return the correct response structure that frontend expects
     return NextResponse.json({
-      missions,
+      missions, // This is the key structure the frontend components expect
       total,
       page,
       limit,

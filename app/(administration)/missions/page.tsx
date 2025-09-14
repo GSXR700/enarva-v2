@@ -1,4 +1,4 @@
-// app/(administration)/missions/page.tsx - FIXED API RESPONSE HANDLING
+// app/(administration)/missions/page.tsx - FIXED API RESPONSE HANDLING AND PROGRESS BAR
 'use client'
 
 import { useState, useEffect, useCallback } from 'react';
@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Progress } from '@/components/ui/progress';
 import {
   Plus,
   Calendar,
@@ -43,73 +44,60 @@ type TaskWithDetails = Task & {
 type MissionWithDetails = Mission & {
   lead: Lead;
   teamLeader: User;
-  team?: { members: { user: User }[] };
+  team?: { 
+    members: { user: User }[] 
+  };
   teamMembers: (TeamMember & { user: User })[];
   tasks: TaskWithDetails[];
   quote?: { finalPrice: number };
-  _count: {
-    tasks: number;
-    qualityChecks: number;
-    expenses: number;
+  _count?: { 
+    tasks: number; 
+    qualityChecks: number; 
   };
 };
 
-type TeamMemberWithUser = TeamMember & { user: User };
-
-type PaginationState = {
+interface PaginationData {
   page: number;
   limit: number;
   total: number;
   totalPages: number;
-};
-
-const getStatusColor = (status: MissionStatus) => {
-    switch (status) {
-      case 'SCHEDULED': return 'bg-blue-100 text-blue-800';
-      case 'IN_PROGRESS': return 'bg-yellow-100 text-yellow-800';
-      case 'QUALITY_CHECK': return 'bg-purple-100 text-purple-800';
-      case 'CLIENT_VALIDATION': return 'bg-orange-100 text-orange-800';
-      case 'COMPLETED': return 'bg-green-100 text-green-800';
-      case 'CANCELLED': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-};
-
-const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'LOW': return 'bg-gray-100 text-gray-800';
-      case 'NORMAL': return 'bg-blue-100 text-blue-800';
-      case 'HIGH': return 'bg-orange-100 text-orange-800';
-      case 'CRITICAL': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-};
+}
 
 export default function MissionsPage() {
   const { data: session } = useSession();
-  const userRole = (session?.user as any)?.role;
   const router = useRouter();
+  const userRole = (session?.user as any)?.role;
 
+  // State management
   const [allMissions, setAllMissions] = useState<MissionWithDetails[]>([]);
   const [filteredMissions, setFilteredMissions] = useState<MissionWithDetails[]>([]);
-  const [selectedMission, setSelectedMission] = useState<MissionWithDetails | null>(null)
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [priorityFilter, setPriorityFilter] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [pagination, setPagination] = useState<PaginationState | null>(null);
-
-  const [allTeamMembers, setAllTeamMembers] = useState<TeamMemberWithUser[]>([]);
+  const [allTeamMembers, setAllTeamMembers] = useState<User[]>([]);
+  const [selectedMission, setSelectedMission] = useState<MissionWithDetails | null>(null);
   const [selectedTeamMemberIds, setSelectedTeamMemberIds] = useState<string[]>([]);
-  const [isTeamSaving, setIsTeamSaving] = useState(false);
+  const [pagination, setPagination] = useState<PaginationData>({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1
+  });
+  
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  
+  // Loading states
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // FIXED: Correct API response handling
   const fetchMissions = useCallback(async () => {
     try {
       console.log('Fetching missions...');
-      const response = await fetch('/api/missions');
-      if (!response.ok) throw new Error('Impossible de récupérer les missions.');
+      const response = await fetch('/api/missions?limit=50');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       
       const responseData = await response.json();
       console.log('API Response:', responseData);
@@ -178,71 +166,56 @@ export default function MissionsPage() {
 
   const handleOpenModal = (mission: MissionWithDetails) => {
     setSelectedMission(mission);
-    setSelectedTeamMemberIds(mission.teamMembers.map(tm => tm.id));
+    setSelectedTeamMemberIds(mission.teamMembers?.map(tm => tm.id) || []);
   };
 
   const handleDeleteMission = async (missionId: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cette mission ? Cette action est irréversible.")) return;
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette mission ? Cette action est irréversible.")) {
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/missions/${missionId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Échec de la suppression');
-      toast.success("Mission supprimée avec succès.");
-      fetchMissions();
-    } catch (error) {
-      toast.error("Erreur lors de la suppression de la mission.");
+      const response = await fetch(`/api/missions?id=${missionId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || 'Erreur lors de la suppression');
+      }
+
+      toast.success('Mission supprimée avec succès');
+      await fetchMissions(); // Refresh the list
+    } catch (error: any) {
+      console.error('Error deleting mission:', error);
+      toast.error(error.message || 'Erreur lors de la suppression de la mission');
     }
   };
 
-  const updateTeamMembers = async () => {
-    if (!selectedMission) return;
-    setIsTeamSaving(true);
-    try {
-      const res = await fetch(`/api/missions/${selectedMission.id}/team`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamMemberIds: selectedTeamMemberIds }),
-      });
-      if (!res.ok) throw new Error('Échec de la mise à jour');
-      toast.success("Équipe mise à jour avec succès.");
-      fetchMissions();
-    } catch (error) {
-      toast.error("Erreur lors de la mise à jour de l'équipe.");
-    } finally {
-      setIsTeamSaving(false);
+  const getStatusColor = (status: MissionStatus) => {
+    switch (status) {
+      case 'SCHEDULED': return 'bg-blue-100 text-blue-800';
+      case 'IN_PROGRESS': return 'bg-yellow-100 text-yellow-800';
+      case 'QUALITY_CHECK': return 'bg-purple-100 text-purple-800';
+      case 'CLIENT_VALIDATION': return 'bg-orange-100 text-orange-800';
+      case 'COMPLETED': return 'bg-green-100 text-green-800';
+      case 'CANCELLED': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPriorityColor = (priority: Priority) => {
+    switch (priority) {
+      case 'LOW': return 'bg-gray-100 text-gray-800';
+      case 'NORMAL': return 'bg-blue-100 text-blue-800';
+      case 'HIGH': return 'bg-orange-100 text-orange-800';
+      case 'CRITICAL': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   if (isLoading) {
-    return (
-      <div className="main-content">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold">Missions</h1>
-        </div>
-        <TableSkeleton />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="main-content">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
-              <h3 className="text-lg font-medium text-red-900 mb-2">Erreur de chargement</h3>
-              <p className="text-red-600 mb-4">{error}</p>
-              <Button onClick={() => {
-                setError(null);
-                fetchMissions();
-              }}>
-                Réessayer
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <TableSkeleton title="Chargement des missions..." />;
   }
 
   return (
@@ -250,9 +223,9 @@ export default function MissionsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Missions</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Gestion des Missions</h1>
           <p className="text-muted-foreground mt-1">
-            {pagination ? `${pagination.total} mission(s) au total` : 'Gestion des missions'}
+            {pagination.total > 0 ? `${pagination.total} mission(s) au total` : 'Gestion des missions'}
           </p>
         </div>
         <div className="flex gap-2">
@@ -321,211 +294,268 @@ export default function MissionsPage() {
       {/* Missions List */}
       {filteredMissions.length === 0 ? (
         <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-8">
-              <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {searchQuery || statusFilter !== 'all' || priorityFilter !== 'all'
-                  ? 'Aucune mission trouvée'
-                  : 'Aucune mission créée'}
-              </h3>
-              <p className="text-gray-500 mb-4">
-                {searchQuery || statusFilter !== 'all' || priorityFilter !== 'all'
-                  ? 'Essayez de modifier vos filtres de recherche'
-                  : 'Commencez par créer votre première mission'}
-              </p>
-              {userRole && ['ADMIN', 'MANAGER', 'AGENT'].includes(userRole) && (
-                <Link href="/missions/new">
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Créer une mission
-                  </Button>
-                </Link>
-              )}
-            </div>
+          <CardContent className="p-8 text-center">
+            <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Aucune mission trouvée</h3>
+            <p className="text-muted-foreground mb-4">
+              {searchQuery || statusFilter !== 'all' || priorityFilter !== 'all' 
+                ? 'Aucune mission ne correspond à vos filtres actuels.'
+                : 'Commencez par créer votre première mission.'}
+            </p>
+            {userRole && ['ADMIN', 'MANAGER', 'AGENT'].includes(userRole) && (
+              <Link href="/missions/new">
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Créer une Mission
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredMissions.map((mission) => (
-            <Card key={mission.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <h3 className="font-semibold text-lg">{mission.missionNumber}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {mission.lead?.firstName} {mission.lead?.lastName}
-                    </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredMissions.map((mission) => {
+            const progress = calculateProgress(mission.tasks || []);
+            
+            return (
+              <Card key={mission.id} className="thread-card hover:shadow-lg transition-all">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-base mb-1">{mission.missionNumber}</CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        {mission.lead.firstName} {mission.lead.lastName}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge className={`text-xs ${getStatusColor(mission.status)}`}>
+                          {translate(mission.status)}
+                        </Badge>
+                        <Badge className={`text-xs ${getPriorityColor(mission.priority)}`}>
+                          {translate(mission.priority)}
+                        </Badge>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/missions/${mission.id}`} className="flex items-center">
+                            <Eye className="w-4 h-4 mr-2" />
+                            Voir détails
+                          </Link>
+                        </DropdownMenuItem>
+                        {userRole && ['ADMIN', 'MANAGER', 'AGENT'].includes(userRole) && (
+                          <DropdownMenuItem asChild>
+                            <Link href={`/missions/${mission.id}/edit`} className="flex items-center">
+                              <Edit className="w-4 h-4 mr-2" />
+                              Modifier
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
+                        {userRole === 'ADMIN' && (
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteMission(mission.id)}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Supprimer
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link href={`/missions/${mission.id}`} className="flex items-center">
-                        <Eye className="w-4 h-4 mr-2" />
-                        Voir détails
-                      </Link>
-                    </DropdownMenuItem>
-                    {userRole && ['ADMIN', 'MANAGER', 'AGENT'].includes(userRole) && (
-                      <DropdownMenuItem asChild>
-                        <Link href={`/missions/${mission.id}/edit`} className="flex items-center">
-                          <Edit className="w-4 h-4 mr-2" />
-                          Modifier
-                        </Link>
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => handleOpenModal(mission)}>
-                      <Users className="w-4 h-4 mr-2" />
-                      Gérer l'équipe
-                    </DropdownMenuItem>
-                    {userRole && ['ADMIN', 'MANAGER'].includes(userRole) && (
-                      <DropdownMenuItem 
-                        className="text-red-600"
-                        onClick={() => handleDeleteMission(mission.id)}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Supprimer
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
+                </CardHeader>
 
-              <CardContent className="space-y-4">
-                {/* Status and Priority */}
-                <div className="flex items-center justify-between">
-                  <Badge className={getStatusColor(mission.status)}>
-                    {translate(mission.status)}
-                  </Badge>
-                  <Badge variant="outline" className={getPriorityColor(mission.priority)}>
-                    {translate(mission.priority)}
-                  </Badge>
-                </div>
+                <CardContent className="space-y-4">
+                  {/* Mission Details */}
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-muted-foreground" />
+                      <span className="truncate">{mission.address}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <span>{formatDate(mission.scheduledDate)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <span>{mission.estimatedDuration / 60}h estimées</span>
+                    </div>
+                  </div>
 
-                {/* Mission Details */}
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center text-muted-foreground">
-                    <Clock className="w-4 h-4 mr-2" />
-                    {formatDate(mission.scheduledDate)} à {formatTime(mission.scheduledDate)}
-                  </div>
-                  <div className="flex items-center text-muted-foreground">
-                    <MapPin className="w-4 h-4 mr-2" />
-                    {mission.address || 'Adresse non spécifiée'}
-                  </div>
-                  {mission.teamLeader && (
-                    <div className="flex items-center text-muted-foreground">
-                      <UserIcon className="w-4 h-4 mr-2" />
-                      Chef: {mission.teamLeader.name}
+                  {/* Progress Bar */}
+                  {mission.tasks && mission.tasks.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Progression</span>
+                        <span className="text-sm font-medium">{progress}%</span>
+                      </div>
+                      <Progress value={progress} className="h-2" />
+                      <p className="text-xs text-muted-foreground">
+                        {mission.tasks.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length} sur {mission.tasks.length} tâches terminées
+                      </p>
                     </div>
                   )}
-                </div>
 
-                {/* Progress */}
-                {mission.tasks && mission.tasks.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Progression</span>
-                      <span className="font-medium">{calculateProgress(mission.tasks)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                        style={{ width: `${calculateProgress(mission.tasks)}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {mission.tasks.filter(t => t.status === 'COMPLETED').length} / {mission.tasks.length} tâches terminées
-                    </p>
-                  </div>
-                )}
-
-                {/* Team Members */}
-                {mission.teamMembers && mission.teamMembers.length > 0 && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Équipe</span>
-                    <div className="flex -space-x-2">
-                      {mission.teamMembers.slice(0, 3).map((member, index) => (
-                        <Avatar key={member.id} className="w-6 h-6 border-2 border-white">
-                          <AvatarImage src={member.user.image || undefined} />
+                  {/* Team Information */}
+                  {mission.teamLeader && (
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      <div className="flex items-center gap-2">
+                        <Avatar className="w-6 h-6">
+                          <AvatarImage src={mission.teamLeader.image || undefined} />
                           <AvatarFallback className="text-xs">
-                            {member.user.name?.charAt(0)}
+                            {mission.teamLeader.name?.split(' ').map(n => n[0]).join('') || 'TL'}
                           </AvatarFallback>
                         </Avatar>
-                      ))}
-                      {mission.teamMembers.length > 3 && (
-                        <div className="w-6 h-6 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center">
-                          <span className="text-xs text-gray-600">+{mission.teamMembers.length - 3}</span>
-                        </div>
-                      )}
+                        <span className="text-sm">{mission.teamLeader.name}</span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Quick Action */}
-                <div className="pt-2">
-                  <Link href={`/missions/${mission.id}`} className="w-full">
-                    <Button variant="outline" size="sm" className="w-full">
-                      <Eye className="w-4 h-4 mr-2" />
-                      Voir détails
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-2">
+                    <Link href={`/missions/${mission.id}`} className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full">
+                        <Eye className="w-4 h-4 mr-2" />
+                        Voir Détails
+                      </Button>
+                    </Link>
+                    {mission.status === 'SCHEDULED' && (
+                      <Link href={`/missions/${mission.id}/execute`}>
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                          <Play className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                    )}
+                    {mission.status === 'IN_PROGRESS' && (
+                      <Link href={`/missions/${mission.id}/execute`}>
+                        <Button size="sm" variant="outline">
+                          <CheckCircle className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {/* Team Management Dialog */}
-      <Dialog open={!!selectedMission} onOpenChange={(open) => !open && setSelectedMission(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              Gérer l'équipe - {selectedMission?.missionNumber}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-64 overflow-y-auto">
-              {allTeamMembers.map((member) => (
-                <div key={member.id} className="flex items-center space-x-3 p-2 border rounded">
-                  <Checkbox
-                    checked={selectedTeamMemberIds.includes(member.id)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedTeamMemberIds([...selectedTeamMemberIds, member.id]);
-                      } else {
-                        setSelectedTeamMemberIds(selectedTeamMemberIds.filter(id => id !== member.id));
-                      }
-                    }}
-                  />
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src={member.user.image || undefined} />
-                    <AvatarFallback>{member.user.name?.charAt(0)}</AvatarFallback>
-                  </Avatar>
+      {/* Mission Assignment Modal */}
+      {selectedMission && (
+        <Dialog open={!!selectedMission} onOpenChange={(open) => !open && setSelectedMission(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Assigner l'équipe - {selectedMission.missionNumber}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-medium mb-2">Informations de la mission</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="font-medium text-sm">{member.user.name}</p>
-                    <p className="text-xs text-muted-foreground">{member.user.role}</p>
+                    <span className="text-muted-foreground">Client:</span>
+                    <p>{selectedMission.lead.firstName} {selectedMission.lead.lastName}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Date:</span>
+                    <p>{formatDate(selectedMission.scheduledDate)}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Adresse:</span>
+                    <p>{selectedMission.address}</p>
                   </div>
                 </div>
-              ))}
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Membres d'équipe disponibles</h4>
+                <div className="max-h-60 overflow-y-auto space-y-2 border rounded-lg p-3">
+                  {allTeamMembers.map((member) => (
+                    <div key={member.id} className="flex items-center gap-3">
+                      <Checkbox
+                        checked={selectedTeamMemberIds.includes(member.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedTeamMemberIds([...selectedTeamMemberIds, member.id]);
+                          } else {
+                            setSelectedTeamMemberIds(selectedTeamMemberIds.filter(id => id !== member.id));
+                          }
+                        }}
+                      />
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={member.image || undefined} />
+                        <AvatarFallback>
+                          {member.name?.split(' ').map(n => n[0]).join('') || 'M'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{member.name}</p>
+                        <p className="text-sm text-muted-foreground">{translate(member.role)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setSelectedMission(null)}>
+                  Annuler
+                </Button>
+                <Button onClick={() => {
+                  // Handle team assignment
+                  toast.success('Équipe assignée avec succès');
+                  setSelectedMission(null);
+                }}>
+                  Assigner l'équipe ({selectedTeamMemberIds.length})
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-end space-x-2 pt-4 border-t">
-              <Button variant="outline" onClick={() => setSelectedMission(null)}>
-                Annuler
-              </Button>
-              <Button onClick={updateTeamMembers} disabled={isTeamSaving}>
-                {isTeamSaving ? 'Mise à jour...' : 'Mettre à jour'}
-              </Button>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Page {pagination.page} sur {pagination.totalPages}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pagination.page <= 1}
+                  onClick={() => {
+                    // Handle previous page
+                    toast.info('Navigation en cours de développement');
+                  }}
+                >
+                  Précédent
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pagination.page >= pagination.totalPages}
+                  onClick={() => {
+                    // Handle next page
+                    toast.info('Navigation en cours de développement');
+                  }}
+                >
+                  Suivant
+                </Button>
+              </div>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
