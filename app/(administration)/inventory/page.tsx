@@ -1,4 +1,3 @@
-// app/(administration)/inventory/page.tsx
 "use client"
 
 import React, { useState, useEffect } from 'react'
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
+import { InventorySkeleton } from '@/components/skeletons/InventorySkeleton'
 
 interface InventoryItem {
   id: string
@@ -242,18 +242,34 @@ export default function EnhancedInventoryManagement() {
     }
   }
 
+  // Helper function for restock
+  async function handleRestock(itemId: string) {
+    try {
+      const response = await fetch(`/api/inventory/${itemId}/restock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quantity: 100, // Default restock quantity
+          note: 'Réapprovisionnement rapide'
+        })
+      })
+
+      if (!response.ok) throw new Error('Restock failed')
+      
+      toast.success('Article réapprovisionné')
+      fetchInventory() // Refresh data
+    } catch (error) {
+      toast.error('Erreur lors du réapprovisionnement')
+    }
+  }
+
   const totalInventoryValue = inventory.reduce((sum, item) => sum + item.totalValue, 0)
   const lowStockCount = stockAlerts.filter(alert => alert.severity === 'LOW').length
   const outOfStockCount = stockAlerts.filter(alert => alert.severity === 'CRITICAL').length
 
+  // Show skeleton while loading
   if (isLoading) {
-    return (
-      <div className="main-content">
-        <div className="flex items-center justify-center h-64">
-          <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
-        </div>
-      </div>
-    )
+    return <InventorySkeleton />
   }
 
   return (
@@ -555,25 +571,4 @@ export default function EnhancedInventoryManagement() {
       )}
     </div>
   )
-
-  // Helper function for restock
-  async function handleRestock(itemId: string) {
-    try {
-      const response = await fetch(`/api/inventory/${itemId}/restock`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          quantity: 100, // Default restock quantity
-          note: 'Réapprovisionnement rapide'
-        })
-      })
-
-      if (!response.ok) throw new Error('Restock failed')
-      
-      toast.success('Article réapprovisionné')
-      fetchInventory() // Refresh data
-    } catch (error) {
-      toast.error('Erreur lors du réapprovisionnement')
-    }
-  }
 }

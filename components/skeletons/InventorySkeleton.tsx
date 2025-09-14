@@ -1,3 +1,4 @@
+// components/skeletons/InventorySkeleton.tsx
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
