@@ -1,4 +1,4 @@
-// app/api/leads/[id]/route.ts - UPDATED WITH ENHANCED VALIDATION AND FIXES
+// app/api/leads/[id]/route.ts - DIAGNOSTIC VERSION WITH DETAILED LOGGING
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -62,6 +62,7 @@ export async function GET(
 
     return NextResponse.json(lead);
   } catch (error) {
+    console.error('GET Error in /api/leads/[id]/route.ts:', error);
     return errorHandler(error);
   }
 }
@@ -70,24 +71,40 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log('🔍 PATCH /api/leads/[id] - Starting request');
+  
   try {
+    // Step 1: Authentication
+    console.log('🔍 Step 1: Checking authentication');
     const session = await getServerSession(authOptions);
     if (!session?.user) {
+      console.log('❌ No session or user found');
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
     
     const user = session.user as ExtendedUser;
     if (!user.id) {
+      console.log('❌ User has no ID');
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
+    console.log('✅ User authenticated:', user.id, user.role);
 
+    // Step 2: Get lead ID
+    console.log('🔍 Step 2: Getting lead ID from params');
     const { id: leadId } = await params;
+    console.log('✅ Lead ID:', leadId);
     
+    // Step 3: Check if lead exists
+    console.log('🔍 Step 3: Fetching existing lead');
     const existingLead = await leadService.getLeadById(leadId);
     if (!existingLead) {
+      console.log('❌ Lead not found');
       return NextResponse.json({ error: 'Lead non trouvé' }, { status: 404 });
     }
+    console.log('✅ Existing lead found:', existingLead.firstName, existingLead.lastName);
 
+    // Step 4: Check permissions
+    console.log('🔍 Step 4: Checking permissions');
     const canEdit = (
       user.role === 'ADMIN' ||
       user.role === 'MANAGER' ||
@@ -95,103 +112,131 @@ export async function PATCH(
     );
 
     if (!canEdit) {
+      console.log('❌ Insufficient permissions');
       return NextResponse.json({ error: 'Permissions insuffisantes' }, { status: 403 });
     }
+    console.log('✅ User has permissions to edit');
 
+    // Step 5: Parse request body
+    console.log('🔍 Step 5: Parsing request body');
     const body = await request.json();
-    console.log('Lead update request body:', body);
+    console.log('✅ Request body parsed, keys:', Object.keys(body));
 
-    // Clean and transform the data before validation
-    const cleanedData = cleanLeadData(body);
-    console.log('Cleaned data:', cleanedData);
-
-    // Check if it's a partial update (status, assignment, or score only)
-    const isPartialUpdate = Object.keys(cleanedData).length <= 3 && (
-      cleanedData.status || 
-      cleanedData.assignedToId !== undefined ||
-      cleanedData.score !== undefined
-    );
-    
-    let updateData = cleanedData;
-
-    // Only validate for full updates, not partial ones
-    if (!isPartialUpdate) {
-      // For updates, we need to merge with existing data to validate properly
-      const mergedDataForValidation = { ...existingLead, ...cleanedData };
+    // Step 6: Clean data - ADD DETAILED LOGGING HERE
+    console.log('🔍 Step 6: Cleaning data');
+    try {
+      const cleanedData = cleanLeadData(body);
+      console.log('✅ Data cleaned successfully, keys:', Object.keys(cleanedData));
       
-      const validation = validateCompleteLeadInput(mergedDataForValidation, false);
-      if (!validation.success) {
-        console.error('Validation errors:', validation.error.errors);
-        return NextResponse.json(
-          { 
-            error: 'Données invalides', 
-            details: validation.error.errors.map((e: any) => e.message)
-          },
-          { status: 400 }
-        );
-      }
-      // Keep only the fields being updated, not the merged data
-      updateData = cleanedData;
-    }
+      // Step 7: Determine if partial update
+      console.log('🔍 Step 7: Determining update type');
+      const isPartialUpdate = Object.keys(cleanedData).length <= 3 && (
+        cleanedData.status || 
+        cleanedData.assignedToId !== undefined ||
+        cleanedData.score !== undefined
+      );
+      console.log('✅ Is partial update:', isPartialUpdate);
+      
+      let updateData = cleanedData;
 
-    // Calculate score for full updates or when score-affecting fields change
-    if (!isPartialUpdate || body.budgetRange || body.urgencyLevel || body.estimatedSurface || body.leadType) {
-      const mergedData = { ...existingLead, ...updateData };
-      updateData.score = calculateLeadScore(mergedData);
-    }
-
-    // Store previous values for logging
-    const previousStatus = existingLead.status;
-    const previousAssignedToId = existingLead.assignedToId;
-
-    // Update the lead
-    const updatedLead = await leadService.updateLead(leadId, updateData);
-
-    // Log status changes (only if status actually changed)
-    if (body.status && body.status !== previousStatus) {
-      try {
-        await leadService.logActivity({
-          type: 'LEAD_CREATED',
-          title: 'Statut modifié',
-          description: `Statut changé de ${previousStatus} vers ${body.status}`,
-          leadId: leadId,
-          userId: user.id,
-          metadata: {
-            oldStatus: previousStatus,
-            newStatus: body.status
+      // Step 8: Validation (only for full updates)
+      if (!isPartialUpdate) {
+        console.log('🔍 Step 8: Running validation for full update');
+        try {
+          const validation = validateCompleteLeadInput(cleanedData, false);
+          if (!validation.success) {
+            console.log('❌ Validation failed:', validation.error.errors);
+            return NextResponse.json(
+              { 
+                error: 'Données invalides', 
+                details: validation.error.errors.map((e: any) => e.message)
+              },
+              { status: 400 }
+            );
           }
-        });
-      } catch (activityError) {
-        console.warn('Failed to log status change activity:', activityError);
-        // Continue without failing the update
+          console.log('✅ Validation passed');
+        } catch (validationError) {
+          console.error('❌ Validation error occurred:', validationError);
+          throw validationError;
+        }
+      } else {
+        console.log('✅ Skipping validation for partial update');
       }
+
+      // Step 9: Calculate score if needed
+      console.log('🔍 Step 9: Checking if score calculation needed');
+      if (!isPartialUpdate || body.budgetRange || body.urgencyLevel || body.estimatedSurface || body.leadType) {
+        console.log('🔍 Calculating score...');
+        const mergedData = { ...existingLead, ...updateData };
+        updateData.score = calculateLeadScore(mergedData);
+        console.log('✅ Score calculated:', updateData.score);
+      }
+
+      // Step 10: Store previous values for logging
+      const previousStatus = existingLead.status;
+      const previousAssignedToId = existingLead.assignedToId;
+
+      // Step 11: Update the lead
+      console.log('🔍 Step 11: Updating lead in database');
+      const updatedLead = await leadService.updateLead(leadId, updateData);
+      console.log('✅ Lead updated successfully');
+
+      // Step 12: Log activities (if needed)
+      console.log('🔍 Step 12: Logging activities');
+      
+      // Log status changes
+      if (body.status && body.status !== previousStatus) {
+        try {
+          await leadService.logActivity({
+            type: 'LEAD_CREATED',
+            title: 'Statut modifié',
+            description: `Statut changé de ${previousStatus} vers ${body.status}`,
+            leadId: leadId,
+            userId: user.id,
+            metadata: {
+              oldStatus: previousStatus,
+              newStatus: body.status
+            }
+          });
+          console.log('✅ Status change logged');
+        } catch (activityError) {
+          console.warn('⚠️ Failed to log status change activity:', activityError);
+        }
+      }
+
+      // Log assignment changes
+      if (body.assignedToId !== undefined && body.assignedToId !== previousAssignedToId) {
+        try {
+          await leadService.logActivity({
+            type: 'LEAD_CREATED',
+            title: 'Assignation modifiée',
+            description: body.assignedToId 
+              ? `Lead assigné à un nouvel agent` 
+              : 'Assignation du lead supprimée',
+            leadId: leadId,
+            userId: user.id,
+            metadata: {
+              oldAssignedToId: previousAssignedToId,
+              newAssignedToId: body.assignedToId
+            }
+          });
+          console.log('✅ Assignment change logged');
+        } catch (activityError) {
+          console.warn('⚠️ Failed to log assignment change activity:', activityError);
+        }
+      }
+
+      console.log('✅ PATCH /api/leads/[id] - Request completed successfully');
+      return NextResponse.json(updatedLead);
+      
+    } catch (dataCleaningError) {
+      console.error('❌ Error in data cleaning step:', dataCleaningError);
+      throw dataCleaningError;
     }
 
-    // Log assignment changes (only if assignment actually changed)
-    if (body.assignedToId !== undefined && body.assignedToId !== previousAssignedToId) {
-      try {
-        await leadService.logActivity({
-          type: 'LEAD_CREATED',
-          title: 'Assignation modifiée',
-          description: body.assignedToId 
-            ? `Lead assigné à ${body.assignedToId}`
-            : 'Lead non assigné',
-          leadId: leadId,
-          userId: user.id,
-          metadata: {
-            oldAssignee: previousAssignedToId,
-            newAssignee: body.assignedToId
-          }
-        });
-      } catch (activityError) {
-        console.warn('Failed to log assignment change activity:', activityError);
-        // Continue without failing the update
-      }
-    }
-
-    return NextResponse.json(updatedLead);
   } catch (error) {
-    console.error('Failed to update lead:', error);
+    console.error('❌ PATCH Error in /api/leads/[id]/route.ts:', error);
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return errorHandler(error);
   }
 }
@@ -207,11 +252,7 @@ export async function DELETE(
     }
     
     const user = session.user as ExtendedUser;
-    if (!user.id) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
-    }
-    
-    if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+    if (!user.id || user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Permissions insuffisantes' }, { status: 403 });
     }
 
@@ -228,71 +269,61 @@ export async function DELETE(
       await leadService.logActivity({
         type: 'LEAD_CREATED',
         title: 'Lead supprimé',
-        description: `Lead ${existingLead.firstName} ${existingLead.lastName} supprimé`,
+        description: `Lead ${existingLead.firstName} ${existingLead.lastName} supprimé par ${user.name}`,
         leadId: leadId,
         userId: user.id,
         metadata: {
           deletedLead: {
             firstName: existingLead.firstName,
             lastName: existingLead.lastName,
-            phone: existingLead.phone
+            phone: existingLead.phone,
+            status: existingLead.status
           }
         }
       });
     } catch (activityError) {
-      console.warn('Failed to log deletion activity:', activityError);
-      // Continue - deletion was successful
+      console.warn('Expected: Could not log deletion activity after lead deletion:', activityError);
     }
 
-    return new NextResponse(null, { status: 204 });
+    return NextResponse.json({ message: 'Lead supprimé avec succès' });
   } catch (error) {
-    console.error('Failed to delete lead:', error);
+    console.error('DELETE Error in /api/leads/[id]/route.ts:', error);
     return errorHandler(error);
   }
 }
 
-/**
- * Enhanced lead score calculation supporting ALL lead types
- * @param leadData The lead data to calculate score for
- * @returns Score from 0-100
- */
 function calculateLeadScore(leadData: any): number {
   let score = 0;
 
-  // 1. BASE INFORMATION SCORE (20 points max)
   if (leadData.firstName && leadData.lastName && leadData.phone) {
-    score += 15; // Basic contact info
+    score += 15;
   }
   if (leadData.email) {
-    score += 5; // Email bonus
+    score += 5;
   }
 
-  // 2. LEAD TYPE SPECIFIC SCORING (25 points max)
   if (leadData.leadType) {
     const leadTypeScores: Record<string, number> = {
-      'PROFESSIONNEL': 25,    // Highest value - recurring business potential
-      'PUBLIC': 22,           // High value - large contracts, stable
-      'SYNDIC': 20,          // Good value - property management, recurring
-      'NGO': 15,             // Medium value - project-based
-      'PARTICULIER': 10,     // Lower value but still important
-      'OTHER': 8             // Lowest priority
+      'PROFESSIONNEL': 25,
+      'PUBLIC': 22,
+      'SYNDIC': 20,
+      'NGO': 15,
+      'PARTICULIER': 10,
+      'OTHER': 8
     };
     score += leadTypeScores[leadData.leadType] || 0;
 
-    // Additional scoring for professional types with complete info
     if (['PROFESSIONNEL', 'PUBLIC', 'NGO', 'SYNDIC'].includes(leadData.leadType)) {
-      if (leadData.company) score += 5; // Company name provided
-      if (leadData.iceNumber) score += 3; // ICE number (legal compliance)
-      if (leadData.activitySector) score += 2; // Sector information
+      if (leadData.company) score += 5;
+      if (leadData.iceNumber) score += 3;
+      if (leadData.activitySector) score += 2;
       
-      // Extra bonus for PUBLIC type with complete info
       if (leadData.leadType === 'PUBLIC' && leadData.activitySector && leadData.company) {
-        score += 5; // Public sector bonus
+        score += 5;
       }
     }
   }
 
-  // 3. BUDGET RANGE SCORING (20 points max)
   if (leadData.budgetRange) {
     const budgetScores: Record<string, number> = {
       'MOINS_1000': 5,
@@ -305,7 +336,6 @@ function calculateLeadScore(leadData: any): number {
     score += budgetScores[leadData.budgetRange] || 0;
   }
   
-  // 4. URGENCY LEVEL SCORING (15 points max)
   if (leadData.urgencyLevel) {
     const urgencyScores: Record<string, number> = {
       'IMMEDIATE': 15,
@@ -317,7 +347,6 @@ function calculateLeadScore(leadData: any): number {
     score += urgencyScores[leadData.urgencyLevel] || 0;
   }
   
-  // 5. SURFACE AREA SCORING (10 points max)
   if (leadData.estimatedSurface && leadData.estimatedSurface > 0) {
     const surface = parseInt(leadData.estimatedSurface);
     if (surface >= 1000) score += 10;
@@ -327,22 +356,18 @@ function calculateLeadScore(leadData: any): number {
     else score += 2;
   }
 
-  // 6. FREQUENCY/RECURRING BUSINESS BONUS (10 points max)
   if (leadData.frequency && leadData.frequency !== 'PONCTUEL') {
     const frequencyScores: Record<string, number> = {
       'HEBDOMADAIRE': 10,
       'MENSUEL': 9,
       'BIMENSUEL': 8,
       'TRIMESTRIEL': 6,
-      'SEMESTRIEL': 5,
       'ANNUEL': 4,
-      'CONTRAT_CADRE': 8,
-      'RECURRING': 9
+      'PERSONNALISE': 7
     };
     score += frequencyScores[leadData.frequency] || 0;
   }
 
-  // 7. PROPERTY TYPE SCORING (5 points max)
   if (leadData.propertyType) {
     const propertyScores: Record<string, number> = {
       'HOTEL_LUXURY': 5,
@@ -352,55 +377,48 @@ function calculateLeadScore(leadData: any): number {
       'RESIDENCE_B2B': 3,
       'BUILDING': 3,
       'RESTAURANT': 3,
-      'WAREHOUSE': 3,
+      'WAREHOUSE': 5,
       'VILLA_LARGE': 2,
       'APARTMENT_LARGE': 2,
       'STORE': 2,
       'VILLA_MEDIUM': 1,
       'APARTMENT_MEDIUM': 1,
+      'VILLA_SMALL': 1,
+      'APARTMENT_SMALL': 1,
+      'PENTHOUSE': 3,
+      'APARTMENT_MULTI': 2,
       'OTHER': 1
     };
     score += propertyScores[leadData.propertyType] || 0;
   }
 
-  // 8. COMPLETENESS BONUS (5 points max)
   let completenessBonus = 0;
   if (leadData.address) completenessBonus += 1;
   if (leadData.gpsLocation) completenessBonus += 1;
   if (leadData.originalMessage && leadData.originalMessage.length > 50) completenessBonus += 2;
-  if (leadData.materials && Object.keys(leadData.materials).some(key => leadData.materials[key])) completenessBonus += 1;
+  if (leadData.materials && typeof leadData.materials === 'object' && 
+      Object.keys(leadData.materials).some(key => leadData.materials[key])) {
+    completenessBonus += 1;
+  }
   score += completenessBonus;
 
-  // 9. ACCESSIBILITY ADJUSTMENT (-2 to +2)
-  if (leadData.accessibility) {
-    const accessibilityAdjustments: Record<string, number> = {
-      'EASY': 2,
-      'MEDIUM': 0,
-      'MODERATE': -1,
-      'DIFFICULT': -1,
-      'VERY_DIFFICULT': -2
-    };
-    score += accessibilityAdjustments[leadData.accessibility] || 0;
-  }
-
-  // 10. CHANNEL QUALITY SCORING (3 points max)
   if (leadData.channel) {
     const channelScores: Record<string, number> = {
-      'RECOMMANDATION_CLIENT': 3,
-      'PARTENARIAT': 3,
-      'APPORTEUR_AFFAIRES': 2,
+      'RECOMMANDATION': 3,
+      'PROSPECTION': 3,
+      'SALON': 2,
       'SITE_WEB': 2,
       'FORMULAIRE_SITE': 2,
-      'LINKEDIN': 2,
-      'GOOGLE_SEARCH': 1,
-      'GOOGLE_MAPS': 1,
-      'WHATSAPP': 1,
-      'EMAIL': 1
-      // Other channels get 0 bonus
+      'EMAIL': 2,
+      'TELEPHONE': 1,
+      'FACEBOOK': 1,
+      'INSTAGRAM': 1,
+      'GOOGLE_ADS': 1,
+      'AFFICHAGE': 1,
+      'AUTRE': 0
     };
     score += channelScores[leadData.channel] || 0;
   }
 
-  // Ensure score doesn't exceed 100 or go below 0
   return Math.max(0, Math.min(score, 100));
 }

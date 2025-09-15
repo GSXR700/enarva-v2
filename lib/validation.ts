@@ -8,23 +8,34 @@ const completeLeadObjectSchema = z.object({
   firstName: z.string().min(1, 'Prénom requis').max(50, 'Prénom trop long'),
   lastName: z.string().min(1, 'Nom requis').max(50, 'Nom trop long'),
   phone: z.string()
-    .min(10, 'Numéro de téléphone requis')
-    .max(20, 'Numéro de téléphone invalide')
-    .regex(/^[+]?[\d\s\-().]+$/, 'Format de téléphone invalide'),
+    .min(1, 'Numéro de téléphone requis')
+    .max(50, 'Numéro de téléphone invalide')
+    .refine((phone) => {
+      // Accept placeholder text for existing leads or valid phone numbers
+      if (phone === 'À renseigner' || phone === 'Non renseigné') return true;
+      // Standard phone validation
+      const phoneRegex = /^[+]?[\d\s\-().]+$/;
+      return phoneRegex.test(phone) && phone.length >= 10;
+    }, 'Format de téléphone invalide'),
+  
   email: z.string()
     .email('Format email invalide')
+    .nullable()
     .optional()
     .or(z.literal(''))
-    .transform(val => val === '' ? null : val),
+    .transform(val => val === '' || val === undefined ? null : val),
 
   // Location Information
   address: z.string()
     .max(200, 'Adresse trop longue')
+    .nullable()
     .optional()
-    .transform(val => val === '' ? null : val),
+    .transform(val => val === '' || val === undefined ? null : val),
+  
   gpsLocation: z.string()
+    .nullable()
     .optional()
-    .transform(val => val === '' ? null : val),
+    .transform(val => val === '' || val === undefined ? null : val),
 
   // Lead Management
   status: z.enum([
@@ -55,36 +66,41 @@ const completeLeadObjectSchema = z.object({
 
   company: z.string()
     .max(100, 'Nom d\'entreprise trop long')
+    .nullable()
     .optional()
-    .transform(val => val === '' ? null : val),
+    .transform(val => val === '' || val === undefined ? null : val),
 
   iceNumber: z.string()
     .max(20, 'Numéro ICE trop long')
+    .nullable()
     .optional()
-    .transform(val => val === '' ? null : val),
+    .transform(val => val === '' || val === undefined ? null : val),
 
   activitySector: z.string()
     .max(100, 'Secteur d\'activité trop long')
+    .nullable()
     .optional()
-    .transform(val => val === '' ? null : val),
+    .transform(val => val === '' || val === undefined ? null : val),
 
   contactPosition: z.string()
     .max(100, 'Poste de contact trop long')
+    .nullable()
     .optional()
-    .transform(val => val === '' ? null : val),
+    .transform(val => val === '' || val === undefined ? null : val),
 
   department: z.string()
     .max(100, 'Département trop long')
+    .nullable()
     .optional()
-    .transform(val => val === '' ? null : val),
+    .transform(val => val === '' || val === undefined ? null : val),
 
   // Property Information
   propertyType: z.enum([
-  'APARTMENT_SMALL', 'APARTMENT_MEDIUM', 'APARTMENT_MULTI', 'APARTMENT_LARGE',
-  'VILLA_SMALL', 'VILLA_MEDIUM', 'VILLA_LARGE', 'PENTHOUSE',
-  'COMMERCIAL', 'STORE', 'HOTEL_STANDARD', 'HOTEL_LUXURY', 'OFFICE',
-  'RESIDENCE_B2B', 'BUILDING', 'RESTAURANT', 'WAREHOUSE', 'OTHER'
-]).optional().nullable(),
+    'APARTMENT_SMALL', 'APARTMENT_MEDIUM', 'APARTMENT_MULTI', 'APARTMENT_LARGE',
+    'VILLA_SMALL', 'VILLA_MEDIUM', 'VILLA_LARGE', 'PENTHOUSE',
+    'COMMERCIAL', 'STORE', 'HOTEL_STANDARD', 'HOTEL_LUXURY', 'OFFICE',
+    'RESIDENCE_B2B', 'BUILDING', 'RESTAURANT', 'WAREHOUSE', 'OTHER'
+  ]).optional().nullable(),
 
   estimatedSurface: z.number()
     .min(1, 'Surface estimée doit être positive')
@@ -102,39 +118,23 @@ const completeLeadObjectSchema = z.object({
 
   budgetRange: z.string()
     .max(50, 'Gamme de budget trop longue')
+    .nullable()
     .optional()
-    .transform(val => val === '' ? null : val),
+    .transform(val => val === '' || val === undefined ? null : val),
 
-  frequency: z.enum([
-    'PONCTUEL', 'HEBDOMADAIRE', 'MENSUEL', 'BIMENSUEL', 'TRIMESTRIEL',
-    'QUARTANNE', 'SEMESTRIEL', 'ANNUEL', 'CONTRAT_CADRE', 'RECURRING', 'AUTRE'
-  ]).default('PONCTUEL'),
+  frequency: z.enum(['PONCTUEL', 'HEBDOMADAIRE', 'BIMENSUEL', 'MENSUEL', 'TRIMESTRIEL', 'ANNUEL', 'PERSONNALISE'])
+    .default('PONCTUEL'),
 
-  contractType: z.enum([
-    'INTERVENTION_UNIQUE', 'MAINTENANCE', 'ABONNEMENT', 'CONTRAT_CADRE', 'RECURRING', 'AUTRE'
-  ]).default('INTERVENTION_UNIQUE'),
+  contractType: z.enum(['INTERVENTION_UNIQUE', 'CONTRAT_PONCTUEL', 'ABONNEMENT_REGULIER', 'CONTRAT_ENTREPRISE', 'AUTRE'])
+    .default('INTERVENTION_UNIQUE'),
 
-  // Products & Equipment
   needsProducts: z.boolean().default(false),
   needsEquipment: z.boolean().default(false),
-  providedBy: z.enum(['ENARVA', 'CLIENT', 'MIXTE']).default('ENARVA'),
 
-  // Materials (Enhanced validation)
-  materials: z.object({
-    marble: z.boolean().optional(),
-    parquet: z.boolean().optional(),
-    tiles: z.boolean().optional(),
-    carpet: z.boolean().optional(),
-    concrete: z.boolean().optional(),
-    wood: z.boolean().optional(),
-    glass: z.boolean().optional(),
-    metal: z.boolean().optional(),
-    fabric: z.boolean().optional(),
-    leather: z.boolean().optional(),
-    other: z.string().max(200, 'Description trop longue').optional()
-  }).optional().nullable(),
-
-  // Lead Source
+  // Business Information
+  providedBy: z.enum(['ENARVA', 'PARTNER', 'SUBCONTRACTOR', 'UNKNOWN']).default('ENARVA'),
+  
+  // FIXED: Complete channel enum to match Prisma schema exactly
   channel: z.enum([
     'WHATSAPP', 'FACEBOOK', 'INSTAGRAM', 'LINKEDIN', 'GOOGLE_MAPS', 'GOOGLE_SEARCH',
     'SITE_WEB', 'FORMULAIRE_SITE', 'MARKETPLACE', 'YOUTUBE', 'EMAIL',
@@ -144,239 +144,35 @@ const completeLeadObjectSchema = z.object({
     'RADIO', 'ANNONCE_PRESSE', 'TELE', 'MANUEL', 'SOURCING_INTERNE', 'PORTE_A_PORTE',
     'CHANTIER_EN_COURS'
   ]),
-
+  
   source: z.string()
     .max(100, 'Source trop longue')
+    .nullable()
     .optional()
-    .transform(val => val === '' ? null : val),
+    .transform(val => val === '' || val === undefined ? null : val),
 
-  // Referral Information
   hasReferrer: z.boolean().default(false),
   referrerContact: z.string()
-    .max(100, 'Contact référent trop long')
+    .max(200, 'Contact référent trop long')
+    .nullable()
     .optional()
-    .transform(val => val === '' ? null : val),
+    .transform(val => val === '' || val === undefined ? null : val),
 
-  enarvaRole: z.enum(['PRESTATAIRE_PRINCIPAL', 'SOUS_TRAITANT', 'CO_TRAITANT', 'AUTRE'])
+  enarvaRole: z.enum(['PRESTATAIRE_PRINCIPAL', 'SOUS_TRAITANT', 'PARTENAIRE', 'CONSEIL_UNIQUEMENT'])
     .default('PRESTATAIRE_PRINCIPAL'),
 
-  // Original Message
-  originalMessage: z.string()
-    .min(1, 'Message original requis')
-    .max(2000, 'Message trop long'),
+  originalMessage: z.string().min(1, 'Message original requis'),
 
-  // Assignment
-  assignedToId: z.string()
-    .optional()
-    .nullable()
-    .transform(val => val === '' ? null : val)
-});
-// =============================================================================
-// MISSING SCHEMAS - ADD THESE TO YOUR EXISTING FILE
-// =============================================================================
+  // System fields
+  assignedToId: z.string().nullable().optional(),
 
-// User & Authentication Schemas
-export const userValidationSchema = z.object({
-  name: z.string().min(1, 'Nom requis').max(100, 'Nom trop long').optional(),
-  email: z.string().email('Format email invalide').max(100, 'Email trop long'),
-  hashedPassword: z.string().min(8, 'Mot de passe minimum 8 caractères').optional(),
-  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'TEAM_LEADER', 'TECHNICIAN']).default('TECHNICIAN'),
-  onlineStatus: z.string().default('OFFLINE'),
-  lastSeen: z.date().optional(),
-  pushSubscription: z.any().optional()
+  // Optional fields for relationships
+  materials: z.any().optional().nullable(), // JSON field
+  assignedTo: z.any().optional(),
+  activities: z.any().optional()
 });
 
-export const accountValidationSchema = z.object({
-  userId: z.string().min(1, 'User ID requis'),
-  type: z.string().min(1, 'Type requis'),
-  provider: z.string().min(1, 'Provider requis'),
-  providerAccountId: z.string().min(1, 'Provider Account ID requis'),
-  refresh_token: z.string().optional(),
-  access_token: z.string().optional(),
-  expires_at: z.number().optional(),
-  token_type: z.string().optional(),
-  scope: z.string().optional(),
-  id_token: z.string().optional(),
-  session_state: z.string().optional()
-});
-
-export const sessionValidationSchema = z.object({
-  sessionToken: z.string().min(1, 'Session token requis'),
-  userId: z.string().min(1, 'User ID requis'),
-  expires: z.date()
-});
-
-// Team Schemas
-export const teamValidationSchema = z.object({
-  name: z.string().min(2, 'Nom d\'équipe minimum 2 caractères').max(100, 'Nom d\'équipe trop long'),
-  description: z.string().max(500, 'Description trop longue').optional().transform(val => val === '' ? null : val)
-});
-
-export const teamMemberValidationSchema = z.object({
-  userId: z.string().min(1, 'User ID requis'),
-  teamId: z.string().min(1, 'Team ID requis'),
-  specialties: z.array(z.enum([
-    'GENERAL_CLEANING', 'WINDOW_SPECIALIST', 'FLOOR_SPECIALIST',
-    'LUXURY_SURFACES', 'EQUIPMENT_HANDLING', 'TEAM_MANAGEMENT',
-    'QUALITY_CONTROL', 'DETAIL_FINISHING'
-  ])).default([]),
-  experience: z.enum(['JUNIOR', 'INTERMEDIATE', 'SENIOR', 'EXPERT']).default('JUNIOR'),
-  availability: z.enum(['AVAILABLE', 'BUSY', 'OFF_DUTY', 'VACATION']).default('AVAILABLE'),
-  hourlyRate: z.number().min(0, 'Taux horaire doit être positif').max(1000, 'Taux horaire trop élevé').optional(),
-  isActive: z.boolean().default(true),
-  joinedAt: z.date().default(() => new Date())
-});
-
-// Task Schemas
-export const taskValidationSchema = z.object({
-  title: z.string().min(1, 'Titre requis').max(200, 'Titre trop long'),
-  description: z.string().max(1000, 'Description trop longue').optional().transform(val => val === '' ? null : val),
-  category: z.enum(['GENERAL', 'CLEANING', 'MAINTENANCE', 'INSPECTION', 'SETUP']),
-  type: z.enum(['EXECUTION', 'QUALITY_CHECK', 'DOCUMENTATION', 'CLIENT_INTERACTION']),
-  status: z.enum(['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'VALIDATED', 'REJECTED']).default('ASSIGNED'),
-  priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).default('NORMAL'),
-  estimatedDuration: z.number().min(0.1, 'Durée minimale: 0.1 heure').max(24, 'Durée maximale: 24 heures'),
-  actualDuration: z.number().min(0).optional(),
-  assignedToId: z.string().optional(),
-  dueDate: z.date().optional(),
-  completedAt: z.date().optional(),
-  validatedAt: z.date().optional(),
-  notes: z.string().max(1000, 'Notes trop longues').optional().transform(val => val === '' ? null : val),
-  attachments: z.array(z.string().url()).default([]),
-  missionId: z.string().min(1, 'Mission ID requis')
-});
-
-// Inventory Schemas
-export const inventoryValidationSchema = z.object({
-  name: z.string().min(1, 'Nom requis').max(100, 'Nom trop long'),
-  category: z.enum(['CLEANING_PRODUCTS', 'EQUIPMENT', 'CONSUMABLES', 'PROTECTIVE_GEAR', 'TOOLS', 'SPARE_PARTS']),
-  unit: z.string().min(1, 'Unité requise').max(20, 'Unité trop longue'),
-  currentStock: z.number().min(0, 'Stock actuel doit être positif'),
-  minimumStock: z.number().min(0, 'Stock minimum doit être positif'),
-  unitPrice: z.number().min(0, 'Prix unitaire doit être positif'),
-  supplier: z.string().min(1, 'Fournisseur requis').max(100, 'Fournisseur trop long'),
-  description: z.string().max(500, 'Description trop longue').optional().transform(val => val === '' ? null : val),
-  sku: z.string().max(50, 'SKU trop long').optional().transform(val => val === '' ? null : val),
-  barcode: z.string().max(50, 'Code-barres trop long').optional().transform(val => val === '' ? null : val),
-  expiryDate: z.date().optional(),
-  location: z.string().max(100, 'Emplacement trop long').optional().transform(val => val === '' ? null : val),
-  isActive: z.boolean().default(true)
-});
-
-export const inventoryUsageValidationSchema = z.object({
-  quantity: z.number().min(0.01, 'Quantité minimale: 0.01'),
-  notes: z.string().max(500, 'Notes trop longues').optional().transform(val => val === '' ? null : val),
-  inventoryId: z.string().min(1, 'Inventory ID requis'),
-  missionId: z.string().min(1, 'Mission ID requis'),
-  usedAt: z.date().default(() => new Date())
-});
-
-// Expense Schemas
-export const expenseValidationSchema = z.object({
-  date: z.date(),
-  amount: z.number().min(0.01, 'Montant minimum: 0.01'),
-  category: z.enum([
-    'OPERATIONS', 'REVENTE_NEGOCE', 'RESSOURCES_HUMAINES', 'ADMINISTRATIF_FINANCIER',
-    'MARKETING_COMMERCIAL', 'LOGISTIQUE_MOBILITE', 'INFRASTRUCTURES_LOCAUX',
-    'LOCATIONS', 'EXCEPTIONNELLES_DIVERSES'
-  ]),
-  subCategory: z.string().min(1, 'Sous-catégorie requise').max(100, 'Sous-catégorie trop longue'),
-  paymentMethod: z.enum(['CASH', 'VIREMENT', 'CARTE', 'CHEQUE', 'MOBILE', 'AUTRE']),
-  vendor: z.string().max(100, 'Fournisseur trop long').optional().transform(val => val === '' ? null : val),
-  description: z.string().max(500, 'Description trop longue').optional().transform(val => val === '' ? null : val),
-  proofUrl: z.string().url('URL de justificatif invalide').optional(),
-  rentalStartDate: z.date().optional(),
-  rentalEndDate: z.date().optional(),
-  missionId: z.string().optional(),
-  leadId: z.string().optional(),
-  userId: z.string().min(1, 'User ID requis')
-});
-
-// Invoice Schemas
-export const invoiceValidationSchema = z.object({
-  invoiceNumber: z.string().min(1, 'Numéro de facture requis').max(50, 'Numéro de facture trop long'),
-  amount: z.number().min(0.01, 'Montant minimum: 0.01'),
-  status: z.enum(['DRAFT', 'SENT', 'PAID', 'OVERDUE', 'CANCELLED']).default('DRAFT'),
-  issueDate: z.date().default(() => new Date()),
-  dueDate: z.date(),
-  missionId: z.string().min(1, 'Mission ID requis'),
-  leadId: z.string().min(1, 'Lead ID requis'),
-  description: z.string().max(1000, 'Description trop longue').optional().transform(val => val === '' ? null : val),
-  lineItems: z.array(z.object({
-    description: z.string().min(1, 'Description requise'),
-    quantity: z.number().min(0.1, 'Quantité minimale: 0.1'),
-    unitPrice: z.number().min(0, 'Prix unitaire doit être positif'),
-    totalPrice: z.number().min(0, 'Prix total doit être positif')
-  })).optional(),
-  subTotal: z.number().min(0, 'Sous-total doit être positif').optional(),
-  taxAmount: z.number().min(0, 'Montant de taxe doit être positif').optional(),
-  totalAmount: z.number().min(0, 'Montant total doit être positif').optional()
-});
-
-// Activity & Communication Schemas
-export const activityValidationSchema = z.object({
-  type: z.enum(['LEAD_CREATED', 'LEAD_UPDATED', 'LEAD_QUALIFIED', 'MISSION_CREATED', 'MISSION_COMPLETED', 'QUOTE_SENT', 'PAYMENT_RECEIVED']),
-  title: z.string().min(1, 'Titre requis').max(200, 'Titre trop long'),
-  description: z.string().min(1, 'Description requise').max(1000, 'Description trop longue'),
-  metadata: z.any().optional(),
-  userId: z.string().min(1, 'User ID requis'),
-  leadId: z.string().optional()
-});
-
-export const conversationValidationSchema = z.object({
-  missionId: z.string().min(1, 'Mission ID requis'),
-  isActive: z.boolean().default(true)
-});
-
-export const messageValidationSchema = z.object({
-  content: z.string().min(1, 'Contenu requis').max(2000, 'Message trop long'),
-  conversationId: z.string().min(1, 'Conversation ID requis'),
-  senderId: z.string().min(1, 'Sender ID requis'),
-  isRead: z.boolean().default(false),
-  attachments: z.array(z.string().url()).default([])
-});
-
-// Quality Check Schemas
-export const qualityCheckValidationSchema = z.object({
-  missionId: z.string().min(1, 'Mission ID requis'),
-  type: z.enum(['PRE_SERVICE', 'IN_PROGRESS', 'POST_SERVICE', 'CLIENT_FEEDBACK', 'INTERNAL_AUDIT']),
-  status: z.enum(['PENDING', 'IN_PROGRESS', 'PASSED', 'FAILED', 'REQUIRES_REWORK']).default('PENDING'),
-  checkedBy: z.string().optional(),
-  checkedAt: z.date().optional(),
-  notes: z.string().max(1000, 'Notes trop longues').optional().transform(val => val === '' ? null : val),
-  photos: z.array(z.string().url()).default([]),
-  issues: z.any().optional(),
-  validatedAt: z.date().optional(),
-  score: z.number().min(1, 'Score minimum: 1').max(5, 'Score maximum: 5').optional(),
-  recommendations: z.string().max(1000, 'Recommandations trop longues').optional().transform(val => val === '' ? null : val)
-});
-
-// Task Template Schemas
-export const taskTemplateValidationSchema = z.object({
-  name: z.string().min(1, 'Nom requis').max(100, 'Nom trop long'),
-  description: z.string().max(500, 'Description trop longue').optional().transform(val => val === '' ? null : val),
-  tasks: z.any(), // JSON field containing task definitions
-  category: z.enum(['GENERAL', 'CLEANING', 'MAINTENANCE', 'INSPECTION', 'SETUP']),
-  isActive: z.boolean().default(true),
-  estimatedDuration: z.number().min(0.1, 'Durée minimale: 0.1 heure').optional(),
-  requiredSpecialties: z.array(z.string()).default([]),
-  difficulty: z.enum(['EASY', 'MEDIUM', 'HARD', 'EXPERT']).default('MEDIUM')
-});
-
-// System Log Schemas
-export const systemLogValidationSchema = z.object({
-  type: z.enum(['INFO', 'WARNING', 'ERROR', 'CRITICAL', 'DEBUG']),
-  status: z.enum(['SUCCESS', 'FAILURE', 'PENDING', 'CANCELLED']),
-  message: z.string().min(1, 'Message requis').max(1000, 'Message trop long'),
-  metadata: z.any().optional(),
-  userId: z.string().optional(),
-  ipAddress: z.string().optional(),
-  userAgent: z.string().optional(),
-  endpoint: z.string().optional(),
-  duration: z.number().min(0).optional()
-});
-
-// Now, apply refinements to the base schema for complete validation.
+// Apply refinements to the base schema for complete validation.
 export const completeLeadValidationSchema = completeLeadObjectSchema.refine((data) => {
   // Custom validation: if leadType is PROFESSIONNEL, company should be provided
   if (data.leadType === 'PROFESSIONNEL' && !data.company) {
@@ -408,22 +204,18 @@ export const completeLeadValidationSchema = completeLeadObjectSchema.refine((dat
   path: ["estimatedSurface"]
 });
 
-
 // Export the type
 export type CompleteLeadInput = z.infer<typeof completeLeadValidationSchema>
 
-// Validation function - FIXED
+// FIXED: Validation function with proper partial schema handling
 export function validateCompleteLeadInput(data: any, isCreation = true) {
   if (isCreation) {
     return completeLeadValidationSchema.safeParse(data)
   } else {
-    // For updates, create a partial schema from the base object
-    // and then re-apply refinements.
+    // For updates, create a partial schema that's more lenient
     const updateSchema = completeLeadObjectSchema.partial().refine((data) => {
-      if (data.leadType === 'PROFESSIONNEL' && data.company === undefined) {
-        // If leadType is being changed TO 'PROFESSIONNEL' but company is not provided.
-        // This check is tricky in a partial schema. We only validate if the leadType is present.
-      } else if (data.leadType === 'PROFESSIONNEL' && !data.company) {
+      // Only validate company requirement if leadType is being changed to PROFESSIONNEL
+      if (data.leadType === 'PROFESSIONNEL' && data.company === null) {
         return false;
       }
       return true;
@@ -431,20 +223,142 @@ export function validateCompleteLeadInput(data: any, isCreation = true) {
       message: "Le nom de l'entreprise est requis pour les clients professionnels",
       path: ["company"]
     }).refine((data) => {
-        // Only validate if hasReferrer is explicitly set in the update
-        if (data.hasReferrer === true && !data.referrerContact) {
-            return false;
-        }
-        return true;
+      // Only validate referrer if hasReferrer is explicitly being set to true
+      if (data.hasReferrer === true && !data.referrerContact) {
+        return false;
+      }
+      return true;
     }, {
-        message: "Les informations du référent sont requises",
-        path: ["referrerContact"]
+      message: "Les informations du référent sont requises",
+      path: ["referrerContact"]
     });
+    
     return updateSchema.safeParse(data);
   }
 }
 
-// Enhanced Mission Validation
+// =============================================================================
+// USER & AUTHENTICATION SCHEMAS
+// =============================================================================
+
+export const userValidationSchema = z.object({
+  name: z.string().min(1, 'Nom requis').max(100, 'Nom trop long').optional(),
+  email: z.string().email('Format email invalide').max(100, 'Email trop long'),
+  hashedPassword: z.string().min(8, 'Mot de passe minimum 8 caractères').optional(),
+  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'TEAM_LEADER', 'TECHNICIAN']).default('TECHNICIAN'),
+  onlineStatus: z.string().default('OFFLINE'),
+  lastSeen: z.date().optional(),
+  pushSubscription: z.any().optional()
+});
+
+export const accountValidationSchema = z.object({
+  userId: z.string().min(1, 'User ID requis'),
+  type: z.string().min(1, 'Type requis'),
+  provider: z.string().min(1, 'Provider requis'),
+  providerAccountId: z.string().min(1, 'Provider Account ID requis'),
+  refresh_token: z.string().optional(),
+  access_token: z.string().optional(),
+  expires_at: z.number().optional(),
+  token_type: z.string().optional(),
+  scope: z.string().optional(),
+  id_token: z.string().optional(),
+  session_state: z.string().optional()
+});
+
+export const sessionValidationSchema = z.object({
+  sessionToken: z.string().min(1, 'Session token requis'),
+  userId: z.string().min(1, 'User ID requis'),
+  expires: z.date()
+});
+
+// =============================================================================
+// TEAM SCHEMAS
+// =============================================================================
+
+export const teamValidationSchema = z.object({
+  name: z.string().min(2, 'Nom d\'équipe minimum 2 caractères').max(100, 'Nom d\'équipe trop long'),
+  description: z.string().max(500, 'Description trop longue').optional().transform(val => val === '' ? null : val)
+});
+
+export const teamMemberValidationSchema = z.object({
+  userId: z.string().min(1, 'User ID requis'),
+  teamId: z.string().min(1, 'Team ID requis'),
+  specialties: z.array(z.enum([
+    'GENERAL_CLEANING', 'WINDOW_SPECIALIST', 'FLOOR_SPECIALIST',
+    'LUXURY_SURFACES', 'EQUIPMENT_HANDLING', 'TEAM_MANAGEMENT',
+    'QUALITY_CONTROL', 'DETAIL_FINISHING'
+  ])).default([]),
+  experience: z.enum(['JUNIOR', 'INTERMEDIATE', 'SENIOR', 'EXPERT']).default('JUNIOR'),
+  availability: z.enum(['AVAILABLE', 'BUSY', 'OFF_DUTY', 'VACATION']).default('AVAILABLE'),
+  hourlyRate: z.number().min(0, 'Taux horaire doit être positif').max(1000, 'Taux horaire trop élevé').optional(),
+  isActive: z.boolean().default(true),
+  joinedAt: z.date().default(() => new Date())
+});
+
+// Enhanced Team Member Validation
+export const completeTeamMemberValidationSchema = z.object({
+  // User information
+  name: z.string()
+    .min(1, 'Nom requis')
+    .max(100, 'Nom trop long'),
+
+  email: z.string()
+    .email('Format email invalide')
+    .max(100, 'Email trop long'),
+
+  password: z.string()
+    .min(8, 'Mot de passe minimum 8 caractères')
+    .max(100, 'Mot de passe trop long')
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Le mot de passe doit contenir au moins une minuscule, une majuscule et un chiffre'),
+
+  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'TEAM_LEADER', 'TECHNICIAN']),
+
+  // Team member specific information
+  teamId: z.string()
+    .min(1, 'ID d\'équipe requis'),
+
+  specialties: z.array(z.enum([
+    'GENERAL_CLEANING', 'WINDOW_SPECIALIST', 'FLOOR_SPECIALIST',
+    'LUXURY_SURFACES', 'EQUIPMENT_HANDLING', 'TEAM_MANAGEMENT',
+    'QUALITY_CONTROL', 'DETAIL_FINISHING'
+  ])).default([]),
+
+  experience: z.enum(['JUNIOR', 'INTERMEDIATE', 'SENIOR', 'EXPERT']),
+
+  availability: z.enum(['AVAILABLE', 'BUSY', 'OFF_DUTY', 'VACATION'])
+    .default('AVAILABLE'),
+
+  hourlyRate: z.number()
+    .min(0, 'Taux horaire doit être positif')
+    .max(1000, 'Taux horaire trop élevé')
+    .optional()
+    .nullable(),
+
+  isActive: z.boolean().default(true)
+}).refine((data) => {
+  // Custom validation: senior/expert roles should have hourly rate
+  if (['SENIOR', 'EXPERT'].includes(data.experience) && !data.hourlyRate) {
+    return false
+  }
+  return true
+}, {
+  message: "Un taux horaire est requis pour les niveaux Senior et Expert",
+  path: ["hourlyRate"]
+}).refine((data) => {
+  // Custom validation: team leaders should have management specialty
+  if (data.role === 'TEAM_LEADER' && !data.specialties.includes('TEAM_MANAGEMENT')) {
+    return false
+  }
+  return true
+}, {
+  message: "Les chefs d'équipe doivent avoir la spécialité 'Gestion d'équipe'",
+  path: ["specialties"]
+})
+
+// =============================================================================
+// MISSION VALIDATION
+// =============================================================================
+
 export const completeMissionValidationSchema = z.object({
   missionNumber: z.string()
     .min(1, 'Numéro de mission requis')
@@ -476,7 +390,6 @@ export const completeMissionValidationSchema = z.object({
     }, {
       message: "La date programmée ne peut pas être dans le passé ou est invalide"
     }),
-
 
   estimatedDuration: z.number()
     .min(0.5, 'Durée minimale: 30 minutes')
@@ -533,13 +446,10 @@ export const completeMissionValidationSchema = z.object({
   correctionRequired: z.boolean().default(false)
 })
 
-export type CompleteMissionInput = z.infer<typeof completeMissionValidationSchema>
+// =============================================================================
+// QUOTE VALIDATION - FIXED
+// =============================================================================
 
-export function validateCompleteMissionInput(data: any) {
-  return completeMissionValidationSchema.safeParse(data)
-}
-
-// FIXED Enhanced Quote Validation - Main fix here
 export const completeQuoteValidationSchema = z.object({
   quoteNumber: z.string()
     .min(1, 'Numéro de devis requis')
@@ -615,10 +525,10 @@ export const completeQuoteValidationSchema = z.object({
   leadUpdates: z.object({
     estimatedSurface: z.number().min(1).max(10000).optional(),
     propertyType: z.enum([
-    'APARTMENT_SMALL', 'APARTMENT_MEDIUM', 'APARTMENT_MULTI', 'APARTMENT_LARGE',
-    'VILLA_SMALL', 'VILLA_MEDIUM', 'VILLA_LARGE', 'PENTHOUSE',
-    'COMMERCIAL', 'STORE', 'HOTEL_STANDARD', 'HOTEL_LUXURY', 'OFFICE',
-    'RESIDENCE_B2B', 'BUILDING', 'RESTAURANT', 'WAREHOUSE', 'OTHER'
+      'APARTMENT_SMALL', 'APARTMENT_MEDIUM', 'APARTMENT_MULTI', 'APARTMENT_LARGE',
+      'VILLA_SMALL', 'VILLA_MEDIUM', 'VILLA_LARGE', 'PENTHOUSE',
+      'COMMERCIAL', 'STORE', 'HOTEL_STANDARD', 'HOTEL_LUXURY', 'OFFICE',
+      'RESIDENCE_B2B', 'BUILDING', 'RESTAURANT', 'WAREHOUSE', 'OTHER'
      ]).optional(),
     address: z.string().max(200).optional(),
     urgencyLevel: z.enum(['LOW', 'NORMAL', 'URGENT', 'HIGH_URGENT', 'IMMEDIATE']).optional(),
@@ -655,79 +565,183 @@ export const completeQuoteValidationSchema = z.object({
   path: ["subTotalHT"]
 })
 
-export type CompleteQuoteInput = z.infer<typeof completeQuoteValidationSchema>
+// =============================================================================
+// TASK SCHEMAS
+// =============================================================================
 
-export function validateCompleteQuoteInput(data: any) {
-  return completeQuoteValidationSchema.safeParse(data)
-}
+export const taskValidationSchema = z.object({
+  title: z.string().min(1, 'Titre requis').max(200, 'Titre trop long'),
+  description: z.string().max(1000, 'Description trop longue').optional().transform(val => val === '' ? null : val),
+  category: z.enum(['GENERAL', 'CLEANING', 'MAINTENANCE', 'INSPECTION', 'SETUP']),
+  type: z.enum(['EXECUTION', 'QUALITY_CHECK', 'DOCUMENTATION', 'CLIENT_INTERACTION']),
+  status: z.enum(['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'VALIDATED', 'REJECTED']).default('ASSIGNED'),
+  priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).default('NORMAL'),
+  estimatedDuration: z.number().min(0.1, 'Durée minimale: 0.1 heure').max(24, 'Durée maximale: 24 heures'),
+  actualDuration: z.number().min(0).optional(),
+  assignedToId: z.string().optional(),
+  dueDate: z.date().optional(),
+  completedAt: z.date().optional(),
+  validatedAt: z.date().optional(),
+  notes: z.string().max(1000, 'Notes trop longues').optional().transform(val => val === '' ? null : val),
+  attachments: z.array(z.string().url()).default([]),
+  missionId: z.string().min(1, 'Mission ID requis')
+});
 
-// Enhanced Team Member Validation
-export const completeTeamMemberValidationSchema = z.object({
-  // User information
-  name: z.string()
-    .min(1, 'Nom requis')
-    .max(100, 'Nom trop long'),
+// =============================================================================
+// INVENTORY SCHEMAS
+// =============================================================================
 
-  email: z.string()
-    .email('Format email invalide')
-    .max(100, 'Email trop long'),
-
-  password: z.string()
-    .min(8, 'Mot de passe minimum 8 caractères')
-    .max(100, 'Mot de passe trop long')
-    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Le mot de passe doit contenir au moins une minuscule, une majuscule et un chiffre'),
-
-  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'TEAM_LEADER', 'TECHNICIAN']),
-
-  // Team member specific information
-  teamId: z.string()
-    .min(1, 'ID d\'équipe requis'),
-
-  specialties: z.array(z.enum([
-    'GENERAL_CLEANING', 'WINDOW_SPECIALIST', 'FLOOR_SPECIALIST',
-    'LUXURY_SURFACES', 'EQUIPMENT_HANDLING', 'TEAM_MANAGEMENT',
-    'QUALITY_CONTROL', 'DETAIL_FINISHING'
-  ])).default([]),
-
-  experience: z.enum(['JUNIOR', 'INTERMEDIATE', 'SENIOR', 'EXPERT']),
-
-  availability: z.enum(['AVAILABLE', 'BUSY', 'OFF_DUTY', 'VACATION'])
-    .default('AVAILABLE'),
-
-  hourlyRate: z.number()
-    .min(0, 'Taux horaire doit être positif')
-    .max(1000, 'Taux horaire trop élevé')
-    .optional()
-    .nullable(),
-
+export const inventoryValidationSchema = z.object({
+  name: z.string().min(1, 'Nom requis').max(100, 'Nom trop long'),
+  category: z.enum(['CLEANING_PRODUCTS', 'EQUIPMENT', 'CONSUMABLES', 'PROTECTIVE_GEAR', 'TOOLS', 'SPARE_PARTS']),
+  unit: z.string().min(1, 'Unité requise').max(20, 'Unité trop longue'),
+  currentStock: z.number().min(0, 'Stock actuel doit être positif'),
+  minimumStock: z.number().min(0, 'Stock minimum doit être positif'),
+  unitPrice: z.number().min(0, 'Prix unitaire doit être positif'),
+  supplier: z.string().min(1, 'Fournisseur requis').max(100, 'Fournisseur trop long'),
+  description: z.string().max(500, 'Description trop longue').optional().transform(val => val === '' ? null : val),
+  sku: z.string().max(50, 'SKU trop long').optional().transform(val => val === '' ? null : val),
+  barcode: z.string().max(50, 'Code-barres trop long').optional().transform(val => val === '' ? null : val),
+  expiryDate: z.date().optional(),
+  location: z.string().max(100, 'Emplacement trop long').optional().transform(val => val === '' ? null : val),
   isActive: z.boolean().default(true)
-}).refine((data) => {
-  // Custom validation: senior/expert roles should have hourly rate
-  if (['SENIOR', 'EXPERT'].includes(data.experience) && !data.hourlyRate) {
-    return false
-  }
-  return true
-}, {
-  message: "Un taux horaire est requis pour les niveaux Senior et Expert",
-  path: ["hourlyRate"]
-}).refine((data) => {
-  // Custom validation: team leaders should have management specialty
-  if (data.role === 'TEAM_LEADER' && !data.specialties.includes('TEAM_MANAGEMENT')) {
-    return false
-  }
-  return true
-}, {
-  message: "Les chefs d'équipe doivent avoir la spécialité 'Gestion d'équipe'",
-  path: ["specialties"]
-})
+});
 
-export type CompleteTeamMemberInput = z.infer<typeof completeTeamMemberValidationSchema>
+export const inventoryUsageValidationSchema = z.object({
+  quantity: z.number().min(0.01, 'Quantité minimale: 0.01'),
+  notes: z.string().max(500, 'Notes trop longues').optional().transform(val => val === '' ? null : val),
+  inventoryId: z.string().min(1, 'Inventory ID requis'),
+  missionId: z.string().min(1, 'Mission ID requis'),
+  usedAt: z.date().default(() => new Date())
+});
 
-export function validateCompleteTeamMemberInput(data: any) {
-  return completeTeamMemberValidationSchema.safeParse(data)
-}
+// =============================================================================
+// EXPENSE SCHEMAS
+// =============================================================================
 
-// Field Report Validation
+export const expenseValidationSchema = z.object({
+  date: z.date(),
+  amount: z.number().min(0.01, 'Montant minimum: 0.01'),
+  category: z.enum([
+    'OPERATIONS', 'REVENTE_NEGOCE', 'RESSOURCES_HUMAINES', 'ADMINISTRATIF_FINANCIER',
+    'MARKETING_COMMERCIAL', 'LOGISTIQUE_MOBILITE', 'INFRASTRUCTURES_LOCAUX',
+    'LOCATIONS', 'EXCEPTIONNELLES_DIVERSES'
+  ]),
+  subCategory: z.string().min(1, 'Sous-catégorie requise').max(100, 'Sous-catégorie trop longue'),
+  paymentMethod: z.enum(['CASH', 'VIREMENT', 'CARTE', 'CHEQUE', 'MOBILE', 'AUTRE']),
+  vendor: z.string().max(100, 'Fournisseur trop long').optional().transform(val => val === '' ? null : val),
+  description: z.string().max(500, 'Description trop longue').optional().transform(val => val === '' ? null : val),
+  proofUrl: z.string().url('URL de justificatif invalide').optional(),
+  rentalStartDate: z.date().optional(),
+  rentalEndDate: z.date().optional(),
+  missionId: z.string().optional(),
+  leadId: z.string().optional(),
+  userId: z.string().min(1, 'User ID requis')
+});
+
+// =============================================================================
+// INVOICE SCHEMAS
+// =============================================================================
+
+export const invoiceValidationSchema = z.object({
+  invoiceNumber: z.string().min(1, 'Numéro de facture requis').max(50, 'Numéro de facture trop long'),
+  amount: z.number().min(0.01, 'Montant minimum: 0.01'),
+  status: z.enum(['DRAFT', 'SENT', 'PAID', 'OVERDUE', 'CANCELLED']).default('DRAFT'),
+  issueDate: z.date().default(() => new Date()),
+  dueDate: z.date(),
+  missionId: z.string().min(1, 'Mission ID requis'),
+  leadId: z.string().min(1, 'Lead ID requis'),
+  description: z.string().max(1000, 'Description trop longue').optional().transform(val => val === '' ? null : val),
+  lineItems: z.array(z.object({
+    description: z.string().min(1, 'Description requise'),
+    quantity: z.number().min(0.1, 'Quantité minimale: 0.1'),
+    unitPrice: z.number().min(0, 'Prix unitaire doit être positif'),
+    totalPrice: z.number().min(0, 'Prix total doit être positif')
+  })).optional(),
+  subTotal: z.number().min(0, 'Sous-total doit être positif').optional(),
+  taxAmount: z.number().min(0, 'Montant de taxe doit être positif').optional(),
+  totalAmount: z.number().min(0, 'Montant total doit être positif').optional()
+});
+
+// =============================================================================
+// ACTIVITY & COMMUNICATION SCHEMAS
+// =============================================================================
+
+export const activityValidationSchema = z.object({
+  type: z.enum(['LEAD_CREATED', 'LEAD_UPDATED', 'LEAD_QUALIFIED', 'MISSION_CREATED', 'MISSION_COMPLETED', 'QUOTE_SENT', 'PAYMENT_RECEIVED']),
+  title: z.string().min(1, 'Titre requis').max(200, 'Titre trop long'),
+  description: z.string().min(1, 'Description requise').max(1000, 'Description trop longue'),
+  metadata: z.any().optional(),
+  userId: z.string().min(1, 'User ID requis'),
+  leadId: z.string().optional()
+});
+
+export const conversationValidationSchema = z.object({
+  missionId: z.string().min(1, 'Mission ID requis'),
+  isActive: z.boolean().default(true)
+});
+
+export const messageValidationSchema = z.object({
+  content: z.string().min(1, 'Contenu requis').max(2000, 'Message trop long'),
+  conversationId: z.string().min(1, 'Conversation ID requis'),
+  senderId: z.string().min(1, 'Sender ID requis'),
+  isRead: z.boolean().default(false),
+  attachments: z.array(z.string().url()).default([])
+});
+
+// =============================================================================
+// QUALITY CHECK SCHEMAS
+// =============================================================================
+
+export const qualityCheckValidationSchema = z.object({
+  missionId: z.string().min(1, 'Mission ID requis'),
+  type: z.enum(['PRE_SERVICE', 'IN_PROGRESS', 'POST_SERVICE', 'CLIENT_FEEDBACK', 'INTERNAL_AUDIT']),
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'PASSED', 'FAILED', 'REQUIRES_REWORK']).default('PENDING'),
+  checkedBy: z.string().optional(),
+  checkedAt: z.date().optional(),
+  notes: z.string().max(1000, 'Notes trop longues').optional().transform(val => val === '' ? null : val),
+  photos: z.array(z.string().url()).default([]),
+  issues: z.any().optional(),
+  validatedAt: z.date().optional(),
+  score: z.number().min(1, 'Score minimum: 1').max(5, 'Score maximum: 5').optional(),
+  recommendations: z.string().max(1000, 'Recommandations trop longues').optional().transform(val => val === '' ? null : val)
+});
+
+// =============================================================================
+// TASK TEMPLATE SCHEMAS
+// =============================================================================
+
+export const taskTemplateValidationSchema = z.object({
+  name: z.string().min(1, 'Nom requis').max(100, 'Nom trop long'),
+  description: z.string().max(500, 'Description trop longue').optional().transform(val => val === '' ? null : val),
+  tasks: z.any(), // JSON field containing task definitions
+  category: z.enum(['GENERAL', 'CLEANING', 'MAINTENANCE', 'INSPECTION', 'SETUP']),
+  isActive: z.boolean().default(true),
+  estimatedDuration: z.number().min(0.1, 'Durée minimale: 0.1 heure').optional(),
+  requiredSpecialties: z.array(z.string()).default([]),
+  difficulty: z.enum(['EASY', 'MEDIUM', 'HARD', 'EXPERT']).default('MEDIUM')
+});
+
+// =============================================================================
+// SYSTEM LOG SCHEMAS
+// =============================================================================
+
+export const systemLogValidationSchema = z.object({
+  type: z.enum(['INFO', 'WARNING', 'ERROR', 'CRITICAL', 'DEBUG']),
+  status: z.enum(['SUCCESS', 'FAILURE', 'PENDING', 'CANCELLED']),
+  message: z.string().min(1, 'Message requis').max(1000, 'Message trop long'),
+  metadata: z.any().optional(),
+  userId: z.string().optional(),
+  ipAddress: z.string().optional(),
+  userAgent: z.string().optional(),
+  endpoint: z.string().optional(),
+  duration: z.number().min(0).optional()
+});
+
+// =============================================================================
+// FIELD REPORT VALIDATION
+// =============================================================================
+
 export const completeFieldReportValidationSchema = z.object({
   missionId: z.string()
     .min(1, 'Mission ID requis'),
@@ -784,13 +798,10 @@ export const completeFieldReportValidationSchema = z.object({
   path: ["beforePhotos"]
 })
 
-export type CompleteFieldReportInput = z.infer<typeof completeFieldReportValidationSchema>
+// =============================================================================
+// SUBSCRIPTION VALIDATION
+// =============================================================================
 
-export function validateCompleteFieldReportInput(data: any) {
-  return completeFieldReportValidationSchema.safeParse(data)
-}
-
-// Subscription Validation
 export const completeSubscriptionValidationSchema = z.object({
   leadId: z.string()
     .min(1, 'Lead ID requis'),
@@ -837,46 +848,57 @@ export const completeSubscriptionValidationSchema = z.object({
   path: ["usedServices"]
 })
 
-export type CompleteSubscriptionInput = z.infer<typeof completeSubscriptionValidationSchema>
+// =============================================================================
+// DATA CLEANING UTILITY FUNCTIONS - FIXED
+// =============================================================================
 
-export function validateCompleteSubscriptionInput(data: any) {
-  return completeSubscriptionValidationSchema.safeParse(data)
-}
-
-// Data cleaning utility functions
 export function cleanLeadData(data: any): any {
   const cleaned = { ...data }
 
-  // Convert empty strings to null for optional fields
-  const optionalFields = [
+  // Handle null values properly - don't transform them to empty strings
+  const nullableFields = [
     'email', 'address', 'gpsLocation', 'company', 'iceNumber',
     'activitySector', 'contactPosition', 'department', 'source',
     'referrerContact', 'budgetRange'
   ]
 
-  optionalFields.forEach(field => {
-    if (cleaned[field] === '') {
+  nullableFields.forEach(field => {
+    if (cleaned[field] === '' || cleaned[field] === undefined) {
       cleaned[field] = null
     }
+    // Keep null values as null - don't convert them
   })
 
-  // Convert string numbers to actual numbers
-  if (cleaned.estimatedSurface) {
+  // Convert string numbers to actual numbers, but handle null properly
+  if (cleaned.estimatedSurface !== null && cleaned.estimatedSurface !== undefined) {
     const surface = parseFloat(cleaned.estimatedSurface);
     cleaned.estimatedSurface = isNaN(surface) ? null : surface;
   }
 
-  if (cleaned.score) {
+  if (cleaned.score !== null && cleaned.score !== undefined) {
     const score = parseInt(cleaned.score, 10);
     cleaned.score = isNaN(score) ? 0 : score;
   }
 
-  // Handle boolean fields
+  // Handle boolean fields properly
   ['needsProducts', 'needsEquipment', 'hasReferrer'].forEach(field => {
-    if (typeof cleaned[field] === 'string') {
-      cleaned[field] = cleaned[field].toLowerCase() === 'true'
+    if (cleaned[field] !== null && cleaned[field] !== undefined) {
+      if (typeof cleaned[field] === 'string') {
+        cleaned[field] = cleaned[field].toLowerCase() === 'true'
+      }
     }
   })
+
+  // Handle assignedToId specifically
+  if (cleaned.assignedToId === '' || cleaned.assignedToId === 'null') {
+    cleaned.assignedToId = null
+  }
+
+  // Remove any system fields that shouldn't be in updates
+  delete cleaned.createdAt;
+  delete cleaned.updatedAt;
+  delete cleaned.activities;
+  delete cleaned.assignedTo;
 
   return cleaned
 }
@@ -921,30 +943,14 @@ export function cleanQuoteData(data: any): any {
   const cleaned = { ...data }
 
   // Convert string numbers to actual numbers
-  if (cleaned.surface) {
-    const surface = parseFloat(cleaned.surface);
-    cleaned.surface = isNaN(surface) ? null : surface;
-  }
-
-  if (cleaned.finalPrice) {
-    const price = parseFloat(cleaned.finalPrice);
-    cleaned.finalPrice = isNaN(price) ? 0 : price;
-  }
-
-  if (cleaned.subTotalHT) {
-    const subtotal = parseFloat(cleaned.subTotalHT);
-    cleaned.subTotalHT = isNaN(subtotal) ? 0 : subtotal;
-  }
-
-  if (cleaned.vatAmount) {
-    const vat = parseFloat(cleaned.vatAmount);
-    cleaned.vatAmount = isNaN(vat) ? 0 : vat;
-  }
-
-  if (cleaned.totalTTC) {
-    const total = parseFloat(cleaned.totalTTC);
-    cleaned.totalTTC = isNaN(total) ? 0 : total;
-  }
+  const numericFields = ['subTotalHT', 'vatAmount', 'totalTTC', 'finalPrice', 'surface']
+  
+  numericFields.forEach(field => {
+    if (cleaned[field]) {
+      const num = parseFloat(cleaned[field])
+      cleaned[field] = isNaN(num) ? 0 : num
+    }
+  })
 
   // Handle lineItems array
   if (cleaned.lineItems && Array.isArray(cleaned.lineItems)) {
@@ -995,13 +1001,96 @@ export function cleanTeamMemberData(data: any): any {
   return cleaned
 }
 
-// Error formatting utility
-export function formatValidationErrors(errors: z.ZodIssue[]): string[] {
-  return errors.map(error => {
-    const path = error.path.join('.')
-    return `${path}: ${error.message}`
-  })
+export function cleanInventoryData(data: any): any {
+  const cleaned = { ...data };
+
+  ['currentStock', 'minimumStock', 'unitPrice'].forEach(field => {
+    if (cleaned[field]) {
+      const num = parseFloat(cleaned[field]);
+      cleaned[field] = isNaN(num) ? 0 : num;
+    }
+  });
+
+  if (cleaned.expiryDate && typeof cleaned.expiryDate === 'string') {
+    cleaned.expiryDate = new Date(cleaned.expiryDate);
+  }
+
+  if (typeof cleaned.isActive === 'string') {
+    cleaned.isActive = cleaned.isActive.toLowerCase() === 'true';
+  }
+
+  return cleaned;
 }
+
+export function cleanExpenseData(data: any): any {
+  const cleaned = { ...data };
+
+  if (cleaned.amount) {
+    const amount = parseFloat(cleaned.amount);
+    cleaned.amount = isNaN(amount) ? 0 : amount;
+  }
+
+  ['date', 'rentalStartDate', 'rentalEndDate'].forEach(field => {
+    if (cleaned[field] && typeof cleaned[field] === 'string') {
+      cleaned[field] = new Date(cleaned[field]);
+    }
+  });
+
+  const optionalFields = ['vendor', 'description', 'proofUrl', 'missionId', 'leadId'];
+  optionalFields.forEach(field => {
+    if (cleaned[field] === '') {
+      cleaned[field] = null;
+    }
+  });
+
+  return cleaned;
+}
+
+export function cleanInvoiceData(data: any): any {
+  const cleaned = { ...data };
+
+  ['amount', 'subTotal', 'taxAmount', 'totalAmount'].forEach(field => {
+    if (cleaned[field]) {
+      const num = parseFloat(cleaned[field]);
+      cleaned[field] = isNaN(num) ? 0 : num;
+    }
+  });
+
+  ['issueDate', 'dueDate'].forEach(field => {
+    if (cleaned[field] && typeof cleaned[field] === 'string') {
+      cleaned[field] = new Date(cleaned[field]);
+    }
+  });
+
+  return cleaned;
+}
+
+export function cleanTaskData(data: any): any {
+  const cleaned = { ...data };
+
+  ['estimatedDuration', 'actualDuration'].forEach(field => {
+    if (cleaned[field]) {
+      const num = parseFloat(cleaned[field]);
+      cleaned[field] = isNaN(num) ? null : num;
+    }
+  });
+
+  ['dueDate', 'completedAt', 'validatedAt'].forEach(field => {
+    if (cleaned[field] && typeof cleaned[field] === 'string') {
+      cleaned[field] = new Date(cleaned[field]);
+    }
+  });
+
+  if (cleaned.attachments && !Array.isArray(cleaned.attachments)) {
+    cleaned.attachments = [];
+  }
+
+  return cleaned;
+}
+
+// =============================================================================
+// VALIDATION HELPER FUNCTIONS
+// =============================================================================
 
 // Additional validation helpers
 export function validateEmail(email: string): boolean {
@@ -1010,6 +1099,8 @@ export function validateEmail(email: string): boolean {
 }
 
 export function validatePhoneNumber(phone: string): boolean {
+  // More flexible phone validation for existing data
+  if (phone === 'À renseigner' || phone === 'Non renseigné') return true;
   const phoneRegex = /^[+]?[\d\s\-().]+$/;
   return phoneRegex.test(phone) && phone.length >= 10;
 }
@@ -1025,8 +1116,16 @@ export function validateDateNotInPast(date: string | Date): boolean {
   }
 }
 
+// Error formatting utility
+export function formatValidationErrors(errors: z.ZodIssue[]): string[] {
+  return errors.map(error => {
+    const path = error.path.join('.')
+    return `${path}: ${error.message}`
+  })
+}
+
 // =============================================================================
-// ADDITIONAL VALIDATION FUNCTIONS - ADD THESE
+// VALIDATION FUNCTIONS FOR ALL SCHEMAS
 // =============================================================================
 
 export function validateCompleteUserInput(data: any, isCreation = true) {
@@ -1121,106 +1220,28 @@ export function validateCompleteSessionInput(data: any) {
   return sessionValidationSchema.safeParse(data);
 }
 
+export function validateCompleteMissionInput(data: any) {
+  return completeMissionValidationSchema.safeParse(data)
+}
+
+export function validateCompleteQuoteInput(data: any) {
+  return completeQuoteValidationSchema.safeParse(data)
+}
+
+export function validateCompleteTeamMemberInput(data: any) {
+  return completeTeamMemberValidationSchema.safeParse(data)
+}
+
+export function validateCompleteFieldReportInput(data: any) {
+  return completeFieldReportValidationSchema.safeParse(data)
+}
+
+export function validateCompleteSubscriptionInput(data: any) {
+  return completeSubscriptionValidationSchema.safeParse(data)
+}
+
 // =============================================================================
-// ADDITIONAL CLEANING FUNCTIONS - ADD THESE
-// =============================================================================
-
-export function cleanInventoryData(data: any): any {
-  const cleaned = { ...data };
-
-  ['currentStock', 'minimumStock', 'unitPrice'].forEach(field => {
-    if (cleaned[field]) {
-      const num = parseFloat(cleaned[field]);
-      cleaned[field] = isNaN(num) ? 0 : num;
-    }
-  });
-
-  if (cleaned.expiryDate && typeof cleaned.expiryDate === 'string') {
-    cleaned.expiryDate = new Date(cleaned.expiryDate);
-  }
-
-  if (typeof cleaned.isActive === 'string') {
-    cleaned.isActive = cleaned.isActive.toLowerCase() === 'true';
-  }
-
-  return cleaned;
-}
-
-export function cleanExpenseData(data: any): any {
-  const cleaned = { ...data };
-
-  if (cleaned.amount) {
-    const amount = parseFloat(cleaned.amount);
-    cleaned.amount = isNaN(amount) ? 0 : amount;
-  }
-
-  ['date', 'rentalStartDate', 'rentalEndDate'].forEach(field => {
-    if (cleaned[field] && typeof cleaned[field] === 'string') {
-      cleaned[field] = new Date(cleaned[field]);
-    }
-  });
-
-  const optionalFields = ['vendor', 'description', 'proofUrl', 'missionId', 'leadId'];
-  optionalFields.forEach(field => {
-    if (cleaned[field] === '') {
-      cleaned[field] = null;
-    }
-  });
-
-  return cleaned;
-}
-
-export function cleanInvoiceData(data: any): any {
-  const cleaned = { ...data };
-
-  ['amount', 'subTotal', 'taxAmount', 'totalAmount'].forEach(field => {
-    if (cleaned[field]) {
-      const num = parseFloat(cleaned[field]);
-      cleaned[field] = isNaN(num) ? 0 : num;
-    }
-  });
-
-  ['issueDate', 'dueDate'].forEach(field => {
-    if (cleaned[field] && typeof cleaned[field] === 'string') {
-      cleaned[field] = new Date(cleaned[field]);
-    }
-  });
-
-  return cleaned;
-}
-
-export function cleanTaskData(data: any): any {
-  const cleaned = { ...data };
-
-  ['estimatedDuration', 'actualDuration'].forEach(field => {
-    if (cleaned[field]) {
-      const num = parseFloat(cleaned[field]);
-      cleaned[field] = isNaN(num) ? null : num;
-    }
-  });
-
-  ['dueDate', 'completedAt', 'validatedAt'].forEach(field => {
-    if (cleaned[field] && typeof cleaned[field] === 'string') {
-      cleaned[field] = new Date(cleaned[field]);
-    }
-  });
-
-  if (cleaned.attachments && !Array.isArray(cleaned.attachments)) {
-    cleaned.attachments = [];
-  }
-
-  return cleaned;
-}
-
-// Type exports for convenience
-export type CreateMissionInput = CompleteMissionInput;
-export type CreateQuoteInput = CompleteQuoteInput;
-export type CreateLeadInput = CompleteLeadInput;
-export type CreateTeamMemberInput = CompleteTeamMemberInput;
-export type CreateFieldReportInput = CompleteFieldReportInput;
-export type CreateSubscriptionInput = CompleteSubscriptionInput;
-// =============================================================================
-// ADDITIONAL TYPE EXPORTS - ADD THESE
+// TYPE EXPORTS
 // =============================================================================
 
 export type CompleteUserInput = z.infer<typeof userValidationSchema>;
@@ -1238,8 +1259,19 @@ export type CompleteTaskTemplateInput = z.infer<typeof taskTemplateValidationSch
 export type CompleteSystemLogInput = z.infer<typeof systemLogValidationSchema>;
 export type CompleteAccountInput = z.infer<typeof accountValidationSchema>;
 export type CompleteSessionInput = z.infer<typeof sessionValidationSchema>;
+export type CompleteMissionInput = z.infer<typeof completeMissionValidationSchema>;
+export type CompleteQuoteInput = z.infer<typeof completeQuoteValidationSchema>;
+export type CompleteTeamMemberInput = z.infer<typeof completeTeamMemberValidationSchema>;
+export type CompleteFieldReportInput = z.infer<typeof completeFieldReportValidationSchema>;
+export type CompleteSubscriptionInput = z.infer<typeof completeSubscriptionValidationSchema>;
 
-// Convenience exports
+// Convenience exports for backwards compatibility
+export type CreateMissionInput = CompleteMissionInput;
+export type CreateQuoteInput = CompleteQuoteInput;
+export type CreateLeadInput = CompleteLeadInput;
+export type CreateTeamMemberInput = CompleteTeamMemberInput;
+export type CreateFieldReportInput = CompleteFieldReportInput;
+export type CreateSubscriptionInput = CompleteSubscriptionInput;
 export type CreateUserInput = CompleteUserInput;
 export type CreateTeamInput = CompleteTeamInput;
 export type CreateTaskInput = CompleteTaskInput;
