@@ -1,9 +1,9 @@
-// app/api/leads/[id]/route.ts - COMPLETE CORRECTED VERSION WITH calculateLeadScore
+// app/api/leads/[id]/route.ts - UPDATED WITH ENHANCED VALIDATION AND FIXES
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { leadService } from '@/services/lead.service';
-import { validateCompleteLeadInput } from '@/lib/validation';
+import { validateCompleteLeadInput, cleanLeadData } from '@/lib/validation';
 import { errorHandler } from '@/lib/error-handler';
 import { LeadStatus } from '@prisma/client';
 import { ExtendedUser } from '@/types/next-auth';
@@ -116,7 +116,10 @@ export async function PATCH(
 
     // Only validate for full updates, not partial ones
     if (!isPartialUpdate) {
-      const validation = validateCompleteLeadInput(cleanedData, false);
+      // For updates, we need to merge with existing data to validate properly
+      const mergedDataForValidation = { ...existingLead, ...cleanedData };
+      
+      const validation = validateCompleteLeadInput(mergedDataForValidation, false);
       if (!validation.success) {
         console.error('Validation errors:', validation.error.errors);
         return NextResponse.json(
@@ -127,11 +130,12 @@ export async function PATCH(
           { status: 400 }
         );
       }
-      updateData = validation.data;
+      // Keep only the fields being updated, not the merged data
+      updateData = cleanedData;
     }
 
     // Calculate score for full updates or when score-affecting fields change
-    if (!isPartialUpdate || body.budgetRange || body.urgencyLevel || body.estimatedSurface) {
+    if (!isPartialUpdate || body.budgetRange || body.urgencyLevel || body.estimatedSurface || body.leadType) {
       const mergedData = { ...existingLead, ...updateData };
       updateData.score = calculateLeadScore(mergedData);
     }
@@ -248,151 +252,155 @@ export async function DELETE(
 }
 
 /**
- * Clean and transform lead data from the request body
- * @param data Raw data from request body
- * @returns Cleaned and transformed data
- */
-function cleanLeadData(data: any) {
-  const cleaned: any = {};
-  
-  for (const [key, value] of Object.entries(data)) {
-    // Skip empty strings and convert them to undefined
-    if (value === '' || value === null) {
-      // For specific fields that should be null when empty
-      if (['urgencyLevel', 'propertyType', 'assignedToId'].includes(key)) {
-        if (value === null || value === '') {
-          cleaned[key] = null;
-        }
-      }
-      continue;
-    }
-    
-    // Convert string numbers to actual numbers
-    if (key === 'estimatedSurface' && typeof value === 'string' && value !== '') {
-      const num = parseInt(value, 10);
-      if (!isNaN(num) && num > 0) {
-        cleaned[key] = num;
-      }
-      continue;
-    }
-    
-    // Convert string numbers to actual numbers for score
-    if (key === 'score' && typeof value === 'string' && value !== '') {
-      const num = parseInt(value, 10);
-      if (!isNaN(num)) {
-        cleaned[key] = num;
-      }
-      continue;
-    }
-    
-    // Handle boolean fields
-    if (typeof value === 'boolean') {
-      cleaned[key] = value;
-      continue;
-    }
-    
-    // Handle string fields - trim whitespace
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (trimmed !== '') {
-        cleaned[key] = trimmed;
-      }
-      continue;
-    }
-    
-    // Keep other types as-is
-    cleaned[key] = value;
-  }
-  
-  return cleaned;
-}
-
-/**
- * Calculate lead score based on various factors
+ * Enhanced lead score calculation supporting ALL lead types
  * @param leadData The lead data to calculate score for
  * @returns Score from 0-100
  */
 function calculateLeadScore(leadData: any): number {
   let score = 0;
-  
-  // Base score for having a lead
-  score += 10;
-  
-  // Budget range scoring (40 points max)
+
+  // 1. BASE INFORMATION SCORE (20 points max)
+  if (leadData.firstName && leadData.lastName && leadData.phone) {
+    score += 15; // Basic contact info
+  }
+  if (leadData.email) {
+    score += 5; // Email bonus
+  }
+
+  // 2. LEAD TYPE SPECIFIC SCORING (25 points max)
+  if (leadData.leadType) {
+    const leadTypeScores: Record<string, number> = {
+      'PROFESSIONNEL': 25,    // Highest value - recurring business potential
+      'PUBLIC': 22,           // High value - large contracts, stable
+      'SYNDIC': 20,          // Good value - property management, recurring
+      'NGO': 15,             // Medium value - project-based
+      'PARTICULIER': 10,     // Lower value but still important
+      'OTHER': 8             // Lowest priority
+    };
+    score += leadTypeScores[leadData.leadType] || 0;
+
+    // Additional scoring for professional types with complete info
+    if (['PROFESSIONNEL', 'PUBLIC', 'NGO', 'SYNDIC'].includes(leadData.leadType)) {
+      if (leadData.company) score += 5; // Company name provided
+      if (leadData.iceNumber) score += 3; // ICE number (legal compliance)
+      if (leadData.activitySector) score += 2; // Sector information
+      
+      // Extra bonus for PUBLIC type with complete info
+      if (leadData.leadType === 'PUBLIC' && leadData.activitySector && leadData.company) {
+        score += 5; // Public sector bonus
+      }
+    }
+  }
+
+  // 3. BUDGET RANGE SCORING (20 points max)
   if (leadData.budgetRange) {
     const budgetScores: Record<string, number> = {
       'MOINS_1000': 5,
-      'ENTRE_1000_5000': 15,
-      'ENTRE_5000_15000': 25,
-      'ENTRE_15000_30000': 35,
-      'ENTRE_30000_50000': 40,
-      'PLUS_50000': 40
+      'ENTRE_1000_5000': 8,
+      'ENTRE_5000_15000': 12,
+      'ENTRE_15000_30000': 16,
+      'ENTRE_30000_50000': 18,
+      'PLUS_50000': 20
     };
     score += budgetScores[leadData.budgetRange] || 0;
   }
   
-  // Urgency level scoring (25 points max)
+  // 4. URGENCY LEVEL SCORING (15 points max)
   if (leadData.urgencyLevel) {
     const urgencyScores: Record<string, number> = {
-      'IMMEDIATE': 25,
-      'HIGH_URGENT': 20,
-      'URGENT': 15,
-      'NORMAL': 10,
+      'IMMEDIATE': 15,
+      'HIGH_URGENT': 12,
+      'URGENT': 10,
+      'NORMAL': 8,
       'LOW': 5
     };
     score += urgencyScores[leadData.urgencyLevel] || 0;
   }
   
-  // Surface area scoring (20 points max)
-  if (leadData.estimatedSurface) {
+  // 5. SURFACE AREA SCORING (10 points max)
+  if (leadData.estimatedSurface && leadData.estimatedSurface > 0) {
     const surface = parseInt(leadData.estimatedSurface);
-    if (surface >= 500) score += 20;
-    else if (surface >= 200) score += 15;
-    else if (surface >= 100) score += 10;
-    else score += 5;
+    if (surface >= 1000) score += 10;
+    else if (surface >= 500) score += 8;
+    else if (surface >= 200) score += 6;
+    else if (surface >= 100) score += 4;
+    else score += 2;
   }
-  
-  // Lead type scoring (10 points max)
-  if (leadData.leadType) {
-    const typeScores: Record<string, number> = {
-      'PROFESSIONNEL': 10,
-      'PUBLIC': 8,
-      'SYNDIC': 7,
-      'PARTICULIER': 5,
-      'NGO': 3,
-      'OTHER': 2
-    };
-    score += typeScores[leadData.leadType] || 0;
-  }
-  
-  // Contact completeness bonus (5 points max)
-  if (leadData.email) score += 2;
-  if (leadData.address) score += 2;
-  if (leadData.company && leadData.leadType === 'PROFESSIONNEL') score += 1;
-  
-  // Frequency bonus (for recurring business potential)
+
+  // 6. FREQUENCY/RECURRING BUSINESS BONUS (10 points max)
   if (leadData.frequency && leadData.frequency !== 'PONCTUEL') {
-    score += 5;
+    const frequencyScores: Record<string, number> = {
+      'HEBDOMADAIRE': 10,
+      'MENSUEL': 9,
+      'BIMENSUEL': 8,
+      'TRIMESTRIEL': 6,
+      'SEMESTRIEL': 5,
+      'ANNUEL': 4,
+      'CONTRAT_CADRE': 8,
+      'RECURRING': 9
+    };
+    score += frequencyScores[leadData.frequency] || 0;
   }
-  
-  // Property type bonus (certain types are more valuable)
+
+  // 7. PROPERTY TYPE SCORING (5 points max)
   if (leadData.propertyType) {
     const propertyScores: Record<string, number> = {
       'HOTEL_LUXURY': 5,
       'COMMERCIAL': 4,
       'OFFICE': 4,
-      'HOTEL_STANDARD': 3,
+      'HOTEL_STANDARD': 4,
       'RESIDENCE_B2B': 3,
       'BUILDING': 3,
-      'RESTAURANT': 2,
-      'WAREHOUSE': 2,
+      'RESTAURANT': 3,
+      'WAREHOUSE': 3,
       'VILLA_LARGE': 2,
-      'APARTMENT_LARGE': 1,
-      'APARTMENT_MULTI': 1
+      'APARTMENT_LARGE': 2,
+      'STORE': 2,
+      'VILLA_MEDIUM': 1,
+      'APARTMENT_MEDIUM': 1,
+      'OTHER': 1
     };
     score += propertyScores[leadData.propertyType] || 0;
   }
-  
-  // Ensure score doesn't exceed 100
-  return Math.min(score, 100);
+
+  // 8. COMPLETENESS BONUS (5 points max)
+  let completenessBonus = 0;
+  if (leadData.address) completenessBonus += 1;
+  if (leadData.gpsLocation) completenessBonus += 1;
+  if (leadData.originalMessage && leadData.originalMessage.length > 50) completenessBonus += 2;
+  if (leadData.materials && Object.keys(leadData.materials).some(key => leadData.materials[key])) completenessBonus += 1;
+  score += completenessBonus;
+
+  // 9. ACCESSIBILITY ADJUSTMENT (-2 to +2)
+  if (leadData.accessibility) {
+    const accessibilityAdjustments: Record<string, number> = {
+      'EASY': 2,
+      'MEDIUM': 0,
+      'MODERATE': -1,
+      'DIFFICULT': -1,
+      'VERY_DIFFICULT': -2
+    };
+    score += accessibilityAdjustments[leadData.accessibility] || 0;
+  }
+
+  // 10. CHANNEL QUALITY SCORING (3 points max)
+  if (leadData.channel) {
+    const channelScores: Record<string, number> = {
+      'RECOMMANDATION_CLIENT': 3,
+      'PARTENARIAT': 3,
+      'APPORTEUR_AFFAIRES': 2,
+      'SITE_WEB': 2,
+      'FORMULAIRE_SITE': 2,
+      'LINKEDIN': 2,
+      'GOOGLE_SEARCH': 1,
+      'GOOGLE_MAPS': 1,
+      'WHATSAPP': 1,
+      'EMAIL': 1
+      // Other channels get 0 bonus
+    };
+    score += channelScores[leadData.channel] || 0;
+  }
+
+  // Ensure score doesn't exceed 100 or go below 0
+  return Math.max(0, Math.min(score, 100));
 }
