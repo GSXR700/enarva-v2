@@ -171,6 +171,210 @@ const completeLeadObjectSchema = z.object({
     .nullable()
     .transform(val => val === '' ? null : val)
 });
+// =============================================================================
+// MISSING SCHEMAS - ADD THESE TO YOUR EXISTING FILE
+// =============================================================================
+
+// User & Authentication Schemas
+export const userValidationSchema = z.object({
+  name: z.string().min(1, 'Nom requis').max(100, 'Nom trop long').optional(),
+  email: z.string().email('Format email invalide').max(100, 'Email trop long'),
+  hashedPassword: z.string().min(8, 'Mot de passe minimum 8 caractères').optional(),
+  role: z.enum(['ADMIN', 'MANAGER', 'AGENT', 'TEAM_LEADER', 'TECHNICIAN']).default('TECHNICIAN'),
+  onlineStatus: z.string().default('OFFLINE'),
+  lastSeen: z.date().optional(),
+  pushSubscription: z.any().optional()
+});
+
+export const accountValidationSchema = z.object({
+  userId: z.string().min(1, 'User ID requis'),
+  type: z.string().min(1, 'Type requis'),
+  provider: z.string().min(1, 'Provider requis'),
+  providerAccountId: z.string().min(1, 'Provider Account ID requis'),
+  refresh_token: z.string().optional(),
+  access_token: z.string().optional(),
+  expires_at: z.number().optional(),
+  token_type: z.string().optional(),
+  scope: z.string().optional(),
+  id_token: z.string().optional(),
+  session_state: z.string().optional()
+});
+
+export const sessionValidationSchema = z.object({
+  sessionToken: z.string().min(1, 'Session token requis'),
+  userId: z.string().min(1, 'User ID requis'),
+  expires: z.date()
+});
+
+// Team Schemas
+export const teamValidationSchema = z.object({
+  name: z.string().min(2, 'Nom d\'équipe minimum 2 caractères').max(100, 'Nom d\'équipe trop long'),
+  description: z.string().max(500, 'Description trop longue').optional().transform(val => val === '' ? null : val)
+});
+
+export const teamMemberValidationSchema = z.object({
+  userId: z.string().min(1, 'User ID requis'),
+  teamId: z.string().min(1, 'Team ID requis'),
+  specialties: z.array(z.enum([
+    'GENERAL_CLEANING', 'WINDOW_SPECIALIST', 'FLOOR_SPECIALIST',
+    'LUXURY_SURFACES', 'EQUIPMENT_HANDLING', 'TEAM_MANAGEMENT',
+    'QUALITY_CONTROL', 'DETAIL_FINISHING'
+  ])).default([]),
+  experience: z.enum(['JUNIOR', 'INTERMEDIATE', 'SENIOR', 'EXPERT']).default('JUNIOR'),
+  availability: z.enum(['AVAILABLE', 'BUSY', 'OFF_DUTY', 'VACATION']).default('AVAILABLE'),
+  hourlyRate: z.number().min(0, 'Taux horaire doit être positif').max(1000, 'Taux horaire trop élevé').optional(),
+  isActive: z.boolean().default(true),
+  joinedAt: z.date().default(() => new Date())
+});
+
+// Task Schemas
+export const taskValidationSchema = z.object({
+  title: z.string().min(1, 'Titre requis').max(200, 'Titre trop long'),
+  description: z.string().max(1000, 'Description trop longue').optional().transform(val => val === '' ? null : val),
+  category: z.enum(['GENERAL', 'CLEANING', 'MAINTENANCE', 'INSPECTION', 'SETUP']),
+  type: z.enum(['EXECUTION', 'QUALITY_CHECK', 'DOCUMENTATION', 'CLIENT_INTERACTION']),
+  status: z.enum(['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'VALIDATED', 'REJECTED']).default('ASSIGNED'),
+  priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).default('NORMAL'),
+  estimatedDuration: z.number().min(0.1, 'Durée minimale: 0.1 heure').max(24, 'Durée maximale: 24 heures'),
+  actualDuration: z.number().min(0).optional(),
+  assignedToId: z.string().optional(),
+  dueDate: z.date().optional(),
+  completedAt: z.date().optional(),
+  validatedAt: z.date().optional(),
+  notes: z.string().max(1000, 'Notes trop longues').optional().transform(val => val === '' ? null : val),
+  attachments: z.array(z.string().url()).default([]),
+  missionId: z.string().min(1, 'Mission ID requis')
+});
+
+// Inventory Schemas
+export const inventoryValidationSchema = z.object({
+  name: z.string().min(1, 'Nom requis').max(100, 'Nom trop long'),
+  category: z.enum(['CLEANING_PRODUCTS', 'EQUIPMENT', 'CONSUMABLES', 'PROTECTIVE_GEAR', 'TOOLS', 'SPARE_PARTS']),
+  unit: z.string().min(1, 'Unité requise').max(20, 'Unité trop longue'),
+  currentStock: z.number().min(0, 'Stock actuel doit être positif'),
+  minimumStock: z.number().min(0, 'Stock minimum doit être positif'),
+  unitPrice: z.number().min(0, 'Prix unitaire doit être positif'),
+  supplier: z.string().min(1, 'Fournisseur requis').max(100, 'Fournisseur trop long'),
+  description: z.string().max(500, 'Description trop longue').optional().transform(val => val === '' ? null : val),
+  sku: z.string().max(50, 'SKU trop long').optional().transform(val => val === '' ? null : val),
+  barcode: z.string().max(50, 'Code-barres trop long').optional().transform(val => val === '' ? null : val),
+  expiryDate: z.date().optional(),
+  location: z.string().max(100, 'Emplacement trop long').optional().transform(val => val === '' ? null : val),
+  isActive: z.boolean().default(true)
+});
+
+export const inventoryUsageValidationSchema = z.object({
+  quantity: z.number().min(0.01, 'Quantité minimale: 0.01'),
+  notes: z.string().max(500, 'Notes trop longues').optional().transform(val => val === '' ? null : val),
+  inventoryId: z.string().min(1, 'Inventory ID requis'),
+  missionId: z.string().min(1, 'Mission ID requis'),
+  usedAt: z.date().default(() => new Date())
+});
+
+// Expense Schemas
+export const expenseValidationSchema = z.object({
+  date: z.date(),
+  amount: z.number().min(0.01, 'Montant minimum: 0.01'),
+  category: z.enum([
+    'OPERATIONS', 'REVENTE_NEGOCE', 'RESSOURCES_HUMAINES', 'ADMINISTRATIF_FINANCIER',
+    'MARKETING_COMMERCIAL', 'LOGISTIQUE_MOBILITE', 'INFRASTRUCTURES_LOCAUX',
+    'LOCATIONS', 'EXCEPTIONNELLES_DIVERSES'
+  ]),
+  subCategory: z.string().min(1, 'Sous-catégorie requise').max(100, 'Sous-catégorie trop longue'),
+  paymentMethod: z.enum(['CASH', 'VIREMENT', 'CARTE', 'CHEQUE', 'MOBILE', 'AUTRE']),
+  vendor: z.string().max(100, 'Fournisseur trop long').optional().transform(val => val === '' ? null : val),
+  description: z.string().max(500, 'Description trop longue').optional().transform(val => val === '' ? null : val),
+  proofUrl: z.string().url('URL de justificatif invalide').optional(),
+  rentalStartDate: z.date().optional(),
+  rentalEndDate: z.date().optional(),
+  missionId: z.string().optional(),
+  leadId: z.string().optional(),
+  userId: z.string().min(1, 'User ID requis')
+});
+
+// Invoice Schemas
+export const invoiceValidationSchema = z.object({
+  invoiceNumber: z.string().min(1, 'Numéro de facture requis').max(50, 'Numéro de facture trop long'),
+  amount: z.number().min(0.01, 'Montant minimum: 0.01'),
+  status: z.enum(['DRAFT', 'SENT', 'PAID', 'OVERDUE', 'CANCELLED']).default('DRAFT'),
+  issueDate: z.date().default(() => new Date()),
+  dueDate: z.date(),
+  missionId: z.string().min(1, 'Mission ID requis'),
+  leadId: z.string().min(1, 'Lead ID requis'),
+  description: z.string().max(1000, 'Description trop longue').optional().transform(val => val === '' ? null : val),
+  lineItems: z.array(z.object({
+    description: z.string().min(1, 'Description requise'),
+    quantity: z.number().min(0.1, 'Quantité minimale: 0.1'),
+    unitPrice: z.number().min(0, 'Prix unitaire doit être positif'),
+    totalPrice: z.number().min(0, 'Prix total doit être positif')
+  })).optional(),
+  subTotal: z.number().min(0, 'Sous-total doit être positif').optional(),
+  taxAmount: z.number().min(0, 'Montant de taxe doit être positif').optional(),
+  totalAmount: z.number().min(0, 'Montant total doit être positif').optional()
+});
+
+// Activity & Communication Schemas
+export const activityValidationSchema = z.object({
+  type: z.enum(['LEAD_CREATED', 'LEAD_UPDATED', 'LEAD_QUALIFIED', 'MISSION_CREATED', 'MISSION_COMPLETED', 'QUOTE_SENT', 'PAYMENT_RECEIVED']),
+  title: z.string().min(1, 'Titre requis').max(200, 'Titre trop long'),
+  description: z.string().min(1, 'Description requise').max(1000, 'Description trop longue'),
+  metadata: z.any().optional(),
+  userId: z.string().min(1, 'User ID requis'),
+  leadId: z.string().optional()
+});
+
+export const conversationValidationSchema = z.object({
+  missionId: z.string().min(1, 'Mission ID requis'),
+  isActive: z.boolean().default(true)
+});
+
+export const messageValidationSchema = z.object({
+  content: z.string().min(1, 'Contenu requis').max(2000, 'Message trop long'),
+  conversationId: z.string().min(1, 'Conversation ID requis'),
+  senderId: z.string().min(1, 'Sender ID requis'),
+  isRead: z.boolean().default(false),
+  attachments: z.array(z.string().url()).default([])
+});
+
+// Quality Check Schemas
+export const qualityCheckValidationSchema = z.object({
+  missionId: z.string().min(1, 'Mission ID requis'),
+  type: z.enum(['PRE_SERVICE', 'IN_PROGRESS', 'POST_SERVICE', 'CLIENT_FEEDBACK', 'INTERNAL_AUDIT']),
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'PASSED', 'FAILED', 'REQUIRES_REWORK']).default('PENDING'),
+  checkedBy: z.string().optional(),
+  checkedAt: z.date().optional(),
+  notes: z.string().max(1000, 'Notes trop longues').optional().transform(val => val === '' ? null : val),
+  photos: z.array(z.string().url()).default([]),
+  issues: z.any().optional(),
+  validatedAt: z.date().optional(),
+  score: z.number().min(1, 'Score minimum: 1').max(5, 'Score maximum: 5').optional(),
+  recommendations: z.string().max(1000, 'Recommandations trop longues').optional().transform(val => val === '' ? null : val)
+});
+
+// Task Template Schemas
+export const taskTemplateValidationSchema = z.object({
+  name: z.string().min(1, 'Nom requis').max(100, 'Nom trop long'),
+  description: z.string().max(500, 'Description trop longue').optional().transform(val => val === '' ? null : val),
+  tasks: z.any(), // JSON field containing task definitions
+  category: z.enum(['GENERAL', 'CLEANING', 'MAINTENANCE', 'INSPECTION', 'SETUP']),
+  isActive: z.boolean().default(true),
+  estimatedDuration: z.number().min(0.1, 'Durée minimale: 0.1 heure').optional(),
+  requiredSpecialties: z.array(z.string()).default([]),
+  difficulty: z.enum(['EASY', 'MEDIUM', 'HARD', 'EXPERT']).default('MEDIUM')
+});
+
+// System Log Schemas
+export const systemLogValidationSchema = z.object({
+  type: z.enum(['INFO', 'WARNING', 'ERROR', 'CRITICAL', 'DEBUG']),
+  status: z.enum(['SUCCESS', 'FAILURE', 'PENDING', 'CANCELLED']),
+  message: z.string().min(1, 'Message requis').max(1000, 'Message trop long'),
+  metadata: z.any().optional(),
+  userId: z.string().optional(),
+  ipAddress: z.string().optional(),
+  userAgent: z.string().optional(),
+  endpoint: z.string().optional(),
+  duration: z.number().min(0).optional()
+});
 
 // Now, apply refinements to the base schema for complete validation.
 export const completeLeadValidationSchema = completeLeadObjectSchema.refine((data) => {
@@ -821,6 +1025,193 @@ export function validateDateNotInPast(date: string | Date): boolean {
   }
 }
 
+// =============================================================================
+// ADDITIONAL VALIDATION FUNCTIONS - ADD THESE
+// =============================================================================
+
+export function validateCompleteUserInput(data: any, isCreation = true) {
+  if (isCreation) {
+    return userValidationSchema.safeParse(data);
+  } else {
+    return userValidationSchema.partial().safeParse(data);
+  }
+}
+
+export function validateCompleteTeamInput(data: any, isCreation = true) {
+  if (isCreation) {
+    return teamValidationSchema.safeParse(data);
+  } else {
+    return teamValidationSchema.partial().safeParse(data);
+  }
+}
+
+export function validateCompleteTaskInput(data: any, isCreation = true) {
+  if (isCreation) {
+    return taskValidationSchema.safeParse(data);
+  } else {
+    return taskValidationSchema.partial().safeParse(data);
+  }
+}
+
+export function validateCompleteInventoryInput(data: any, isCreation = true) {
+  if (isCreation) {
+    return inventoryValidationSchema.safeParse(data);
+  } else {
+    return inventoryValidationSchema.partial().safeParse(data);
+  }
+}
+
+export function validateCompleteExpenseInput(data: any, isCreation = true) {
+  if (isCreation) {
+    return expenseValidationSchema.safeParse(data);
+  } else {
+    return expenseValidationSchema.partial().safeParse(data);
+  }
+}
+
+export function validateCompleteInvoiceInput(data: any, isCreation = true) {
+  if (isCreation) {
+    return invoiceValidationSchema.safeParse(data);
+  } else {
+    return invoiceValidationSchema.partial().safeParse(data);
+  }
+}
+
+export function validateCompleteActivityInput(data: any) {
+  return activityValidationSchema.safeParse(data);
+}
+
+export function validateCompleteQualityCheckInput(data: any, isCreation = true) {
+  if (isCreation) {
+    return qualityCheckValidationSchema.safeParse(data);
+  } else {
+    return qualityCheckValidationSchema.partial().safeParse(data);
+  }
+}
+
+export function validateCompleteTaskTemplateInput(data: any, isCreation = true) {
+  if (isCreation) {
+    return taskTemplateValidationSchema.safeParse(data);
+  } else {
+    return taskTemplateValidationSchema.partial().safeParse(data);
+  }
+}
+
+export function validateCompleteSystemLogInput(data: any) {
+  return systemLogValidationSchema.safeParse(data);
+}
+
+export function validateCompleteConversationInput(data: any) {
+  return conversationValidationSchema.safeParse(data);
+}
+
+export function validateCompleteMessageInput(data: any) {
+  return messageValidationSchema.safeParse(data);
+}
+
+export function validateCompleteInventoryUsageInput(data: any) {
+  return inventoryUsageValidationSchema.safeParse(data);
+}
+
+export function validateCompleteAccountInput(data: any) {
+  return accountValidationSchema.safeParse(data);
+}
+
+export function validateCompleteSessionInput(data: any) {
+  return sessionValidationSchema.safeParse(data);
+}
+
+// =============================================================================
+// ADDITIONAL CLEANING FUNCTIONS - ADD THESE
+// =============================================================================
+
+export function cleanInventoryData(data: any): any {
+  const cleaned = { ...data };
+
+  ['currentStock', 'minimumStock', 'unitPrice'].forEach(field => {
+    if (cleaned[field]) {
+      const num = parseFloat(cleaned[field]);
+      cleaned[field] = isNaN(num) ? 0 : num;
+    }
+  });
+
+  if (cleaned.expiryDate && typeof cleaned.expiryDate === 'string') {
+    cleaned.expiryDate = new Date(cleaned.expiryDate);
+  }
+
+  if (typeof cleaned.isActive === 'string') {
+    cleaned.isActive = cleaned.isActive.toLowerCase() === 'true';
+  }
+
+  return cleaned;
+}
+
+export function cleanExpenseData(data: any): any {
+  const cleaned = { ...data };
+
+  if (cleaned.amount) {
+    const amount = parseFloat(cleaned.amount);
+    cleaned.amount = isNaN(amount) ? 0 : amount;
+  }
+
+  ['date', 'rentalStartDate', 'rentalEndDate'].forEach(field => {
+    if (cleaned[field] && typeof cleaned[field] === 'string') {
+      cleaned[field] = new Date(cleaned[field]);
+    }
+  });
+
+  const optionalFields = ['vendor', 'description', 'proofUrl', 'missionId', 'leadId'];
+  optionalFields.forEach(field => {
+    if (cleaned[field] === '') {
+      cleaned[field] = null;
+    }
+  });
+
+  return cleaned;
+}
+
+export function cleanInvoiceData(data: any): any {
+  const cleaned = { ...data };
+
+  ['amount', 'subTotal', 'taxAmount', 'totalAmount'].forEach(field => {
+    if (cleaned[field]) {
+      const num = parseFloat(cleaned[field]);
+      cleaned[field] = isNaN(num) ? 0 : num;
+    }
+  });
+
+  ['issueDate', 'dueDate'].forEach(field => {
+    if (cleaned[field] && typeof cleaned[field] === 'string') {
+      cleaned[field] = new Date(cleaned[field]);
+    }
+  });
+
+  return cleaned;
+}
+
+export function cleanTaskData(data: any): any {
+  const cleaned = { ...data };
+
+  ['estimatedDuration', 'actualDuration'].forEach(field => {
+    if (cleaned[field]) {
+      const num = parseFloat(cleaned[field]);
+      cleaned[field] = isNaN(num) ? null : num;
+    }
+  });
+
+  ['dueDate', 'completedAt', 'validatedAt'].forEach(field => {
+    if (cleaned[field] && typeof cleaned[field] === 'string') {
+      cleaned[field] = new Date(cleaned[field]);
+    }
+  });
+
+  if (cleaned.attachments && !Array.isArray(cleaned.attachments)) {
+    cleaned.attachments = [];
+  }
+
+  return cleaned;
+}
+
 // Type exports for convenience
 export type CreateMissionInput = CompleteMissionInput;
 export type CreateQuoteInput = CompleteQuoteInput;
@@ -828,3 +1219,33 @@ export type CreateLeadInput = CompleteLeadInput;
 export type CreateTeamMemberInput = CompleteTeamMemberInput;
 export type CreateFieldReportInput = CompleteFieldReportInput;
 export type CreateSubscriptionInput = CompleteSubscriptionInput;
+// =============================================================================
+// ADDITIONAL TYPE EXPORTS - ADD THESE
+// =============================================================================
+
+export type CompleteUserInput = z.infer<typeof userValidationSchema>;
+export type CompleteTeamInput = z.infer<typeof teamValidationSchema>;
+export type CompleteTaskInput = z.infer<typeof taskValidationSchema>;
+export type CompleteInventoryInput = z.infer<typeof inventoryValidationSchema>;
+export type CompleteInventoryUsageInput = z.infer<typeof inventoryUsageValidationSchema>;
+export type CompleteExpenseInput = z.infer<typeof expenseValidationSchema>;
+export type CompleteInvoiceInput = z.infer<typeof invoiceValidationSchema>;
+export type CompleteActivityInput = z.infer<typeof activityValidationSchema>;
+export type CompleteConversationInput = z.infer<typeof conversationValidationSchema>;
+export type CompleteMessageInput = z.infer<typeof messageValidationSchema>;
+export type CompleteQualityCheckInput = z.infer<typeof qualityCheckValidationSchema>;
+export type CompleteTaskTemplateInput = z.infer<typeof taskTemplateValidationSchema>;
+export type CompleteSystemLogInput = z.infer<typeof systemLogValidationSchema>;
+export type CompleteAccountInput = z.infer<typeof accountValidationSchema>;
+export type CompleteSessionInput = z.infer<typeof sessionValidationSchema>;
+
+// Convenience exports
+export type CreateUserInput = CompleteUserInput;
+export type CreateTeamInput = CompleteTeamInput;
+export type CreateTaskInput = CompleteTaskInput;
+export type CreateInventoryInput = CompleteInventoryInput;
+export type CreateExpenseInput = CompleteExpenseInput;
+export type CreateInvoiceInput = CompleteInvoiceInput;
+export type CreateActivityInput = CompleteActivityInput;
+export type CreateQualityCheckInput = CompleteQualityCheckInput;
+export type CreateTaskTemplateInput = CompleteTaskTemplateInput;
