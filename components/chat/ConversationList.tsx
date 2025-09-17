@@ -11,7 +11,7 @@ import { PenSquare } from 'lucide-react';
 interface ConversationListProps {
     currentUserId: string;
     conversations: PopulatedConversation[];
-    selectedConversationId?: string;
+    selectedConversationId?: string | undefined;
     onSelect: (conversation: PopulatedConversation) => void;
     onNewConversation: (conversation: PopulatedConversation) => void;
     onlineMembers: string[];

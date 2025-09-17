@@ -80,11 +80,13 @@ export default function ProfilePage() {
       const croppedFile = await urlToFile(croppedImageBlobUrl, `${currentUser.id}-avatar.jpeg`, 'image/jpeg');
 
       const res = await edgestore.profileImages.upload({
-          file: croppedFile,
-          options: {
-              replaceTargetUrl: session?.user?.image ?? undefined,
-          },
-      });
+    file: croppedFile,
+    ...(session?.user?.image && {
+        options: {
+            replaceTargetUrl: session.user.image,
+        }
+    }),
+});
 
       await update({ image: res.url })
       
@@ -167,8 +169,9 @@ export default function ProfilePage() {
                 type="file"
                 ref={fileInputRef}
                 onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    setImageToCrop(URL.createObjectURL(e.target.files[0]));
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setImageToCrop(URL.createObjectURL(file));
                     setAvatarCropperOpen(true);
                   }
                 }}

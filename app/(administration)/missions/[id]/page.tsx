@@ -24,8 +24,6 @@ import {
   CheckCircle,
   AlertTriangle,
   Play,
-  Pause,
-  Eye,
   FileText,
   DollarSign
 } from 'lucide-react';

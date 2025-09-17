@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -25,15 +24,13 @@ import {
   Edit,
   Trash2,
   MoreVertical,
-  User as UserIcon,
   CheckCircle,
-  AlertTriangle,
   Play,
   Filter,
   Search
 } from 'lucide-react';
 import { Mission, Lead, User, Task, TeamMember, MissionStatus, Priority } from '@prisma/client';
-import { formatDate, formatTime, formatCurrency, translate } from '@/lib/utils';
+import { formatDate, translate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
 
@@ -65,7 +62,6 @@ interface PaginationData {
 
 export default function MissionsPage() {
   const { data: session } = useSession();
-  const router = useRouter();
   const userRole = (session?.user as any)?.role;
 
   // State management
@@ -88,7 +84,6 @@ export default function MissionsPage() {
   
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const fetchMissions = useCallback(async () => {
     try {
@@ -118,7 +113,6 @@ export default function MissionsPage() {
       setPagination(paginationData);
     } catch (err: any) {
       console.error('Error fetching missions:', err);
-      setError(err.message);
       toast.error('Erreur lors du chargement des missions');
     }
   }, []);
@@ -132,8 +126,8 @@ export default function MissionsPage() {
           // Handle team members response structure
           const teamMembers = data.teamMembers || data || [];
           setAllTeamMembers(teamMembers);
-        }).catch(err => {
-          console.error('Error fetching team members:', err);
+        }).catch(() => {
+          console.error('Error fetching team members');
           setAllTeamMembers([]);
         })
       ]);
@@ -162,11 +156,6 @@ export default function MissionsPage() {
       if (tasks.length === 0) return 0;
       const completedTasks = tasks.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length;
       return Math.round((completedTasks / tasks.length) * 100);
-  };
-
-  const handleOpenModal = (mission: MissionWithDetails) => {
-    setSelectedMission(mission);
-    setSelectedTeamMemberIds(mission.teamMembers?.map(tm => tm.id) || []);
   };
 
   const handleDeleteMission = async (missionId: string) => {
@@ -212,6 +201,11 @@ export default function MissionsPage() {
       case 'CRITICAL': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const handleTeamAssignment = () => {
+    toast.success('Équipe assignée avec succès');
+    setSelectedMission(null);
   };
 
   if (isLoading) {
@@ -507,11 +501,7 @@ export default function MissionsPage() {
                 <Button variant="outline" onClick={() => setSelectedMission(null)}>
                   Annuler
                 </Button>
-                <Button onClick={() => {
-                  // Handle team assignment
-                  toast.success('Équipe assignée avec succès');
-                  setSelectedMission(null);
-                }}>
+                <Button onClick={handleTeamAssignment}>
                   Assigner l'équipe ({selectedTeamMemberIds.length})
                 </Button>
               </div>

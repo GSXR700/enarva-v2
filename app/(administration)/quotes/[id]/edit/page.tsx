@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, FileText, Save, AlertCircle, Search, Plus } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { validateCompleteQuoteInput  } from '@/lib/validation'
@@ -142,6 +141,14 @@ export default function EditQuotePage() {
     fetchQuote();
   }, [fetchQuote]);
 
+  // FIX: Helper function to handle lead updates safely
+  const handleLeadChange = (field: keyof typeof leadUpdates, value: string | undefined) => {
+    setLeadUpdates(prev => ({ 
+      ...prev, 
+      [field]: value || '' // Ensure value is never undefined
+    }));
+  };
+
   const handleLineItemChange = (id: string, field: 'unitPrice' | 'quantity' | 'amount' | 'serviceType', value: number | string) => {
     setEditableLineItems(currentItems =>
       currentItems.map(item => {
@@ -218,128 +225,125 @@ export default function EditQuotePage() {
     };
   }, [editableLineItems]);
 
-  // Fix for the handleSubmit function in app/(administration)/quotes/[id]/edit/page.tsx
-// Replace the handleSubmit function with this corrected version:
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setValidationErrors([]);
+    
+    try {
+      // FIX: Include ALL required fields for lineItems validation
+      const formattedLineItems = editableLineItems.map(item => ({
+        id: item.id,
+        description: item.description,
+        detail: item.detail || '',
+        amount: item.totalPrice,
+        serviceType: item.serviceType,
+        editable: item.editable,
+        // FIX: Add missing required fields
+        quantity: item.quantity || 1,
+        unitPrice: item.unitPrice || 0,
+        totalPrice: item.totalPrice || 0
+      }));
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsSaving(true);
-  setValidationErrors([]);
-  
-  try {
-    // FIX: Include ALL required fields for lineItems validation
-    const formattedLineItems = editableLineItems.map(item => ({
-      id: item.id,
-      description: item.description,
-      detail: item.detail || '',
-      amount: item.totalPrice,
-      serviceType: item.serviceType,
-      editable: item.editable,
-      // FIX: Add missing required fields
-      quantity: item.quantity || 1,
-      unitPrice: item.unitPrice || 0,
-      totalPrice: item.totalPrice || 0
-    }));
+      // Calculate surface from quote or lead
+      const surfaceValue = quote?.surface || parseInt(leadUpdates.estimatedSurface) || undefined;
 
-    // Calculate surface from quote or lead
-    const surfaceValue = quote?.surface || parseInt(leadUpdates.estimatedSurface) || undefined;
+      const quoteData = {
+        leadId: quote?.leadId,
+        quoteNumber: quote?.quoteNumber,
+        businessType: quote?.businessType || 'SERVICE',
+        lineItems: formattedLineItems, // Now includes all required fields
+        subTotalHT: finalQuote.subTotalHT,
+        vatAmount: finalQuote.vatAmount,
+        totalTTC: finalQuote.totalTTC,
+        finalPrice: finalQuote.finalPrice,
+        status,
+        type,
+        surface: surfaceValue,
+        expiresAt,
+        leadUpdates: {
+          estimatedSurface: parseInt(leadUpdates.estimatedSurface) || undefined,
+          propertyType: leadUpdates.propertyType || undefined,
+          address: leadUpdates.address || undefined,
+          urgencyLevel: leadUpdates.urgencyLevel || undefined,
+          budgetRange: leadUpdates.budgetRange || undefined
+        }
+      };
 
-    const quoteData = {
-      leadId: quote?.leadId,
-      quoteNumber: quote?.quoteNumber,
-      businessType: quote?.businessType || 'SERVICE',
-      lineItems: formattedLineItems, // Now includes all required fields
-      subTotalHT: finalQuote.subTotalHT,
-      vatAmount: finalQuote.vatAmount,
-      totalTTC: finalQuote.totalTTC,
-      finalPrice: finalQuote.finalPrice,
-      status,
-      type,
-      surface: surfaceValue,
-      expiresAt,
-      leadUpdates: {
+      const validation = validateCompleteQuoteInput(quoteData);
+      
+      if (!validation.success) {
+        const errors = validation.error.errors.map(error => `${error.path.join('.')}: ${error.message}`);
+        setValidationErrors(errors);
+        toast.error('Données invalides. Veuillez corriger les erreurs.');
+        return;
+      }
+
+      // Create the final payload for the API (matching what the API expects)
+      const quotePayload = {
+        lineItems: editableLineItems.map(item => ({
+          id: item.id,
+          designation: item.description,
+          description: item.detail,
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice || 0,
+          totalPrice: item.totalPrice || 0,
+          serviceType: item.serviceType
+        })),
+        subTotalHT: finalQuote.subTotalHT,
+        vatAmount: finalQuote.vatAmount,
+        totalTTC: finalQuote.totalTTC,
+        finalPrice: finalQuote.finalPrice,
+        status,
+        type,
+        surface: surfaceValue,
+        expiresAt: new Date(expiresAt).toISOString()
+      };
+
+      const leadPayload = {
         estimatedSurface: parseInt(leadUpdates.estimatedSurface) || undefined,
         propertyType: leadUpdates.propertyType || undefined,
         address: leadUpdates.address || undefined,
         urgencyLevel: leadUpdates.urgencyLevel || undefined,
         budgetRange: leadUpdates.budgetRange || undefined
-      }
-    };
+      };
 
-    const validation = validateCompleteQuoteInput(quoteData);
-    
-    if (!validation.success) {
-      const errors = validation.error.errors.map(error => `${error.path.join('.')}: ${error.message}`);
-      setValidationErrors(errors);
-      toast.error('Données invalides. Veuillez corriger les erreurs.');
-      return;
-    }
-
-    // Create the final payload for the API (matching what the API expects)
-    const quotePayload = {
-      lineItems: editableLineItems.map(item => ({
-        id: item.id,
-        designation: item.description,
-        description: item.detail,
-        quantity: item.quantity || 1,
-        unitPrice: item.unitPrice || 0,
-        totalPrice: item.totalPrice || 0,
-        serviceType: item.serviceType
-      })),
-      subTotalHT: finalQuote.subTotalHT,
-      vatAmount: finalQuote.vatAmount,
-      totalTTC: finalQuote.totalTTC,
-      finalPrice: finalQuote.finalPrice,
-      status,
-      type,
-      surface: surfaceValue,
-      expiresAt: new Date(expiresAt).toISOString()
-    };
-
-    const leadPayload = {
-      estimatedSurface: parseInt(leadUpdates.estimatedSurface) || undefined,
-      propertyType: leadUpdates.propertyType || undefined,
-      address: leadUpdates.address || undefined,
-      urgencyLevel: leadUpdates.urgencyLevel || undefined,
-      budgetRange: leadUpdates.budgetRange || undefined
-    };
-
-    // Update quote
-    const response = await fetch(`/api/quotes/${quoteId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(quotePayload),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Échec de la mise à jour du devis.');
-    }
-
-    // Update lead if there are changes
-    const hasLeadChanges = Object.values(leadPayload).some(value => value !== undefined);
-    if (hasLeadChanges && quote?.leadId) {
-      const leadResponse = await fetch(`/api/leads/${quote.leadId}`, {
+      // Update quote
+      const response = await fetch(`/api/quotes/${quoteId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(leadPayload),
+        body: JSON.stringify(quotePayload),
       });
 
-      if (!leadResponse.ok) {
-        console.warn('Lead update failed, but quote was updated successfully');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Échec de la mise à jour du devis.');
       }
+
+      // Update lead if there are changes
+      const hasLeadChanges = Object.values(leadPayload).some(value => value !== undefined);
+      if (hasLeadChanges && quote?.leadId) {
+        const leadResponse = await fetch(`/api/leads/${quote.leadId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(leadPayload),
+        });
+
+        if (!leadResponse.ok) {
+          console.warn('Lead update failed, but quote was updated successfully');
+        }
+      }
+
+      toast.success('Devis mis à jour avec succès !');
+      router.push('/quotes');
+
+    } catch (error: any) {
+      console.error('Quote update error:', error);
+      toast.error(error.message || 'Erreur lors de la mise à jour du devis.');
+    } finally {
+      setIsSaving(false);
     }
-
-    toast.success('Devis mis à jour avec succès !');
-    router.push('/quotes');
-
-  } catch (error: any) {
-    console.error('Quote update error:', error);
-    toast.error(error.message || 'Erreur lors de la mise à jour du devis.');
-  } finally {
-    setIsSaving(false);
-  }
-};
+  };
 
   if (isLoading) {
     return (
@@ -513,7 +517,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   id="estimatedSurface"
                   type="number"
                   value={leadUpdates.estimatedSurface}
-                  onChange={(e) => setLeadUpdates(prev => ({ ...prev, estimatedSurface: e.target.value }))}
+                  onChange={(e) => handleLeadChange('estimatedSurface', e.target.value)}
                   min="1"
                   placeholder="Surface en m²"
                 />
@@ -523,7 +527,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <Label htmlFor="propertyType">Type de propriété</Label>
                 <Select
                   value={leadUpdates.propertyType}
-                  onValueChange={(value) => setLeadUpdates(prev => ({ ...prev, propertyType: value as PropertyType }))}
+                  onValueChange={(value) => handleLeadChange('propertyType', value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner..." />
@@ -546,7 +550,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <Label htmlFor="urgencyLevel">Niveau d'urgence</Label>
                 <Select
                   value={leadUpdates.urgencyLevel}
-                  onValueChange={(value) => setLeadUpdates(prev => ({ ...prev, urgencyLevel: value as UrgencyLevel }))}
+                  onValueChange={(value) => handleLeadChange('urgencyLevel', value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner..." />
@@ -565,7 +569,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <Input
                   id="budgetRange"
                   value={leadUpdates.budgetRange}
-                  onChange={(e) => setLeadUpdates(prev => ({ ...prev, budgetRange: e.target.value }))}
+                  onChange={(e) => handleLeadChange('budgetRange', e.target.value)}
                   placeholder="1000-5000 MAD"
                 />
               </div>
@@ -575,7 +579,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <Input
                   id="address"
                   value={leadUpdates.address}
-                  onChange={(e) => setLeadUpdates(prev => ({ ...prev, address: e.target.value }))}
+                  onChange={(e) => handleLeadChange('address', e.target.value)}
                   placeholder="Adresse complète"
                 />
               </div>
@@ -675,7 +679,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               {/* Existing Services */}
               <div className="space-y-4">
                 {editableLineItems.length > 0 ? (
-                  editableLineItems.map((item, index) => (
+                  editableLineItems.map((item) => (
                     <div key={item.id} className="border rounded-lg p-4 bg-gray-50">
                       <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 items-start">
                         {/* Service Type - Searchable */}
@@ -798,7 +802,6 @@ const handleSubmit = async (e: React.FormEvent) => {
               </div>
             </CardContent>
           </Card>
-
           {/* Totals */}
           <Card>
             <CardHeader>

@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Camera, Upload, Save, Trash2, PenTool, RotateCcw, Check } from 'lucide-react'
+import { ArrowLeft, Camera, Save, Trash2, PenTool, RotateCcw, Check } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface SignaturePadProps {

@@ -1,5 +1,5 @@
 // prisma/seed/task-templates/residentiel.ts
-import { PrismaClient, TaskCategory } from '@prisma/client'
+import { TaskCategory } from '@prisma/client'
 
 type TemplateItem = {
   category: TaskCategory

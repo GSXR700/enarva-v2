@@ -59,9 +59,28 @@ export default function ActivitiesPage() {
   }, [searchQuery, typeFilter, activities])
 
   const getActivityIcon = (type: ActivityType) => {
-    // Return appropriate icon based on activity type
-    return '📋' // Default icon
+  switch (type) {
+    case 'LEAD_CREATED': return '👤'
+    case 'LEAD_QUALIFIED': return '✅'
+    case 'QUOTE_GENERATED': return '📝'
+    case 'QUOTE_SENT': return '📤'
+    case 'MISSION_SCHEDULED': return '📅'
+    case 'MISSION_STARTED': return '🚀'
+    case 'MISSION_COMPLETED': return '✅'
+    case 'MISSION_STATUS_UPDATED': return '🔄'
+    case 'PAYMENT_RECEIVED': return '💰'
+    case 'SUBSCRIPTION_CREATED': return '📋'
+    case 'QUALITY_ISSUE': return '⚠️'
+    case 'CLIENT_FEEDBACK': return '💬'
+    case 'USER_CREATED': return '👥'
+    case 'USER_DELETED': return '🗑️'
+    case 'TEAM_MEMBER_CREATED': return '🧑‍🤝‍🧑'
+    case 'TEAM_MEMBER_UPDATED': return '✏️'
+    case 'TEAM_MEMBER_DELETED': return '👋'
+    case 'SYSTEM_MAINTENANCE': return '🔧'
+    default: return '📋'
   }
+}
 
   const getActivityColor = (type: ActivityType) => {
     switch (type) {

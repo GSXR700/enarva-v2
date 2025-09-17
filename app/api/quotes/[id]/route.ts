@@ -18,7 +18,7 @@ const quoteUpdateSchema = z.object({
   status: z.nativeEnum(QuoteStatus).optional(),
   type: z.nativeEnum(QuoteType).optional(),
   surface: z.number().optional().nullable(),
-  expiresAt: z.string().datetime().optional().nullable(),
+  expiresAt: z.string().datetime(),
   leadUpdates: z.object({
     // Define lead properties that can be updated
     name: z.string().optional(),

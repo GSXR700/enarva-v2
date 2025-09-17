@@ -106,7 +106,7 @@ export default function EditInventoryItemPage() {
             </div>
             <div>
               <Label htmlFor="category">Catégorie</Label>
-              <Select value={formData.category} onValueChange={(value) => handleSelectChange('category', value)}>
+              <Select value={formData.category ?? ''} onValueChange={(value) => handleSelectChange('category', value)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ProductCategory.CLEANING_PRODUCTS}>Produits de nettoyage</SelectItem>

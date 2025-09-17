@@ -8,24 +8,20 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { 
   CheckCircle, 
   XCircle, 
   Eye, 
   Star, 
-   
   MapPin, 
   User,
   Camera,
   MessageSquare,
   Calendar,
-  AlertTriangle,
-  ThumbsUp,
-  ThumbsDown
+  ThumbsUp
 } from 'lucide-react'
 import { Mission, Lead, Task, User as PrismaUser } from '@prisma/client'
-import { formatDate, formatTime, formatCurrency, translate } from '@/lib/utils'
+import { formatDate, formatCurrency, translate } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 

@@ -98,13 +98,13 @@ export default function ChatPage() {
             </div>
             <div className="hidden md:flex w-full h-full">
                  <ConversationList
-                    currentUserId={currentUserId}
-                    conversations={conversations}
-                    selectedConversationId={selectedConversation?.id}
-                    onSelect={setSelectedConversation}
-                    onNewConversation={handleSelectConversation}
-                    onlineMembers={onlineMembers}
-                />
+    currentUserId={currentUserId}
+    conversations={conversations}
+    selectedConversationId={selectedConversation?.id ?? undefined}
+    onSelect={setSelectedConversation}
+    onNewConversation={handleSelectConversation}
+    onlineMembers={onlineMembers}
+/>
                 {selectedConversation ? (
                     <ChatWindow
                         currentUserId={currentUserId}

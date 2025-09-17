@@ -166,7 +166,7 @@ model Quote {
   // --- Timestamps & Details ---
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
-  expiresAt         DateTime
+  expiresAt         DateTime?
   type              QuoteType?
   propertyType      PropertyType?
   surface           Int?

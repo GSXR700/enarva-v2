@@ -5,14 +5,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Plus, Upload } from 'lucide-react';
-import { Lead, Mission, User } from '@prisma/client';
+import { ArrowLeft, Plus } from 'lucide-react';
+import { Lead, Mission } from '@prisma/client';
 import { toast } from 'sonner';
 import { useEdgeStore } from '@/lib/edgestore';
 
@@ -33,6 +33,7 @@ export default function NewExpensePage() {
   // Initialize router, session, and EdgeStore
   const router = useRouter();
   const { data: session } = useSession();
+  const currentUserId = (session?.user as any)?.id;
   const { edgestore } = useEdgeStore();
 
   // State for missions, leads, form data, file, loading, and error
@@ -99,6 +100,13 @@ export default function NewExpensePage() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate that user is authenticated
+    if (!currentUserId) {
+      toast.error('Vous devez être connecté pour créer une dépense');
+      return;
+    }
+
     setIsLoading(true);
     let proofUrl: string | undefined = undefined;
 
@@ -113,15 +121,23 @@ export default function NewExpensePage() {
       const response = await fetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, proofUrl }),
+        body: JSON.stringify({ 
+          ...formData, 
+          proofUrl,
+          userId: currentUserId // Include the current user ID
+        }),
       });
 
-      if (!response.ok) throw new Error('Échec de la création de la dépense.');
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(errorData || 'Échec de la création de la dépense.');
+      }
 
       toast.success('Dépense enregistrée avec succès !');
       router.push('/expenses');
     } catch (err: any) {
-      toast.error(err.message);
+      console.error('Error creating expense:', err);
+      toast.error(err.message || 'Une erreur est survenue');
     } finally {
       setIsLoading(false);
     }
@@ -129,6 +145,20 @@ export default function NewExpensePage() {
 
   // Determine if the category is LOCATIONS to show rental date fields
   const isRental = formData.category === 'LOCATIONS';
+
+  // Show loading state while fetching initial data
+  if (isLoading && missions.length === 0 && leads.length === 0) {
+    return (
+      <div className="main-content">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground mt-2">Chargement...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="main-content space-y-6">
@@ -154,17 +184,26 @@ export default function NewExpensePage() {
           <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Date input */}
             <div>
-              <Label htmlFor="date">Date</Label>
+              <Label htmlFor="date">Date *</Label>
               <Input id="date" type="date" value={formData.date} onChange={handleChange} required />
             </div>
             {/* Amount input */}
             <div>
-              <Label htmlFor="amount">Montant (MAD)</Label>
-              <Input id="amount" type="number" step="0.01" value={formData.amount} onChange={handleChange} required />
+              <Label htmlFor="amount">Montant (MAD) *</Label>
+              <Input 
+                id="amount" 
+                type="number" 
+                step="0.01" 
+                min="0"
+                value={formData.amount} 
+                onChange={handleChange} 
+                required 
+                placeholder="0.00"
+              />
             </div>
             {/* Payment method select */}
             <div>
-              <Label htmlFor="paymentMethod">Mode de paiement</Label>
+              <Label htmlFor="paymentMethod">Mode de paiement *</Label>
               <Select value={formData.paymentMethod} onValueChange={(value) => handleSelectChange('paymentMethod', value)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -181,7 +220,7 @@ export default function NewExpensePage() {
             </div>
             {/* Category select */}
             <div>
-              <Label htmlFor="category">Catégorie</Label>
+              <Label htmlFor="category">Catégorie *</Label>
               <Select value={formData.category} onValueChange={(value) => handleSelectChange('category', value)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -197,7 +236,7 @@ export default function NewExpensePage() {
             </div>
             {/* Subcategory select */}
             <div>
-              <Label htmlFor="subCategory">Sous-Catégorie</Label>
+              <Label htmlFor="subCategory">Sous-Catégorie *</Label>
               <Select value={formData.subCategory} onValueChange={(value) => handleSelectChange('subCategory', value)} required>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir..." />
@@ -214,12 +253,23 @@ export default function NewExpensePage() {
             {/* Vendor input */}
             <div>
               <Label htmlFor="vendor">Fournisseur / Payé à</Label>
-              <Input id="vendor" value={formData.vendor} onChange={handleChange} />
+              <Input 
+                id="vendor" 
+                value={formData.vendor} 
+                onChange={handleChange}
+                placeholder="Nom du fournisseur..."
+              />
             </div>
             {/* Description textarea */}
             <div className="md:col-span-3">
               <Label htmlFor="description">Description / Notes</Label>
-              <Textarea id="description" value={formData.description} onChange={handleChange} />
+              <Textarea 
+                id="description" 
+                value={formData.description} 
+                onChange={handleChange}
+                placeholder="Détails de la dépense..."
+                rows={3}
+              />
             </div>
             {/* Mission select */}
             <div>
@@ -227,23 +277,18 @@ export default function NewExpensePage() {
               <Select
                 value={formData.missionId}
                 onValueChange={(value) => handleSelectChange('missionId', value)}
-                disabled={isLoading || missions.length === 0}
+                disabled={missions.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={isLoading ? 'Chargement...' : missions.length === 0 ? 'Aucune mission disponible' : 'Sélectionner...'} />
+                  <SelectValue placeholder={missions.length === 0 ? 'Aucune mission disponible' : 'Sélectionner...'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {missions.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      Aucune mission disponible
+                  <SelectItem value="">Aucune mission</SelectItem>
+                  {missions.map(m => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.missionNumber}
                     </SelectItem>
-                  ) : (
-                    missions.map(m => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.missionNumber}
-                      </SelectItem>
-                    ))
-                  )}
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -253,51 +298,83 @@ export default function NewExpensePage() {
               <Select
                 value={formData.leadId}
                 onValueChange={(value) => handleSelectChange('leadId', value)}
-                disabled={isLoading || leads.length === 0}
+                disabled={leads.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={isLoading ? 'Chargement...' : leads.length === 0 ? 'Aucun lead disponible' : 'Sélectionner...'} />
+                  <SelectValue placeholder={leads.length === 0 ? 'Aucun lead disponible' : 'Sélectionner...'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {leads.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      Aucun lead disponible
+                  <SelectItem value="">Aucun lead</SelectItem>
+                  {leads.map(l => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.firstName} {l.lastName}
                     </SelectItem>
-                  ) : (
-                    leads.map(l => (
-                      <SelectItem key={l.id} value={l.id}>
-                        {l.firstName} {l.lastName}
-                      </SelectItem>
-                    ))
-                  )}
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             {/* File upload */}
             <div>
               <Label htmlFor="proof">Justificatif (PDF, Image)</Label>
-              <Input id="proof" type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              <Input 
+                id="proof" 
+                type="file" 
+                accept="image/*,application/pdf"
+                onChange={(e) => setFile(e.target.files?.[0] || null)} 
+              />
+              {file && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Fichier sélectionné: {file.name}
+                </p>
+              )}
             </div>
             {/* Rental date fields (shown only for LOCATIONS category) */}
             {isRental && (
               <>
                 <div>
                   <Label htmlFor="rentalStartDate">Début location</Label>
-                  <Input id="rentalStartDate" type="date" value={formData.rentalStartDate} onChange={handleChange} />
+                  <Input 
+                    id="rentalStartDate" 
+                    type="date" 
+                    value={formData.rentalStartDate} 
+                    onChange={handleChange} 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="rentalEndDate">Fin location</Label>
-                  <Input id="rentalEndDate" type="date" value={formData.rentalEndDate} onChange={handleChange} />
+                  <Input 
+                    id="rentalEndDate" 
+                    type="date" 
+                    value={formData.rentalEndDate} 
+                    onChange={handleChange} 
+                  />
                 </div>
               </>
             )}
           </CardContent>
         </Card>
+        
         {/* Error message display */}
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+        {error && (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="pt-6">
+              <p className="text-red-600 text-sm">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+        
         {/* Submit button */}
-        <div className="flex justify-end mt-6">
-          <Button type="submit" className="bg-enarva-gradient rounded-lg px-8" disabled={isLoading}>
+        <div className="flex justify-end gap-4">
+          <Link href="/expenses">
+            <Button type="button" variant="outline">
+              Annuler
+            </Button>
+          </Link>
+          <Button 
+            type="submit" 
+            className="bg-enarva-gradient rounded-lg px-8" 
+            disabled={isLoading || !currentUserId}
+          >
             <Plus className="w-4 h-4 mr-2" />
             {isLoading ? 'Enregistrement...' : 'Enregistrer la Dépense'}
           </Button>
