@@ -118,7 +118,8 @@ export default function EditQuotePage() {
       
       setStatus(data.status);
       setType(data.type || 'STANDARD');
-      setExpiresAt(new Date(data.expiresAt).toISOString().split('T')[0]);
+      
+    
 
       // Initialize lead updates with current lead data
       setLeadUpdates({

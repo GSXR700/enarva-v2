@@ -16,9 +16,7 @@ import {
   TrendingUp, 
   MessageSquare, 
   Mail, 
-  Phone,
-  MapPin,
-  Calendar
+  Phone
 } from 'lucide-react'
 import { Lead, Mission, User, LeadStatus } from '@prisma/client'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
