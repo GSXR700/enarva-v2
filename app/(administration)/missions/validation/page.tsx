@@ -14,7 +14,7 @@ import {
   XCircle, 
   Eye, 
   Star, 
-  Clock, 
+   
   MapPin, 
   User,
   Camera,

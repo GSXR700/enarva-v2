@@ -1,8 +1,11 @@
 'use client';
 
+'use client';
+
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Lead, LeadStatus, User } from '@prisma/client';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,13 +16,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuIte
 import { LeadForm } from '@/components/leads/LeadForm';
 import { useOptimisticMutation } from '@/hooks/useOptimisticMutation';
 import { usePusherChannel } from '@/hooks/usePusherClient';
-import { Plus, Search, Filter, Eye, Edit, Trash2, Download, Phone, Mail, Building2, MapPin, MoreVertical, Users, Calendar, AlertTriangle, CheckCircle, Star } from 'lucide-react';
-import { formatDate, formatCurrency, translate } from '@/lib/utils';
+import { Plus, Search, Eye, Edit, Trash2, Download, Phone, Mail, Building2, MapPin, MoreVertical, Users, Calendar, AlertTriangle, CheckCircle, Star } from 'lucide-react';
+import { formatDate, translate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CardGridSkeleton } from '@/components/skeletons/CardGridSkeleton';
-import Link from 'next/link';
+
 
 type LeadWithRelations = Lead & { assignedTo?: User | null };
 
@@ -138,29 +140,7 @@ export default function LeadsPage() {
   });
 
   // Optimistic mutation for lead assignment
-  const assignmentMutation = useOptimisticMutation<LeadWithRelations, { id: string; assignedToId: string | null }>({
-    queryKey: ['leads', page, limit, statusFilter, searchTerm],
-    mutationFn: async ({ id, assignedToId }) => {
-      const response = await fetch(`/api/leads/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignedToId }),
-      });
-      if (!response.ok) throw new Error('Failed to assign lead');
-      return response.json();
-    },
-    optimisticUpdate: (oldData: LeadsResponse, { id, assignedToId }) => {
-      if (!oldData) return oldData;
-      return {
-        ...oldData,
-        leads: oldData.leads.map(lead =>
-          lead.id === id ? { ...lead, assignedToId } : lead
-        )
-      };
-    },
-    successMessage: 'Lead assigné avec succès',
-    errorMessage: 'Erreur lors de l\'assignation'
-  });
+  
 
   // Optimistic mutation for lead deletion
   const deleteMutation = useOptimisticMutation<void, string>({
@@ -201,9 +181,7 @@ export default function LeadsPage() {
     statusUpdateMutation.mutate({ id: leadId, status: newStatus });
   };
 
-  const handleAssignment = (leadId: string, assignedToId: string | null) => {
-    assignmentMutation.mutate({ id: leadId, assignedToId });
-  };
+  
 
   const handleDelete = (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce lead?')) return;

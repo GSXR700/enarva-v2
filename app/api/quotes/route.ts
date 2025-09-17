@@ -4,8 +4,28 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { PrismaClient, QuoteType, LeadStatus, ActivityType } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
+import { z } from 'zod'
 
 const prisma = new PrismaClient()
+
+const createQuoteSchema = z.object({
+  leadId: z.string().min(1, 'Lead ID is required').optional(),
+  newClientName: z.string().min(1, 'Client name is required').optional(),
+  quoteNumber: z.string().min(1, 'Quote number is required'),
+  lineItems: z.array(z.object({
+    description: z.string().min(1, 'Description is required'),
+    quantity: z.number().min(0.1, 'Quantity must be positive'),
+    unitPrice: z.number().min(0, 'Unit price must be positive'),
+    totalPrice: z.number().min(0, 'Total price must be positive')
+  })).min(1, 'At least one line item required'),
+  subTotalHT: z.number().min(0, 'Subtotal must be positive'),
+  vatAmount: z.number().min(0, 'VAT amount must be positive'), 
+  totalTTC: z.number().min(0, 'Total must be positive'),
+  finalPrice: z.number().min(0, 'Final price must be positive'),
+  expiresAt: z.string().min(1, 'Expiration date required'),
+  type: z.enum(['EXPRESS', 'STANDARD', 'PREMIUM']).default('STANDARD'),
+  businessType: z.enum(['SERVICE', 'PRODUCT']).default('SERVICE')
+});
 
 // GET /api/quotes - Récupère tous les devis
 export async function GET() {
@@ -31,6 +51,19 @@ export async function POST(request: Request) {
     const body = await request.json()
     console.log('Received quote data:', body)
 
+    let validatedData;
+    try {
+      validatedData = createQuoteSchema.parse(body);
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        return NextResponse.json(
+          { error: 'Validation failed', details: validationError.flatten().fieldErrors }, 
+          { status: 400 }
+        );
+      }
+      throw validationError;
+    }
+
     const { 
       leadId, 
       newClientName, 
@@ -44,7 +77,7 @@ export async function POST(request: Request) {
       type,
       businessType,
       ...restData 
-    } = body;
+    } = validatedData;
 
     // Validation des champs requis
     if (!quoteNumber || !lineItems || finalPrice === undefined || finalPrice === null) {
@@ -70,7 +103,7 @@ export async function POST(request: Request) {
 
     // Execute the quote creation in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      let targetLeadId = leadId;
+      let targetLeadId: string = leadId || '';
 
       // Si pas de leadId mais un newClientName, créer un nouveau lead
       if (!leadId && newClientName && newClientName.trim()) {
@@ -98,6 +131,11 @@ export async function POST(request: Request) {
 
         targetLeadId = newLead.id;
         console.log('Created new lead with ID:', targetLeadId)
+      }
+
+      // Ensure we have a valid leadId
+      if (!targetLeadId) {
+        throw new Error('Lead ID is required');
       }
 
       // Vérifier que le lead existe

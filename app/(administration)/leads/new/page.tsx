@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ArrowLeft, User, Briefcase, Search, Package, Plus, Trash2, Users as UsersIcon } from 'lucide-react'
-import { LeadCanal, LeadType, PropertyType, AccessibilityLevel, UrgencyLevel, Frequency, ContractType, User as PrismaUser, ProviderType, EnarvaRole } from '@prisma/client'
+import { User as PrismaUser } from '@prisma/client'
 import { toast } from 'sonner'
 import { translations } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -35,17 +35,29 @@ export default function NewLeadPage() {
     // Section 1
     firstName: '', lastName: '', phone: '', email: '', address: '', gpsLocation: '',
     // Section 2
-    leadType: 'PARTICULIER' as LeadType, company: '', iceNumber: '', activitySector: '', contactPosition: '', department: '',
+    leadType: 'PARTICULIER',
+    company: '', iceNumber: '', activitySector: '', contactPosition: '', department: '',
     // Section 3 (Service)
-    propertyType: '' as PropertyType | '', estimatedSurface: '', accessibility: 'EASY' as AccessibilityLevel,
-    urgencyLevel: 'NORMAL' as UrgencyLevel, budgetRange: '', frequency: 'PONCTUEL' as Frequency,
-    contractType: 'INTERVENTION_UNIQUE' as ContractType,
+    propertyType: '',
+    estimatedSurface: '', 
+    accessibility: 'EASY',
+    urgencyLevel: 'NORMAL',
+    budgetRange: '', 
+    frequency: 'PONCTUEL',
+    contractType: 'INTERVENTION_UNIQUE',
     // Section 4 (Produits)
-    needsProducts: false, needsEquipment: false, providedBy: 'ENARVA' as ProviderType,
+    needsProducts: false, 
+    needsEquipment: false, 
+    providedBy: 'ENARVA',
     // Section 5 (Origine)
-    channel: '' as LeadCanal | '', source: '', hasReferrer: false, referrerContact: '', enarvaRole: 'PRESTATAIRE_PRINCIPAL' as EnarvaRole,
+    channel: '',
+    source: '', 
+    hasReferrer: false, 
+    referrerContact: '', 
+    enarvaRole: 'PRESTATAIRE_PRINCIPAL',
     // Section 6 (Suivi)
-    originalMessage: '', assignedToId: '',
+    originalMessage: '', 
+    assignedToId: '',
   });
 
   useEffect(() => {
@@ -190,12 +202,12 @@ export default function NewLeadPage() {
 
                 {requestType === 'SERVICE' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div><Label htmlFor="propertyType">Type de propriété</Label><Select value={formData.propertyType || undefined} onValueChange={(v) => handleSelectChange('propertyType', v as PropertyType)}><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger><SelectContent>{Object.entries(translations.PropertyType).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
+                        <div><Label htmlFor="propertyType">Type de propriété</Label><Select value={formData.propertyType} onValueChange={(v) => handleSelectChange('propertyType', v)}><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger><SelectContent>{Object.entries(translations.PropertyType).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
                         <div><Label htmlFor="estimatedSurface">Surface Estimée (m²)</Label><Input id="estimatedSurface" type="number" value={formData.estimatedSurface} onChange={handleChange} /></div>
-                        <div><Label htmlFor="accessibility">Accessibilité</Label><Select value={formData.accessibility} onValueChange={(v) => handleSelectChange('accessibility', v as AccessibilityLevel)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{Object.entries(translations.AccessibilityLevel).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
-                        <div><Label htmlFor="urgencyLevel">Urgence</Label><Select value={formData.urgencyLevel} onValueChange={(v) => handleSelectChange('urgencyLevel', v as UrgencyLevel)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{Object.entries(translations.UrgencyLevel).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
+                        <div><Label htmlFor="accessibility">Accessibilité</Label><Select value={formData.accessibility} onValueChange={(v) => handleSelectChange('accessibility', v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{Object.entries(translations.AccessibilityLevel).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
+                        <div><Label htmlFor="urgencyLevel">Urgence</Label><Select value={formData.urgencyLevel} onValueChange={(v) => handleSelectChange('urgencyLevel', v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{Object.entries(translations.UrgencyLevel).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
                         <div><Label htmlFor="budgetRange">Budget estimé</Label><Input id="budgetRange" value={formData.budgetRange} onChange={handleChange} /></div>
-                        <div><Label htmlFor="frequency">Fréquence</Label><Select value={formData.frequency} onValueChange={(v) => handleSelectChange('frequency', v as Frequency)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{Object.entries(translations.Frequency).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
+                        <div><Label htmlFor="frequency">Fréquence</Label><Select value={formData.frequency} onValueChange={(v) => handleSelectChange('frequency', v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{Object.entries(translations.Frequency).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select></div>
                         <div className="md:col-span-2"><Label htmlFor="originalMessage">Service(s) demandé(s) / Notes</Label><Textarea id="originalMessage" value={formData.originalMessage} onChange={handleChange} placeholder="Décrivez la prestation, les besoins spécifiques..."/></div>
                     </div>
                 )}
@@ -233,7 +245,7 @@ export default function NewLeadPage() {
         <Card className="thread-card">
             <CardHeader><CardTitle className="flex items-center gap-2"><Search/>Origine du Lead</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 <div><Label htmlFor="channel">Canal d’entrée</Label><Select value={formData.channel || undefined} onValueChange={(v) => handleSelectChange('channel', v as LeadCanal)} required><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger><SelectContent>{Object.entries(translations.LeadCanal).map(([key, value]) => <SelectItem key={key} value={key as string}>{value}</SelectItem>)}</SelectContent></Select></div>
+                 <div><Label htmlFor="channel">Canal d’entrée</Label><Select value={formData.channel} onValueChange={(v) => handleSelectChange('channel', v)} required><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger><SelectContent>{Object.entries(translations.LeadCanal).map(([key, value]) => <SelectItem key={key} value={key as string}>{value}</SelectItem>)}</SelectContent></Select></div>
                 <div><Label htmlFor="source">Source précise (campagne, contact...)</Label><Input id="source" value={formData.source} onChange={handleChange} /></div>
                 <div className="md:col-span-2 space-y-2">
                     <div className="flex items-center space-x-2">
@@ -250,7 +262,7 @@ export default function NewLeadPage() {
             <CardContent>
                 <div>
                     <Label htmlFor="assignedToId">Assigner à</Label>
-                    <Select value={formData.assignedToId || undefined} onValueChange={(v) => handleSelectChange('assignedToId', v)}>
+                    <Select value={formData.assignedToId} onValueChange={(v) => handleSelectChange('assignedToId', v)}>
                         <SelectTrigger><SelectValue placeholder="Choisir un agent..." /></SelectTrigger>
                         <SelectContent>
                             {/* Correction: Utiliser une valeur non-vide pour l'option "Non assigné" */}

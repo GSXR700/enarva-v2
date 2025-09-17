@@ -10,11 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ArrowLeft, Save, User, Briefcase, Search, Package, Plus, Trash2, Tag, Users as UsersIcon } from 'lucide-react';
-import { Lead, LeadStatus, LeadType, PropertyType, AccessibilityLevel, UrgencyLevel, LeadCanal, Frequency, ContractType, User as PrismaUser } from '@prisma/client';
+import { ArrowLeft, Save, User, Briefcase, Search, Package, Plus, Trash2 } from 'lucide-react';
+import { Lead, User as PrismaUser } from '@prisma/client';
 import { toast } from 'sonner';
-import { translations } from '@/lib/utils';
-import { Checkbox } from '@/components/ui/checkbox';
 
 type ProductRequest = {
   name: string;
@@ -120,13 +118,6 @@ export default function EditLeadPage() {
     setFormData(prev => ({
       ...prev,
       [name]: value === 'null' || value === '' ? null : value
-    }));
-  };
-
-  const handleCheckboxChange = (name: keyof FormDataType, checked: boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      [name]: checked
     }));
   };
 

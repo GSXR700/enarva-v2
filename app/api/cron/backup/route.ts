@@ -11,10 +11,7 @@ const prisma = new PrismaClient();
 // Initialize the S3 client once to be reused across invocations
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  }
+  // Credentials will be automatically assumed from IAM role or environment
 });
 
 /**
@@ -23,6 +20,11 @@ const s3Client = new S3Client({
  * It creates a database dump, uploads it to S3, and logs the result.
  */
 export async function GET(request: NextRequest) {
+  // Add validation for required environment variables
+  if (!process.env.AWS_REGION || !process.env.BACKUP_BUCKET || !process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Missing required AWS configuration' }, { status: 500 });
+  }
+
   // 1. Verify Cron Secret for Security
   const authHeader = request.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -87,4 +89,3 @@ export async function GET(request: NextRequest) {
     await prisma.$disconnect();
   }
 }
-
