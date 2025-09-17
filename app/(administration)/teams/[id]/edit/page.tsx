@@ -21,7 +21,6 @@ import {
   UserPlus, 
   Trash2, 
   Users, 
-  Shield, 
   User as UserIcon,
   Search,
   Plus

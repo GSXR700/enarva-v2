@@ -19,11 +19,7 @@ import {
   Clock,
   AlertCircle,
   Settings,
-  UserPlus,
-  MapPin,
-  Phone,
-  Mail,
-  Award
+  UserPlus
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TeamDetailSkeleton } from '@/components/skeletons/TeamsSkeleton';

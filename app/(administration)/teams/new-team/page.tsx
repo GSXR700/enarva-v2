@@ -2,7 +2,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useState, useEffect } from 'react';
@@ -45,7 +45,6 @@ export default function NewTeamPage() {
   const {
     register,
     handleSubmit,
-    control,
     setValue,
     formState: { errors },
   } = useForm<TeamFormValues>({
@@ -105,7 +104,7 @@ export default function NewTeamPage() {
         throw new Error(errorData.details || 'Erreur lors de la création de l\'équipe');
       }
 
-      const result = await response.json();
+      await response.json();
       toast.success('Équipe créée avec succès !');
       router.push('/teams');
       router.refresh();
@@ -150,10 +149,12 @@ export default function NewTeamPage() {
 
   // Group users by role for better organization
   const usersByRole = availableUsers.reduce((acc, user) => {
-    if (!acc[user.role]) {
-      acc[user.role] = [];
+    const role = user.role;
+    if (!acc[role]) {
+      acc[role] = [];
     }
-    acc[user.role].push(user);
+    // TypeScript is now certain acc[role] is an array
+    acc[role].push(user);
     return acc;
   }, {} as Record<string, User[]>);
 
@@ -248,59 +249,64 @@ export default function NewTeamPage() {
               </div>
             ) : (
               <div className="space-y-6">
-                {sortedRoles.map((role) => (
-                  <div key={role} className="space-y-3">
-                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                      {getRoleIcon(role)}
-                      {role === 'TEAM_LEADER' ? 'Chefs d\'équipe' :
-                       role === 'MANAGER' ? 'Managers' :
-                       role === 'AGENT' ? 'Agents' :
-                       role === 'TECHNICIAN' ? 'Techniciens' :
-                       role === 'ADMIN' ? 'Administrateurs' : role}
-                      <Badge variant="outline">{usersByRole[role].length}</Badge>
-                    </h4>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {usersByRole[role].map((user) => (
-                        <div
-                          key={user.id}
-                          className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                            selectedMembers.includes(user.id)
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <Checkbox
-                            checked={selectedMembers.includes(user.id)}
-                            onCheckedChange={(checked) => handleMemberToggle(user.id, !!checked)}
-                            className="mr-3"
-                          />
-                          
-                          <Avatar className="w-10 h-10 mr-3">
-                            <AvatarImage src={user.image} alt={user.name} />
-                            <AvatarFallback>{user.name?.[0] || 'U'}</AvatarFallback>
-                          </Avatar>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h5 className="font-medium text-gray-900 truncate">{user.name}</h5>
-                              <div className={`w-2 h-2 rounded-full ${
-                                user.onlineStatus === 'ONLINE' ? 'bg-green-500' : 'bg-gray-400'
-                              }`} />
-                            </div>
-                            <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              {getRoleBadge(user.role)}
-                              <span className="text-xs text-gray-400">
-                                {user.onlineStatus === 'ONLINE' ? 'En ligne' : 'Hors ligne'}
-                              </span>
+                {sortedRoles.map((role) => {
+                  const usersInRole = usersByRole[role];
+                  if (!usersInRole) return null; // Safety check
+
+                  return (
+                    <div key={role} className="space-y-3">
+                      <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                        {getRoleIcon(role)}
+                        {role === 'TEAM_LEADER' ? 'Chefs d\'équipe' :
+                        role === 'MANAGER' ? 'Managers' :
+                        role === 'AGENT' ? 'Agents' :
+                        role === 'TECHNICIAN' ? 'Techniciens' :
+                        role === 'ADMIN' ? 'Administrateurs' : role}
+                        <Badge variant="outline">{usersInRole.length}</Badge>
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {usersInRole.map((user) => (
+                          <div
+                            key={user.id}
+                            className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                              selectedMembers.includes(user.id)
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <Checkbox
+                              checked={selectedMembers.includes(user.id)}
+                              onCheckedChange={(checked) => handleMemberToggle(user.id, !!checked)}
+                              className="mr-3"
+                            />
+                            
+                            <Avatar className="w-10 h-10 mr-3">
+                              <AvatarImage src={user.image} alt={user.name} />
+                              <AvatarFallback>{user.name?.[0] || 'U'}</AvatarFallback>
+                            </Avatar>
+                            
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h5 className="font-medium text-gray-900 truncate">{user.name}</h5>
+                                <div className={`w-2 h-2 rounded-full ${
+                                  user.onlineStatus === 'ONLINE' ? 'bg-green-500' : 'bg-gray-400'
+                                }`} />
+                              </div>
+                              <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                {getRoleBadge(user.role)}
+                                <span className="text-xs text-gray-400">
+                                  {user.onlineStatus === 'ONLINE' ? 'En ligne' : 'Hors ligne'}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

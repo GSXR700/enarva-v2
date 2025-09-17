@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -467,7 +467,7 @@ export default function TeamsPage() {
                         </Link>
                       </div>
                       <div className="flex -space-x-2">
-                        {team.membersSummary.slice(0, 4).map((member, index) => (
+                        {team.membersSummary.slice(0, 4).map((member) => (
                           <Avatar key={member.id} className="w-8 h-8 border-2 border-white">
                             <AvatarImage 
                               src={member.image} 
