@@ -6,32 +6,32 @@ const prisma = new PrismaClient()
 
 // GET /api/conversations/[id]/messages - Récupère les messages d'une conversation
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id: conversationId } = await params; // ✅ Await params for Next.js 15
+  try {
+    const { id: conversationId } = await params; // ✅ Await params for Next.js 15
 
-    if (!conversationId) {
-      return new NextResponse('Conversation ID is required', { status: 400 })
-    }
+    if (!conversationId) {
+      return new NextResponse('Conversation ID is required', { status: 400 })
+    }
 
-    const messages = await prisma.message.findMany({
-      where: {
-        conversationId: conversationId,
-      },
-      include: {
-        sender: true,
-        readBy: true, // ✅ Add this line to include readBy relation
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    })
-    
-    return NextResponse.json(messages)
-  } catch (error) {
-    console.error(`Failed to fetch messages for conversation:`, error)
-    return new NextResponse('Internal Server Error', { status: 500 })
-  }
+    const messages = await prisma.message.findMany({
+      where: {
+        conversationId: conversationId,
+      },
+      include: {
+        sender: true,
+        readBy: true, // ✅ Add this line to include readBy relation
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    })
+    
+    return NextResponse.json(messages)
+  } catch (error) {
+    console.error(`Failed to fetch messages for conversation:`, error)
+    return new NextResponse('Internal Server Error', { status: 500 })
+  }
 }

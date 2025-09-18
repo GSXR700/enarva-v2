@@ -11,6 +11,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id || !['ADMIN', 'MANAGER'].includes(session.user.role)) {
+      return new NextResponse('Unauthorized: Admin or Manager access required', { status: 403 });
+    }
+
     const { id } = await params
 
     const subscription = await prisma.subscription.findUnique({
@@ -85,13 +90,14 @@ export async function POST(
         type: 'SUBSCRIPTION_CREATED',
         title: 'Facture d\'abonnement générée manuellement',
         description: `Facture ${invoiceNumber} créée manuellement pour l'abonnement ${subscription.type}`,
-        userId: 'manual',
+        userId: session.user.id, // Used session user ID
         leadId: subscription.leadId,
         metadata: {
           subscriptionId: subscription.id,
           invoiceId: invoice.id,
           amount: finalAmount.toString(),
-          manualBilling: true
+          manualBilling: true,
+          billedByIp: request.headers.get('x-forwarded-for') ?? 'IP Not Found' // Used request object
         }
       }
     })

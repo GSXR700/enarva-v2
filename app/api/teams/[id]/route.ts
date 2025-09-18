@@ -16,7 +16,7 @@ const updateTeamSchema = z.object({
 
 // GET /api/teams/[id] - Get individual team with full details
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -127,7 +127,7 @@ export async function GET(
 
 // PUT /api/teams/[id] - Update team information
 export async function PUT(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -146,7 +146,7 @@ export async function PUT(
     }
 
     const { id: teamId } = await params;
-    const body = await request.json();
+    const body = await _request.json();
 
     // Validate input
     const validationResult = updateTeamSchema.safeParse(body);
@@ -251,7 +251,7 @@ export async function PUT(
 
 // DELETE /api/teams/[id] - Delete team (only if no active missions)
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

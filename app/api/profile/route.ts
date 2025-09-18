@@ -9,7 +9,7 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-async function handleProfileGet(request: NextRequest) {
+async function handleProfileGet(_request: NextRequest) {
   const session = await getServerSession(authOptions);
   
   if (!session?.user) {

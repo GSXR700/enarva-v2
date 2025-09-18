@@ -85,7 +85,7 @@ export async function PUT(
 
 // DELETE /api/users/[id] - Delete a user
 export async function DELETE(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

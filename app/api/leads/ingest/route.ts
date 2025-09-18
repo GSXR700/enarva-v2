@@ -66,8 +66,8 @@ export async function POST(request: Request) {
     });
 
     const leadData: Prisma.LeadCreateInput = {
-      firstName: firstName,
-      lastName: lastName,
+      firstName: firstName ?? '',
+      lastName: lastName ?? '(non spécifié)',
       phone: telephone,
       email: email || null,
       originalMessage: message,

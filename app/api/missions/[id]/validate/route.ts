@@ -45,7 +45,6 @@ export async function POST(
       qualityScore,
       issuesFound,
       correctionNeeded,
-      status
     } = body;
 
     const mission = await prisma.mission.findUnique({

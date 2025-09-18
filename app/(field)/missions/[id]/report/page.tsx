@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { ArrowLeft, Camera, CheckCircle, Play, Upload, MapPin, Clock, User, ListChecks } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Play, Upload, MapPin, Clock, User, ListChecks } from 'lucide-react';
 import Link from 'next/link';
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
 import { formatDate, formatTime } from '@/lib/utils';
@@ -247,7 +247,7 @@ export default function MissionReportPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        {mission.tasks.map((task, index) => (
+                        {mission.tasks.map((task) => (
                             <div key={task.id} className="flex items-start gap-3 p-3 rounded-lg border">
                                 <div className="flex items-center gap-2 min-w-0 flex-1">
                                     <Checkbox 

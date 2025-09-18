@@ -130,25 +130,38 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    // Create user
-    const newUser = await prisma.user.create({
-      data: {
-        name,
-        email,
-        hashedPassword,
-        role: role as UserRole,
-        onlineStatus: 'OFFLINE'
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        image: true,
-        onlineStatus: true,
-        createdAt: true
+    // Create user and optionally assign to a team within a transaction
+    const newUser = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          name,
+          email,
+          hashedPassword,
+          role: role as UserRole,
+          onlineStatus: 'OFFLINE'
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          image: true,
+          onlineStatus: true,
+          createdAt: true
+        }
+      });
+
+      if (teamId) {
+        await tx.teamMember.create({
+          data: {
+            userId: createdUser.id,
+            teamId: teamId
+          }
+        });
       }
-    })
+
+      return createdUser;
+    });
 
     console.log(`Created new user: ${newUser.email} with role: ${newUser.role}`)
 

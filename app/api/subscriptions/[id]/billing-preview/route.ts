@@ -1,11 +1,11 @@
 // app/api/subscriptions/[id]/billing-preview/route.ts - BILLING PREVIEW
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import { Decimal } from '@prisma/client/runtime/library'
+
 const prisma = new PrismaClient()
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

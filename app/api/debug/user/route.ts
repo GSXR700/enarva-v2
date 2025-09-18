@@ -17,7 +17,9 @@ export async function GET(request: NextRequest) {
         id: session.user.id,
         email: session.user.email,
         name: session.user.name
-      } : null
+      } : null,
+      requestUrl: request.url,
+      userAgent: request.headers.get('user-agent')
     });
 
     if (!session?.user) {
@@ -62,6 +64,11 @@ export async function GET(request: NextRequest) {
     }) : null;
 
     return NextResponse.json({
+      requestInfo: {
+        url: request.url,
+        userAgent: request.headers.get('user-agent'),
+        ip: request.headers.get('x-forwarded-for') ?? 'IP Not Found'
+      },
       session: {
         userId: user.id,
         userEmail: user.email,
@@ -74,6 +81,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Debug error:', error);
-    return NextResponse.json({ error: error }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

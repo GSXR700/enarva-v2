@@ -6,7 +6,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 const prisma = new PrismaClient();
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -59,7 +59,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

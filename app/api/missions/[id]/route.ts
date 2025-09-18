@@ -1,6 +1,4 @@
 // app/api/missions/[id]/route.ts - Consolidated and corrected
-// app/api/missions/[id]/route.ts - Consolidated and corrected
-// app/api/missions/[id]/route.ts - Consolidated and corrected
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -28,7 +26,7 @@ const missionUpdateSchema = z.object({
 }).passthrough();
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -168,7 +166,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

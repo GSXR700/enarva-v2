@@ -14,21 +14,16 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { 
   ArrowLeft, 
-  Camera, 
   CheckCircle, 
   Clock, 
   Play, 
-  Pause,
   Eye,
   ThumbsUp,
   ThumbsDown,
-  Send,
-  AlertCircle,
-  Users,
   MapPin,
   Calendar
 } from 'lucide-react'
-import { Mission, Lead, Task, TaskStatus, MissionStatus } from '@prisma/client'
+import { Mission, Lead, Task, TaskStatus } from '@prisma/client'
 import { formatDate, formatTime, translate } from '@/lib/utils'
 import { toast } from 'sonner'
 import Link from 'next/link'

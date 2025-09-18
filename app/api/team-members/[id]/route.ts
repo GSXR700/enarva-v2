@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 
 // DELETE /api/team-members/[id] - Remove team member
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -123,7 +123,7 @@ export async function DELETE(
 
 // PUT /api/team-members/[id] - Update team member
 export async function PUT(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -138,7 +138,7 @@ export async function PUT(
     }
 
     const { id: teamMemberId } = await params;
-    const body = await request.json();
+    const body = await _request.json();
 
     const updatedTeamMember = await prisma.$transaction(async (tx) => {
       // Check if team member exists
@@ -241,7 +241,7 @@ export async function PUT(
 
 // GET /api/team-members/[id] - Get team member details
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
       const newTeam = await tx.team.create({
         data: {
           name: validatedData.name,
-          description: validatedData.description
+          description: validatedData.description ?? null
         }
       });
 

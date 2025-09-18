@@ -1,7 +1,7 @@
 // app/api/invoices/route.ts
+
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import { Decimal } from '@prisma/client/runtime/library';
 
 const prisma = new PrismaClient()
 

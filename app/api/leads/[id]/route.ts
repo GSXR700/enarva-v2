@@ -5,11 +5,10 @@ import { authOptions } from '@/lib/auth';
 import { leadService } from '@/services/lead.service';
 import { validateCompleteLeadInput, cleanLeadData } from '@/lib/validation';
 import { errorHandler } from '@/lib/error-handler';
-import { LeadStatus } from '@prisma/client';
 import { ExtendedUser } from '@/types/next-auth';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -242,7 +241,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
