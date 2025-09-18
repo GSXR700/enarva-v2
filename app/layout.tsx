@@ -1,15 +1,16 @@
-// app/layout.tsx
+// app/layout.tsx - AUTHENTIFICATION CORRIGÉE
 import './globals.css'
 import { Poppins } from 'next/font/google'
 import { Providers } from '@/components/providers/Providers'
 import SplashScreen from '@/components/SplashScreen'
+import PWAInstaller from '@/components/PWAInstaller'
 import { Metadata, Viewport } from 'next'
-import PWAInstaller from '@/components/PWAInstaller';
 
 const poppins = Poppins({ 
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700'],
   variable: '--font-poppins',
+  display: 'swap',
 })
 
 export const viewport: Viewport = {
@@ -21,7 +22,10 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'Enarva OS',
+  title: {
+    default: 'Enarva OS',
+    template: '%s | Enarva OS'
+  },
   description: 'Plateforme de gestion complète pour Enarva.',
   manifest: '/manifest.json',
   appleWebApp: {
@@ -52,6 +56,7 @@ export default function RootLayout({
   return (
     <html lang="fr" className={poppins.variable} suppressHydrationWarning>
       <head>
+        {/* PWA Meta Tags essentiels uniquement */}
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/apple-icon.png" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -63,7 +68,7 @@ export default function RootLayout({
         <SplashScreen />
         <Providers>
           {children}
-           <PWAInstaller />
+          <PWAInstaller />
         </Providers>
       </body>
     </html>

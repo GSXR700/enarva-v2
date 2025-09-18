@@ -1,7 +1,6 @@
-module.exports = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   experimental: {
-    // Temporarily disable optimizeCss to fix the critters issue
-    // optimizeCss: true,
     optimizePackageImports: ['lucide-react', '@radix-ui/react-*', 'recharts']
   },
   images: {
@@ -10,6 +9,33 @@ module.exports = {
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
+  },
+  // PWA Headers uniquement pour les fichiers statiques
+  async headers() {
+    return [
+      {
+        source: '/manifest.json',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/manifest+json',
+          },
+        ],
+      },
+      {
+        source: '/sw.js',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/javascript; charset=utf-8',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+        ],
+      },
+    ]
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -29,7 +55,6 @@ module.exports = {
             test: /[\\/]node_modules[\\/]/,
             name(module) {
               const packageName = module.context.match(/[\\/]node_modules[\\/](.*?)[\\/]/)?.[1];
-              // FIX: Add a fallback for modules where the name can't be extracted.
               if (packageName) {
                 return `lib.${packageName.replace('@', '')}`;
               }
@@ -45,3 +70,5 @@ module.exports = {
     return config;
   },
 };
+
+module.exports = nextConfig;

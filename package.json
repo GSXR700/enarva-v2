@@ -4,14 +4,18 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && npm run generate:icons && next build",
     "start": "next start",
     "lint": "next lint",
     "db:push": "npx prisma db push",
-    "db:generate": "npx prisma generate",
+    "db:generate": "npx prisma generate", 
     "db:studio": "npx prisma studio",
     "db:seed": "npx tsx prisma/seed.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "generate:icons": "node scripts/generate-icons.js",
+    "pwa:build": "npm run generate:icons && next build",
+    "pwa:audit": "npx lighthouse http://localhost:3000 --preset=desktop --output=html --output-path=./lighthouse-report.html",
+    "pwa:test": "npm run build && npm start & npx wait-on http://localhost:3000 && npm run pwa:audit"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
