@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Activity } from '@prisma/client'
 import { getRelativeTime } from '@/lib/utils'
+import InstallPWAButton from '@/components/InstallPWAButton';
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -75,7 +76,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
             <Search className="w-5 h-5" />
         </Button>
         <Link href="/chat"><Button variant="ghost" size="icon"><MessageSquare className="w-5 h-5" /></Button></Link>
-        
+        <InstallPWAButton />
         <DropdownMenu onOpenChange={(open) => !open && setShowNotificationDot(false)}>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
