@@ -1,60 +1,98 @@
-// middleware.ts - FIXED
-import { NextRequest, NextResponse } from 'next/server'
+// middleware.ts - FIXED ROLE-BASED ROUTING
+import { NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
+
 export async function middleware(req: NextRequest) {
-  // Fixed: Ensure NEXTAUTH_SECRET is defined
-  const secret = process.env.NEXTAUTH_SECRET
-  if (!secret) {
-    console.error('NEXTAUTH_SECRET is not defined')
-    return NextResponse.redirect(new URL('/login', req.url))
+  const token = await getToken({ req, ...(process.env.NEXTAUTH_SECRET ? { secret: process.env.NEXTAUTH_SECRET } : {}) });
+  const { pathname } = req.nextUrl;
+
+  // Routes that should be excluded from authentication
+  const publicRoutes = [
+    '/login',
+    '/signup', 
+    '/forgot-password',
+    '/api/auth',
+    '/api/edgestore',
+    '/api/leads/ingest',
+    '/_next',
+    '/favicon.ico',
+    '/images'
+  ];
+
+  // Check if route is public
+  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
+  
+  if (isPublicRoute) {
+    return NextResponse.next();
   }
 
-  const token = await getToken({ req, secret })
-
-  const { pathname } = req.nextUrl
-
-  // Allow requests to the login page and public assets
-  if (
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/favicon.ico') ||
-    pathname.startsWith('/images')
-  ) {
-    return NextResponse.next()
-  }
-
-  // Check if user is authenticated
+  // If no token, redirect to login
   if (!token) {
-    return NextResponse.redirect(new URL('/login', req.url))
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('callbackUrl', req.url);
+    return NextResponse.redirect(loginUrl);
   }
 
-  // Check role-based access for admin routes
-  if (pathname.startsWith('/administration')) {
-    const userRole = token.role as string
-    const allowedRoles = ['ADMIN', 'MANAGER', 'AGENT', 'TEAM_LEADER']
-    
-    if (!allowedRoles.includes(userRole)) {
-      return NextResponse.redirect(new URL('/field/dashboard', req.url))
+  const userRole = token.role as string;
+
+  // Define route patterns more precisely
+  const adminRoutes = [
+    '/(administration)',
+    '/leads',
+    '/quotes', 
+    '/missions',
+    '/teams',
+    '/inventory',
+    '/billing',
+    '/analytics',
+    '/expenses',
+    '/loyalty',
+    '/settings'
+  ];
+
+  // Field/Technician routes - these contain "dashboard" or "(field)"
+  const fieldRoutes = [
+    '/(field)',
+    '/dashboard' // This is the field dashboard
+  ];
+
+  const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route)) || pathname === '/';
+  const isFieldRoute = fieldRoutes.some(route => pathname.startsWith(route));
+
+  // Role-based access control
+  if (userRole === 'ADMIN' || userRole === 'MANAGER') {
+    // Admins and Managers should use admin interface
+    if (isFieldRoute) {
+      // Redirect field routes to admin dashboard
+      return NextResponse.redirect(new URL('/', req.url));
     }
+    // Allow access to admin routes
+    return NextResponse.next();
   }
 
-  // Check field access
-  if (pathname.startsWith('/field')) {
-    const userRole = token.role as string
-    const allowedFieldRoles = ['TECHNICIAN', 'TEAM_LEADER']
-    
-    if (!allowedFieldRoles.includes(userRole)) {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
+  if (userRole === 'TECHNICIAN' || userRole === 'TEAM_LEADER') {
+    // Technicians and Team Leaders should use field interface
+    if (isAdminRoute) {
+      // Redirect admin routes to field dashboard  
+      return NextResponse.redirect(new URL('/dashboard', req.url));
     }
+    // Allow access to field routes
+    return NextResponse.next();
   }
 
-  return NextResponse.next()
+  if (userRole === 'AGENT') {
+    // Agents can access both, but default to admin interface
+    return NextResponse.next();
+  }
+
+  // Default: allow access
+  return NextResponse.next();
 }
 
-export const config = {
+export const config = { 
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|images).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
-}
+};
