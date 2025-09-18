@@ -12,6 +12,7 @@ const poppins = Poppins({
 export const metadata = {
   title: 'Enarva OS',
   description: 'Plateforme de gestion complète pour Enarva.',
+  manifest: '/manifest.json',
   icons: {
     icon: '/favicon.ico',
   },
