@@ -18,14 +18,12 @@ export async function GET(request: Request) {
     const year = parseInt(url.searchParams.get('year') || new Date().getFullYear().toString())
 
     let groupBy: string
-    let dateFormat: string
     let periods: any[]
 
     switch (period) {
       case 'week':
         // Last 12 weeks
         groupBy = 'week'
-        dateFormat = 'YYYY-"W"WW'
         periods = Array.from({ length: 12 }, (_, i) => {
           const date = new Date()
           date.setDate(date.getDate() - (i * 7))

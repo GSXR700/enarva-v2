@@ -72,7 +72,21 @@ export function TemplatesSettings() {
 
   const handleItemChange = (index: number, field: keyof TaskTemplateItem, value: string) => {
     const updatedItems = [...formState.items]
-    updatedItems[index] = { ...updatedItems[index], [field]: value }
+    // Fixed: Ensure the item has required properties before updating
+    const currentItem = updatedItems[index]
+    if (field === 'title') {
+      updatedItems[index] = { 
+        ...currentItem, 
+        title: value,
+        category: currentItem?.category || 'GENERAL' as TaskCategory
+      }
+    } else if (field === 'category') {
+      updatedItems[index] = { 
+        ...currentItem, 
+        title: currentItem?.title || '',
+        category: value as TaskCategory 
+      }
+    }
     setFormState(prev => ({ ...prev, items: updatedItems }))
   }
 
@@ -96,42 +110,50 @@ export function TemplatesSettings() {
       name: template.name,
       description: template.description || '',
       items: template.items && template.items.length > 0 
-        ? template.items.map(item => ({
-            id: item.id,
-            title: item.title,
-            category: item.category
-          }))
+        ? template.items
         : [{ title: '', category: 'GENERAL' }]
     })
   }
 
+  const resetForm = () => {
+    setFormState(initialFormState)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (formState.items.length === 0) {
-      toast.error('Au moins une tâche est requise')
+    if (!formState.name.trim()) {
+      toast.error('Le nom du modèle est requis')
+      return
+    }
+
+    if (formState.items.length === 0 || !formState.items.some(item => item.title.trim())) {
+      toast.error('Au moins une tâche avec un titre est requise')
       return
     }
 
     setIsSaving(true)
     try {
+      const filteredItems = formState.items.filter(item => item.title.trim())
+      const templateData = {
+        name: formState.name.trim(),
+        description: formState.description.trim() || null,
+        items: filteredItems
+      }
+
       const url = formState.id ? `/api/task-templates/${formState.id}` : '/api/task-templates'
       const method = formState.id ? 'PUT' : 'POST'
 
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formState.name,
-          description: formState.description || null,
-          items: formState.items
-        })
+        body: JSON.stringify(templateData)
       })
 
       if (!response.ok) throw new Error('Erreur lors de la sauvegarde')
 
-      toast.success(formState.id ? 'Modèle mis à jour avec succès' : 'Modèle créé avec succès')
-      await fetchTemplates()
+      toast.success(formState.id ? 'Modèle mis à jour' : 'Modèle créé avec succès')
       resetForm()
+      fetchTemplates()
     } catch (error: any) {
       toast.error(error.message)
     } finally {
@@ -150,8 +172,7 @@ export function TemplatesSettings() {
       if (!response.ok) throw new Error('Erreur lors de la suppression')
 
       toast.success('Modèle supprimé avec succès')
-      await fetchTemplates()
-      
+      fetchTemplates()
       if (formState.id === templateId) {
         resetForm()
       }
@@ -160,18 +181,17 @@ export function TemplatesSettings() {
     }
   }
 
-  const resetForm = () => {
-    setFormState(initialFormState)
-  }
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-6">
       {/* Templates List */}
       <Card className="thread-card">
         <CardHeader>
-          <CardTitle>Modèles de Tâches</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-enarva-start" />
+            Modèles Existants
+          </CardTitle>
           <CardDescription>
-            Gérez vos modèles de tâches pour une création rapide de missions.
+            Sélectionnez un modèle pour le modifier ou créez-en un nouveau.
           </CardDescription>
         </CardHeader>
         <CardContent>

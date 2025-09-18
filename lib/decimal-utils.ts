@@ -40,14 +40,12 @@ export function safeDecimalToNumber(value: any): number {
 /**
  * Safely formats a Prisma Decimal as currency
  * @param value - The value to format
- * @param currency - The currency code (default: 'MAD')
  * @param locale - The locale for formatting (default: 'fr-FR')
  * @returns Formatted currency string
  */
 export function safeFormatCurrency(
   value: any, 
-  currency: string = 'MAD', 
-  locale: string = 'fr-FR'
+  locale: string = 'fr-FR' // Fixed: Remove unused currency parameter
 ): string {
   const numericValue = safeDecimalToNumber(value)
   

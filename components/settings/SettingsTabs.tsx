@@ -2,7 +2,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { DollarSign, FileText, Users, Settings as SettingsIcon } from 'lucide-react'
+import { FileText, Users, Settings as SettingsIcon } from 'lucide-react'
 
 interface SettingsTabsProps {
   activeTab: string

@@ -58,15 +58,19 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   const BLUE_PRIMARY = [33, 85, 201]; // #2155C9
   const BLUE_DARK = [28, 63, 145]; // Darker blue for header
   const TEXT_DARK = [33, 33, 33];
-  const TEXT_GRAY = [102, 102, 102];
+  // Removed unused TEXT_GRAY constant
 
-  // Helper function to set colors
+  // Helper function to set colors - Fixed: Add proper type guards for array access
   const setColor = (color: number[]) => {
-    doc.setTextColor(color[0], color[1], color[2]);
+    if (color.length >= 3 && typeof color[0] === 'number' && typeof color[1] === 'number' && typeof color[2] === 'number') {
+      doc.setTextColor(color[0], color[1], color[2]);
+    }
   };
 
   const setFillColor = (color: number[]) => {
-    doc.setFillColor(color[0], color[1], color[2]);
+    if (color.length >= 3 && typeof color[0] === 'number' && typeof color[1] === 'number' && typeof color[2] === 'number') {
+      doc.setFillColor(color[0], color[1], color[2]);
+    }
   };
 
   // 1. HEADER SECTION WITH BLUE BACKGROUND
@@ -281,7 +285,7 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   doc.text(`ICE: ${data.company.ice}`, PAGE_WIDTH - 200, footerY + 65);
   doc.text(`RIB: ${data.company.rib}`, PAGE_WIDTH - 200, footerY + 80);
 
-  // ** FIX: Correctly convert ArrayBuffer to Uint8Array **
+  // Convert ArrayBuffer to Uint8Array for return
   const buffer = doc.output('arraybuffer');
   return new Uint8Array(buffer);
 }

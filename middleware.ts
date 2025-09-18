@@ -1,65 +1,60 @@
-// middleware.ts - FIXED VERSION
-import { NextResponse } from 'next/server'
-import { NextRequest } from 'next/server'
+// middleware.ts - FIXED
+import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
 export async function middleware(req: NextRequest) {
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  const { pathname } = req.nextUrl;
+  // Fixed: Ensure NEXTAUTH_SECRET is defined
+  const secret = process.env.NEXTAUTH_SECRET
+  if (!secret) {
+    console.error('NEXTAUTH_SECRET is not defined')
+    return NextResponse.redirect(new URL('/login', req.url))
+  }
 
-  // Define admin and field routes
-  const isAdminRoute = pathname.startsWith('/(administration)') || 
-                       pathname === '/' ||
-                       pathname.startsWith('/leads') ||
-                       pathname.startsWith('/quotes') ||
-                       pathname.startsWith('/teams') ||
-                       pathname.startsWith('/inventory') ||
-                       pathname.startsWith('/billing') ||
-                       pathname.startsWith('/analytics') ||
-                       pathname.startsWith('/expenses') ||
-                       pathname.startsWith('/loyalty') ||
-                       pathname.startsWith('/settings');
+  const token = await getToken({ req, secret })
 
-  const isFieldRoute = pathname.startsWith('/(field)') || pathname.startsWith('/dashboard');
+  const { pathname } = req.nextUrl
 
-  // CRITICAL FIX: Add ingestion API to excluded paths
+  // Allow requests to the login page and public assets
   if (
     pathname.startsWith('/login') ||
-    pathname.startsWith('/signup') ||
-    pathname.startsWith('/forgot-password') ||
-    pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/api/edgestore') ||
-    pathname.startsWith('/api/leads/ingest') || // ADD THIS LINE
     pathname.startsWith('/_next') ||
-    pathname.includes('/favicon.ico') ||
+    pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/favicon.ico') ||
     pathname.startsWith('/images')
   ) {
-    return NextResponse.next();
+    return NextResponse.next()
   }
 
-  // If no token, redirect to login
+  // Check if user is authenticated
   if (!token) {
-    const loginUrl = new URL('/login', req.url);
-    loginUrl.searchParams.set('callbackUrl', req.url);
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  const userRole = token.role as string;
+  // Check role-based access for admin routes
+  if (pathname.startsWith('/administration')) {
+    const userRole = token.role as string
+    const allowedRoles = ['ADMIN', 'MANAGER', 'AGENT', 'TEAM_LEADER']
+    
+    if (!allowedRoles.includes(userRole)) {
+      return NextResponse.redirect(new URL('/field/dashboard', req.url))
+    }
+  }
 
-  // Role-based redirections
-  if ((userRole === 'TECHNICIAN' || userRole === 'TEAM_LEADER') && isAdminRoute) {
-    return NextResponse.redirect(new URL('/dashboard', req.url));
+  // Check field access
+  if (pathname.startsWith('/field')) {
+    const userRole = token.role as string
+    const allowedFieldRoles = ['TECHNICIAN', 'TEAM_LEADER']
+    
+    if (!allowedFieldRoles.includes(userRole)) {
+      return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
   }
-  
-  if ((userRole === 'ADMIN' || userRole === 'MANAGER') && isFieldRoute) {
-     return NextResponse.redirect(new URL('/', req.url));
-  }
-  
-  return NextResponse.next();
+
+  return NextResponse.next()
 }
 
-export const config = { 
+export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|images).*)',
   ],
-};
+}

@@ -1,7 +1,7 @@
 // components/providers/Providers.tsx
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useEffect, useState } from 'react'
 import { SessionProvider } from 'next-auth/react'
 import { EdgeStoreProvider } from '@/lib/edgestore'
 

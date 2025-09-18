@@ -110,7 +110,7 @@ export const AvatarCropperModal: React.FC<AvatarCropperModalProps> = ({
             max={3}
             step={0.1}
             value={[zoom]}
-            onValueChange={(val) => setZoom(val[0])}
+            onValueChange={(val) => setZoom(val[0] ?? 1)} // Fixed: Handle undefined value
           />
         </div>
 

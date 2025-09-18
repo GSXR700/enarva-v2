@@ -87,7 +87,9 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
   }
 
   const handleScoreChange = (value: number[]) => {
-    setFormData(prev => ({ ...prev, score: value[0] }))
+    // Fixed: Ensure the score value is always a number, not undefined
+    const scoreValue = value[0] ?? 0
+    setFormData(prev => ({ ...prev, score: scoreValue }))
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -164,10 +166,11 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="NEW">Nouveau</SelectItem>
-                  <SelectItem value="TO_QUALIFY">À qualifier</SelectItem>
+                  <SelectItem value="CONTACTED">Contacté</SelectItem>
                   <SelectItem value="QUALIFIED">Qualifié</SelectItem>
-                  <SelectItem value="QUOTE_SENT">Devis envoyé</SelectItem>
-                  <SelectItem value="COMPLETED">Terminé</SelectItem>
+                  <SelectItem value="QUOTED">Devisé</SelectItem>
+                  <SelectItem value="CONVERTED">Converti</SelectItem>
+                  <SelectItem value="LOST">Perdu</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -175,53 +178,46 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="address">Adresse complète</Label>
-              <Textarea
-                id="address"
-                value={formData.address}
-                onChange={(e) => handleChange('address', e.target.value)}
-                rows={2}
-              />
+              <Label htmlFor="address">Adresse</Label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  id="address"
+                  value={formData.address}
+                  onChange={(e) => handleChange('address', e.target.value)}
+                  className="pl-10"
+                  placeholder="Adresse complète"
+                />
+              </div>
             </div>
             <div>
-              <Label htmlFor="gpsLocation">
-                <MapPin className="w-4 h-4 inline mr-1" />
-                Coordonnées GPS
-              </Label>
+              <Label htmlFor="gpsLocation">Coordonnées GPS</Label>
               <Input
                 id="gpsLocation"
                 value={formData.gpsLocation}
                 onChange={(e) => handleChange('gpsLocation', e.target.value)}
-                placeholder="33.5731, -7.5898"
+                placeholder="lat, lng"
               />
             </div>
           </div>
 
-          {/* Lead Score Slider */}
           <div>
             <Label className="flex items-center gap-2">
               <Star className="w-4 h-4" />
-              Score du Lead: {formData.score}/100
+              Score du Lead: {formData.score}
             </Label>
-            <div className="mt-2">
-              <Slider
-                value={[formData.score]}
-                onValueChange={handleScoreChange}
-                max={100}
-                step={5}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>Faible (0)</span>
-                <span>Moyen (50)</span>
-                <span>Élevé (100)</span>
-              </div>
-            </div>
+            <Slider
+              value={[formData.score]}
+              onValueChange={handleScoreChange}
+              max={100}
+              step={1}
+              className="mt-2"
+            />
           </div>
         </CardContent>
       </Card>
 
-      {/* Enhanced Professional Details */}
+      {/* Professional Details */}
       <Card className="thread-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -230,34 +226,28 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="leadType">Type de lead</Label>
+            <Select value={formData.leadType} onValueChange={(value) => handleChange('leadType', value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PARTICULIER">Particulier</SelectItem>
+                <SelectItem value="PROFESSIONNEL">Professionnel</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="leadType">Type de client</Label>
-              <Select value={formData.leadType} onValueChange={(value) => handleChange('leadType', value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PARTICULIER">Particulier</SelectItem>
-                  <SelectItem value="PROFESSIONNEL">Professionnel</SelectItem>
-                  <SelectItem value="PUBLIC">Public</SelectItem>
-                  <SelectItem value="NGO">ONG</SelectItem>
-                  <SelectItem value="SYNDIC">Syndic</SelectItem>
-                  <SelectItem value="OTHER">Autre</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="company">Entreprise/Société</Label>
+              <Label htmlFor="company">Entreprise</Label>
               <Input
                 id="company"
                 value={formData.company}
                 onChange={(e) => handleChange('company', e.target.value)}
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="iceNumber">Numéro ICE</Label>
               <Input
@@ -266,6 +256,9 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
                 onChange={(e) => handleChange('iceNumber', e.target.value)}
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="activitySector">Secteur d'activité</Label>
               <Input
@@ -337,45 +330,69 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
                 <SelectContent>
                   <SelectItem value="EASY">Facile</SelectItem>
                   <SelectItem value="MEDIUM">Moyenne</SelectItem>
-                  <SelectItem value="MODERATE">Modérée</SelectItem>
                   <SelectItem value="DIFFICULT">Difficile</SelectItem>
-                  <SelectItem value="VERY_DIFFICULT">Très difficile</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          {/* Enhanced Materials Selection */}
+          {/* Materials Selection */}
           <div>
-            <Label className="mb-3 block">Matériaux présents</Label>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {[
-                { key: 'marble', label: 'Marbre' },
-                { key: 'parquet', label: 'Parquet' },
-                { key: 'tiles', label: 'Carrelage' },
-                { key: 'carpet', label: 'Moquette' },
-                { key: 'concrete', label: 'Béton' }
-              ].map(({ key, label }) => (
-                <div key={key} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={key}
-                    checked={formData.materials[key as keyof typeof formData.materials] as boolean}
-                    onCheckedChange={(checked) => handleMaterialChange(key, !!checked)}
-                  />
-                  <Label htmlFor={key} className="text-sm">{label}</Label>
-                </div>
-              ))}
+            <Label>Matériaux à nettoyer</Label>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="marble"
+                  checked={formData.materials.marble}
+                  onCheckedChange={(checked) => handleMaterialChange('marble', !!checked)}
+                />
+                <Label htmlFor="marble">Marbre</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="parquet"
+                  checked={formData.materials.parquet}
+                  onCheckedChange={(checked) => handleMaterialChange('parquet', !!checked)}
+                />
+                <Label htmlFor="parquet">Parquet</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="tiles"
+                  checked={formData.materials.tiles}
+                  onCheckedChange={(checked) => handleMaterialChange('tiles', !!checked)}
+                />
+                <Label htmlFor="tiles">Carrelage</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="carpet"
+                  checked={formData.materials.carpet}
+                  onCheckedChange={(checked) => handleMaterialChange('carpet', !!checked)}
+                />
+                <Label htmlFor="carpet">Moquette</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="concrete"
+                  checked={formData.materials.concrete}
+                  onCheckedChange={(checked) => handleMaterialChange('concrete', !!checked)}
+                />
+                <Label htmlFor="concrete">Béton</Label>
+              </div>
+              <div>
+                <Label htmlFor="other">Autre</Label>
+                <Input
+                  id="other"
+                  value={formData.materials.other}
+                  onChange={(e) => handleMaterialChange('other', e.target.value)}
+                  placeholder="Préciser..."
+                />
+              </div>
             </div>
-            <div className="mt-2">
-              <Input
-                placeholder="Autres matériaux..."
-                value={formData.materials.other}
-                onChange={(e) => handleMaterialChange('other', e.target.value)}
-              />
-            </div>
-        </div>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="urgencyLevel">Niveau d'urgence</Label>
               <Select value={formData.urgencyLevel} onValueChange={(value) => handleChange('urgencyLevel', value)}>
@@ -385,24 +402,20 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
                 <SelectContent>
                   <SelectItem value="LOW">Faible</SelectItem>
                   <SelectItem value="NORMAL">Normal</SelectItem>
+                  <SelectItem value="HIGH">Élevé</SelectItem>
                   <SelectItem value="URGENT">Urgent</SelectItem>
-                  <SelectItem value="HIGH_URGENT">Très urgent</SelectItem>
-                  <SelectItem value="IMMEDIATE">Immédiat</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label htmlFor="budgetRange">Budget estimé</Label>
+              <Label htmlFor="budgetRange">Fourchette budgétaire</Label>
               <Input
                 id="budgetRange"
                 value={formData.budgetRange}
                 onChange={(e) => handleChange('budgetRange', e.target.value)}
-                placeholder="ex: 5000-10000 MAD"
+                placeholder="ex: 500-1000 MAD"
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="frequency">Fréquence</Label>
               <Select value={formData.frequency} onValueChange={(value) => handleChange('frequency', value)}>
@@ -414,22 +427,6 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
                   <SelectItem value="HEBDOMADAIRE">Hebdomadaire</SelectItem>
                   <SelectItem value="MENSUEL">Mensuel</SelectItem>
                   <SelectItem value="TRIMESTRIEL">Trimestriel</SelectItem>
-                  <SelectItem value="RECURRING">Récurrent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="contractType">Type de contrat</Label>
-              <Select value={formData.contractType} onValueChange={(value) => handleChange('contractType', value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="INTERVENTION_UNIQUE">Intervention unique</SelectItem>
-                  <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                  <SelectItem value="ABONNEMENT">Abonnement</SelectItem>
-                  <SelectItem value="CONTRAT_CADRE">Contrat cadre</SelectItem>
-                  <SelectItem value="RECURRING">Récurrent</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -520,13 +517,14 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
                   checked={formData.hasReferrer}
                   onCheckedChange={(checked) => handleChange('hasReferrer', !!checked)}
                 />
-                <Label htmlFor="hasReferrer">A un parrain/référent</Label>
+                <Label htmlFor="hasReferrer">A un référent</Label>
               </div>
               {formData.hasReferrer && (
                 <Input
-                  placeholder="Contact du parrain"
+                  id="referrerContact"
                   value={formData.referrerContact}
                   onChange={(e) => handleChange('referrerContact', e.target.value)}
+                  placeholder="Contact du référent"
                 />
               )}
             </div>
@@ -539,8 +537,7 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
                 <SelectContent>
                   <SelectItem value="PRESTATAIRE_PRINCIPAL">Prestataire principal</SelectItem>
                   <SelectItem value="SOUS_TRAITANT">Sous-traitant</SelectItem>
-                  <SelectItem value="CO_TRAITANT">Co-traitant</SelectItem>
-                  <SelectItem value="AUTRE">Autre</SelectItem>
+                  <SelectItem value="PARTENAIRE">Partenaire</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -548,33 +545,43 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
         </CardContent>
       </Card>
 
-      {/* Follow-up */}
+      {/* Follow-up & Assignment */}
       <Card className="thread-card">
         <CardHeader>
-          <CardTitle>Suivi et Notes</CardTitle>
+          <CardTitle>Suivi & Attribution</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="originalMessage">Message/Demande originale *</Label>
+            <Label htmlFor="originalMessage">Message original *</Label>
             <Textarea
               id="originalMessage"
               value={formData.originalMessage}
               onChange={(e) => handleChange('originalMessage', e.target.value)}
+              placeholder="Décrivez la demande du client..."
               rows={4}
               required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="assignedToId">Assigné à</Label>
+            <Input
+              id="assignedToId"
+              value={formData.assignedToId}
+              onChange={(e) => handleChange('assignedToId', e.target.value)}
+              placeholder="ID de l'utilisateur assigné"
             />
           </div>
         </CardContent>
       </Card>
 
       {/* Submit Button */}
-      <div className="flex justify-end">
-        <Button 
-          type="submit" 
-          disabled={isLoading}
-          className="bg-enarva-gradient rounded-lg px-8"
-        >
-          {isLoading ? 'Enregistrement...' : 'Enregistrer le Lead'}
+      <div className="flex justify-end gap-4">
+        <Button type="button" variant="outline" disabled={isLoading}>
+          Annuler
+        </Button>
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? 'Enregistrement...' : lead ? 'Mettre à jour' : 'Créer le lead'}
         </Button>
       </div>
     </form>

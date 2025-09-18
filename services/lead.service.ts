@@ -1,5 +1,5 @@
 // services/lead.service.ts - UPDATED TO HANDLE WEBSITE SYSTEM LEADS
-import { PrismaClient, Prisma, Lead, LeadStatus, ActivityType } from '@prisma/client';
+import { PrismaClient, Prisma, LeadStatus, ActivityType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -19,10 +19,11 @@ export class LeadService {
  }
 
  async getLeadById(id: string, include?: Prisma.LeadInclude) {
-   return await prisma.lead.findUnique({
-     where: { id },
-     include
-   });
+   const query: any = { where: { id } };
+   if (include !== undefined) {
+     query.include = include;
+   }
+   return await prisma.lead.findUnique(query);
  }
 
  async createLead(data: Prisma.LeadCreateInput, creatorId: string) {
@@ -263,7 +264,7 @@ export class LeadService {
          type: data.type,
          title: data.title,
          description: data.description,
-         leadId: data.leadId,
+         leadId: data.leadId ?? null,
          userId: data.userId,
          metadata: data.metadata || {},
          createdAt: new Date()

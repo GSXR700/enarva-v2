@@ -72,10 +72,10 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60, // 30 days,
   },
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) { // Fixed: Remove unused account parameter
       console.log('JWT callback - user:', !!user, 'token sub:', token.sub);
       
       if (user) {

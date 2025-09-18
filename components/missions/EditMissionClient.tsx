@@ -1,42 +1,39 @@
+// components/missions/EditMissionClient.tsx
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
+import { DndProvider, useDrag, useDrop } from 'react-dnd'
+import { HTML5Backend } from 'react-dnd-html5-backend'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Save, ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import {
   Mission,
-  Lead,
   Task,
-  TaskCategory,
   TaskStatus,
   TaskType,
+  TaskCategory,
   MissionStatus,
   Priority,
   MissionType,
-  TeamMember,
 } from '@prisma/client'
 import { toast } from 'sonner'
-import { DndProvider } from 'react-dnd'
-import { HTML5Backend } from 'react-dnd-html5-backend'
-import { useDrag, useDrop } from 'react-dnd'
 
 type TaskWithId = Task & { id: string }
-type TaskTemplateWithTasks = {
+
+interface TaskTemplateWithTasks {
   id: string
   name: string
   description?: string
   tasks: any[]
 }
 
-const TaskItem = ({
+function TaskItem({
   task,
   index,
   handleTaskChange,
@@ -54,7 +51,9 @@ const TaskItem = ({
   removeTask: (index: number) => void
   moveTask: (dragIndex: number, hoverIndex: number) => void
   isClientView: boolean
-}) => {
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
   const [{ isDragging }, drag] = useDrag({
     type: 'task',
     item: { index },
@@ -65,19 +64,16 @@ const TaskItem = ({
 
   const [, drop] = useDrop({
     accept: 'task',
-    hover: (draggedItem: { index: number }) => {
-      if (draggedItem.index !== index) {
-        moveTask(draggedItem.index, index)
-        draggedItem.index = index
+    hover: (item: { index: number }) => {
+      if (item.index !== index) {
+        moveTask(item.index, index)
+        item.index = index
       }
     },
   })
 
-  const ref = (node: HTMLDivElement | null) => {
-    if (node !== null) {
-      drag(drop(node))
-    }
-  }
+  // Fixed: Properly combine drag and drop refs
+  drag(drop(ref))
 
   return (
     <div
@@ -176,8 +172,6 @@ export default function EditMissionClient({ params, searchParams }: Props) {
   const [mission, setMission] = useState<
     Partial<Mission & { tasks: TaskWithId[] }>
   >({})
-  const [leads, setLeads] = useState<Lead[]>([])
-  const [teamLeaders, setTeamLeaders] = useState<TeamMember[]>([])
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplateWithTasks[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isClientView, setIsClientView] = useState(false)
@@ -191,13 +185,9 @@ export default function EditMissionClient({ params, searchParams }: Props) {
 
         const [
           missionRes,
-          leadsRes,
-          teamLeadersRes,
           taskTemplatesRes,
         ] = await Promise.all([
           fetch(`/api/missions/${params.id}`),
-          fetch('/api/leads'),
-          fetch('/api/users?role=TEAM_LEADER'),
           fetch('/api/task-templates'),
         ])
 
@@ -208,17 +198,16 @@ export default function EditMissionClient({ params, searchParams }: Props) {
         const missionData = await missionRes.json()
         setMission({
           ...missionData,
-          scheduledDate: new Date(missionData.scheduledDate)
-            .toISOString()
-            .slice(0, 16),
+          // Fixed: Ensure scheduledDate is always a string for input
+          scheduledDate: missionData.scheduledDate 
+            ? new Date(missionData.scheduledDate).toISOString().slice(0, 16)
+            : '',
           tasks:
             missionData.tasks?.map((t: Task) => ({
               ...t,
               id: t.id || Math.random().toString(),
             })) || [],
         })
-        setLeads(await leadsRes.json())
-        setTeamLeaders(await teamLeadersRes.json())
         setTaskTemplates(await taskTemplatesRes.json())
       } catch (error) {
         console.error('Error fetching data:', error)
@@ -314,6 +303,8 @@ export default function EditMissionClient({ params, searchParams }: Props) {
     (dragIndex: number, hoverIndex: number) => {
       if (!mission.tasks) return;
       const dragTask = mission.tasks[dragIndex]
+      // Fixed: Handle potential undefined dragTask
+      if (!dragTask) return;
       const newTasks = [...mission.tasks]
       newTasks.splice(dragIndex, 1)
       newTasks.splice(hoverIndex, 0, dragTask)
@@ -348,58 +339,71 @@ export default function EditMissionClient({ params, searchParams }: Props) {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-96 bg-gray-200 rounded"></div>
-        </div>
+      <div className="main-content flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
   }
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="main-content space-y-6">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/missions">
-              <Button variant="outline" size="icon">
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-            </Link>
-            <h1 className="text-2xl font-bold">
-              {isClientView ? 'Détails de la Mission' : 'Modifier la Mission'}
-            </h1>
-            {isClientView && <Badge variant="secondary">Vue Client</Badge>}
-          </div>
-          {!isClientView && (
-            <Button onClick={handleSubmit} disabled={isLoading}>
-              <Save className="w-4 h-4 mr-2" />
-              Sauvegarder
+            <Button variant="outline" onClick={() => router.back()}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Retour
             </Button>
-          )}
+            <div>
+              <h1 className="text-2xl font-bold">
+                {isClientView ? 'Détails de la Mission' : 'Modifier la Mission'}
+              </h1>
+              <p className="text-muted-foreground">
+                Mission #{mission.missionNumber}
+              </p>
+            </div>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <Card>
+          {/* Basic Information */}
+          <Card className="thread-card">
             <CardHeader>
               <CardTitle>Informations Générales</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="missionNumber">Numéro de Mission</Label>
+                  <Label htmlFor="scheduledDate">Date prévue</Label>
                   <Input
-                    id="missionNumber"
-                    value={mission.missionNumber || ''}
+                    id="scheduledDate"
+                    type="datetime-local"
+                    value={typeof mission.scheduledDate === 'string' ? mission.scheduledDate : ''}
                     onChange={handleInputChange}
-                    disabled={true} // Usually read-only
+                    disabled={isClientView}
                   />
                 </div>
                 <div>
+                  <Label htmlFor="estimatedDuration">Durée estimée (heures)</Label>
+                  <Input
+                    id="estimatedDuration"
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    max="24"
+                    value={mission.estimatedDuration || ''}
+                    onChange={handleInputChange}
+                    disabled={isClientView}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
                   <Label htmlFor="status">Statut</Label>
-                  <Select
-                    value={mission.status}
+                  {/* Fixed: Ensure mission.status is not undefined */}
+                  <Select 
+                    value={mission.status || MissionStatus.SCHEDULED} 
                     onValueChange={(value) => handleSelectChange('status', value as MissionStatus)}
                     disabled={isClientView}
                   >
@@ -415,47 +419,74 @@ export default function EditMissionClient({ params, searchParams }: Props) {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="scheduledDate">Date Programmée</Label>
-                  <Input
-                    id="scheduledDate"
-                    type="datetime-local"
-                    value={mission.scheduledDate?.toString() || ''}
-                    onChange={handleInputChange}
+                  <Label htmlFor="priority">Priorité</Label>
+                  <Select
+                    value={mission.priority || Priority.NORMAL}
+                    onValueChange={(value) => handleSelectChange('priority', value as Priority)}
                     disabled={isClientView}
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir une priorité" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(Priority).map((priority) => (
+                        <SelectItem key={priority} value={priority}>
+                          {priority}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
-                  <Label htmlFor="estimatedDuration">Durée Estimée (minutes)</Label>
-                  <Input
-                    id="estimatedDuration"
-                    type="number"
-                    value={mission.estimatedDuration || ''}
-                    onChange={handleInputChange}
+                  <Label htmlFor="type">Type</Label>
+                  <Select
+                    value={mission.type || MissionType.SERVICE}
+                    onValueChange={(value) => handleSelectChange('type', value as MissionType)}
                     disabled={isClientView}
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir un type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(MissionType).map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
               <div>
                 <Label htmlFor="address">Adresse</Label>
-                <Textarea
+                <Input
                   id="address"
                   value={mission.address || ''}
                   onChange={handleInputChange}
                   disabled={isClientView}
                 />
               </div>
+
+              <div>
+                <Label htmlFor="accessNotes">Notes d'accès</Label>
+                <Textarea
+                  id="accessNotes"
+                  value={mission.accessNotes || ''}
+                  onChange={handleInputChange}
+                  disabled={isClientView}
+                  rows={3}
+                />
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
+          {/* Tasks */}
+          <Card className="thread-card">
             <CardHeader>
-              <CardTitle className="flex justify-between items-center">
-                <span>Tâches</span>
+              <CardTitle className="flex items-center justify-between">
+                Tâches de la Mission
                 {!isClientView && (
                   <div className="flex gap-2">
                     <Select onValueChange={applyTemplate}>
@@ -499,6 +530,28 @@ export default function EditMissionClient({ params, searchParams }: Props) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Submit */}
+          {!isClientView && (
+            <div className="flex justify-end gap-4">
+              <Button type="button" variant="outline" onClick={() => router.back()}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Sauvegarde...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Sauvegarder
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </form>
       </div>
     </DndProvider>

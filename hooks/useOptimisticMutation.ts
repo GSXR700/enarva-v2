@@ -43,7 +43,7 @@ export function useOptimisticMutation<TData = unknown, TVariables = unknown>({
       return { previousData };
     },
     // If the mutation fails...
-    onError: (err, variables, context) => {
+    onError: (err, _variables, context) => { // Fixed: Remove unused variables parameter
       // 5. Roll back to the previous value.
       if (context?.previousData) {
         queryClient.setQueryData(queryKey, context.previousData);

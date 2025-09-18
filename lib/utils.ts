@@ -352,8 +352,8 @@ export const translations = {
 export function translate(value: string | null | undefined): string {
   if (!value) return "N/A";
   
-  // Essaie de trouver la valeur dans nos objets de traduction
-  for (const [key, translationObj] of Object.entries(translations)) {
+  // Fixed: Remove unused 'key' variable by using Object.values instead of Object.entries
+  for (const translationObj of Object.values(translations)) {
     if (translationObj[value as keyof typeof translationObj]) {
       return translationObj[value as keyof typeof translationObj];
     }
@@ -470,7 +470,8 @@ const getServiceDetail = (service: ServiceInput): string => {
 };
 
 export function generateQuote(services: ServiceInput[]): QuoteCalculation {
-    const lineItems: QuoteLineItem[] = services.map((service, index) => {
+    // Fixed: Remove unused 'index' parameter from map function
+    const lineItems: QuoteLineItem[] = services.map((service) => {
         const amount = calculateIndividualService(service);
         return {
             id: `service-${service.id}`,

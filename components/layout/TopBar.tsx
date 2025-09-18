@@ -17,7 +17,6 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { cn } from '@/lib/utils'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Activity } from '@prisma/client'
 import { getRelativeTime } from '@/lib/utils'
@@ -108,44 +107,65 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                     <div className="p-0.5 rounded-full bg-enarva-gradient cursor-pointer">
                          <Avatar className="h-9 w-9">
                             <AvatarImage src={session.user.image || ''} alt={session.user.name || 'Utilisateur'} />
-                            <AvatarFallback>{session.user.name ? session.user.name.split(' ').map(n => n[0]).join('') : <User />}</AvatarFallback>
-                        </Avatar>
+                            <AvatarFallback>{session.user.name ? session.user.name.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
+                         </Avatar>
                     </div>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuContent className="w-64" align="end">
                     <DropdownMenuLabel className="font-normal">
                         <div className="flex flex-col space-y-1">
-                            <p className="text-sm font-medium leading-none">{session.user.name}</p>
-                            <p className="text-xs leading-none text-muted-foreground">{session.user.email}</p>
+                            <p className="text-sm font-medium leading-none">{session.user.name || 'Utilisateur'}</p>
+                            <p className="text-xs leading-none text-muted-foreground">
+                                {session.user.email}
+                            </p>
                         </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <Link href="/profile" passHref><DropdownMenuItem><User className="mr-2 h-4 w-4" /><span>Profil</span></DropdownMenuItem></Link>
-                    <Link href="/settings" passHref><DropdownMenuItem><Settings className="mr-2 h-4 w-4" /><span>Réglages</span></DropdownMenuItem></Link>
-                    <DropdownMenuItem onClick={handleEnableNotifications}><BellRing className="mr-2 h-4 w-4" /><span>Activer les notifications</span></DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <Link href="/profile" className="flex items-center gap-2">
+                            <User className="w-4 h-4" />
+                            Mon profil
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <Link href="/settings" className="flex items-center gap-2">
+                            <Settings className="w-4 h-4" />
+                            Paramètres
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleEnableNotifications} className="flex items-center gap-2">
+                        <BellRing className="w-4 h-4" />
+                        Activer les notifications
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-red-500" onClick={() => signOut({ callbackUrl: '/login' })}>
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Déconnexion</span>
+                    <DropdownMenuItem onClick={() => signOut()} className="flex items-center gap-2 text-red-600">
+                        <LogOut className="w-4 h-4" />
+                        Se déconnecter
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
         )}
       </div>
 
+      {/* Mobile Search Overlay */}
       <AnimatePresence>
         {isMobileSearchOpen && (
-            <motion.div 
-                initial={{ y: '-100%', opacity: 0 }}
-                animate={{ y: '0%', opacity: 1 }}
-                exit={{ y: '-100%', opacity: 0 }}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                className="absolute top-0 left-0 w-full h-full bg-card px-4 flex items-center gap-2 z-30"
-            >
-                <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                <Input placeholder="Rechercher dans Enarva..." className="h-full bg-transparent border-none text-base focus-visible:ring-0 focus-visible:ring-offset-0" autoFocus />
-                <Button variant="ghost" size="icon" onClick={() => setMobileSearchOpen(false)}><X className="w-5 h-5" /></Button>
-            </motion.div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-background z-10 flex items-center gap-2 p-4 lg:hidden"
+          >
+            <Search className="w-5 h-5 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher..."
+              className="flex-1 border-none focus-visible:ring-0"
+              autoFocus
+            />
+            <Button variant="ghost" size="icon" onClick={() => setMobileSearchOpen(false)}>
+              <X className="w-5 h-5" />
+            </Button>
+          </motion.div>
         )}
       </AnimatePresence>
     </header>

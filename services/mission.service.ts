@@ -1,5 +1,5 @@
 // services/mission.service.ts - COMPLETELY CORRECTED VERSION WITH FULL RELATIONSHIPS
-import { PrismaClient, Prisma, LeadStatus, Mission } from '@prisma/client';
+import { PrismaClient, Prisma, Mission } from '@prisma/client';
 import { CreateMissionInput } from '@/lib/validation';
 import { AppError } from '@/lib/error-handler';
 
@@ -252,9 +252,9 @@ class MissionService {
    * Creates a new mission, generates tasks from a template, and updates the related lead.
    */
   public async createMission(data: CreateMissionInput): Promise<Mission> {
-    const { leadId, teamLeaderId, quoteId, type, taskTemplateId, ...missionData } = data;
+    const { leadId, teamLeaderId, quoteId, taskTemplateId, ...missionData } = data;
 
-    if (type === 'SERVICE' && !quoteId) {
+    if (!quoteId) {
       throw new AppError(400, 'Quote ID is required for service missions.', true);
     }
 
@@ -285,16 +285,32 @@ class MissionService {
       const missionCount = await tx.mission.count();
       const missionNumber = `MSN-${(missionCount + 1).toString().padStart(6, '0')}`;
 
+      // Fixed: Build mission data without 'type' field and properly handle quote relation
+      const missionCreateData: Prisma.MissionCreateInput = {
+        missionNumber,
+        status: 'SCHEDULED',
+        priority: missionData.priority || 'NORMAL',
+        scheduledDate: new Date(missionData.scheduledDate),
+        estimatedDuration: missionData.estimatedDuration,
+        address: missionData.address,
+        // Fixed: Convert undefined to null for all optional fields with exactOptionalPropertyTypes
+        coordinates: missionData.coordinates ?? null,
+        accessNotes: missionData.accessNotes ?? null,
+        adminNotes: missionData.adminNotes ?? null,
+        qualityScore: missionData.qualityScore ?? null,
+        issuesFound: missionData.issuesFound ?? null,
+        // Fixed: Handle adminValidated - convert undefined to null explicitly
+        adminValidated: missionData.adminValidated ?? null,
+        // Relations
+        lead: { connect: { id: leadId } },
+        teamLeader: { connect: { id: teamLeaderId } },
+        // Fixed: Only include quote if quoteId exists, don't use undefined
+        ...(quoteId && { quote: { connect: { id: quoteId } } }),
+      };
+
       // Create the mission
       const newMission = await tx.mission.create({
-        data: {
-          ...missionData,
-          missionNumber,
-          leadId,
-          teamLeaderId,
-          quoteId,
-          status: 'SCHEDULED',
-        },
+        data: missionCreateData,
       });
 
       // Create default tasks if template is provided
@@ -307,17 +323,23 @@ class MissionService {
           const templateTasks = template.tasks as any[];
           
           for (const taskData of templateTasks) {
+            // Fixed: Properly handle task creation with exact optional property types
+            const taskCreateData: Prisma.TaskCreateInput = {
+              title: taskData.title,
+              description: taskData.description ?? null,
+              category: taskData.category || 'GENERAL',
+              type: taskData.type || 'EXECUTION',
+              estimatedTime: taskData.estimatedTime ?? null,
+              status: 'ASSIGNED',
+              mission: { connect: { id: newMission.id } },
+              // Fixed: Only include assignedTo if taskData.assignedToId exists
+              ...(taskData.assignedToId && {
+                assignedTo: { connect: { id: taskData.assignedToId } }
+              }),
+            };
+
             await tx.task.create({
-              data: {
-                title: taskData.title,
-                description: taskData.description || null,
-                category: taskData.category || 'GENERAL',
-                type: taskData.type || 'EXECUTION',
-                estimatedTime: taskData.estimatedTime || null,
-                missionId: newMission.id,
-                assignedToId: taskData.assignedToId || null,
-                status: 'ASSIGNED',
-              },
+              data: taskCreateData,
             });
           }
         }
@@ -328,7 +350,7 @@ class MissionService {
         where: { id: leadId },
         data: { 
           status: 'MISSION_SCHEDULED',
-          assignedToId: teamLeaderId
+          assignedTo: { connect: { id: teamLeaderId } }
         },
       });
 
@@ -346,8 +368,8 @@ class MissionService {
           type: 'MISSION_SCHEDULED',
           title: 'Mission créée',
           description: `Mission ${missionNumber} créée pour ${lead.firstName} ${lead.lastName}`,
-          userId: teamLeaderId,
-          leadId: leadId,
+          user: { connect: { id: teamLeaderId } },
+          lead: { connect: { id: leadId } },
           metadata: {
             missionId: newMission.id,
             missionNumber: missionNumber,
@@ -371,9 +393,45 @@ class MissionService {
       throw new AppError(404, 'Mission not found', true);
     }
 
+    // Fixed: Properly handle optional fields that could be undefined
+    const updateData: any = {
+      ...data,
+      coordinates: data.coordinates ?? undefined,
+      accessNotes: data.accessNotes ?? undefined,
+      adminNotes: data.adminNotes ?? undefined,
+      qualityScore: data.qualityScore ?? undefined,
+      issuesFound: data.issuesFound ?? undefined,
+    };
+
+    // Handle relation updates
+    if (data.teamLeaderId !== undefined) {
+      if (data.teamLeaderId) {
+        updateData.teamLeader = { connect: { id: data.teamLeaderId } };
+      } else {
+        updateData.teamLeader = { disconnect: true };
+      }
+      delete updateData.teamLeaderId;
+    }
+
+    if (data.leadId !== undefined) {
+      if (data.leadId) {
+        updateData.lead = { connect: { id: data.leadId } };
+      }
+      delete updateData.leadId;
+    }
+
+    if (data.quoteId !== undefined) {
+      if (data.quoteId) {
+        updateData.quote = { connect: { id: data.quoteId } };
+      } else {
+        updateData.quote = { disconnect: true };
+      }
+      delete updateData.quoteId;
+    }
+
     return await this.prisma.mission.update({
       where: { id },
-      data,
+      data: updateData,
       include: {
         lead: true,
         teamLeader: true,
@@ -411,9 +469,19 @@ class MissionService {
       throw new AppError(404, 'Mission not found', true);
     }
 
+    // Fixed: Handle optional fields properly for patch operations
+    const patchData: any = { ...data };
+    
+    // Convert undefined to null for optional fields that need explicit null values
+    Object.keys(patchData).forEach(key => {
+      if (patchData[key] === undefined && ['coordinates', 'accessNotes', 'adminNotes', 'qualityScore', 'issuesFound'].includes(key)) {
+        patchData[key] = null;
+      }
+    });
+
     return await this.prisma.mission.update({
       where: { id },
-      data,
+      data: patchData,
       include: {
         lead: true,
         teamLeader: true,
@@ -458,6 +526,132 @@ class MissionService {
 
       return { success: true, message: 'Mission deleted successfully' };
     });
+  }
+
+  /**
+   * Get mission statistics and analytics
+   */
+  public async getMissionStats(filters: {
+    dateFrom?: Date;
+    dateTo?: Date;
+    teamLeaderId?: string;
+    status?: string;
+  } = {}) {
+    const where: Prisma.MissionWhereInput = {};
+
+    if (filters.dateFrom || filters.dateTo) {
+      where.scheduledDate = {};
+      if (filters.dateFrom) where.scheduledDate.gte = filters.dateFrom;
+      if (filters.dateTo) where.scheduledDate.lte = filters.dateTo;
+    }
+
+    if (filters.teamLeaderId) {
+      where.teamLeaderId = filters.teamLeaderId;
+    }
+
+    if (filters.status) {
+      where.status = filters.status as any;
+    }
+
+    const [
+      totalMissions,
+      scheduledMissions,
+      inProgressMissions,
+      completedMissions,
+      averageDuration,
+      statusDistribution
+    ] = await Promise.all([
+      this.prisma.mission.count({ where }),
+      this.prisma.mission.count({ where: { ...where, status: 'SCHEDULED' } }),
+      this.prisma.mission.count({ where: { ...where, status: 'IN_PROGRESS' } }),
+      this.prisma.mission.count({ where: { ...where, status: 'COMPLETED' } }),
+      this.prisma.mission.aggregate({
+        where,
+        _avg: { estimatedDuration: true }
+      }),
+      this.prisma.mission.groupBy({
+        by: ['status'],
+        where,
+        _count: true
+      })
+    ]);
+
+    const completionRate = totalMissions > 0 ? (completedMissions / totalMissions) * 100 : 0;
+
+    return {
+      totalMissions,
+      scheduledMissions,
+      inProgressMissions,
+      completedMissions,
+      completionRate: Math.round(completionRate * 100) / 100,
+      averageDuration: Math.round((averageDuration._avg.estimatedDuration || 0) * 100) / 100,
+      statusDistribution
+    };
+  }
+
+  /**
+   * Search missions with flexible criteria
+   */
+  public async searchMissions(query: string, options: {
+    limit?: number;
+    offset?: number;
+    filters?: Prisma.MissionWhereInput;
+  } = {}) {
+    const { limit = 20, offset = 0, filters = {} } = options;
+
+    const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 0);
+    
+    const searchConditions: Prisma.MissionWhereInput[] = searchTerms.map(term => ({
+      OR: [
+        { missionNumber: { contains: term, mode: 'insensitive' } },
+        { address: { contains: term, mode: 'insensitive' } },
+        { lead: { firstName: { contains: term, mode: 'insensitive' } } },
+        { lead: { lastName: { contains: term, mode: 'insensitive' } } },
+        { lead: { phone: { contains: term } } },
+        { teamLeader: { name: { contains: term, mode: 'insensitive' } } }
+      ]
+    }));
+
+    const where: Prisma.MissionWhereInput = {
+      AND: [...searchConditions, filters]
+    };
+
+    const [missions, total] = await Promise.all([
+      this.prisma.mission.findMany({
+        where,
+        skip: offset,
+        take: limit,
+        include: {
+          lead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              email: true
+            }
+          },
+          teamLeader: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true
+            }
+          },
+          _count: {
+            select: {
+              tasks: true,
+              expenses: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      }),
+      this.prisma.mission.count({ where })
+    ]);
+
+    return { missions, total };
   }
 }
 
