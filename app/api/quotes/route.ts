@@ -7,6 +7,7 @@ import { Decimal } from '@prisma/client/runtime/library'
 import { z } from 'zod'
 
 const prisma = new PrismaClient()
+// Schema de validation pour la création d'un devis
 
 const createQuoteSchema = z.object({
   leadId: z.string().min(1, 'Lead ID is required').optional(),
@@ -18,12 +19,19 @@ const createQuoteSchema = z.object({
     unitPrice: z.number().min(0, 'Unit price must be positive'),
     totalPrice: z.number().min(0, 'Total price must be positive')
   })).min(1, 'At least one line item required'),
-  subTotalHT: z.number().min(0, 'Subtotal must be positive'),
-  vatAmount: z.number().min(0, 'VAT amount must be positive'), 
-  totalTTC: z.number().min(0, 'Total must be positive'),
-  finalPrice: z.number().min(0, 'Final price must be positive'),
-  expiresAt: z.string().min(1, 'Expiration date required'),
-  type: z.enum(['EXPRESS', 'STANDARD', 'PREMIUM']).default('STANDARD'),
+  
+  // FIX 1: Convert numbers to Decimal for Prisma
+  subTotalHT: z.union([z.number(), z.string()]).transform((val) => new Decimal(val)),
+  vatAmount: z.union([z.number(), z.string()]).transform((val) => new Decimal(val)),
+  totalTTC: z.union([z.number(), z.string()]).transform((val) => new Decimal(val)),
+  finalPrice: z.union([z.number(), z.string()]).transform((val) => new Decimal(val)),
+
+  // FIX 2: Coerce string to Date and make it optional
+  expiresAt: z.coerce.date().optional(),
+
+  // FIX 3: Make quote type optional to match schema
+  type: z.enum(['EXPRESS', 'STANDARD', 'PREMIUM']).optional(),
+  
   businessType: z.enum(['SERVICE', 'PRODUCT']).default('SERVICE')
 });
 
