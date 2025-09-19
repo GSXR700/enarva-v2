@@ -1,4 +1,4 @@
-// components/missions/EditMissionClient.tsx - FIXED VERSION
+// components/missions/EditMissionClient.tsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -134,8 +134,10 @@ const DraggableTask = ({
     },
   });
 
-  const ref = useCallback((node: HTMLDivElement) => {
-    drag(drop(node));
+  const ref = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+        drag(drop(node));
+    }
   }, [drag, drop]);
 
   return (
@@ -173,10 +175,15 @@ const DraggableTask = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="GENERAL">Général</SelectItem>
-              <SelectItem value="CLEANING">Nettoyage</SelectItem>
-              <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-              <SelectItem value="INSPECTION">Inspection</SelectItem>
-              <SelectItem value="SETUP">Installation</SelectItem>
+              <SelectItem value="EXTERIOR_FACADE">Façade Extérieure</SelectItem>
+              <SelectItem value="WALLS_BASEBOARDS">Murs et Plinthes</SelectItem>
+              <SelectItem value="FLOORS">Sols</SelectItem>
+              <SelectItem value="STAIRS">Escaliers</SelectItem>
+              <SelectItem value="WINDOWS_JOINERY">Fenêtres</SelectItem>
+              <SelectItem value="KITCHEN">Cuisine</SelectItem>
+              <SelectItem value="BATHROOM_SANITARY">Salle de Bain</SelectItem>
+              <SelectItem value="LIVING_SPACES">Espaces de Vie</SelectItem>
+              <SelectItem value="LOGISTICS_ACCESS">Logistique</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -320,7 +327,7 @@ export default function EditMissionClient() {
         const processedMission = {
           ...missionData,
           scheduledDate: new Date(missionData.scheduledDate).toISOString().slice(0, 16),
-          estimatedDuration: missionData.estimatedDuration / 60, // Convert minutes to hours
+          estimatedDuration: missionData.estimatedDuration, // Keep original value
           actualStartTime: missionData.actualStartTime ? new Date(missionData.actualStartTime).toISOString().slice(0, 16) : null,
           actualEndTime: missionData.actualEndTime ? new Date(missionData.actualEndTime).toISOString().slice(0, 16) : null,
           tasks: missionData.tasks || []
@@ -420,7 +427,10 @@ export default function EditMissionClient() {
       if (!prev || !prev.tasks) return prev;
       
       const newTasks = [...prev.tasks];
-      newTasks[index] = { ...newTasks[index], [field]: value };
+      const taskToUpdate = newTasks[index];
+      if (taskToUpdate) {
+        newTasks[index] = { ...taskToUpdate, [field]: value };
+      }
       
       return { ...prev, tasks: newTasks };
     });
@@ -472,7 +482,7 @@ export default function EditMissionClient() {
       // Prepare data for submission
       const submissionData = {
         ...mission,
-        // Convert hours back to minutes for the API
+        // Send duration in minutes
         estimatedDuration: mission.estimatedDuration,
         // Ensure datetime fields are properly formatted
         scheduledDate: mission.scheduledDate ? new Date(mission.scheduledDate).toISOString() : undefined,
@@ -688,14 +698,13 @@ export default function EditMissionClient() {
                 </div>
 
                 <div>
-                  <Label htmlFor="estimatedDuration">Durée Estimée (heures)</Label>
+                  <Label htmlFor="estimatedDuration">Durée Estimée (minutes)</Label>
                   <Input
                     id="estimatedDuration"
                     name="estimatedDuration"
                     type="number"
-                    step="0.5"
-                    min="0.5"
-                    max="24"
+                    step="30"
+                    min="30"
                     value={mission.estimatedDuration}
                     onChange={handleChange}
                     required
@@ -878,7 +887,7 @@ export default function EditMissionClient() {
               {mission.tasks && mission.tasks.length > 0 ? (
                 mission.tasks.map((task, index) => (
                   <DraggableTask
-                    key={`task-${index}`}
+                    key={task.id || `task-${index}`}
                     task={task}
                     index={index}
                     moveTask={moveTask}
