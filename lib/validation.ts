@@ -51,7 +51,7 @@ const completeLeadObjectSchema = z.object({
     'CANCELED_BY_ENARVA', 'INTERNAL_REVIEW', 'AWAITING_PARTS', 'CONTRACT_SIGNED',
     'UNDER_CONTRACT', 'SUBCONTRACTED', 'OUTSOURCED', 'WAITING_THIRD_PARTY',
     'PRODUCT_ONLY', 'PRODUCT_SUPPLIER', 'DELIVERY_ONLY', 'AFFILIATE_LEAD',
-    'SUBCONTRACTOR_LEAD'
+    'SUBCONTRACTOR_LEAD', 'CONVERTED_CLIENT', 'ARCHIVED', 'LOST'
   ]).default('NEW'),
 
   score: z.number()
@@ -134,7 +134,7 @@ const completeLeadObjectSchema = z.object({
   // Business Information
   providedBy: z.enum(['ENARVA', 'PARTNER', 'SUBCONTRACTOR', 'UNKNOWN']).default('ENARVA'),
   
-  // FIXED: Complete channel enum to match Prisma schema exactly
+  // Complete channel enum to match Prisma schema exactly
   channel: z.enum([
     'WHATSAPP', 'FACEBOOK', 'INSTAGRAM', 'LINKEDIN', 'GOOGLE_MAPS', 'GOOGLE_SEARCH',
     'SITE_WEB', 'FORMULAIRE_SITE', 'MARKETPLACE', 'YOUTUBE', 'EMAIL',
@@ -207,7 +207,7 @@ export const completeLeadValidationSchema = completeLeadObjectSchema.refine((dat
 // Export the type
 export type CompleteLeadInput = z.infer<typeof completeLeadValidationSchema>
 
-// FIXED: Validation function with proper partial schema handling
+// Validation function with proper partial schema handling
 export function validateCompleteLeadInput(data: any, isCreation = true) {
   if (isCreation) {
     return completeLeadValidationSchema.safeParse(data)
@@ -356,13 +356,15 @@ export const completeTeamMemberValidationSchema = z.object({
 })
 
 // =============================================================================
-// MISSION VALIDATION
+// MISSION VALIDATION SCHEMAS - FIXED AND ENHANCED
 // =============================================================================
 
+// Complete mission creation validation schema
 export const completeMissionValidationSchema = z.object({
   missionNumber: z.string()
     .min(1, 'Numéro de mission requis')
-    .max(50, 'Numéro de mission trop long'),
+    .max(50, 'Numéro de mission trop long')
+    .optional(), // Optional for creation as it's auto-generated
 
   status: z.enum([
     'SCHEDULED', 'IN_PROGRESS', 'QUALITY_CHECK', 'CLIENT_VALIDATION',
@@ -375,6 +377,9 @@ export const completeMissionValidationSchema = z.object({
     'SERVICE', 'TECHNICAL_VISIT', 'DELIVERY', 'INTERNAL', 'RECURRING'
   ]).default('SERVICE'),
 
+  // Required fields for creation
+  leadId: z.string().min(1, 'Lead ID requis'),
+  
   scheduledDate: z.string()
     .min(1, 'Date programmée requise')
     .refine((date) => {
@@ -382,7 +387,6 @@ export const completeMissionValidationSchema = z.object({
         const scheduledDate = new Date(date);
         const now = new Date();
         now.setHours(0, 0, 0, 0);
-        // Check if date is valid
         return !isNaN(scheduledDate.getTime()) && scheduledDate >= now;
       } catch (error) {
         return false;
@@ -399,52 +403,322 @@ export const completeMissionValidationSchema = z.object({
     .min(1, 'Adresse requise')
     .max(200, 'Adresse trop longue'),
 
+  // Optional fields
   coordinates: z.string()
     .optional()
+    .nullable()
     .transform(val => val === '' ? null : val),
 
   accessNotes: z.string()
-    .max(500, 'Notes d\'accès trop longues')
     .optional()
+    .nullable()
     .transform(val => val === '' ? null : val),
-
-  teamLeaderId: z.string()
-    .min(1, 'Chef d\'équipe requis'),
-
-  leadId: z.string()
-    .min(1, 'Lead ID requis'),
 
   quoteId: z.string()
     .optional()
-    .nullable()
-    .transform(val => val === '' ? null : val),
+    .nullable(),
+
+  teamLeaderId: z.string()
+    .optional()
+    .nullable(),
+
+  teamId: z.string()
+    .optional()
+    .nullable(),
 
   taskTemplateId: z.string()
+    .optional()
+    .nullable(),
+
+  // Time tracking fields
+  actualStartTime: z.string()
+    .datetime()
+    .optional()
+    .nullable(),
+
+  actualEndTime: z.string()
+    .datetime()
+    .optional()
+    .nullable(),
+
+  // Client validation fields
+  clientValidated: z.boolean()
+    .default(false),
+
+  clientFeedback: z.string()
     .optional()
     .nullable()
     .transform(val => val === '' ? null : val),
 
-  // Additional validation fields
-  clientValidated: z.boolean().default(false),
-  adminValidated: z.boolean().optional().nullable(),
-  qualityScore: z.number()
-    .min(1, 'Score qualité minimum: 1')
-    .max(5, 'Score qualité maximum: 5')
+  clientRating: z.number()
+    .min(1, 'Note minimum: 1')
+    .max(5, 'Note maximum: 5')
+    .optional()
+    .nullable(),
+
+  // Admin fields
+  adminValidated: z.boolean()
+    .optional()
+    .nullable(),
+
+  adminValidatedBy: z.string()
     .optional()
     .nullable(),
 
   adminNotes: z.string()
-    .max(1000, 'Notes admin trop longues')
     .optional()
+    .nullable()
     .transform(val => val === '' ? null : val),
+
+  qualityScore: z.number()
+    .min(1, 'Score minimum: 1')
+    .max(5, 'Score maximum: 5')
+    .optional()
+    .nullable(),
 
   issuesFound: z.string()
-    .max(1000, 'Description des problèmes trop longue')
     .optional()
+    .nullable()
     .transform(val => val === '' ? null : val),
 
-  correctionRequired: z.boolean().default(false)
-})
+  correctionRequired: z.boolean()
+    .optional()
+    .nullable(),
+
+  // Invoice fields
+  invoiceGenerated: z.boolean()
+    .default(false)
+    .optional(),
+
+  invoiceId: z.string()
+    .optional()
+    .nullable(),
+
+}).refine((data) => {
+  // Custom validation: Either teamLeaderId OR teamId must be provided for service missions
+  if (data.type === 'SERVICE' && !data.teamLeaderId && !data.teamId) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Un chef d'équipe ou une équipe doit être assigné pour les missions de service",
+  path: ["teamLeaderId"]
+}).refine((data) => {
+  // Custom validation: Service missions should have a quote
+  if (data.type === 'SERVICE' && !data.quoteId) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Un devis est requis pour les missions de service",
+  path: ["quoteId"]
+}).refine((data) => {
+  // Custom validation: End time should be after start time
+  if (data.actualStartTime && data.actualEndTime) {
+    const startTime = new Date(data.actualStartTime);
+    const endTime = new Date(data.actualEndTime);
+    return endTime > startTime;
+  }
+  return true;
+}, {
+  message: "L'heure de fin doit être après l'heure de début",
+  path: ["actualEndTime"]
+});
+
+// Mission update validation schema (more flexible)
+export const missionUpdateValidationSchema = z.object({
+  status: z.enum([
+    'SCHEDULED', 'IN_PROGRESS', 'QUALITY_CHECK', 'CLIENT_VALIDATION',
+    'COMPLETED', 'CANCELLED'
+  ]).optional(),
+
+  priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).optional(),
+
+  type: z.enum([
+    'SERVICE', 'TECHNICAL_VISIT', 'DELIVERY', 'INTERNAL', 'RECURRING'
+  ]).optional(),
+
+  scheduledDate: z.string()
+    .datetime()
+    .optional(),
+
+  estimatedDuration: z.number()
+    .min(0.5, 'Durée minimale: 30 minutes')
+    .max(24, 'Durée maximale: 24 heures')
+    .optional(),
+
+  address: z.string()
+    .min(1, 'Adresse requise')
+    .max(200, 'Adresse trop longue')
+    .optional(),
+
+  coordinates: z.string()
+    .optional()
+    .nullable()
+    .transform(val => val === '' ? null : val),
+
+  accessNotes: z.string()
+    .optional()
+    .nullable()
+    .transform(val => val === '' ? null : val),
+
+  teamLeaderId: z.string()
+    .optional()
+    .nullable(),
+
+  teamId: z.string()
+    .optional()
+    .nullable(),
+
+  actualStartTime: z.string()
+    .datetime()
+    .optional()
+    .nullable(),
+
+  actualEndTime: z.string()
+    .datetime()
+    .optional()
+    .nullable(),
+
+  clientValidated: z.boolean()
+    .optional(),
+
+  clientFeedback: z.string()
+    .optional()
+    .nullable()
+    .transform(val => val === '' ? null : val),
+
+  clientRating: z.number()
+    .min(1, 'Note minimum: 1')
+    .max(5, 'Note maximum: 5')
+    .optional()
+    .nullable(),
+
+  adminValidated: z.boolean()
+    .optional()
+    .nullable(),
+
+  adminValidatedBy: z.string()
+    .optional()
+    .nullable(),
+
+  adminNotes: z.string()
+    .optional()
+    .nullable()
+    .transform(val => val === '' ? null : val),
+
+  qualityScore: z.number()
+    .min(1, 'Score minimum: 1')
+    .max(5, 'Score maximum: 5')
+    .optional()
+    .nullable(),
+
+  issuesFound: z.string()
+    .optional()
+    .nullable()
+    .transform(val => val === '' ? null : val),
+
+  correctionRequired: z.boolean()
+    .optional()
+    .nullable(),
+
+  // Task updates
+  tasks: z.array(z.object({
+    id: z.string().optional(), // For existing tasks
+    title: z.string().min(1, 'Titre requis'),
+    description: z.string()
+      .optional()
+      .nullable()
+      .transform(val => val === '' ? null : val),
+    category: z.enum(['GENERAL', 'CLEANING', 'MAINTENANCE', 'INSPECTION', 'SETUP']),
+    type: z.enum(['EXECUTION', 'QUALITY_CHECK', 'DOCUMENTATION', 'CLIENT_INTERACTION']),
+    status: z.enum(['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'VALIDATED', 'REJECTED'])
+      .default('ASSIGNED'),
+    priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL'])
+      .default('NORMAL'),
+    estimatedTime: z.number()
+      .min(0)
+      .optional()
+      .nullable(),
+    actualTime: z.number()
+      .min(0)
+      .optional()
+      .nullable(),
+    assignedToId: z.string()
+      .optional()
+      .nullable(),
+    notes: z.string()
+      .optional()
+      .nullable()
+      .transform(val => val === '' ? null : val),
+  })).optional(),
+
+}).passthrough().refine((data) => {
+  // Custom validation: End time should be after start time
+  if (data.actualStartTime && data.actualEndTime) {
+    const startTime = new Date(data.actualStartTime);
+    const endTime = new Date(data.actualEndTime);
+    return endTime > startTime;
+  }
+  return true;
+}, {
+  message: "L'heure de fin doit être après l'heure de début",
+  path: ["actualEndTime"]
+});
+
+// Mission creation schema (stricter validation)
+export const missionCreationValidationSchema = z.object({
+  leadId: z.string().min(1, 'Lead ID requis'),
+  quoteId: z.string().optional().nullable(),
+  teamLeaderId: z.string().optional().nullable(),
+  teamId: z.string().optional().nullable(),
+  
+  scheduledDate: z.string()
+    .min(1, 'Date programmée requise')
+    .refine((date) => {
+      try {
+        // Handle datetime-local format and full datetime
+        const dateToValidate = date.includes('T') && !date.endsWith(':00') ? `${date}:00` : date;
+        const parsedDate = new Date(dateToValidate);
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        return !isNaN(parsedDate.getTime()) && parsedDate >= now;
+      } catch {
+        return false;
+      }
+    }, {
+      message: "Date programmée invalide ou dans le passé"
+    }),
+
+  estimatedDuration: z.union([
+    z.number(),
+    z.string().transform((val) => {
+      const num = parseFloat(val);
+      if (isNaN(num)) throw new Error('Durée invalide');
+      return num;
+    })
+  ]).refine((val) => val >= 0.5 && val <= 24, {
+    message: 'La durée doit être entre 0.5 et 24 heures'
+  }),
+
+  address: z.string().min(1, 'Adresse requise'),
+  coordinates: z.string().optional().nullable(),
+  accessNotes: z.string().optional().nullable(),
+  priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).default('NORMAL'),
+  type: z.enum(['SERVICE', 'TECHNICAL_VISIT', 'DELIVERY', 'INTERNAL', 'RECURRING']).default('SERVICE'),
+  taskTemplateId: z.string().optional().nullable(),
+  adminNotes: z.string().optional().nullable(),
+
+}).refine((data) => {
+  // Either teamLeaderId OR teamId must be provided
+  if (!data.teamLeaderId && !data.teamId) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Un chef d'équipe ou une équipe doit être assigné",
+  path: ["teamLeaderId"]
+});
 
 // =============================================================================
 // QUOTE VALIDATION - FIXED
@@ -521,6 +795,10 @@ export const completeQuoteValidationSchema = z.object({
     .max(1000, 'Détails produit trop longs')
     .optional(),
 
+  deliveryType: z.enum(['PICKUP', 'DELIVERY', 'INSTALLATION']).optional(),
+  deliveryAddress: z.string().max(200, 'Adresse de livraison trop longue').optional(),
+  deliveryNotes: z.string().max(500, 'Notes de livraison trop longues').optional(),
+
   // Lead updates that can be made from quote
   leadUpdates: z.object({
     estimatedSurface: z.number().min(1).max(10000).optional(),
@@ -533,16 +811,18 @@ export const completeQuoteValidationSchema = z.object({
     address: z.string().max(200).optional(),
     urgencyLevel: z.enum(['LOW', 'NORMAL', 'URGENT', 'HIGH_URGENT', 'IMMEDIATE']).optional(),
     budgetRange: z.string().max(50).optional()
-  }).optional()
+  }).optional(),
+
+  validatedAt: z.date().optional()
 }).refine((data) => {
-  // FIXED: Check lineItems instead of services for SERVICE business type
+  // Check lineItems instead of services for SERVICE business type
   if (data.businessType === 'SERVICE') {
     return data.lineItems && data.lineItems.length > 0
   }
   return true
 }, {
   message: "Au moins un élément de service est requis pour un devis de service",
-  path: ["lineItems"] // Changed from "services" to "lineItems"
+  path: ["lineItems"]
 }).refine((data) => {
   // Custom validation for product quotes
   if (data.businessType === 'PRODUCT') {
@@ -668,7 +948,11 @@ export const invoiceValidationSchema = z.object({
 // =============================================================================
 
 export const activityValidationSchema = z.object({
-  type: z.enum(['LEAD_CREATED', 'LEAD_UPDATED', 'LEAD_QUALIFIED', 'MISSION_CREATED', 'MISSION_COMPLETED', 'QUOTE_SENT', 'PAYMENT_RECEIVED']),
+  type: z.enum([
+    'LEAD_CREATED', 'LEAD_UPDATED', 'LEAD_QUALIFIED', 'MISSION_CREATED', 
+    'MISSION_UPDATED', 'MISSION_COMPLETED', 'MISSION_DELETED', 'QUOTE_SENT', 
+    'QUOTE_ACCEPTED', 'PAYMENT_RECEIVED', 'SYSTEM_MAINTENANCE'
+  ]),
   title: z.string().min(1, 'Titre requis').max(200, 'Titre trop long'),
   description: z.string().min(1, 'Description requise').max(1000, 'Description trop longue'),
   metadata: z.any().optional(),
@@ -695,7 +979,7 @@ export const messageValidationSchema = z.object({
 
 export const qualityCheckValidationSchema = z.object({
   missionId: z.string().min(1, 'Mission ID requis'),
-  type: z.enum(['PRE_SERVICE', 'IN_PROGRESS', 'POST_SERVICE', 'CLIENT_FEEDBACK', 'INTERNAL_AUDIT']),
+  type: z.enum(['PRE_SERVICE', 'IN_PROGRESS', 'POST_SERVICE', 'CLIENT_FEEDBACK', 'INTERNAL_AUDIT', 'TEAM_LEADER_CHECK']),
   status: z.enum(['PENDING', 'IN_PROGRESS', 'PASSED', 'FAILED', 'REQUIRES_REWORK']).default('PENDING'),
   checkedBy: z.string().optional(),
   checkedAt: z.date().optional(),
@@ -786,7 +1070,10 @@ export const completeFieldReportValidationSchema = z.object({
   additionalNotes: z.string()
     .max(2000, 'Notes supplémentaires trop longues')
     .optional()
-    .transform(val => val === '' ? null : val)
+    .transform(val => val === '' ? null : val),
+
+  submittedById: z.string().min(1, 'ID du soumissionnaire requis'),
+  submissionDate: z.date().default(() => new Date())
 }).refine((data) => {
   // Custom validation: at least one photo should be provided
   if (data.beforePhotos.length === 0 && data.afterPhotos.length === 0) {
@@ -866,7 +1153,6 @@ export function cleanLeadData(data: any): any {
     if (cleaned[field] === '' || cleaned[field] === undefined) {
       cleaned[field] = null
     }
-    // Keep null values as null - don't convert them
   })
 
   // Convert string numbers to actual numbers, but handle null properly
@@ -904,39 +1190,108 @@ export function cleanLeadData(data: any): any {
 }
 
 export function cleanMissionData(data: any): any {
-  const cleaned = { ...data }
+  const cleaned = { ...data };
 
   // Convert string numbers to actual numbers
-  if (cleaned.estimatedDuration) {
-    const duration = parseFloat(cleaned.estimatedDuration);
+  if (cleaned.estimatedDuration !== undefined) {
+    const duration = typeof cleaned.estimatedDuration === 'string' 
+      ? parseFloat(cleaned.estimatedDuration) 
+      : cleaned.estimatedDuration;
     cleaned.estimatedDuration = isNaN(duration) ? null : duration;
   }
 
-  if (cleaned.qualityScore) {
-    const score = parseInt(cleaned.qualityScore, 10);
+  if (cleaned.qualityScore !== undefined) {
+    const score = typeof cleaned.qualityScore === 'string' 
+      ? parseInt(cleaned.qualityScore, 10) 
+      : cleaned.qualityScore;
     cleaned.qualityScore = isNaN(score) ? null : score;
   }
 
+  if (cleaned.clientRating !== undefined) {
+    const rating = typeof cleaned.clientRating === 'string' 
+      ? parseInt(cleaned.clientRating, 10) 
+      : cleaned.clientRating;
+    cleaned.clientRating = isNaN(rating) ? null : rating;
+  }
+
   // Handle boolean fields
-  ['clientValidated', 'adminValidated', 'correctionRequired'].forEach(field => {
-    if (typeof cleaned[field] === 'string') {
-      cleaned[field] = cleaned[field].toLowerCase() === 'true'
+  ['clientValidated', 'adminValidated', 'correctionRequired', 'invoiceGenerated'].forEach(field => {
+    if (cleaned[field] !== undefined) {
+      if (typeof cleaned[field] === 'string') {
+        cleaned[field] = cleaned[field].toLowerCase() === 'true';
+      }
     }
-  })
+  });
 
-  // Convert empty strings to null
-  const optionalFields = [
+  // Convert empty strings to null for optional fields
+  const optionalStringFields = [
     'coordinates', 'accessNotes', 'quoteId', 'taskTemplateId',
-    'adminNotes', 'issuesFound'
-  ]
+    'adminNotes', 'issuesFound', 'clientFeedback', 'teamLeaderId', 
+    'teamId', 'adminValidatedBy', 'invoiceId'
+  ];
 
-  optionalFields.forEach(field => {
+  optionalStringFields.forEach(field => {
     if (cleaned[field] === '') {
-      cleaned[field] = null
+      cleaned[field] = null;
     }
-  })
+  });
 
-  return cleaned
+  // Handle datetime fields
+  const datetimeFields = ['scheduledDate', 'actualStartTime', 'actualEndTime'];
+  datetimeFields.forEach(field => {
+    if (cleaned[field]) {
+      try {
+        // Ensure proper datetime format
+        const dateValue = cleaned[field];
+        if (typeof dateValue === 'string') {
+          // Handle datetime-local format (add seconds if missing)
+          if (dateValue.includes('T') && !dateValue.includes(':00')) {
+            cleaned[field] = `${dateValue}:00`;
+          }
+        }
+      } catch (error) {
+        console.warn(`Invalid datetime for field ${field}:`, cleaned[field]);
+      }
+    }
+  });
+
+  // Clean tasks if provided
+  if (cleaned.tasks && Array.isArray(cleaned.tasks)) {
+    cleaned.tasks = cleaned.tasks.map((task: any) => {
+      const cleanedTask = { ...task };
+      
+      // Convert numeric fields
+      if (cleanedTask.estimatedTime !== undefined) {
+        const time = parseFloat(cleanedTask.estimatedTime);
+        cleanedTask.estimatedTime = isNaN(time) ? null : time;
+      }
+      
+      if (cleanedTask.actualTime !== undefined) {
+        const time = parseFloat(cleanedTask.actualTime);
+        cleanedTask.actualTime = isNaN(time) ? null : time;
+      }
+      
+      // Convert empty strings to null
+      ['description', 'notes', 'assignedToId'].forEach(field => {
+        if (cleanedTask[field] === '') {
+          cleanedTask[field] = null;
+        }
+      });
+      
+      return cleanedTask;
+    });
+  }
+
+  // Remove system fields that shouldn't be in updates
+  delete cleaned.createdAt;
+  delete cleaned.updatedAt;
+  delete cleaned.missionNumber; // Auto-generated
+  delete cleaned.lead;
+  delete cleaned.quote;
+  delete cleaned.teamLeader;
+  delete cleaned.team;
+
+  return cleaned;
 }
 
 export function cleanQuoteData(data: any): any {
@@ -1220,8 +1575,20 @@ export function validateCompleteSessionInput(data: any) {
   return sessionValidationSchema.safeParse(data);
 }
 
-export function validateCompleteMissionInput(data: any) {
-  return completeMissionValidationSchema.safeParse(data)
+export function validateCompleteMissionInput(data: any, isCreation = true) {
+  if (isCreation) {
+    return missionCreationValidationSchema.safeParse(data);
+  } else {
+    return missionUpdateValidationSchema.safeParse(data);
+  }
+}
+
+export function validateMissionUpdate(data: any) {
+  return missionUpdateValidationSchema.safeParse(data);
+}
+
+export function validateMissionCreation(data: any) {
+  return missionCreationValidationSchema.safeParse(data);
 }
 
 export function validateCompleteQuoteInput(data: any) {
@@ -1260,13 +1627,15 @@ export type CompleteSystemLogInput = z.infer<typeof systemLogValidationSchema>;
 export type CompleteAccountInput = z.infer<typeof accountValidationSchema>;
 export type CompleteSessionInput = z.infer<typeof sessionValidationSchema>;
 export type CompleteMissionInput = z.infer<typeof completeMissionValidationSchema>;
+export type MissionUpdateInput = z.infer<typeof missionUpdateValidationSchema>;
+export type MissionCreationInput = z.infer<typeof missionCreationValidationSchema>;
 export type CompleteQuoteInput = z.infer<typeof completeQuoteValidationSchema>;
 export type CompleteTeamMemberInput = z.infer<typeof completeTeamMemberValidationSchema>;
 export type CompleteFieldReportInput = z.infer<typeof completeFieldReportValidationSchema>;
 export type CompleteSubscriptionInput = z.infer<typeof completeSubscriptionValidationSchema>;
 
 // Convenience exports for backwards compatibility
-export type CreateMissionInput = CompleteMissionInput;
+export type CreateMissionInput = MissionCreationInput;
 export type CreateQuoteInput = CompleteQuoteInput;
 export type CreateLeadInput = CompleteLeadInput;
 export type CreateTeamMemberInput = CompleteTeamMemberInput;

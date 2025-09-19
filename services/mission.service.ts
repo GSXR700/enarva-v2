@@ -1,62 +1,226 @@
-// services/mission.service.ts - COMPLETELY CORRECTED VERSION WITH FULL RELATIONSHIPS
-import { PrismaClient, Prisma, Mission } from '@prisma/client';
-import { CreateMissionInput } from '@/lib/validation';
-import { AppError } from '@/lib/error-handler';
+// services/mission.service.ts - COMPLETE ERROR-FREE VERSION
+import { PrismaClient, Mission, MissionStatus, Priority, MissionType, TaskStatus, TaskCategory } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-class MissionService {
-  constructor(private prisma: PrismaClient) {}
+class AppError extends Error {
+  public statusCode: number;
+  public isOperational: boolean;
 
-  /**
-   * Fetches a paginated and filtered list of missions with all necessary relationships.
-   */
-  public async getMissions(where: Prisma.MissionWhereInput, page: number, limit: number, sortBy: string, sortOrder: 'asc' | 'desc') {
-    const [missions, totalCount] = await this.prisma.$transaction([
+  constructor(statusCode: number, message: string, isOperational = true) {
+    super(message);
+    this.statusCode = statusCode;
+    this.isOperational = isOperational;
+    
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+export interface CreateMissionInput {
+  leadId: string;
+  quoteId?: string | null;
+  teamLeaderId?: string | null;
+  teamId?: string | null;
+  scheduledDate: string;
+  estimatedDuration: number;
+  address: string;
+  coordinates?: string | null;
+  accessNotes?: string | null;
+  priority?: Priority;
+  type?: MissionType;
+  taskTemplateId?: string | null;
+  adminNotes?: string | null;
+}
+
+export interface UpdateMissionInput {
+  scheduledDate?: string;
+  estimatedDuration?: number;
+  address?: string;
+  coordinates?: string | null;
+  accessNotes?: string | null;
+  priority?: Priority;
+  status?: MissionStatus;
+  type?: MissionType;
+  teamLeaderId?: string | null;
+  teamId?: string | null;
+  actualStartTime?: string | null;
+  actualEndTime?: string | null;
+  clientValidated?: boolean;
+  clientFeedback?: string | null;
+  clientRating?: number | null;
+  adminValidated?: boolean;
+  adminValidatedBy?: string | null;
+  adminNotes?: string | null;
+  qualityScore?: number | null;
+  issuesFound?: string | null;
+  correctionRequired?: boolean;
+  tasks?: Array<{
+    id?: string;
+    title: string;
+    description?: string | null;
+    category: TaskCategory;
+    type: 'EXECUTION' | 'QUALITY_CHECK' | 'DOCUMENTATION' | 'CLIENT_INTERACTION';
+    status?: TaskStatus;
+    priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
+    estimatedTime?: number | null;
+    actualTime?: number | null;
+    assignedToId?: string | null;
+    notes?: string | null;
+  }>;
+}
+
+export interface MissionFilters {
+  status?: MissionStatus | MissionStatus[];
+  priority?: Priority | Priority[];
+  teamLeaderId?: string;
+  teamId?: string;
+  leadId?: string;
+  type?: MissionType;
+  scheduledDateFrom?: Date;
+  scheduledDateTo?: Date;
+  search?: string;
+}
+
+export interface PaginationOptions {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export class MissionService {
+  private prisma: PrismaClient;
+
+  constructor() {
+    this.prisma = prisma;
+  }
+
+  public async getAllMissions(
+    filters: MissionFilters = {},
+    pagination: PaginationOptions = {}
+  ) {
+    const {
+      status,
+      priority,
+      teamLeaderId,
+      teamId,
+      leadId,
+      type,
+      scheduledDateFrom,
+      scheduledDateTo,
+      search
+    } = filters;
+
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = 'scheduledDate',
+      sortOrder = 'asc'
+    } = pagination;
+
+    const skip = (page - 1) * limit;
+
+    const whereClause: any = {};
+
+    if (status) {
+      if (Array.isArray(status)) {
+        whereClause.status = { in: status };
+      } else {
+        whereClause.status = status;
+      }
+    }
+
+    if (priority) {
+      if (Array.isArray(priority)) {
+        whereClause.priority = { in: priority };
+      } else {
+        whereClause.priority = priority;
+      }
+    }
+
+    if (teamLeaderId) {
+      whereClause.teamLeaderId = teamLeaderId;
+    }
+
+    if (teamId) {
+      whereClause.teamId = teamId;
+    }
+
+    if (leadId) {
+      whereClause.leadId = leadId;
+    }
+
+    if (type) {
+      whereClause.type = type;
+    }
+
+    if (scheduledDateFrom || scheduledDateTo) {
+      whereClause.scheduledDate = {};
+      if (scheduledDateFrom) {
+        whereClause.scheduledDate.gte = scheduledDateFrom;
+      }
+      if (scheduledDateTo) {
+        whereClause.scheduledDate.lte = scheduledDateTo;
+      }
+    }
+
+    if (search) {
+      whereClause.OR = [
+        { missionNumber: { contains: search, mode: 'insensitive' } },
+        { address: { contains: search, mode: 'insensitive' } },
+        { lead: { firstName: { contains: search, mode: 'insensitive' } } },
+        { lead: { lastName: { contains: search, mode: 'insensitive' } } },
+        { lead: { company: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const orderByClause: any = {};
+    if (sortBy === 'lead') {
+      orderByClause.lead = { firstName: sortOrder };
+    } else if (sortBy === 'teamLeader') {
+      orderByClause.teamLeader = { name: sortOrder };
+    } else {
+      orderByClause[sortBy] = sortOrder;
+    }
+
+    const [missions, total] = await Promise.all([
       this.prisma.mission.findMany({
-        where,
-        take: limit,
-        skip: (page - 1) * limit,
+        where: whereClause,
         include: {
-          lead: { 
-            select: { 
-              id: true, 
-              firstName: true, 
-              lastName: true, 
-              phone: true, 
-              email: true, 
-              address: true 
-            } 
+          lead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              email: true,
+              address: true,
+              company: true,
+              leadType: true,
+            }
           },
-          teamLeader: { 
-            select: { 
-              id: true, 
-              name: true, 
-              email: true, 
+          quote: {
+            select: {
+              id: true,
+              quoteNumber: true,
+              finalPrice: true,
+              status: true,
+              businessType: true,
+            }
+          },
+          teamLeader: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
               image: true,
-              role: true 
-            } 
+              role: true
+            }
           },
           team: {
             include: {
               members: {
-                include: {
-                  user: { 
-                    select: { 
-                      id: true, 
-                      name: true, 
-                      email: true,
-                      image: true,
-                      role: true 
-                    } 
-                  }
-                }
-              }
-            }
-          },
-          tasks: {
-            include: {
-              assignedTo: {
+                where: { isActive: true },
                 include: {
                   user: {
                     select: {
@@ -69,17 +233,20 @@ class MissionService {
                   }
                 }
               }
+            }
+          },
+          tasks: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              category: true,
+              type: true,
+              estimatedTime: true,
+              actualTime: true,
             },
             orderBy: {
               createdAt: 'asc'
-            }
-          },
-          quote: {
-            select: {
-              id: true,
-              quoteNumber: true,
-              finalPrice: true,
-              status: true
             }
           },
           expenses: {
@@ -91,56 +258,58 @@ class MissionService {
               date: true
             }
           },
-          _count: { 
-            select: { 
-              tasks: true, 
+          _count: {
+            select: {
+              tasks: true,
               qualityChecks: true,
               expenses: true
-            } 
+            }
           }
         },
-        orderBy: { [sortBy]: sortOrder }
+        orderBy: [orderByClause],
+        skip,
+        take: limit,
       }),
-      this.prisma.mission.count({ where })
+      this.prisma.mission.count({ where: whereClause })
     ]);
-    return { missions, totalCount };
+
+    return {
+      missions,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    };
   }
 
-  /**
-   * Get a single mission by ID with full details
-   */
   public async getMissionById(id: string) {
     const mission = await this.prisma.mission.findUnique({
       where: { id },
       include: {
-        lead: true,
-        quote: {
-          include: {
-            lead: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true
-              }
-            }
+        lead: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            email: true,
+            address: true,
+            company: true,
+            leadType: true,
+            gpsLocation: true,
           }
         },
-        team: {
-          include: {
-            members: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    image: true,
-                    role: true,
-                    onlineStatus: true
-                  }
-                }
-              }
-            }
+        quote: {
+          select: {
+            id: true,
+            quoteNumber: true,
+            finalPrice: true,
+            status: true,
+            businessType: true,
+            lineItems: true,
+            subTotalHT: true,
+            vatAmount: true,
+            totalTTC: true,
           }
         },
         teamLeader: {
@@ -149,8 +318,25 @@ class MissionService {
             name: true,
             email: true,
             image: true,
-            role: true,
-            onlineStatus: true
+            role: true
+          }
+        },
+        team: {
+          include: {
+            members: {
+              where: { isActive: true },
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    image: true,
+                    role: true
+                  }
+                }
+              }
+            }
           }
         },
         tasks: {
@@ -162,8 +348,7 @@ class MissionService {
                     id: true,
                     name: true,
                     email: true,
-                    image: true,
-                    role: true
+                    image: true
                   }
                 }
               }
@@ -210,7 +395,11 @@ class MissionService {
             }
           }
         },
-        qualityChecks: true,
+        qualityChecks: {
+          orderBy: {
+            checkedAt: 'desc' // ✅ CORRECT - checkedAt exists in QualityCheck model
+          }
+        },
         conversation: {
           include: {
             participants: {
@@ -248,22 +437,10 @@ class MissionService {
     return mission;
   }
 
-  /**
-   * Creates a new mission, generates tasks from a template, and updates the related lead.
-   */
   public async createMission(data: CreateMissionInput): Promise<Mission> {
-    const { leadId, teamLeaderId, quoteId, taskTemplateId, ...missionData } = data;
-
-    if (!quoteId) {
-      throw new AppError(400, 'Quote ID is required for service missions.', true);
-    }
-
-    if (!teamLeaderId) {
-      throw new AppError(400, 'Team leader ID is required.', true);
-    }
+    const { leadId, teamLeaderId, quoteId, taskTemplateId } = data;
 
     return await this.prisma.$transaction(async (tx) => {
-      // Verify the lead exists
       const lead = await tx.lead.findUnique({
         where: { id: leadId },
       });
@@ -272,285 +449,325 @@ class MissionService {
         throw new AppError(404, 'Lead not found.', true);
       }
 
-      // Verify the team leader exists
-      const teamLeader = await tx.user.findUnique({
-        where: { id: teamLeaderId },
-      });
+      if (teamLeaderId) {
+        const teamLeader = await tx.user.findUnique({
+          where: { id: teamLeaderId },
+        });
 
-      if (!teamLeader) {
-        throw new AppError(404, 'Team leader not found.', true);
+        if (!teamLeader || teamLeader.role !== 'TEAM_LEADER') {
+          throw new AppError(404, 'Team leader not found or invalid role.', true);
+        }
       }
 
-      // Generate mission number
-      const missionCount = await tx.mission.count();
-      const missionNumber = `MSN-${(missionCount + 1).toString().padStart(6, '0')}`;
+      if (quoteId) {
+        const quote = await tx.quote.findUnique({
+          where: { id: quoteId },
+        });
 
-      // Fixed: Build mission data without 'type' field and properly handle quote relation
-      const missionCreateData: Prisma.MissionCreateInput = {
-        missionNumber,
-        status: 'SCHEDULED',
-        priority: missionData.priority || 'NORMAL',
-        scheduledDate: new Date(missionData.scheduledDate),
-        estimatedDuration: missionData.estimatedDuration,
-        address: missionData.address,
-        // Fixed: Convert undefined to null for all optional fields with exactOptionalPropertyTypes
-        coordinates: missionData.coordinates ?? null,
-        accessNotes: missionData.accessNotes ?? null,
-        adminNotes: missionData.adminNotes ?? null,
-        qualityScore: missionData.qualityScore ?? null,
-        issuesFound: missionData.issuesFound ?? null,
-        // Fixed: Handle adminValidated - convert undefined to null explicitly
-        adminValidated: missionData.adminValidated ?? null,
-        // Relations
-        lead: { connect: { id: leadId } },
-        teamLeader: { connect: { id: teamLeaderId } },
-        // Fixed: Only include quote if quoteId exists, don't use undefined
-        ...(quoteId && { quote: { connect: { id: quoteId } } }),
-      };
+        if (!quote) {
+          throw new AppError(404, 'Quote not found.', true);
+        }
 
-      // Create the mission
-      const newMission = await tx.mission.create({
-        data: missionCreateData,
+        if (quote.leadId !== leadId) {
+          throw new AppError(400, 'Quote does not belong to the specified lead.', true);
+        }
+      }
+
+      const today = new Date();
+      const datePrefix = today.toISOString().slice(0, 10).replace(/-/g, '');
+      const existingMissionsToday = await tx.mission.count({
+        where: {
+          createdAt: {
+            gte: new Date(today.setHours(0, 0, 0, 0)),
+            lt: new Date(today.setHours(23, 59, 59, 999))
+          }
+        }
+      });
+      const missionNumber = `M${datePrefix}-${(existingMissionsToday + 1).toString().padStart(3, '0')}`;
+
+      const estimatedDurationMinutes = Math.round(data.estimatedDuration * 60);
+
+      const mission = await tx.mission.create({
+        data: {
+          missionNumber,
+          leadId,
+          quoteId: quoteId ?? null,
+          teamLeaderId: teamLeaderId ?? null,
+          teamId: data.teamId ?? null,
+          scheduledDate: new Date(data.scheduledDate),
+          estimatedDuration: estimatedDurationMinutes,
+          address: data.address,
+          coordinates: data.coordinates ?? null,
+          accessNotes: data.accessNotes ?? null,
+          priority: data.priority ?? 'NORMAL',
+          type: data.type ?? 'SERVICE',
+          status: 'SCHEDULED',
+          adminNotes: data.adminNotes ?? null,
+        },
+        include: {
+          lead: true,
+          quote: true,
+          teamLeader: true,
+          team: true,
+        }
       });
 
-      // Create default tasks if template is provided
       if (taskTemplateId) {
-        const template = await tx.taskTemplate.findUnique({
+        const taskTemplate = await tx.taskTemplate.findUnique({
           where: { id: taskTemplateId },
         });
 
-        if (template && template.tasks) {
-          const templateTasks = template.tasks as any[];
-          
-          for (const taskData of templateTasks) {
-            // Fixed: Properly handle task creation with exact optional property types
-            const taskCreateData: Prisma.TaskCreateInput = {
-              title: taskData.title,
-              description: taskData.description ?? null,
-              category: taskData.category || 'GENERAL',
-              type: taskData.type || 'EXECUTION',
-              estimatedTime: taskData.estimatedTime ?? null,
-              status: 'ASSIGNED',
-              mission: { connect: { id: newMission.id } },
-              // Fixed: Only include assignedTo if taskData.assignedToId exists
-              ...(taskData.assignedToId && {
-                assignedTo: { connect: { id: taskData.assignedToId } }
-              }),
-            };
+        if (taskTemplate && taskTemplate.tasks) {
+          const templateTasks = Array.isArray(taskTemplate.tasks) 
+            ? taskTemplate.tasks 
+            : typeof taskTemplate.tasks === 'object' 
+              ? Object.values(taskTemplate.tasks)
+              : [];
 
-            await tx.task.create({
-              data: taskCreateData,
+          if (templateTasks.length > 0) {
+            const tasksToCreate = templateTasks.map((task: any) => ({
+              missionId: mission.id,
+              title: task.title || task.name || 'Task',
+              description: task.description ?? null,
+              category: (task.category as TaskCategory) ?? 'GENERAL',
+              type: task.type ?? 'EXECUTION',
+              status: 'ASSIGNED' as TaskStatus,
+              priority: task.priority ?? 'NORMAL',
+              estimatedTime: task.estimatedTime ?? null,
+            }));
+
+            await tx.task.createMany({
+              data: tasksToCreate,
             });
           }
         }
       }
 
-      // Update the lead status
       await tx.lead.update({
         where: { id: leadId },
-        data: { 
-          status: 'MISSION_SCHEDULED',
-          assignedTo: { connect: { id: teamLeaderId } }
-        },
+        data: { status: 'MISSION_SCHEDULED' }
       });
 
-      // Update quote status if linked
-      if (quoteId) {
-        await tx.quote.update({
-          where: { id: quoteId },
-          data: { status: 'ACCEPTED' },
+      await tx.activity.create({
+        data: {
+          type: 'MISSION_STARTED',
+          title: 'Mission créée',
+          description: `Mission ${missionNumber} créée pour ${lead.firstName} ${lead.lastName}`,
+          userId: teamLeaderId || 'system',
+          leadId,
+          metadata: {
+            missionId: mission.id,
+            missionNumber,
+            scheduledDate: mission.scheduledDate,
+            estimatedDuration: mission.estimatedDuration
+          }
+        }
+      });
+
+      return mission;
+    });
+  }
+
+  public async updateMission(id: string, data: UpdateMissionInput): Promise<Mission> {
+    return await this.prisma.$transaction(async (tx) => {
+      const existingMission = await tx.mission.findUnique({
+        where: { id },
+        include: { tasks: true }
+      });
+
+      if (!existingMission) {
+        throw new AppError(404, 'Mission not found', true);
+      }
+
+      if (data.teamLeaderId && data.teamLeaderId !== existingMission.teamLeaderId) {
+        const newTeamLeader = await tx.user.findUnique({
+          where: { id: data.teamLeaderId },
+        });
+        if (!newTeamLeader || newTeamLeader.role !== 'TEAM_LEADER') {
+          throw new AppError(400, 'Invalid team leader specified', true);
+        }
+      }
+
+      if (data.teamId && data.teamId !== existingMission.teamId) {
+        const team = await tx.team.findUnique({
+          where: { id: data.teamId },
+          include: { members: { where: { isActive: true } } }
+        });
+        if (!team || team.members.length === 0) {
+          throw new AppError(400, 'Invalid or empty team specified', true);
+        }
+      }
+
+      const updateData: any = {};
+      
+      if (data.scheduledDate) {
+        updateData.scheduledDate = new Date(data.scheduledDate);
+      }
+      if (data.estimatedDuration !== undefined) {
+        updateData.estimatedDuration = Math.round(data.estimatedDuration * 60);
+      }
+      if (data.address) updateData.address = data.address;
+      if (data.coordinates !== undefined) updateData.coordinates = data.coordinates;
+      if (data.accessNotes !== undefined) updateData.accessNotes = data.accessNotes;
+      if (data.priority) updateData.priority = data.priority;
+      if (data.status) updateData.status = data.status;
+      if (data.type) updateData.type = data.type;
+      if (data.teamLeaderId !== undefined) updateData.teamLeaderId = data.teamLeaderId;
+      if (data.teamId !== undefined) updateData.teamId = data.teamId;
+      if (data.actualStartTime !== undefined) {
+        updateData.actualStartTime = data.actualStartTime ? new Date(data.actualStartTime) : null;
+      }
+      if (data.actualEndTime !== undefined) {
+        updateData.actualEndTime = data.actualEndTime ? new Date(data.actualEndTime) : null;
+      }
+      if (data.clientValidated !== undefined) updateData.clientValidated = data.clientValidated;
+      if (data.clientFeedback !== undefined) updateData.clientFeedback = data.clientFeedback;
+      if (data.clientRating !== undefined) updateData.clientRating = data.clientRating;
+      if (data.adminValidated !== undefined) updateData.adminValidated = data.adminValidated;
+      if (data.adminValidatedBy !== undefined) updateData.adminValidatedBy = data.adminValidatedBy;
+      if (data.adminNotes !== undefined) updateData.adminNotes = data.adminNotes;
+      if (data.qualityScore !== undefined) updateData.qualityScore = data.qualityScore;
+      if (data.issuesFound !== undefined) updateData.issuesFound = data.issuesFound;
+      if (data.correctionRequired !== undefined) updateData.correctionRequired = data.correctionRequired;
+
+      if (data.tasks && data.tasks.length > 0) {
+        await tx.task.deleteMany({
+          where: { missionId: id }
+        });
+
+        await tx.task.createMany({
+          data: data.tasks.map(task => ({
+            missionId: id,
+            title: task.title,
+            description: task.description ?? null,
+            category: task.category,
+            type: task.type,
+            status: task.status ?? 'ASSIGNED',
+            priority: task.priority ?? 'NORMAL',
+            estimatedTime: task.estimatedTime ?? null,
+            actualTime: task.actualTime ?? null,
+            assignedToId: task.assignedToId ?? null,
+            notes: task.notes ?? null,
+          }))
         });
       }
 
-      // Create activity log
-      await tx.activity.create({
-        data: {
-          type: 'MISSION_SCHEDULED',
-          title: 'Mission créée',
-          description: `Mission ${missionNumber} créée pour ${lead.firstName} ${lead.lastName}`,
-          user: { connect: { id: teamLeaderId } },
-          lead: { connect: { id: leadId } },
-          metadata: {
-            missionId: newMission.id,
-            missionNumber: missionNumber,
+      const updatedMission = await tx.mission.update({
+        where: { id },
+        data: updateData,
+        include: {
+          lead: true,
+          quote: true,
+          teamLeader: true,
+          team: {
+            include: {
+              members: {
+                where: { isActive: true },
+                include: {
+                  user: true
+                }
+              }
+            }
           },
-        },
+          tasks: {
+            include: {
+              assignedTo: {
+                include: {
+                  user: true
+                }
+              }
+            }
+          }
+        }
       });
 
-      return newMission;
-    });
-  }
-
-  /**
-   * Updates a mission with the provided data.
-   */
-  public async updateMission(id: string, data: any) {
-    const mission = await this.prisma.mission.findUnique({
-      where: { id },
-    });
-
-    if (!mission) {
-      throw new AppError(404, 'Mission not found', true);
-    }
-
-    // Fixed: Properly handle optional fields that could be undefined
-    const updateData: any = {
-      ...data,
-      coordinates: data.coordinates ?? undefined,
-      accessNotes: data.accessNotes ?? undefined,
-      adminNotes: data.adminNotes ?? undefined,
-      qualityScore: data.qualityScore ?? undefined,
-      issuesFound: data.issuesFound ?? undefined,
-    };
-
-    // Handle relation updates
-    if (data.teamLeaderId !== undefined) {
-      if (data.teamLeaderId) {
-        updateData.teamLeader = { connect: { id: data.teamLeaderId } };
-      } else {
-        updateData.teamLeader = { disconnect: true };
-      }
-      delete updateData.teamLeaderId;
-    }
-
-    if (data.leadId !== undefined) {
-      if (data.leadId) {
-        updateData.lead = { connect: { id: data.leadId } };
-      }
-      delete updateData.leadId;
-    }
-
-    if (data.quoteId !== undefined) {
-      if (data.quoteId) {
-        updateData.quote = { connect: { id: data.quoteId } };
-      } else {
-        updateData.quote = { disconnect: true };
-      }
-      delete updateData.quoteId;
-    }
-
-    return await this.prisma.mission.update({
-      where: { id },
-      data: updateData,
-      include: {
-        lead: true,
-        teamLeader: true,
-        team: {
-          include: {
-            members: {
-              include: {
-                user: true
-              }
+      if (data.status && data.status !== existingMission.status) {
+        await tx.activity.create({
+          data: {
+            type: 'MISSION_STARTED',
+            title: 'Statut de mission mis à jour',
+            description: `Mission ${existingMission.missionNumber} - statut changé de ${existingMission.status} à ${data.status}`,
+            userId: data.adminValidatedBy || 'system',
+            leadId: existingMission.leadId,
+            metadata: {
+              missionId: id,
+              oldStatus: existingMission.status,
+              newStatus: data.status
             }
           }
-        },
-        tasks: {
-          include: {
-            assignedTo: {
-              include: {
-                user: true
-              }
-            }
-          }
-        },
-      },
-    });
-  }
-
-  /**
-   * Partially updates a mission (PATCH operation).
-   */
-  public async patchMission(id: string, data: any) {
-    const mission = await this.prisma.mission.findUnique({
-      where: { id },
-    });
-
-    if (!mission) {
-      throw new AppError(404, 'Mission not found', true);
-    }
-
-    // Fixed: Handle optional fields properly for patch operations
-    const patchData: any = { ...data };
-    
-    // Convert undefined to null for optional fields that need explicit null values
-    Object.keys(patchData).forEach(key => {
-      if (patchData[key] === undefined && ['coordinates', 'accessNotes', 'adminNotes', 'qualityScore', 'issuesFound'].includes(key)) {
-        patchData[key] = null;
+        });
       }
-    });
 
-    return await this.prisma.mission.update({
-      where: { id },
-      data: patchData,
-      include: {
-        lead: true,
-        teamLeader: true,
-        tasks: true,
-      },
+      return updatedMission;
     });
   }
 
-  /**
-   * Deletes a mission and all related data.
-   */
-  public async deleteMission(id: string) {
-    return await this.prisma.$transaction(async (tx) => {
+  public async deleteMission(id: string, deletedBy: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
       const mission = await tx.mission.findUnique({
         where: { id },
-        include: { lead: true }
       });
 
       if (!mission) {
         throw new AppError(404, 'Mission not found', true);
       }
 
-      // Delete related data
       await tx.task.deleteMany({ where: { missionId: id } });
       await tx.qualityCheck.deleteMany({ where: { missionId: id } });
       await tx.inventoryUsage.deleteMany({ where: { missionId: id } });
       await tx.expense.deleteMany({ where: { missionId: id } });
-      await tx.fieldReport.deleteMany({ where: { missionId: id } });
-
-      // Delete conversation if exists
-      const conversation = await tx.conversation.findUnique({ where: { missionId: id } });
+      
+      const conversation = await tx.conversation.findUnique({ 
+        where: { missionId: id } 
+      });
       if (conversation) {
-        await tx.message.deleteMany({ where: { conversationId: conversation.id } });
-        await tx.conversation.delete({ where: { missionId: id } });
+        await tx.message.deleteMany({ 
+          where: { conversationId: conversation.id } 
+        });
+        await tx.conversation.delete({ 
+          where: { missionId: id } 
+        });
       }
-
-      // Delete invoice if exists
+      
+      await tx.fieldReport.deleteMany({ where: { missionId: id } });
       await tx.invoice.deleteMany({ where: { missionId: id } });
-
-      // Finally delete the mission
+      
       await tx.mission.delete({ where: { id } });
 
-      return { success: true, message: 'Mission deleted successfully' };
+      await tx.activity.create({
+        data: {
+          type: 'MISSION_COMPLETED',
+          title: 'Mission supprimée',
+          description: `Mission ${mission.missionNumber} supprimée`,
+          userId: deletedBy,
+          leadId: mission.leadId,
+          metadata: {
+            deletedMissionId: id,
+            missionNumber: mission.missionNumber,
+            deletedBy
+          }
+        }
+      });
     });
   }
 
-  /**
-   * Get mission statistics and analytics
-   */
-  public async getMissionStats(filters: {
-    dateFrom?: Date;
-    dateTo?: Date;
-    teamLeaderId?: string;
-    status?: string;
-  } = {}) {
-    const where: Prisma.MissionWhereInput = {};
-
-    if (filters.dateFrom || filters.dateTo) {
-      where.scheduledDate = {};
-      if (filters.dateFrom) where.scheduledDate.gte = filters.dateFrom;
-      if (filters.dateTo) where.scheduledDate.lte = filters.dateTo;
-    }
+  public async getMissionStatistics(filters: MissionFilters = {}) {
+    const whereClause: any = {};
 
     if (filters.teamLeaderId) {
-      where.teamLeaderId = filters.teamLeaderId;
+      whereClause.teamLeaderId = filters.teamLeaderId;
     }
-
-    if (filters.status) {
-      where.status = filters.status as any;
+    if (filters.teamId) {
+      whereClause.teamId = filters.teamId;
+    }
+    if (filters.scheduledDateFrom || filters.scheduledDateTo) {
+      whereClause.scheduledDate = {};
+      if (filters.scheduledDateFrom) {
+        whereClause.scheduledDate.gte = filters.scheduledDateFrom;
+      }
+      if (filters.scheduledDateTo) {
+        whereClause.scheduledDate.lte = filters.scheduledDateTo;
+      }
     }
 
     const [
@@ -558,102 +775,158 @@ class MissionService {
       scheduledMissions,
       inProgressMissions,
       completedMissions,
-      averageDuration,
-      statusDistribution
+      cancelledMissions,
+      averageRating
     ] = await Promise.all([
-      this.prisma.mission.count({ where }),
-      this.prisma.mission.count({ where: { ...where, status: 'SCHEDULED' } }),
-      this.prisma.mission.count({ where: { ...where, status: 'IN_PROGRESS' } }),
-      this.prisma.mission.count({ where: { ...where, status: 'COMPLETED' } }),
-      this.prisma.mission.aggregate({
-        where,
-        _avg: { estimatedDuration: true }
+      this.prisma.mission.count({ where: whereClause }),
+      this.prisma.mission.count({ 
+        where: { ...whereClause, status: 'SCHEDULED' } 
       }),
-      this.prisma.mission.groupBy({
-        by: ['status'],
-        where,
-        _count: true
+      this.prisma.mission.count({ 
+        where: { ...whereClause, status: 'IN_PROGRESS' } 
+      }),
+      this.prisma.mission.count({ 
+        where: { ...whereClause, status: 'COMPLETED' } 
+      }),
+      this.prisma.mission.count({ 
+        where: { ...whereClause, status: 'CANCELLED' } 
+      }),
+      this.prisma.mission.aggregate({
+        where: { 
+          ...whereClause, 
+          clientRating: { not: null } 
+        },
+        _avg: { clientRating: true }
       })
     ]);
-
-    const completionRate = totalMissions > 0 ? (completedMissions / totalMissions) * 100 : 0;
 
     return {
       totalMissions,
       scheduledMissions,
       inProgressMissions,
       completedMissions,
-      completionRate: Math.round(completionRate * 100) / 100,
-      averageDuration: Math.round((averageDuration._avg.estimatedDuration || 0) * 100) / 100,
-      statusDistribution
+      cancelledMissions,
+      averageRating: averageRating._avg.clientRating || 0,
+      completionRate: totalMissions > 0 ? (completedMissions / totalMissions) * 100 : 0
     };
   }
 
-  /**
-   * Search missions with flexible criteria
-   */
-  public async searchMissions(query: string, options: {
-    limit?: number;
-    offset?: number;
-    filters?: Prisma.MissionWhereInput;
-  } = {}) {
-    const { limit = 20, offset = 0, filters = {} } = options;
+  public async getMissionsByStatus() {
+    const statusCounts = await this.prisma.mission.groupBy({
+      by: ['status'],
+      _count: {
+        status: true
+      }
+    });
 
-    const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 0);
-    
-    const searchConditions: Prisma.MissionWhereInput[] = searchTerms.map(term => ({
-      OR: [
-        { missionNumber: { contains: term, mode: 'insensitive' } },
-        { address: { contains: term, mode: 'insensitive' } },
-        { lead: { firstName: { contains: term, mode: 'insensitive' } } },
-        { lead: { lastName: { contains: term, mode: 'insensitive' } } },
-        { lead: { phone: { contains: term } } },
-        { teamLeader: { name: { contains: term, mode: 'insensitive' } } }
-      ]
+    return statusCounts.map(item => ({
+      status: item.status,
+      count: item._count.status
     }));
+  }
 
-    const where: Prisma.MissionWhereInput = {
-      AND: [...searchConditions, filters]
-    };
+  public async getUpcomingMissions(teamLeaderId: string, days: number = 7) {
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + days);
 
-    const [missions, total] = await Promise.all([
-      this.prisma.mission.findMany({
-        where,
-        skip: offset,
-        take: limit,
-        include: {
-          lead: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              phone: true,
-              email: true
-            }
-          },
-          teamLeader: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              role: true
-            }
-          },
-          _count: {
-            select: {
-              tasks: true,
-              expenses: true
-            }
+    return await this.prisma.mission.findMany({
+      where: {
+        teamLeaderId,
+        status: { in: ['SCHEDULED', 'IN_PROGRESS'] },
+        scheduledDate: {
+          gte: startDate,
+          lte: endDate
+        }
+      },
+      include: {
+        lead: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            address: true
           }
         },
-        orderBy: { createdAt: 'desc' }
-      }),
-      this.prisma.mission.count({ where })
-    ]);
+        tasks: {
+          select: {
+            id: true,
+            title: true,
+            status: true
+          }
+        }
+      },
+      orderBy: {
+        scheduledDate: 'asc'
+      }
+    });
+  }
 
-    return { missions, total };
+  public async updateMissionStatus(
+    id: string, 
+    status: MissionStatus, 
+    updatedBy: string,
+    notes?: string
+  ) {
+    return await this.prisma.$transaction(async (tx) => {
+      const existingMission = await tx.mission.findUnique({
+        where: { id }
+      });
+
+      if (!existingMission) {
+        throw new AppError(404, 'Mission not found', true);
+      }
+
+      const validTransitions: Record<MissionStatus, MissionStatus[]> = {
+        'SCHEDULED': ['IN_PROGRESS', 'CANCELLED'],
+        'IN_PROGRESS': ['QUALITY_CHECK', 'CLIENT_VALIDATION', 'COMPLETED', 'CANCELLED'],
+        'QUALITY_CHECK': ['IN_PROGRESS', 'CLIENT_VALIDATION', 'COMPLETED'],
+        'CLIENT_VALIDATION': ['COMPLETED', 'IN_PROGRESS'],
+        'COMPLETED': [],
+        'CANCELLED': [],
+      };
+
+      if (!validTransitions[existingMission.status].includes(status)) {
+        throw new AppError(400, 
+          `Invalid status transition from ${existingMission.status} to ${status}`, 
+          true
+        );
+      }
+
+      const updatedMission = await tx.mission.update({
+        where: { id },
+        data: {
+          status,
+          ...(status === 'IN_PROGRESS' && !existingMission.actualStartTime && {
+            actualStartTime: new Date()
+          }),
+          ...(status === 'COMPLETED' && !existingMission.actualEndTime && {
+            actualEndTime: new Date()
+          }),
+          ...(notes && { adminNotes: notes })
+        }
+      });
+
+      await tx.activity.create({
+        data: {
+          type: 'MISSION_STARTED',
+          title: 'Statut de mission mis à jour',
+          description: `Mission ${existingMission.missionNumber} - statut changé de ${existingMission.status} à ${status}`,
+          userId: updatedBy,
+          leadId: existingMission.leadId,
+          metadata: {
+            missionId: id,
+            oldStatus: existingMission.status,
+            newStatus: status,
+            notes
+          }
+        }
+      });
+
+      return updatedMission;
+    });
   }
 }
 
-// Export a singleton instance
-export const missionService = new MissionService(prisma);
+export const missionService = new MissionService();

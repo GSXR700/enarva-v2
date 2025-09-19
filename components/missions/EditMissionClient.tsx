@@ -1,559 +1,944 @@
-// components/missions/EditMissionClient.tsx
+// components/missions/EditMissionClient.tsx - FIXED VERSION
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { DndProvider, useDrag, useDrop } from 'react-dnd'
-import { HTML5Backend } from 'react-dnd-html5-backend'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, Save, ArrowLeft, Plus, Trash2 } from 'lucide-react'
-import {
-  Mission,
-  Task,
-  TaskStatus,
-  TaskType,
-  TaskCategory,
-  MissionStatus,
-  Priority,
-  MissionType,
-} from '@prisma/client'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, Save, Plus, Trash2, GripVertical } from 'lucide-react'
+import { MissionStatus, Priority, MissionType, TaskStatus, TaskCategory, TaskType } from '@prisma/client'
 import { toast } from 'sonner'
+import Link from 'next/link'
+import { DndProvider, useDrag, useDrop } from 'react-dnd'
+import { HTML5Backend } from 'react-dnd-html5-backend'
 
-type TaskWithId = Task & { id: string }
-
-interface TaskTemplateWithTasks {
-  id: string
-  name: string
-  description?: string
-  tasks: any[]
+// Types
+interface TaskWithId {
+  id?: string;
+  title: string;
+  description?: string | null;
+  category: TaskCategory;
+  type: TaskType;
+  status: TaskStatus;
+  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
+  estimatedTime?: number | null;
+  actualTime?: number | null;
+  assignedToId?: string | null;
+  notes?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  missionId?: string;
+  completedAt?: Date | null;
+  validatedAt?: Date | null;
 }
 
-function TaskItem({
-  task,
-  index,
-  handleTaskChange,
-  removeTask,
-  moveTask,
-  isClientView,
-}: {
-  task: TaskWithId
-  index: number
-  handleTaskChange: (
-    index: number,
-    field: keyof Task,
-    value: string | boolean | TaskStatus | TaskType | Date | null
-  ) => void
-  removeTask: (index: number) => void
-  moveTask: (dragIndex: number, hoverIndex: number) => void
-  isClientView: boolean
-}) {
-  const ref = useRef<HTMLDivElement>(null)
+interface MissionData {
+  id: string;
+  missionNumber: string;
+  status: MissionStatus;
+  priority: Priority;
+  type: MissionType;
+  scheduledDate: string;
+  estimatedDuration: number;
+  address: string;
+  coordinates?: string | null;
+  accessNotes?: string | null;
+  teamLeaderId?: string | null;
+  teamId?: string | null;
+  actualStartTime?: string | null;
+  actualEndTime?: string | null;
+  clientValidated: boolean;
+  clientFeedback?: string | null;
+  clientRating?: number | null;
+  adminNotes?: string | null;
+  tasks?: TaskWithId[];
+  lead: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    email?: string;
+    address?: string;
+    company?: string;
+  };
+  teamLeader?: {
+    id: string;
+    name: string;
+    email: string;
+    image?: string;
+  };
+  team?: {
+    id: string;
+    name: string;
+    members: Array<{
+      id: string;
+      user: {
+        id: string;
+        name: string;
+        email: string;
+        image?: string;
+      };
+    }>;
+  };
+}
 
+interface TaskTemplate {
+  id: string;
+  name: string;
+  tasks: any;
+}
+
+interface TeamLeader {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+// Drag and Drop Task Component
+const DraggableTask = ({ 
+  task, 
+  index, 
+  moveTask, 
+  updateTask, 
+  removeTask,
+  teamMembers 
+}: {
+  task: TaskWithId;
+  index: number;
+  moveTask: (dragIndex: number, hoverIndex: number) => void;
+  updateTask: (index: number, field: keyof TaskWithId, value: any) => void;
+  removeTask: (index: number) => void;
+  teamMembers: Array<{ id: string; user: { id: string; name: string } }>;
+}) => {
   const [{ isDragging }, drag] = useDrag({
     type: 'task',
     item: { index },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
-  })
+  });
 
   const [, drop] = useDrop({
     accept: 'task',
     hover: (item: { index: number }) => {
       if (item.index !== index) {
-        moveTask(item.index, index)
-        item.index = index
+        moveTask(item.index, index);
+        item.index = index;
       }
     },
-  })
+  });
 
-  // Fixed: Properly combine drag and drop refs
-  drag(drop(ref))
+  const ref = useCallback((node: HTMLDivElement) => {
+    drag(drop(node));
+  }, [drag, drop]);
 
   return (
     <div
       ref={ref}
-      style={{ opacity: isDragging ? 0.5 : 1 }}
-      className="p-4 border rounded-lg bg-card"
+      className={`bg-gray-50 p-4 rounded-lg border ${isDragging ? 'opacity-50' : ''}`}
     >
-      <div className="flex justify-between items-center mb-2">
-        <h4 className="font-semibold text-sm">Tâche #{index + 1}</h4>
-        {!isClientView && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => removeTask(index)}
-          >
-            <Trash2 className="w-4 h-4 text-red-500" />
-          </Button>
-        )}
+      <div className="flex items-center gap-2 mb-3">
+        <GripVertical className="h-4 w-4 text-gray-400 cursor-move" />
+        <Input
+          value={task.title}
+          onChange={(e) => updateTask(index, 'title', e.target.value)}
+          placeholder="Titre de la tâche"
+          className="flex-1"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => removeTask(index)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+      <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <Label htmlFor={`taskTitle-${index}`}>Titre</Label>
-          <Input
-            id={`taskTitle-${index}`}
-            value={task.title || ''}
-            onChange={(e) => handleTaskChange(index, 'title', e.target.value)}
-            disabled={isClientView}
-          />
-        </div>
-        <div>
-          <Label htmlFor={`taskCategory-${index}`}>Catégorie</Label>
+          <Label className="text-xs">Catégorie</Label>
           <Select
             value={task.category}
-            onValueChange={(value) =>
-              handleTaskChange(index, 'category', value as TaskCategory)
-            }
-            disabled={isClientView}
+            onValueChange={(value) => updateTask(index, 'category', value)}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Choisir une catégorie" />
+            <SelectTrigger className="h-8">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Object.values(TaskCategory).map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat.replace(/_/g, ' ')}
-                </SelectItem>
-              ))}
+              <SelectItem value="GENERAL">Général</SelectItem>
+              <SelectItem value="CLEANING">Nettoyage</SelectItem>
+              <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
+              <SelectItem value="INSPECTION">Inspection</SelectItem>
+              <SelectItem value="SETUP">Installation</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <div className="md:col-span-2">
-          <Label htmlFor={`taskDescription-${index}`}>Description</Label>
-          <Textarea
-            id={`taskDescription-${index}`}
-            value={task.description || ''}
-            onChange={(e) =>
-              handleTaskChange(index, 'description', e.target.value)
-            }
-            disabled={isClientView}
-          />
-        </div>
+
         <div>
-          <Label htmlFor={`taskStatus-${index}`}>Statut</Label>
+          <Label className="text-xs">Type</Label>
+          <Select
+            value={task.type}
+            onValueChange={(value) => updateTask(index, 'type', value)}
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="EXECUTION">Exécution</SelectItem>
+              <SelectItem value="QUALITY_CHECK">Contrôle Qualité</SelectItem>
+              <SelectItem value="DOCUMENTATION">Documentation</SelectItem>
+              <SelectItem value="CLIENT_INTERACTION">Interaction Client</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label className="text-xs">Priorité</Label>
+          <Select
+            value={task.priority}
+            onValueChange={(value) => updateTask(index, 'priority', value)}
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="LOW">Basse</SelectItem>
+              <SelectItem value="NORMAL">Normale</SelectItem>
+              <SelectItem value="HIGH">Haute</SelectItem>
+              <SelectItem value="CRITICAL">Critique</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label className="text-xs">Statut</Label>
           <Select
             value={task.status}
-            onValueChange={(value) =>
-              handleTaskChange(index, 'status', value as TaskStatus)
-            }
-            disabled={isClientView}
+            onValueChange={(value) => updateTask(index, 'status', value)}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Choisir un statut" />
+            <SelectTrigger className="h-8">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Object.values(TaskStatus).map((status) => (
-                <SelectItem key={status} value={status}>
-                  {status}
+              <SelectItem value="ASSIGNED">Assignée</SelectItem>
+              <SelectItem value="IN_PROGRESS">En Cours</SelectItem>
+              <SelectItem value="COMPLETED">Terminée</SelectItem>
+              <SelectItem value="VALIDATED">Validée</SelectItem>
+              <SelectItem value="REJECTED">Rejetée</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <Label className="text-xs">Temps estimé (min)</Label>
+          <Input
+            type="number"
+            value={task.estimatedTime || ''}
+            onChange={(e) => updateTask(index, 'estimatedTime', e.target.value ? parseInt(e.target.value) : null)}
+            placeholder="0"
+            min="0"
+            className="h-8"
+          />
+        </div>
+
+        <div>
+          <Label className="text-xs">Assignée à</Label>
+          <Select
+            value={task.assignedToId || 'unassigned'}
+            onValueChange={(value) => updateTask(index, 'assignedToId', value === 'unassigned' ? null : value)}
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder="Non assignée" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassigned">Non assignée</SelectItem>
+              {teamMembers.map((member) => (
+                <SelectItem key={member.id} value={member.user.id}>
+                  {member.user.name}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       </div>
+
+      <div>
+        <Label className="text-xs">Description</Label>
+        <Textarea
+          value={task.description || ''}
+          onChange={(e) => updateTask(index, 'description', e.target.value || null)}
+          placeholder="Description de la tâche..."
+          rows={2}
+          className="text-sm"
+        />
+      </div>
     </div>
-  )
-}
+  );
+};
 
-interface Props {
-  params: { id: string };
-  searchParams: { [key: string]: string | string[] | undefined };
-}
+export default function EditMissionClient() {
+  const router = useRouter();
+  const params = useParams();
+  const missionId = params.id as string;
 
-export default function EditMissionClient({ params, searchParams }: Props) {
-  const router = useRouter()
-  const [mission, setMission] = useState<
-    Partial<Mission & { tasks: TaskWithId[] }>
-  >({})
-  const [taskTemplates, setTaskTemplates] = useState<TaskTemplateWithTasks[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isClientView, setIsClientView] = useState(false)
+  const [mission, setMission] = useState<MissionData | null>(null);
+  const [teamLeaders, setTeamLeaders] = useState<TeamLeader[]>([]);
+  const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
+  // Load initial data
   useEffect(() => {
-    const initializeData = async () => {
+    const loadData = async () => {
       try {
-        if (searchParams?.view === 'client') {
-          setIsClientView(true)
-        }
+        const [missionRes, teamLeadersRes, templatesRes] = await Promise.all([
+          fetch(`/api/missions/${missionId}`),
+          fetch('/api/users?role=TEAM_LEADER'),
+          fetch('/api/task-templates')
+        ]);
 
-        const [
-          missionRes,
-          taskTemplatesRes,
-        ] = await Promise.all([
-          fetch(`/api/missions/${params.id}`),
-          fetch('/api/task-templates'),
-        ])
+        if (!missionRes.ok) throw new Error('Failed to fetch mission');
+        if (!teamLeadersRes.ok) throw new Error('Failed to fetch team leaders');
+        if (!templatesRes.ok) throw new Error('Failed to fetch templates');
 
-        if (!missionRes.ok) {
-          throw new Error('Mission introuvable')
-        }
+        const [missionData, teamLeadersData, templatesData] = await Promise.all([
+          missionRes.json(),
+          teamLeadersRes.json(),
+          templatesRes.json()
+        ]);
 
-        const missionData = await missionRes.json()
-        setMission({
+        // Process mission data
+        const processedMission = {
           ...missionData,
-          // Fixed: Ensure scheduledDate is always a string for input
-          scheduledDate: missionData.scheduledDate 
-            ? new Date(missionData.scheduledDate).toISOString().slice(0, 16)
-            : '',
-          tasks:
-            missionData.tasks?.map((t: Task) => ({
-              ...t,
-              id: t.id || Math.random().toString(),
-            })) || [],
-        })
-        setTaskTemplates(await taskTemplatesRes.json())
+          scheduledDate: new Date(missionData.scheduledDate).toISOString().slice(0, 16),
+          estimatedDuration: missionData.estimatedDuration / 60, // Convert minutes to hours
+          actualStartTime: missionData.actualStartTime ? new Date(missionData.actualStartTime).toISOString().slice(0, 16) : null,
+          actualEndTime: missionData.actualEndTime ? new Date(missionData.actualEndTime).toISOString().slice(0, 16) : null,
+          tasks: missionData.tasks || []
+        };
+
+        setMission(processedMission);
+        setTeamLeaders(teamLeadersData);
+        setTaskTemplates(templatesData);
       } catch (error) {
-        console.error('Error fetching data:', error)
-        toast.error('Erreur lors de la récupération des données.')
+        console.error('Error loading data:', error);
+        toast.error('Erreur lors du chargement des données');
       } finally {
-        setIsLoading(false)
+        setIsLoadingData(false);
       }
+    };
+
+    if (missionId) {
+      loadData();
     }
+  }, [missionId]);
 
-    initializeData()
-  }, [params.id, searchParams])
+  // Handle form field changes
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    setMission(prev => {
+      if (!prev) return prev;
+      
+      let processedValue: any = value;
+      
+      // Handle numeric fields
+      if (name === 'estimatedDuration') {
+        processedValue = parseFloat(value) || 0;
+      } else if (name === 'clientRating') {
+        processedValue = value ? parseInt(value) : null;
+      } else if (type === 'checkbox') {
+        processedValue = (e.target as HTMLInputElement).checked;
+      }
+      
+      return { ...prev, [name]: processedValue };
+    });
+  };
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { id, value } = e.target
-    setMission((prev) => ({ ...prev, [id]: value }))
-  }
+  // Handle select changes
+  const handleSelectChange = (name: string, value: string) => {
+    setMission(prev => {
+      if (!prev) return prev;
+      
+      let processedValue: any = value;
+      
+      // Handle null values
+      if (value === '' || value === 'null') {
+        processedValue = null;
+      }
+      
+      return { ...prev, [name]: processedValue };
+    });
+  };
 
-  const handleSelectChange = (
-    field: keyof Mission,
-    value: string | MissionStatus | Priority | MissionType
-  ) => {
-    setMission((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const handleTaskChange = (
-    index: number,
-    field: keyof Task,
-    value: string | boolean | TaskStatus | TaskType | Date | null
-  ) => {
-    const newTasks = [...(mission.tasks || [])]
-    const taskToUpdate = newTasks[index] as any
-    taskToUpdate[field] = value
-    setMission((prev) => ({ ...prev, tasks: newTasks }))
-  }
-
+  // Task management functions
   const addTask = () => {
-    const newTasks: TaskWithId[] = [
-      ...(mission.tasks || []),
-      {
-        id: Date.now().toString(),
-        title: '',
+    setMission(prev => {
+      if (!prev) return prev;
+      
+      const newTask: TaskWithId = {
+        title: 'Nouvelle tâche',
         description: '',
-        category: TaskCategory.LIVING_SPACES,
-        status: TaskStatus.ASSIGNED,
-        type: TaskType.CLEANUP,
-        missionId: params.id,
+        category: 'GENERAL',
+        type: 'EXECUTION',
+        status: 'ASSIGNED',
+        priority: 'NORMAL',
         estimatedTime: null,
         actualTime: null,
-        notes: null,
-        completedAt: null,
-        validatedAt: null,
         assignedToId: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-    ]
-    setMission((prev) => ({ ...prev, tasks: newTasks }))
-  }
+        notes: null,
+      };
+      
+      return {
+        ...prev,
+        tasks: [...(prev.tasks || []), newTask]
+      };
+    });
+  };
 
   const removeTask = (index: number) => {
-    const newTasks = [...(mission.tasks || [])]
-    newTasks.splice(index, 1)
-    setMission((prev) => ({ ...prev, tasks: newTasks }))
-  }
+    setMission(prev => {
+      if (!prev || !prev.tasks) return prev;
+      
+      const newTasks = [...prev.tasks];
+      newTasks.splice(index, 1);
+      
+      return { ...prev, tasks: newTasks };
+    });
+  };
+
+  const updateTask = (index: number, field: keyof TaskWithId, value: any) => {
+    setMission(prev => {
+      if (!prev || !prev.tasks) return prev;
+      
+      const newTasks = [...prev.tasks];
+      newTasks[index] = { ...newTasks[index], [field]: value };
+      
+      return { ...prev, tasks: newTasks };
+    });
+  };
+
+  const moveTask = useCallback((dragIndex: number, hoverIndex: number) => {
+    setMission(prev => {
+      if (!prev || !prev.tasks) return prev;
+      
+      const dragTask = prev.tasks[dragIndex];
+      if (!dragTask) return prev;
+      
+      const newTasks = [...prev.tasks];
+      newTasks.splice(dragIndex, 1);
+      newTasks.splice(hoverIndex, 0, dragTask);
+      
+      return { ...prev, tasks: newTasks };
+    });
+  }, []);
 
   const applyTemplate = (templateId: string) => {
-    const template = taskTemplates.find((t) => t.id === templateId)
-    if (template && Array.isArray(template.tasks)) {
-      const newTasks: TaskWithId[] = (template.tasks as any[]).map((item) => ({
-        id: Math.random().toString(),
-        title: item.title,
-        description: '',
-        category: item.category,
-        type: item.type,
-        status: TaskStatus.ASSIGNED,
-        missionId: params.id,
-        estimatedTime: null,
-        actualTime: null,
-        notes: null,
-        completedAt: null,
-        validatedAt: null,
-        assignedToId: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }))
-      setMission((prev) => ({ ...prev, tasks: newTasks }))
-    }
-  }
+    const template = taskTemplates.find(t => t.id === templateId);
+    if (!template || !Array.isArray(template.tasks)) return;
 
-  const moveTask = useCallback(
-    (dragIndex: number, hoverIndex: number) => {
-      if (!mission.tasks) return;
-      const dragTask = mission.tasks[dragIndex]
-      // Fixed: Handle potential undefined dragTask
-      if (!dragTask) return;
-      const newTasks = [...mission.tasks]
-      newTasks.splice(dragIndex, 1)
-      newTasks.splice(hoverIndex, 0, dragTask)
-      setMission((prev) => ({ ...prev, tasks: newTasks }))
-    },
-    [mission.tasks]
-  )
+    const newTasks: TaskWithId[] = template.tasks.map((item: any) => ({
+      title: item.title || item.name || 'Task',
+      description: item.description || '',
+      category: item.category || 'GENERAL',
+      type: item.type || 'EXECUTION',
+      status: 'ASSIGNED',
+      priority: item.priority || 'NORMAL',
+      estimatedTime: item.estimatedTime || null,
+      actualTime: null,
+      assignedToId: null,
+      notes: null,
+    }));
 
+    setMission(prev => prev ? { ...prev, tasks: newTasks } : prev);
+  };
+
+  // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    if (!mission) return;
+
+    setIsLoading(true);
+    
     try {
-      const response = await fetch(`/api/missions/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...mission,
-          estimatedDuration: Number(mission.estimatedDuration),
-          tasks: mission.tasks?.map(({ id, ...rest }) => rest), // Remove temp id
-        }),
-      })
-      if (!response.ok) throw new Error("Erreur lors de la mise à jour.")
+      // Prepare data for submission
+      const submissionData = {
+        ...mission,
+        // Convert hours back to minutes for the API
+        estimatedDuration: mission.estimatedDuration,
+        // Ensure datetime fields are properly formatted
+        scheduledDate: mission.scheduledDate ? new Date(mission.scheduledDate).toISOString() : undefined,
+        actualStartTime: mission.actualStartTime ? new Date(mission.actualStartTime).toISOString() : null,
+        actualEndTime: mission.actualEndTime ? new Date(mission.actualEndTime).toISOString() : null,
+        // Clean up tasks data
+        tasks: mission.tasks?.map(task => ({
+          title: task.title,
+          description: task.description,
+          category: task.category,
+          type: task.type,
+          status: task.status,
+          priority: task.priority,
+          estimatedTime: task.estimatedTime,
+          actualTime: task.actualTime,
+          assignedToId: task.assignedToId,
+          notes: task.notes,
+        })) || []
+      };
 
-      toast.success('Mission mise à jour avec succès!')
-      router.push('/missions')
-    } catch (error) {
-      toast.error('Erreur lors de la sauvegarde.')
+      // Remove fields that shouldn't be sent to API
+      delete (submissionData as any).lead;
+      delete (submissionData as any).teamLeader;
+      delete (submissionData as any).team;
+      delete (submissionData as any).id;
+      delete (submissionData as any).missionNumber;
+      delete (submissionData as any).createdAt;
+      delete (submissionData as any).updatedAt;
+
+      console.log('Submitting mission data:', submissionData);
+
+      const response = await fetch(`/api/missions/${missionId}`, {
+        method: 'PUT', // Use PUT for full update
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submissionData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || `HTTP ${response.status}`);
+      }
+
+      const updatedMission = await response.json();
+      console.log('Mission updated successfully:', updatedMission);
+
+      toast.success('Mission mise à jour avec succès!');
+      router.push('/missions');
+    } catch (error: any) {
+      console.error('Error updating mission:', error);
+      toast.error(error.message || 'Erreur lors de la sauvegarde');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
+  };
+
+  if (isLoadingData) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Chargement de la mission...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  if (isLoading) {
+  if (!mission) {
     return (
-      <div className="main-content flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="container mx-auto p-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600">Mission non trouvée</h1>
+          <p className="text-gray-600 mt-2">La mission demandée n'existe pas ou a été supprimée.</p>
+          <Link href="/missions">
+            <Button className="mt-4">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour aux missions
+            </Button>
+          </Link>
+        </div>
       </div>
-    )
+    );
   }
+
+  const teamMembers = mission.team?.members || [];
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="main-content space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="container mx-auto p-6 max-w-4xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => router.back()}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Retour
-            </Button>
+            <Link href="/missions">
+              <Button variant="outline" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Retour
+              </Button>
+            </Link>
             <div>
-              <h1 className="text-2xl font-bold">
-                {isClientView ? 'Détails de la Mission' : 'Modifier la Mission'}
-              </h1>
-              <p className="text-muted-foreground">
-                Mission #{mission.missionNumber}
-              </p>
+              <h1 className="text-2xl font-bold">Modifier la Mission</h1>
+              <p className="text-gray-600">{mission.missionNumber}</p>
             </div>
           </div>
+          <Badge variant={
+            mission.status === 'COMPLETED' ? 'default' :
+            mission.status === 'IN_PROGRESS' ? 'secondary' :
+            mission.status === 'CANCELLED' ? 'destructive' : 'outline'
+          }>
+            {mission.status}
+          </Badge>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
-          <Card className="thread-card">
+          <Card>
             <CardHeader>
               <CardTitle>Informations Générales</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="scheduledDate">Date prévue</Label>
+                  <Label htmlFor="status">Statut</Label>
+                  <Select
+                    value={mission.status}
+                    onValueChange={(value) => handleSelectChange('status', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SCHEDULED">Planifiée</SelectItem>
+                      <SelectItem value="IN_PROGRESS">En Cours</SelectItem>
+                      <SelectItem value="QUALITY_CHECK">Contrôle Qualité</SelectItem>
+                      <SelectItem value="CLIENT_VALIDATION">Validation Client</SelectItem>
+                      <SelectItem value="COMPLETED">Terminée</SelectItem>
+                      <SelectItem value="CANCELLED">Annulée</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="priority">Priorité</Label>
+                  <Select
+                    value={mission.priority}
+                    onValueChange={(value) => handleSelectChange('priority', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="LOW">Basse</SelectItem>
+                      <SelectItem value="NORMAL">Normale</SelectItem>
+                      <SelectItem value="HIGH">Haute</SelectItem>
+                      <SelectItem value="CRITICAL">Critique</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="type">Type</Label>
+                  <Select
+                    value={mission.type}
+                    onValueChange={(value) => handleSelectChange('type', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SERVICE">Service</SelectItem>
+                      <SelectItem value="TECHNICAL_VISIT">Visite Technique</SelectItem>
+                      <SelectItem value="DELIVERY">Livraison</SelectItem>
+                      <SelectItem value="INTERNAL">Interne</SelectItem>
+                      <SelectItem value="RECURRING">Récurrent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="teamLeaderId">Chef d'Équipe</Label>
+                  <Select
+                    value={mission.teamLeaderId || 'null'}
+                    onValueChange={(value) => handleSelectChange('teamLeaderId', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un chef d'équipe" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="null">Aucun</SelectItem>
+                      {teamLeaders.map((leader) => (
+                        <SelectItem key={leader.id} value={leader.id}>
+                          {leader.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="scheduledDate">Date et Heure Programmées</Label>
                   <Input
                     id="scheduledDate"
+                    name="scheduledDate"
                     type="datetime-local"
-                    value={typeof mission.scheduledDate === 'string' ? mission.scheduledDate : ''}
-                    onChange={handleInputChange}
-                    disabled={isClientView}
+                    value={mission.scheduledDate}
+                    onChange={handleChange}
+                    required
                   />
                 </div>
+
                 <div>
-                  <Label htmlFor="estimatedDuration">Durée estimée (heures)</Label>
+                  <Label htmlFor="estimatedDuration">Durée Estimée (heures)</Label>
                   <Input
                     id="estimatedDuration"
+                    name="estimatedDuration"
                     type="number"
                     step="0.5"
                     min="0.5"
                     max="24"
-                    value={mission.estimatedDuration || ''}
-                    onChange={handleInputChange}
-                    disabled={isClientView}
+                    value={mission.estimatedDuration}
+                    onChange={handleChange}
+                    required
                   />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="status">Statut</Label>
-                  {/* Fixed: Ensure mission.status is not undefined */}
-                  <Select 
-                    value={mission.status || MissionStatus.SCHEDULED} 
-                    onValueChange={(value) => handleSelectChange('status', value as MissionStatus)}
-                    disabled={isClientView}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choisir un statut" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.values(MissionStatus).map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="priority">Priorité</Label>
-                  <Select
-                    value={mission.priority || Priority.NORMAL}
-                    onValueChange={(value) => handleSelectChange('priority', value as Priority)}
-                    disabled={isClientView}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choisir une priorité" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.values(Priority).map((priority) => (
-                        <SelectItem key={priority} value={priority}>
-                          {priority}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="type">Type</Label>
-                  <Select
-                    value={mission.type || MissionType.SERVICE}
-                    onValueChange={(value) => handleSelectChange('type', value as MissionType)}
-                    disabled={isClientView}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choisir un type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.values(MissionType).map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
 
               <div>
                 <Label htmlFor="address">Adresse</Label>
-                <Input
+                <Textarea
                   id="address"
-                  value={mission.address || ''}
-                  onChange={handleInputChange}
-                  disabled={isClientView}
+                  name="address"
+                  value={mission.address}
+                  onChange={handleChange}
+                  rows={2}
+                  required
                 />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="coordinates">Coordonnées GPS</Label>
+                  <Input
+                    id="coordinates"
+                    name="coordinates"
+                    value={mission.coordinates || ''}
+                    onChange={handleChange}
+                    placeholder="Latitude, Longitude"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="accessNotes">Notes d'Accès</Label>
+                  <Textarea
+                    id="accessNotes"
+                    name="accessNotes"
+                    value={mission.accessNotes || ''}
+                    onChange={handleChange}
+                    rows={2}
+                    placeholder="Instructions d'accès au site..."
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Client Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Informations Client</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Client</Label>
+                  <div className="p-3 bg-gray-50 rounded-md">
+                    <p className="font-medium">
+                      {mission.lead.firstName} {mission.lead.lastName}
+                    </p>
+                    {mission.lead.company && (
+                      <p className="text-sm text-gray-600">{mission.lead.company}</p>
+                    )}
+                    <p className="text-sm text-gray-600">{mission.lead.phone}</p>
+                    {mission.lead.email && (
+                      <p className="text-sm text-gray-600">{mission.lead.email}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="clientValidated">Client Validé</Label>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <input
+                        type="checkbox"
+                        id="clientValidated"
+                        name="clientValidated"
+                        checked={mission.clientValidated}
+                        onChange={handleChange}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-600">Mission validée par le client</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="clientRating">Note Client</Label>
+                    <Select
+                      value={mission.clientRating?.toString() || 'null'}
+                      onValueChange={(value) => handleSelectChange('clientRating', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner une note" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="null">Aucune note</SelectItem>
+                        <SelectItem value="1">1 - Très insatisfait</SelectItem>
+                        <SelectItem value="2">2 - Insatisfait</SelectItem>
+                        <SelectItem value="3">3 - Neutre</SelectItem>
+                        <SelectItem value="4">4 - Satisfait</SelectItem>
+                        <SelectItem value="5">5 - Très satisfait</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
 
               <div>
-                <Label htmlFor="accessNotes">Notes d'accès</Label>
+                <Label htmlFor="clientFeedback">Retour Client</Label>
                 <Textarea
-                  id="accessNotes"
-                  value={mission.accessNotes || ''}
-                  onChange={handleInputChange}
-                  disabled={isClientView}
+                  id="clientFeedback"
+                  name="clientFeedback"
+                  value={mission.clientFeedback || ''}
+                  onChange={handleChange}
                   rows={3}
+                  placeholder="Commentaires et retour du client..."
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* Tasks */}
-          <Card className="thread-card">
+          {/* Time Tracking */}
+          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Tâches de la Mission
-                {!isClientView && (
-                  <div className="flex gap-2">
-                    <Select onValueChange={applyTemplate}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Appliquer un modèle" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {taskTemplates.map((template) => (
-                          <SelectItem key={template.id} value={template.id}>
-                            {template.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button type="button" onClick={addTask}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Ajouter
-                    </Button>
-                  </div>
-                )}
-              </CardTitle>
+              <CardTitle>Suivi du Temps</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {mission.tasks?.map((task, index) => (
-                  <TaskItem
-                    key={task.id}
-                    task={task}
-                    index={index}
-                    handleTaskChange={handleTaskChange}
-                    removeTask={removeTask}
-                    moveTask={moveTask}
-                    isClientView={isClientView}
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="actualStartTime">Heure de Début Réelle</Label>
+                  <Input
+                    id="actualStartTime"
+                    name="actualStartTime"
+                    type="datetime-local"
+                    value={mission.actualStartTime || ''}
+                    onChange={handleChange}
                   />
-                ))}
-                {(!mission.tasks || mission.tasks.length === 0) && (
-                  <p className="text-center text-muted-foreground py-8">
-                    Aucune tâche définie pour cette mission
-                  </p>
-                )}
+                </div>
+
+                <div>
+                  <Label htmlFor="actualEndTime">Heure de Fin Réelle</Label>
+                  <Input
+                    id="actualEndTime"
+                    name="actualEndTime"
+                    type="datetime-local"
+                    value={mission.actualEndTime || ''}
+                    onChange={handleChange}
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Submit */}
-          {!isClientView && (
-            <div className="flex justify-end gap-4">
-              <Button type="button" variant="outline" onClick={() => router.back()}>
+          {/* Tasks Management */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Tâches ({mission.tasks?.length || 0})</CardTitle>
+                <div className="flex gap-2">
+                  <Select onValueChange={applyTemplate}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Appliquer un modèle" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {taskTemplates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" variant="outline" onClick={addTask}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {mission.tasks && mission.tasks.length > 0 ? (
+                mission.tasks.map((task, index) => (
+                  <DraggableTask
+                    key={`task-${index}`}
+                    task={task}
+                    index={index}
+                    moveTask={moveTask}
+                    updateTask={updateTask}
+                    removeTask={removeTask}
+                    teamMembers={teamMembers}
+                  />
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Aucune tâche définie</p>
+                  <p className="text-sm">Utilisez le bouton "Ajouter" ou appliquez un modèle</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Admin Notes */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Notes Administratives</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div>
+                <Label htmlFor="adminNotes">Notes</Label>
+                <Textarea
+                  id="adminNotes"
+                  name="adminNotes"
+                  value={mission.adminNotes || ''}
+                  onChange={handleChange}
+                  rows={4}
+                  placeholder="Notes internes, observations, remarques..."
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-4">
+            <Link href="/missions">
+              <Button type="button" variant="outline">
                 Annuler
               </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Sauvegarde...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Sauvegarder
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
+            </Link>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Sauvegarde...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Sauvegarder
+                </>
+              )}
+            </Button>
+          </div>
         </form>
       </div>
     </DndProvider>
-  )
+  );
 }

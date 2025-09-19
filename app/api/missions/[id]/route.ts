@@ -1,8 +1,8 @@
-// app/api/missions/[id]/route.ts - Consolidated and corrected
+// app/api/missions/[id]/route.ts - CORRECTED VERSION
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { PrismaClient, MissionStatus, Priority } from '@prisma/client';
+import { PrismaClient, MissionStatus, Priority, MissionType, TaskCategory, TaskType, TaskStatus } from '@prisma/client';
 import { ExtendedUser } from '@/types/next-auth';
 import { z } from 'zod';
 
@@ -16,13 +16,32 @@ const missionUpdateSchema = z.object({
   accessNotes: z.string().optional().nullable(),
   priority: z.nativeEnum(Priority).optional(),
   status: z.nativeEnum(MissionStatus).optional(),
-  teamLeaderId: z.string().optional(),
-  teamId: z.string().optional(),
+  type: z.nativeEnum(MissionType).optional(),
+  teamLeaderId: z.string().optional().nullable(),
+  teamId: z.string().optional().nullable(),
   actualStartTime: z.string().datetime().optional().nullable(),
   actualEndTime: z.string().datetime().optional().nullable(),
   clientValidated: z.boolean().optional(),
   clientFeedback: z.string().optional().nullable(),
   clientRating: z.number().min(1).max(5).optional().nullable(),
+  adminValidated: z.boolean().optional(),
+  adminValidatedBy: z.string().optional().nullable(),
+  adminNotes: z.string().optional().nullable(),
+  qualityScore: z.number().min(1).max(5).optional().nullable(),
+  issuesFound: z.string().optional().nullable(),
+  correctionRequired: z.boolean().optional(),
+  tasks: z.array(z.object({
+    id: z.string().optional(),
+    title: z.string().min(1),
+    description: z.string().optional().nullable(),
+    category: z.nativeEnum(TaskCategory),
+    type: z.nativeEnum(TaskType),
+    status: z.nativeEnum(TaskStatus).default('ASSIGNED'),
+    estimatedTime: z.number().min(0).optional().nullable(),
+    actualTime: z.number().min(0).optional().nullable(),
+    assignedToId: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+  })).optional(),
 }).passthrough();
 
 export async function GET(
@@ -39,14 +58,153 @@ export async function GET(
     const mission = await prisma.mission.findUnique({
       where: { id },
       include: {
-        lead: true,
-        quote: true,
-        teamLeader: { select: { id: true, name: true, email: true, image: true } },
-        team: { include: { members: { include: { user: true } } } },
-        tasks: true,
-        expenses: true,
-        qualityChecks: true,
-        fieldReport: true,
+        lead: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            email: true,
+            address: true,
+            company: true,
+            leadType: true,
+          }
+        },
+        quote: {
+          select: {
+            id: true,
+            quoteNumber: true,
+            finalPrice: true,
+            status: true,
+            businessType: true,
+          }
+        },
+        teamLeader: { 
+          select: { 
+            id: true, 
+            name: true, 
+            email: true, 
+            image: true,
+            role: true 
+          } 
+        },
+        team: { 
+          include: { 
+            members: { 
+              where: { isActive: true },
+              include: { 
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    image: true,
+                    role: true
+                  }
+                }
+              } 
+            } 
+          } 
+        },
+        tasks: {
+          include: {
+            assignedTo: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    image: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'asc'
+          }
+        },
+        expenses: {
+          select: {
+            id: true,
+            amount: true,
+            category: true,
+            subCategory: true,
+            description: true,
+            date: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: {
+            date: 'desc'
+          }
+        },
+        qualityChecks: {
+          include: {
+            mission: {
+              select: {
+                id: true,
+                missionNumber: true
+              }
+            }
+          }
+        },
+        fieldReport: {
+          include: {
+            submittedBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        },
+        inventoryUsed: {
+          include: {
+            inventory: {
+              select: {
+                id: true,
+                name: true,
+                unit: true,
+                unitPrice: true
+              }
+            }
+          }
+        },
+        conversation: {
+          include: {
+            participants: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true
+              }
+            },
+            messages: {
+              include: {
+                sender: {
+                  select: {
+                    id: true,
+                    name: true,
+                    image: true
+                  }
+                }
+              },
+              orderBy: {
+                createdAt: 'desc'
+              },
+              take: 10
+            }
+          }
+        }
       },
     });
 
@@ -65,6 +223,20 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  return handleMissionUpdate(request, { params });
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  return handleMissionUpdate(request, { params });
+}
+
+async function handleMissionUpdate(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const session = await getServerSession(authOptions);
     const user = session?.user as ExtendedUser;
@@ -72,17 +244,27 @@ export async function PATCH(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    if (!['ADMIN', 'MANAGER', 'TEAM_LEADER'].includes(user.role)) {
+    if (!['ADMIN', 'MANAGER', 'TEAM_LEADER', 'AGENT'].includes(user.role)) {
       return new NextResponse('Forbidden', { status: 403 });
     }
     
     const { id } = await params;
     const body = await request.json();
-    const validatedData = missionUpdateSchema.parse(body);
+    
+    const validationResult = missionUpdateSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json({ 
+        error: 'Invalid input', 
+        details: validationResult.error.errors
+      }, { status: 400 });
+    }
+
+    const validatedData = validationResult.data;
 
     const updatedMission = await prisma.$transaction(async (tx) => {
       const existingMission = await tx.mission.findUnique({
         where: { id },
+        include: { tasks: true }
       });
 
       if (!existingMission) {
@@ -93,31 +275,58 @@ export async function PATCH(
         throw new Error('Not authorized to update this mission');
       }
 
-      if (validatedData.teamLeaderId && validatedData.teamLeaderId !== existingMission.teamLeaderId) {
-        const newTeamLeader = await tx.user.findUnique({
-          where: { id: validatedData.teamLeaderId },
-          include: { teamMemberships: { where: { isActive: true } } }
-        });
-        if (!newTeamLeader || newTeamLeader.role !== 'TEAM_LEADER' || newTeamLeader.teamMemberships.length === 0) {
-          throw new Error('Invalid or inactive team leader specified');
-        }
-      }
-
       const dataToUpdate: any = {};
-      if (validatedData.scheduledDate) dataToUpdate.scheduledDate = new Date(validatedData.scheduledDate);
-      if (validatedData.estimatedDuration) dataToUpdate.estimatedDuration = validatedData.estimatedDuration;
+      
+      if (validatedData.scheduledDate) {
+        dataToUpdate.scheduledDate = new Date(validatedData.scheduledDate);
+      }
+      if (validatedData.estimatedDuration !== undefined) {
+        dataToUpdate.estimatedDuration = Math.round(validatedData.estimatedDuration * 60);
+      }
       if (validatedData.address) dataToUpdate.address = validatedData.address;
-      if (validatedData.coordinates) dataToUpdate.coordinates = validatedData.coordinates;
-      if (validatedData.accessNotes) dataToUpdate.accessNotes = validatedData.accessNotes;
+      if (validatedData.coordinates !== undefined) dataToUpdate.coordinates = validatedData.coordinates;
+      if (validatedData.accessNotes !== undefined) dataToUpdate.accessNotes = validatedData.accessNotes;
       if (validatedData.priority) dataToUpdate.priority = validatedData.priority;
       if (validatedData.status) dataToUpdate.status = validatedData.status;
-      if (validatedData.teamLeaderId) dataToUpdate.teamLeaderId = validatedData.teamLeaderId;
-      if (validatedData.teamId) dataToUpdate.teamId = validatedData.teamId;
-      if (validatedData.actualStartTime) dataToUpdate.actualStartTime = new Date(validatedData.actualStartTime);
-      if (validatedData.actualEndTime) dataToUpdate.actualEndTime = new Date(validatedData.actualEndTime);
-      if (validatedData.clientValidated) dataToUpdate.clientValidated = validatedData.clientValidated;
-      if (validatedData.clientFeedback) dataToUpdate.clientFeedback = validatedData.clientFeedback;
-      if (validatedData.clientRating) dataToUpdate.clientRating = validatedData.clientRating;
+      if (validatedData.type) dataToUpdate.type = validatedData.type;
+      if (validatedData.teamLeaderId !== undefined) dataToUpdate.teamLeaderId = validatedData.teamLeaderId;
+      if (validatedData.teamId !== undefined) dataToUpdate.teamId = validatedData.teamId;
+      if (validatedData.actualStartTime !== undefined) {
+        dataToUpdate.actualStartTime = validatedData.actualStartTime ? new Date(validatedData.actualStartTime) : null;
+      }
+      if (validatedData.actualEndTime !== undefined) {
+        dataToUpdate.actualEndTime = validatedData.actualEndTime ? new Date(validatedData.actualEndTime) : null;
+      }
+      if (validatedData.clientValidated !== undefined) dataToUpdate.clientValidated = validatedData.clientValidated;
+      if (validatedData.clientFeedback !== undefined) dataToUpdate.clientFeedback = validatedData.clientFeedback;
+      if (validatedData.clientRating !== undefined) dataToUpdate.clientRating = validatedData.clientRating;
+      if (validatedData.adminValidated !== undefined) dataToUpdate.adminValidated = validatedData.adminValidated;
+      if (validatedData.adminValidatedBy !== undefined) dataToUpdate.adminValidatedBy = validatedData.adminValidatedBy;
+      if (validatedData.adminNotes !== undefined) dataToUpdate.adminNotes = validatedData.adminNotes;
+      if (validatedData.qualityScore !== undefined) dataToUpdate.qualityScore = validatedData.qualityScore;
+      if (validatedData.issuesFound !== undefined) dataToUpdate.issuesFound = validatedData.issuesFound;
+      if (validatedData.correctionRequired !== undefined) dataToUpdate.correctionRequired = validatedData.correctionRequired;
+
+      if (validatedData.tasks && validatedData.tasks.length > 0) {
+        await tx.task.deleteMany({
+          where: { missionId: id }
+        });
+
+        await tx.task.createMany({
+          data: validatedData.tasks.map(task => ({
+            missionId: id,
+            title: task.title,
+            description: task.description ?? null,
+            category: task.category,
+            type: task.type,
+            status: task.status ?? 'ASSIGNED',
+            estimatedTime: task.estimatedTime ?? null,
+            actualTime: task.actualTime ?? null,
+            assignedToId: task.assignedToId ?? null,
+            notes: task.notes ?? null,
+          }))
+        });
+      }
 
       const updated = await tx.mission.update({
         where: { id },
@@ -126,7 +335,14 @@ export async function PATCH(
           lead: true,
           quote: true,
           teamLeader: true,
-          team: { include: { members: { where: { isActive: true }, include: { user: true } } } },
+          team: { 
+            include: { 
+              members: { 
+                where: { isActive: true },
+                include: { user: true } 
+              } 
+            } 
+          },
           tasks: true
         }
       });
@@ -139,7 +355,11 @@ export async function PATCH(
             description: `Mission ${existingMission.missionNumber} - statut changé de ${existingMission.status} à ${validatedData.status}`,
             userId: user.id,
             leadId: existingMission.leadId,
-            metadata: { missionId: existingMission.id, oldStatus: existingMission.status, newStatus: validatedData.status }
+            metadata: { 
+              missionId: existingMission.id, 
+              oldStatus: existingMission.status, 
+              newStatus: validatedData.status 
+            }
           }
         });
       }
@@ -151,17 +371,25 @@ export async function PATCH(
 
   } catch (error) {
     if (error instanceof z.ZodError) {
-        return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 });
     }
+    
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error('Failed to update mission:', error);
-    if (errorMessage.includes('Not found')) {
+    
+    if (errorMessage.includes('not found')) {
       return new NextResponse(errorMessage, { status: 404 });
     }
     if (errorMessage.includes('Not authorized')) {
       return new NextResponse(errorMessage, { status: 403 });
     }
-    return NextResponse.json({ error: 'Failed to update mission', details: errorMessage }, { status: 500 });
+    
+    return NextResponse.json({ 
+      error: 'Failed to update mission', 
+      details: errorMessage 
+    }, { status: 500 });
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
@@ -186,31 +414,40 @@ export async function DELETE(
         throw new Error('Mission not found');
       }
 
-      // Cascade delete related data
       await tx.task.deleteMany({ where: { missionId: id } });
       await tx.qualityCheck.deleteMany({ where: { missionId: id } });
       await tx.inventoryUsage.deleteMany({ where: { missionId: id } });
       await tx.expense.deleteMany({ where: { missionId: id } });
-      const conversation = await tx.conversation.findUnique({ where: { missionId: id } });
+      
+      const conversation = await tx.conversation.findUnique({ 
+        where: { missionId: id } 
+      });
       if (conversation) {
-        await tx.message.deleteMany({ where: { conversationId: conversation.id } });
-        await tx.conversation.delete({ where: { missionId: id } });
+        await tx.message.deleteMany({ 
+          where: { conversationId: conversation.id } 
+        });
+        await tx.conversation.delete({ 
+          where: { missionId: id } 
+        });
       }
+      
       await tx.fieldReport.deleteMany({ where: { missionId: id } });
       await tx.invoice.deleteMany({ where: { missionId: id } });
       
-      // Finally delete the mission
       await tx.mission.delete({ where: { id } });
 
-      // Log the deletion
       await tx.activity.create({
         data: {
           type: 'SYSTEM_MAINTENANCE',
           title: 'Mission supprimée',
-          description: `Mission ${mission.missionNumber} a été supprimée par ${user.name}`,
+          description: `Mission ${mission.missionNumber} supprimée`,
           userId: user.id,
           leadId: mission.leadId,
-          metadata: { deletedMissionId: id, missionNumber: mission.missionNumber, deletedBy: user.name }
+          metadata: {
+            deletedMissionId: id,
+            missionNumber: mission.missionNumber,
+            deletedBy: user.name
+          }
         }
       });
     });
@@ -220,9 +457,16 @@ export async function DELETE(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error('Failed to delete mission:', error);
-     if (errorMessage.includes('not found')) {
+    
+    if (errorMessage.includes('not found')) {
       return new NextResponse(errorMessage, { status: 404 });
     }
-    return NextResponse.json({ error: 'Failed to delete mission', details: errorMessage }, { status: 500 });
+    
+    return NextResponse.json({ 
+      error: 'Failed to delete mission', 
+      details: errorMessage 
+    }, { status: 500 });
+  } finally {
+    await prisma.$disconnect();
   }
 }

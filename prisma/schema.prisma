@@ -312,6 +312,8 @@ model FieldReport {
   clientSignatureUrl   String?
   teamLeadSignatureUrl String?
   additionalNotes      String?  @db.Text
+
+  @@map("field_reports") // Fixed: Add explicit table mapping
 }
 
 // EXPLANATION: Next-Auth model for OAuth providers.
@@ -773,6 +775,12 @@ enum TaskType {
   DETAIL_FINISHING
   SETUP
   CLEANUP
+
+  // New generic workflow types needed by the application
+  EXECUTION
+  QUALITY_CHECK
+  DOCUMENTATION
+  CLIENT_INTERACTION
 }
 
 enum TaskStatus {
