@@ -1,6 +1,6 @@
+// app/(administration)/expenses/new/page.tsx
 'use client'
 
-// Import required dependencies and components
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -15,6 +15,7 @@ import { ArrowLeft, Plus } from 'lucide-react';
 import { Lead, Mission } from '@prisma/client';
 import { toast } from 'sonner';
 import { useEdgeStore } from '@/lib/edgestore';
+import { cleanExpenseData } from '@/lib/validation';
 
 // Define expense structure for categories and subcategories
 const expenseStructure = {
@@ -30,7 +31,6 @@ const expenseStructure = {
 };
 
 export default function NewExpensePage() {
-  // Initialize router, session, and EdgeStore
   const router = useRouter();
   const { data: session } = useSession();
   const currentUserId = (session?.user as any)?.id;
@@ -43,12 +43,12 @@ export default function NewExpensePage() {
     date: new Date().toISOString().split('T')[0],
     amount: '',
     description: '',
-    category: 'OPERATIONS',
+    category: '',
     subCategory: '',
-    paymentMethod: 'CASH',
+    paymentMethod: '',
     vendor: '',
-    missionId: '',
-    leadId: '',
+    missionId: 'none', // Use 'none' instead of empty string to fix Radix UI issue
+    leadId: 'none', // Use 'none' instead of empty string to fix Radix UI issue
     rentalStartDate: '',
     rentalEndDate: '',
   });
@@ -72,9 +72,9 @@ export default function NewExpensePage() {
         const missionsData = await missionsRes.json();
         const leadsData = await leadsRes.json();
 
-        // Ensure missions and leads are arrays
-        setMissions(Array.isArray(missionsData.data) ? missionsData.data : []);
-        setLeads(Array.isArray(leadsData.data) ? leadsData.data : []);
+        // Handle both direct array and wrapped data responses
+        setMissions(Array.isArray(missionsData) ? missionsData : (missionsData.data || []));
+        setLeads(Array.isArray(leadsData) ? leadsData : (leadsData.data || []));
       } catch (err: any) {
         setError(`Erreur lors du chargement des données : ${err.message}`);
         toast.error(`Erreur lors du chargement des données : ${err.message}`);
@@ -95,6 +95,18 @@ export default function NewExpensePage() {
   // Handle select dropdown changes
   const handleSelectChange = (id: keyof typeof formData, value: string) => {
     setFormData(prev => ({ ...prev, [id]: value }));
+    
+    // Reset subcategory when category changes
+    if (id === 'category') {
+      setFormData(prev => ({ ...prev, subCategory: '' }));
+    }
+  };
+
+  // Handle file change
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
   };
 
   // Handle form submission
@@ -117,20 +129,29 @@ export default function NewExpensePage() {
         proofUrl = res.url;
       }
 
+      // Prepare the data using the validation function from lib/validation.ts
+      const expenseData = {
+        ...formData,
+        proofUrl,
+        userId: currentUserId,
+        // Convert 'none' to empty string for validation processing
+        missionId: formData.missionId === 'none' ? '' : formData.missionId,
+        leadId: formData.leadId === 'none' ? '' : formData.leadId,
+      };
+
+      // Apply the validation/cleaning function
+      const cleanedData = cleanExpenseData(expenseData);
+
       // Submit expense data to API
       const response = await fetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ...formData, 
-          proofUrl,
-          userId: currentUserId // Include the current user ID
-        }),
+        body: JSON.stringify(cleanedData),
       });
 
       if (!response.ok) {
         const errorData = await response.text();
-        throw new Error(errorData || 'Échec de la création de la dépense.');
+        throw new Error(errorData || 'Échec de la création de la dépense');
       }
 
       toast.success('Dépense enregistrée avec succès !');
@@ -175,11 +196,21 @@ export default function NewExpensePage() {
         </div>
       </div>
 
+      {/* Error display */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-800">{error}</p>
+        </div>
+      )}
+
       {/* Expense form */}
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card className="thread-card">
           <CardHeader>
-            <CardTitle>Détails de la Dépense</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5" />
+              Détails de la Dépense
+            </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Date input */}
@@ -187,6 +218,7 @@ export default function NewExpensePage() {
               <Label htmlFor="date">Date *</Label>
               <Input id="date" type="date" value={formData.date} onChange={handleChange} required />
             </div>
+
             {/* Amount input */}
             <div>
               <Label htmlFor="amount">Montant (MAD) *</Label>
@@ -201,12 +233,13 @@ export default function NewExpensePage() {
                 placeholder="0.00"
               />
             </div>
+
             {/* Payment method select */}
             <div>
               <Label htmlFor="paymentMethod">Mode de paiement *</Label>
-              <Select value={formData.paymentMethod} onValueChange={(value) => handleSelectChange('paymentMethod', value)}>
+              <Select value={formData.paymentMethod} onValueChange={(value) => handleSelectChange('paymentMethod', value)} required>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Sélectionner..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="CASH">Cash</SelectItem>
@@ -218,12 +251,13 @@ export default function NewExpensePage() {
                 </SelectContent>
               </Select>
             </div>
+
             {/* Category select */}
             <div>
               <Label htmlFor="category">Catégorie *</Label>
-              <Select value={formData.category} onValueChange={(value) => handleSelectChange('category', value)}>
+              <Select value={formData.category} onValueChange={(value) => handleSelectChange('category', value)} required>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Sélectionner..." />
                 </SelectTrigger>
                 <SelectContent>
                   {Object.keys(expenseStructure).map(cat => (
@@ -234,15 +268,21 @@ export default function NewExpensePage() {
                 </SelectContent>
               </Select>
             </div>
+
             {/* Subcategory select */}
             <div>
               <Label htmlFor="subCategory">Sous-Catégorie *</Label>
-              <Select value={formData.subCategory} onValueChange={(value) => handleSelectChange('subCategory', value)} required>
+              <Select 
+                value={formData.subCategory} 
+                onValueChange={(value) => handleSelectChange('subCategory', value)} 
+                required
+                disabled={!formData.category}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir..." />
+                  <SelectValue placeholder={formData.category ? "Choisir..." : "Sélectionnez d'abord une catégorie"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {expenseStructure[formData.category as keyof typeof expenseStructure]?.map(subCat => (
+                  {formData.category && expenseStructure[formData.category as keyof typeof expenseStructure]?.map(subCat => (
                     <SelectItem key={subCat} value={subCat}>
                       {subCat}
                     </SelectItem>
@@ -250,6 +290,7 @@ export default function NewExpensePage() {
                 </SelectContent>
               </Select>
             </div>
+
             {/* Vendor input */}
             <div>
               <Label htmlFor="vendor">Fournisseur / Payé à</Label>
@@ -260,6 +301,7 @@ export default function NewExpensePage() {
                 placeholder="Nom du fournisseur..."
               />
             </div>
+
             {/* Description textarea */}
             <div className="md:col-span-3">
               <Label htmlFor="description">Description / Notes</Label>
@@ -271,6 +313,7 @@ export default function NewExpensePage() {
                 rows={3}
               />
             </div>
+
             {/* Mission select */}
             <div>
               <Label htmlFor="missionId">Lier à une mission (optionnel)</Label>
@@ -283,7 +326,7 @@ export default function NewExpensePage() {
                   <SelectValue placeholder={missions.length === 0 ? 'Aucune mission disponible' : 'Sélectionner...'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Aucune mission</SelectItem>
+                  <SelectItem value="none">Aucune mission</SelectItem>
                   {missions.map(m => (
                     <SelectItem key={m.id} value={m.id}>
                       {m.missionNumber}
@@ -292,6 +335,7 @@ export default function NewExpensePage() {
                 </SelectContent>
               </Select>
             </div>
+
             {/* Lead select */}
             <div>
               <Label htmlFor="leadId">Lier à un lead (optionnel)</Label>
@@ -304,31 +348,28 @@ export default function NewExpensePage() {
                   <SelectValue placeholder={leads.length === 0 ? 'Aucun lead disponible' : 'Sélectionner...'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Aucun lead</SelectItem>
-                  {leads.map(l => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.firstName} {l.lastName}
+                  <SelectItem value="none">Aucun lead</SelectItem>
+                  {leads.map(lead => (
+                    <SelectItem key={lead.id} value={lead.id}>
+                      {lead.firstName} {lead.lastName}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
             {/* File upload */}
             <div>
-              <Label htmlFor="proof">Justificatif (PDF, Image)</Label>
+              <Label htmlFor="proof">Justificatif (optionnel)</Label>
               <Input 
                 id="proof" 
                 type="file" 
-                accept="image/*,application/pdf"
-                onChange={(e) => setFile(e.target.files?.[0] || null)} 
+                onChange={handleFileChange}
+                accept="image/*,.pdf"
               />
-              {file && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  Fichier sélectionné: {file.name}
-                </p>
-              )}
             </div>
-            {/* Rental date fields (shown only for LOCATIONS category) */}
+
+            {/* Rental date fields - only show for rental expenses */}
             {isRental && (
               <>
                 <div>
@@ -337,7 +378,7 @@ export default function NewExpensePage() {
                     id="rentalStartDate" 
                     type="date" 
                     value={formData.rentalStartDate} 
-                    onChange={handleChange} 
+                    onChange={handleChange}
                   />
                 </div>
                 <div>
@@ -346,37 +387,21 @@ export default function NewExpensePage() {
                     id="rentalEndDate" 
                     type="date" 
                     value={formData.rentalEndDate} 
-                    onChange={handleChange} 
+                    onChange={handleChange}
                   />
                 </div>
               </>
             )}
           </CardContent>
         </Card>
-        
-        {/* Error message display */}
-        {error && (
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="pt-6">
-              <p className="text-red-600 text-sm">{error}</p>
-            </CardContent>
-          </Card>
-        )}
-        
-        {/* Submit button */}
-        <div className="flex justify-end gap-4">
-          <Link href="/expenses">
-            <Button type="button" variant="outline">
-              Annuler
-            </Button>
-          </Link>
+
+        <div className="flex justify-end">
           <Button 
             type="submit" 
-            className="bg-enarva-gradient rounded-lg px-8" 
-            disabled={isLoading || !currentUserId}
+            className="bg-enarva-gradient text-white px-8"
+            disabled={isLoading}
           >
-            <Plus className="w-4 h-4 mr-2" />
-            {isLoading ? 'Enregistrement...' : 'Enregistrer la Dépense'}
+            {isLoading ? 'Création...' : 'Créer la Dépense'}
           </Button>
         </div>
       </form>
