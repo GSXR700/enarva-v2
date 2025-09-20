@@ -279,39 +279,47 @@ const NewQuoteForm = () => {
     }
   }, [serviceQuoteCalculation, productQuoteCalculation, editableLineItems, businessType, enablePriceOverride, finalPriceOverride])
 
-  // Form validation
+  // Form validation - FIXED with better logic
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    // Client validation - FIXED: More specific validation
-    if (!selectedLead && !newClientData.name.trim()) {
+    // CLIENT VALIDATION - Must have either selected lead OR complete new client data
+    const hasSelectedLead = selectedLead && selectedLead.id
+    const hasNewClientName = newClientData.name.trim()
+    const hasNewClientPhone = newClientData.phone.trim()
+
+    if (!hasSelectedLead && !hasNewClientName) {
       newErrors.client = "Veuillez sélectionner un client existant ou entrer le nom d'un nouveau client"
     }
 
-    // New client validation - FIXED: Only require phone if new client name is provided
-    if (newClientData.name.trim() && !newClientData.phone.trim()) {
+    // If creating new client, phone is required
+    if (hasNewClientName && !hasNewClientPhone) {
       newErrors.phone = "Le numéro de téléphone est requis pour un nouveau client"
     }
 
-    // Line items validation - FIXED: Check actual final quote
-    if (finalQuote.lineItems.length === 0) {
-      newErrors.lineItems = "Veuillez ajouter au moins un élément au devis"
-    }
-
-    // Service validation - FIXED: Only validate if SERVICE type
+    // BUSINESS TYPE SPECIFIC VALIDATION
     if (businessType === 'SERVICE') {
+      // Must have at least one valid service
       const hasValidService = services.some(s => s.surface > 0 && s.type.trim())
       if (!hasValidService) {
         newErrors.services = "Veuillez configurer au moins un service avec une surface valide"
       }
-    }
-
-    // Product validation - FIXED: Only validate if PRODUCT type
-    if (businessType === 'PRODUCT') {
+    } else if (businessType === 'PRODUCT') {
+      // Must have at least one valid product
       const hasValidProduct = productItems.some(p => p.name.trim() && p.qty > 0 && p.unitPrice > 0)
       if (!hasValidProduct) {
         newErrors.products = "Veuillez ajouter au moins un produit valide"
       }
+    }
+
+    // FINAL QUOTE VALIDATION - Must have line items
+    if (finalQuote.lineItems.length === 0) {
+      newErrors.lineItems = "Aucun élément dans le devis. Veuillez ajouter des services ou produits."
+    }
+
+    // EXPIRATION DATE VALIDATION
+    if (!expiresAt) {
+      newErrors.expiresAt = "La date d'expiration est requise"
     }
 
     setErrors(newErrors)
@@ -431,12 +439,17 @@ const NewQuoteForm = () => {
     }
   }
 
-  // Form submission
+  // Form submission - FIXED with better payload structure
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!validateForm()) {
       toast.error("Veuillez corriger les erreurs dans le formulaire")
+      // Scroll to first error
+      const firstErrorElement = document.querySelector('.border-red-500')
+      if (firstErrorElement) {
+        firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
       return
     }
 
@@ -446,6 +459,7 @@ const NewQuoteForm = () => {
     try {
       const quoteNumber = `DV-${businessType.substring(0, 3)}-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
 
+      // CRITICAL: Build proper payload structure matching API expectations
       const quotePayload: any = {
         quoteNumber,
         businessType,
@@ -459,19 +473,23 @@ const NewQuoteForm = () => {
         vatAmount: finalQuote.vatAmount,
         totalTTC: finalQuote.totalTTC,
         finalPrice: finalQuote.finalPrice,
-        expiresAt: expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        // FIXED: Handle undefined expiresAt properly
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       }
 
-      // Handle existing vs new client
-      if (selectedLead) {
+      // CRITICAL: Handle client data properly - either leadId OR new client fields
+      if (selectedLead && selectedLead.id) {
         quotePayload.leadId = selectedLead.id
         console.log('📋 Using existing lead:', selectedLead.id)
-      } else {
+      } else if (newClientData.name.trim() && newClientData.phone.trim()) {
+        // ALL required fields for new client
         quotePayload.newClientName = newClientData.name.trim()
-        quotePayload.newClientEmail = newClientData.email.trim() || null
         quotePayload.newClientPhone = newClientData.phone.trim()
+        quotePayload.newClientEmail = newClientData.email.trim() || null
         quotePayload.newClientAddress = newClientData.address.trim() || null
         console.log('👤 Creating new client:', newClientData.name.trim())
+      } else {
+        throw new Error('Client information is incomplete')
       }
 
       // Add business-specific data
@@ -480,8 +498,9 @@ const NewQuoteForm = () => {
         quotePayload.surface = services.reduce((acc, s) => acc + (s.surface * s.levels), 0)
         quotePayload.levels = services.reduce((acc, s) => Math.max(acc, s.levels), 1)
         
-        const hasApartment = services.some(s => s.type.includes('Appartement'))
-        const hasMaison = services.some(s => s.type.includes('Maison'))
+        // Determine property type from services
+        const hasApartment = services.some(s => s.type.toLowerCase().includes('appartement'))
+        const hasMaison = services.some(s => s.type.toLowerCase().includes('maison'))
         quotePayload.propertyType = hasApartment ? 'APPARTEMENT' : hasMaison ? 'MAISON' : 'AUTRE'
       } else {
         quotePayload.productCategory = productCategory || 'AUTRE'
@@ -489,7 +508,7 @@ const NewQuoteForm = () => {
           items: productItems.filter(item => item.name.trim()),
           category: productCategory
         }
-        quotePayload.deliveryType = deliveryType
+        quotePayload.deliveryType = deliveryType || 'STANDARD'
         quotePayload.deliveryAddress = deliveryAddress || null
         quotePayload.deliveryNotes = deliveryNotes || null
       }
@@ -508,7 +527,17 @@ const NewQuoteForm = () => {
 
       if (!response.ok) {
         console.error('❌ Quote creation failed:', responseData)
-        throw new Error(responseData.message || responseData.error || 'Failed to create quote')
+        
+        // Show specific validation errors if available
+        if (responseData.details) {
+          const errorMessages = Object.entries(responseData.details).map(([field, messages]: [string, any]) => 
+            `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`
+          ).join('\n')
+          toast.error(`Erreurs de validation:\n${errorMessages}`)
+        } else {
+          toast.error(responseData.message || 'Erreur lors de la création du devis')
+        }
+        return
       }
 
       console.log('✅ Quote created successfully:', responseData)
@@ -525,10 +554,10 @@ const NewQuoteForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8">
+    <div className="min-h-screen bg-gray-50">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Header */}
-        <div className="bg-white border-b sticky top-0 z-10">
+        <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -565,40 +594,100 @@ const NewQuoteForm = () => {
           </div>
         </div>
 
-        <div className="container mx-auto px-4 max-w-4xl space-y-6">
-          {/* Business Type Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wrench className="h-5 w-5" />
-                Type de Devis
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button
-                  type="button"
-                  variant={businessType === 'SERVICE' ? 'default' : 'outline'}
-                  onClick={() => setBusinessType('SERVICE')}
-                  className="h-20 flex flex-col justify-center"
-                >
-                  <Wrench className="h-6 w-6 mb-2" />
-                  <span>Devis de Service</span>
-                  <span className="text-xs opacity-75">Nettoyage, maintenance, intervention</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant={businessType === 'PRODUCT' ? 'default' : 'outline'}
-                  onClick={() => setBusinessType('PRODUCT')}
-                  className="h-20 flex flex-col justify-center"
-                >
-                  <Package className="h-6 w-6 mb-2" />
-                  <span>Devis de Produit</span>
-                  <span className="text-xs opacity-75">Vente de produits, équipements</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="container mx-auto px-4 max-w-4xl pb-8">
+          <div className="space-y-6">
+            {/* Business Type Selection - REDESIGNED */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wrench className="h-5 w-5" />
+                  Type de Devis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div
+                    className={`relative cursor-pointer rounded-xl border-2 p-6 transition-all duration-200 ${
+                      businessType === 'SERVICE'
+                        ? 'border-blue-500 bg-blue-50 shadow-lg'
+                        : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
+                    }`}
+                    onClick={() => setBusinessType('SERVICE')}
+                  >
+                    <div className="flex flex-col items-center text-center space-y-3">
+                      <div className={`p-3 rounded-full ${
+                        businessType === 'SERVICE' ? 'bg-blue-100' : 'bg-gray-100'
+                      }`}>
+                        <Wrench className={`h-8 w-8 ${
+                          businessType === 'SERVICE' ? 'text-blue-600' : 'text-gray-600'
+                        }`} />
+                      </div>
+                      <div>
+                        <h3 className={`text-lg font-semibold ${
+                          businessType === 'SERVICE' ? 'text-blue-900' : 'text-gray-900'
+                        }`}>
+                          Devis de Service
+                        </h3>
+                        <p className={`text-sm ${
+                          businessType === 'SERVICE' ? 'text-blue-700' : 'text-gray-600'
+                        }`}>
+                          Nettoyage, maintenance, intervention
+                        </p>
+                      </div>
+                    </div>
+                    {businessType === 'SERVICE' && (
+                      <div className="absolute top-2 right-2">
+                        <div className="bg-blue-600 text-white rounded-full p-1">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div
+                    className={`relative cursor-pointer rounded-xl border-2 p-6 transition-all duration-200 ${
+                      businessType === 'PRODUCT'
+                        ? 'border-green-500 bg-green-50 shadow-lg'
+                        : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
+                    }`}
+                    onClick={() => setBusinessType('PRODUCT')}
+                  >
+                    <div className="flex flex-col items-center text-center space-y-3">
+                      <div className={`p-3 rounded-full ${
+                        businessType === 'PRODUCT' ? 'bg-green-100' : 'bg-gray-100'
+                      }`}>
+                        <Package className={`h-8 w-8 ${
+                          businessType === 'PRODUCT' ? 'text-green-600' : 'text-gray-600'
+                        }`} />
+                      </div>
+                      <div>
+                        <h3 className={`text-lg font-semibold ${
+                          businessType === 'PRODUCT' ? 'text-green-900' : 'text-gray-900'
+                        }`}>
+                          Devis de Produit
+                        </h3>
+                        <p className={`text-sm ${
+                          businessType === 'PRODUCT' ? 'text-green-700' : 'text-gray-600'
+                        }`}>
+                          Vente de produits, équipements
+                        </p>
+                      </div>
+                    </div>
+                    {businessType === 'PRODUCT' && (
+                      <div className="absolute top-2 right-2">
+                        <div className="bg-green-600 text-white rounded-full p-1">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
           {/* Client Selection */}
           <Card>
@@ -1236,7 +1325,11 @@ const NewQuoteForm = () => {
                     value={expiresAt}
                     onChange={(e) => setExpiresAt(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
+                    className={errors.expiresAt ? 'border-red-500' : ''}
                   />
+                  {errors.expiresAt && (
+                    <p className="text-red-500 text-xs mt-1">{errors.expiresAt}</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -1287,6 +1380,7 @@ const NewQuoteForm = () => {
             </CardContent>
           </Card>
         </div>
+      </div>
       </form>
     </div>
   )
