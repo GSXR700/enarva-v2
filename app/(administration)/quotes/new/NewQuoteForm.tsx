@@ -1,19 +1,28 @@
-// app/(administration)/quotes/new/NewQuoteForm.tsx - PART 1: IMPORTS AND STATE
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
-import { Separator } from '@/components/ui/separator'
-//import { Badge } from '@/components/ui/badge'
-import { Search, Plus, Minus, Package, Wrench, User, Calendar, Save, AlertCircle } from 'lucide-react'
-import { toast } from 'sonner'
-import { formatCurrency, generateQuote, ServiceInput } from '@/lib/utils'
+import { Switch } from '@/components/ui/Switch'
+import { Plus, X, Save, Search, User, Package, Wrench } from 'lucide-react'
+
+// Types
+interface ServiceInput {
+  type: string
+  surface: number
+  levels: number
+  distance: number
+  etage: 'RDC' | 'AvecAscenseur' | 'SansAscenseur'
+  delai: 'IMMEDIAT' | 'URGENT' | 'STANDARD'
+  difficulte: 'STANDARD' | 'DIFFICILE' | 'EXTREME'
+}
 
 interface Lead {
   id: string
@@ -53,6 +62,24 @@ interface LineItem {
 type ServiceInputState = ServiceInput & { id: number }
 type QuoteBusinessType = 'SERVICE' | 'PRODUCT'
 
+// Complete list of Enarva services
+const ENARVA_SERVICES = [
+  'Grand Ménage',
+  'Fin de chantier', 
+  'Nettoyage Standard',
+  'Nettoyage Express',
+  'Nettoyage Vitres',
+  'Nettoyage Post-Travaux',
+  'Nettoyage Bureaux',
+  'Nettoyage Commercial',
+  'Entretien Régulier',
+  'Cristallisation Marbre',
+  'Ménage Régulier',
+  'Nettoyage Industriel',
+  'Remise en état',
+  'Maintenance'
+] as const
+
 const NewQuoteForm = () => {
   const router = useRouter()
   
@@ -75,7 +102,7 @@ const NewQuoteForm = () => {
 
   // Service-specific state
   const [services, setServices] = useState<ServiceInputState[]>([
-    { id: Date.now(), type: 'GrandMénage', surface: 50, levels: 1, distance: 5, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }
+    { id: Date.now(), type: 'Grand Ménage', surface: 50, levels: 1, distance: 5, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }
   ])
   const [quoteType, setQuoteType] = useState<'EXPRESS' | 'STANDARD' | 'PREMIUM'>('STANDARD')
   const [editableLineItems, setEditableLineItems] = useState<LineItem[]>([])
@@ -94,10 +121,12 @@ const NewQuoteForm = () => {
     new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]
   )
 
+  // NEW: Final price override
+  const [finalPriceOverride, setFinalPriceOverride] = useState<number | null>(null)
+  const [enablePriceOverride, setEnablePriceOverride] = useState(false)
+
   // Error state
   const [errors, setErrors] = useState<Record<string, string>>({})
-
-  // NewQuoteForm.tsx - PART 2: SEARCH AND CALCULATIONS
 
   // Search functionality with debouncing
   const searchLeads = useCallback(async (query: string) => {
@@ -115,7 +144,7 @@ const NewQuoteForm = () => {
         const processedLeads = leads.map((lead: any) => ({
           ...lead,
           displayName: `${lead.firstName} ${lead.lastName}${lead.company ? ` (${lead.company})` : ''}`,
-          typeLabel: lead.leadType === 'PARTICULIER' ? 'Particulier' : 'Professionnel'
+          typeLabel: lead.leadType === 'PARTICULIER' ? 'Particulier' : 'Entreprise'
         }))
         setSearchResults(processedLeads)
         setShowSearchResults(true)
@@ -135,59 +164,80 @@ const NewQuoteForm = () => {
     }
 
     const timeoutId = setTimeout(() => {
-      if (searchQuery && !selectedLead) {
-        searchLeads(searchQuery)
-      }
+      searchLeads(searchQuery)
     }, 300)
 
     setSearchTimeoutId(timeoutId)
 
     return () => clearTimeout(timeoutId)
-  }, [searchQuery, selectedLead, searchLeads])
+  }, [searchQuery, searchLeads])
 
-  // Calculate quote for services
+  // Service quote calculation
   const serviceQuoteCalculation = useMemo(() => {
-    if (businessType === 'SERVICE') {
-      try {
-        const quote = generateQuote(services)
-        return {
-          lineItems: quote.lineItems.map((item, index) => ({
-            id: `service-${index}`,
-            description: item.description,
-            detail: item.detail || '',
-            amount: item.amount,
-            quantity: 1,
-            unitPrice: item.amount,
-            totalPrice: item.amount,
-            editable: true
-          })),
-          subTotalHT: quote.subTotalHT,
-          vatAmount: quote.vatAmount,
-          totalTTC: quote.totalTTC,
-          finalPrice: quote.finalPrice
-        }
-      } catch (error) {
-        console.error('Quote generation error:', error)
-        return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 }
+    if (businessType !== 'SERVICE') return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 }
+
+    const lineItems: LineItem[] = services.map(service => {
+      const surface = service.surface * service.levels
+      let baseRate = 20
+
+      // Service-specific base rates
+      switch (service.type) {
+        case 'Grand Ménage': baseRate = 25; break
+        case 'Fin de chantier': baseRate = 35; break
+        case 'Nettoyage Standard': baseRate = 15; break
+        case 'Nettoyage Express': baseRate = 12; break
+        case 'Nettoyage Vitres': baseRate = 8; break
+        case 'Cristallisation Marbre': baseRate = 40; break
+        case 'Nettoyage Post-Travaux': baseRate = 30; break
+        case 'Nettoyage Bureaux': baseRate = 18; break
+        case 'Nettoyage Commercial': baseRate = 22; break
+        case 'Entretien Régulier': baseRate = 14; break
+        default: baseRate = 20
       }
-    }
-    return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 }
+
+      // Apply coefficients
+      let coefficient = 1.0
+      if (service.distance > 10) coefficient *= 1.15
+      if (service.etage === 'SansAscenseur') coefficient *= 1.3
+      else if (service.etage === 'AvecAscenseur') coefficient *= 1.1
+      if (service.delai === 'IMMEDIAT') coefficient *= 1.8
+      else if (service.delai === 'URGENT') coefficient *= 1.4
+      if (service.difficulte === 'EXTREME') coefficient *= 1.5
+      else if (service.difficulte === 'DIFFICILE') coefficient *= 1.2
+
+      const amount = Math.round(surface * baseRate * coefficient)
+
+      return {
+        id: `service-${service.id}`,
+        description: service.type,
+        detail: `${surface}m²${service.levels > 1 ? ` • ${service.levels} niveaux` : ''}${service.distance > 10 ? ` • ${service.distance}km` : ''}`,
+        amount,
+        quantity: 1,
+        unitPrice: amount,
+        totalPrice: amount,
+        editable: true
+      }
+    })
+
+    const subTotalHT = lineItems.reduce((acc, item) => acc + item.totalPrice, 0)
+    const vatAmount = subTotalHT * 0.20
+    let totalTTC = subTotalHT + vatAmount
+    if (totalTTC < 500) totalTTC = 500
+    const finalPrice = Math.round(totalTTC / 10) * 10
+
+    return { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice }
   }, [services, businessType])
 
-  // Calculate quote for products
+  // Product quote calculation
   const productQuoteCalculation = useMemo(() => {
-    if (businessType === 'PRODUCT') {
-      const validItems = productItems.filter(item => item.name.trim() && item.qty > 0 && item.unitPrice > 0)
-      const subTotalHT = validItems.reduce((acc, item) => acc + (item.qty * item.unitPrice), 0)
-      const vatAmount = subTotalHT * 0.20
-      let totalTTC = subTotalHT + vatAmount
-      if (totalTTC < 500) totalTTC = 500
-      const finalPrice = Math.round(totalTTC / 10) * 10
+    if (businessType !== 'PRODUCT') return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 }
 
-      const lineItems: LineItem[] = validItems.map(item => ({
-        id: item.id,
+    const lineItems: LineItem[] = productItems
+      .filter(item => item.name.trim() && item.qty > 0 && item.unitPrice > 0)
+      .map(item => ({
+        id: `product-${item.id}`,
         description: item.name,
-        detail: `${item.qty} × ${formatCurrency(item.unitPrice)}${item.reference ? ` (Réf: ${item.reference})` : ''}`,
+        detail: `${item.description ? item.description : ''}${item.reference ? ` (Réf: ${item.reference})` : ''}`,
         amount: item.qty * item.unitPrice,
         quantity: item.qty,
         unitPrice: item.unitPrice,
@@ -195,12 +245,16 @@ const NewQuoteForm = () => {
         editable: true
       }))
 
-      return { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice }
-    }
-    return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 }
+    const subTotalHT = lineItems.reduce((acc, item) => acc + item.totalPrice, 0)
+    const vatAmount = subTotalHT * 0.20
+    let totalTTC = subTotalHT + vatAmount
+    if (totalTTC < 500) totalTTC = 500
+    const finalPrice = Math.round(totalTTC / 10) * 10
+
+    return { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice }
   }, [productItems, businessType])
 
-  // Final quote calculation
+  // Final quote calculation with override
   const finalQuote = useMemo(() => {
     const baseQuote = businessType === 'SERVICE' ? serviceQuoteCalculation : productQuoteCalculation
     
@@ -210,39 +264,49 @@ const NewQuoteForm = () => {
     const vatAmount = subTotalHT * 0.20
     let totalTTC = subTotalHT + vatAmount
     if (totalTTC < 500) totalTTC = 500
-    const finalPrice = Math.round(totalTTC / 10) * 10
+    
+    // Use override price if enabled, otherwise use calculated price
+    const calculatedFinalPrice = Math.round(totalTTC / 10) * 10
+    const finalPrice = enablePriceOverride && finalPriceOverride !== null ? finalPriceOverride : calculatedFinalPrice
 
-    return { lineItems: allLineItems, subTotalHT, vatAmount, totalTTC, finalPrice }
-  }, [serviceQuoteCalculation, productQuoteCalculation, editableLineItems, businessType])
+    return { 
+      lineItems: allLineItems, 
+      subTotalHT, 
+      vatAmount, 
+      totalTTC, 
+      finalPrice,
+      calculatedPrice: calculatedFinalPrice
+    }
+  }, [serviceQuoteCalculation, productQuoteCalculation, editableLineItems, businessType, enablePriceOverride, finalPriceOverride])
 
   // Form validation
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    // Client validation
+    // Client validation - FIXED: More specific validation
     if (!selectedLead && !newClientData.name.trim()) {
       newErrors.client = "Veuillez sélectionner un client existant ou entrer le nom d'un nouveau client"
     }
 
-    // New client validation
+    // New client validation - FIXED: Only require phone if new client name is provided
     if (newClientData.name.trim() && !newClientData.phone.trim()) {
       newErrors.phone = "Le numéro de téléphone est requis pour un nouveau client"
     }
 
-    // Line items validation
+    // Line items validation - FIXED: Check actual final quote
     if (finalQuote.lineItems.length === 0) {
       newErrors.lineItems = "Veuillez ajouter au moins un élément au devis"
     }
 
-    // Service validation
+    // Service validation - FIXED: Only validate if SERVICE type
     if (businessType === 'SERVICE') {
-      const hasValidService = services.some(s => s.surface > 0)
+      const hasValidService = services.some(s => s.surface > 0 && s.type.trim())
       if (!hasValidService) {
         newErrors.services = "Veuillez configurer au moins un service avec une surface valide"
       }
     }
 
-    // Product validation
+    // Product validation - FIXED: Only validate if PRODUCT type
     if (businessType === 'PRODUCT') {
       const hasValidProduct = productItems.some(p => p.name.trim() && p.qty > 0 && p.unitPrice > 0)
       if (!hasValidProduct) {
@@ -254,8 +318,6 @@ const NewQuoteForm = () => {
     return Object.keys(newErrors).length === 0
   }
 
-  // NewQuoteForm.tsx - PART 3: EVENT HANDLERS
-
   // Handle service changes
   const updateService = (id: number, field: keyof ServiceInput, value: any) => {
     setServices(current =>
@@ -266,20 +328,25 @@ const NewQuoteForm = () => {
   }
 
   const addService = () => {
-    setServices(current => [
-      ...current,
-      { id: Date.now(), type: 'GrandMénage', surface: 50, levels: 1, distance: 5, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }
-    ])
+    const newService: ServiceInputState = {
+      id: Date.now(),
+      type: 'Grand Ménage',
+      surface: 50,
+      levels: 1,
+      distance: 5,
+      etage: 'RDC',
+      delai: 'STANDARD',
+      difficulte: 'STANDARD'
+    }
+    setServices(current => [...current, newService])
   }
 
   const removeService = (id: number) => {
-    if (services.length > 1) {
-      setServices(current => current.filter(service => service.id !== id))
-    }
+    setServices(current => current.filter(service => service.id !== id))
   }
 
   // Handle product changes
-  const updateProductItem = (id: string, field: keyof ProductItem, value: any) => {
+  const updateProduct = (id: string, field: keyof ProductItem, value: any) => {
     setProductItems(current =>
       current.map(item =>
         item.id === id ? { ...item, [field]: value } : item
@@ -287,44 +354,35 @@ const NewQuoteForm = () => {
     )
   }
 
-  const addProductItem = () => {
-    setProductItems(current => [
-      ...current,
-      { id: Date.now().toString(), name: '', qty: 1, unitPrice: 0, description: '', reference: '' }
-    ])
+  const addProduct = () => {
+    const newProduct: ProductItem = {
+      id: Date.now().toString(),
+      name: '',
+      qty: 1,
+      unitPrice: 0,
+      description: '',
+      reference: ''
+    }
+    setProductItems(current => [...current, newProduct])
   }
 
-  const removeProductItem = (id: string) => {
+  const removeProduct = (id: string) => {
     setProductItems(current => current.filter(item => item.id !== id))
   }
 
   // Handle editable line items
-  const handleLineItemChange = (id: string, field: string, value: number) => {
+  const updateEditableLineItem = (id: string, field: keyof LineItem, value: any) => {
     setEditableLineItems(current =>
-      current.map(item => {
-        if (item.id === id) {
-          const updatedItem = { ...item }
-          
-          if (field === 'unitPrice') {
-            updatedItem.unitPrice = Math.max(0, value)
-            updatedItem.totalPrice = updatedItem.unitPrice * updatedItem.quantity
-            updatedItem.amount = updatedItem.totalPrice
-          } else if (field === 'quantity') {
-            updatedItem.quantity = Math.max(1, value)
-            updatedItem.totalPrice = updatedItem.unitPrice * updatedItem.quantity
-            updatedItem.amount = updatedItem.totalPrice
-          } else if (field === 'amount') {
-            updatedItem.amount = Math.max(0, value)
-            updatedItem.totalPrice = updatedItem.amount
-            if (updatedItem.quantity > 0) {
-              updatedItem.unitPrice = updatedItem.totalPrice / updatedItem.quantity
-            }
-          }
-          
-          return updatedItem
-        }
-        return item
-      })
+      current.map(item =>
+        item.id === id ? { 
+          ...item, 
+          [field]: value,
+          ...(field === 'quantity' || field === 'unitPrice' ? 
+            { totalPrice: (field === 'quantity' ? value : item.quantity) * (field === 'unitPrice' ? value : item.unitPrice) } : 
+            {}
+          )
+        } : item
+      )
     )
   }
 
@@ -466,252 +524,253 @@ const NewQuoteForm = () => {
     }
   }
 
-  // NewQuoteForm.tsx - PART 4: MAIN UI JSX
-
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Nouveau Devis</h1>
-        <p className="text-gray-600 mt-2">Créez un devis détaillé pour un client existant ou nouveau</p>
-      </div>
-
+    <div className="min-h-screen bg-gray-50 pb-8">
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Configuration */}
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* Business Type Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Type de Devis
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div
-                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      businessType === 'SERVICE' 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => setBusinessType('SERVICE')}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Wrench className="h-6 w-6 text-blue-600" />
-                      <div>
-                        <h3 className="font-semibold">Devis de Service</h3>
-                        <p className="text-sm text-gray-600">Nettoyage, entretien, maintenance</p>
-                      </div>
-                    </div>
+        {/* Header */}
+        <div className="bg-white border-b sticky top-0 z-10">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">Nouveau Devis</h1>
+                <p className="text-gray-600">Créer un devis pour un client</p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.back()}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Création...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Créer le Devis
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="container mx-auto px-4 max-w-4xl space-y-6">
+          {/* Business Type Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wrench className="h-5 w-5" />
+                Type de Devis
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Button
+                  type="button"
+                  variant={businessType === 'SERVICE' ? 'default' : 'outline'}
+                  onClick={() => setBusinessType('SERVICE')}
+                  className="h-20 flex flex-col justify-center"
+                >
+                  <Wrench className="h-6 w-6 mb-2" />
+                  <span>Devis de Service</span>
+                  <span className="text-xs opacity-75">Nettoyage, maintenance, intervention</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant={businessType === 'PRODUCT' ? 'default' : 'outline'}
+                  onClick={() => setBusinessType('PRODUCT')}
+                  className="h-20 flex flex-col justify-center"
+                >
+                  <Package className="h-6 w-6 mb-2" />
+                  <span>Devis de Produit</span>
+                  <span className="text-xs opacity-75">Vente de produits, équipements</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Client Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Sélection du Client
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Selected Lead Display */}
+              {selectedLead ? (
+                <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div>
+                    <h3 className="font-medium">{selectedLead.displayName}</h3>
+                    <p className="text-sm text-gray-600">{selectedLead.phone}</p>
+                    <Badge variant="outline" className="mt-1 text-xs">
+                      {selectedLead.typeLabel}
+                    </Badge>
                   </div>
-                  
-                  <div
-                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      businessType === 'PRODUCT' 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => setBusinessType('PRODUCT')}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearSelectedLead}
                   >
-                    <div className="flex items-center gap-3">
-                      <Package className="h-6 w-6 text-green-600" />
-                      <div>
-                        <h3 className="font-semibold">Devis de Produit</h3>
-                        <p className="text-sm text-gray-600">Équipements, fournitures, matériel</p>
-                      </div>
-                    </div>
-                  </div>
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Client Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Sélection du Client
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {errors.client && (
-                  <div className="flex items-center gap-2 text-red-600 text-sm">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.client}
-                  </div>
-                )}
-                
-                {selectedLead ? (
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-green-800">
-                          {selectedLead.displayName}
-                        </h3>
-                        <p className="text-sm text-green-600">
-                          {selectedLead.phone} • {selectedLead.typeLabel}
-                        </p>
-                        {selectedLead.email && (
-                          <p className="text-sm text-green-600">{selectedLead.email}</p>
-                        )}
-                        {selectedLead.company && (
-                          <p className="text-sm text-green-600">{selectedLead.company}</p>
-                        )}
-                        {selectedLead.address && (
-                          <p className="text-sm text-green-600">{selectedLead.address}</p>
-                        )}
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={clearSelectedLead}
-                        disabled={isLoading}
-                      >
-                        Changer
-                      </Button>
+              ) : (
+                <>
+                  {/* Search Field */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="h-4 w-4 text-gray-400" />
                     </div>
+                    <Input
+                      placeholder="Rechercher un client existant..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <Input
-                        type="text"
-                        placeholder="Rechercher un client par nom, email, téléphone..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        disabled={isLoading}
-                      />
-                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      {isSearching && (
-                        <div className="absolute right-10 top-1/2 -translate-y-1/2">
-                          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+
+                  {/* Search Results */}
+                  {showSearchResults && (
+                    <div className="border rounded-lg bg-white shadow-sm max-h-64 overflow-y-auto">
+                      {isSearching ? (
+                        <div className="p-4 text-center text-gray-500">
+                          Recherche en cours...
                         </div>
-                      )}
-                      {showSearchResults && searchResults.length > 0 && (
-                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                          {searchResults.map(lead => (
-                            <div
-                              key={lead.id}
-                              className="p-3 hover:bg-gray-100 cursor-pointer"
-                              onClick={() => selectLead(lead)}
-                            >
-                              <h4 className="font-medium">{lead.displayName}</h4>
-                              <p className="text-sm text-gray-600">
-                                {lead.phone} • {lead.typeLabel}
-                              </p>
+                      ) : searchResults.length > 0 ? (
+                        searchResults.map((lead) => (
+                          <div
+                            key={lead.id}
+                            className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                            onClick={() => selectLead(lead)}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="font-medium text-sm">{lead.displayName}</h4>
+                                <p className="text-xs text-gray-600">{lead.phone}</p>
+                              </div>
+                              <Badge variant="outline" className="text-xs">
+                                {lead.typeLabel}
+                              </Badge>
                             </div>
-                          ))}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-gray-500">
+                          Aucun client trouvé
                         </div>
                       )}
-                    </div>
-
-                    <div className="text-center text-sm text-gray-500">— OU —</div>
-
-                    <div className="space-y-3">
-                      <Label>Nom du Nouveau Client</Label>
-                      <Input
-                        type="text"
-                        placeholder="Nom complet"
-                        value={newClientData.name}
-                        onChange={(e) => updateNewClientData('name', e.target.value)}
-                        disabled={isLoading}
-                      />
-                      {errors.phone && (
-                        <div className="flex items-center gap-2 text-red-600 text-sm">
-                          <AlertCircle className="h-4 w-4" />
-                          {errors.phone}
-                        </div>
-                      )}
-                      <Label>Contact du Nouveau Client</Label>
-                      <Input
-                        type="email"
-                        placeholder="Email (optionnel)"
-                        value={newClientData.email}
-                        onChange={(e) => updateNewClientData('email', e.target.value)}
-                        disabled={isLoading}
-                        className="mb-2"
-                      />
-                      <Input
-                        type="text"
-                        placeholder="Téléphone *"
-                        value={newClientData.phone}
-                        onChange={(e) => updateNewClientData('phone', e.target.value)}
-                        disabled={isLoading}
-                        className="mb-2"
-                      />
-                      <Textarea
-                        placeholder="Adresse (optionnel)"
-                        value={newClientData.address}
-                        onChange={(e) => updateNewClientData('address', e.target.value)}
-                        disabled={isLoading}
-                        className="mb-2"
-                        rows={2}
-                      />
-                      <Textarea
-                        placeholder="Société (optionnel)"
-                        value={newClientData.company}
-                        onChange={(e) => updateNewClientData('company', e.target.value)}
-                        disabled={isLoading}
-                        className="mb-2"
-                        rows={1}
-                      />
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Business Type Specific Configuration */}
-
-            {/* Service Configuration */}
-            {businessType === 'SERVICE' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Configuration des Services</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {errors.services && (
-                    <div className="flex items-center gap-2 text-red-600 text-sm">
-                      <AlertCircle className="h-4 w-4" />
-                      {errors.services}
                     </div>
                   )}
-                  
-                  <div className="space-y-2">
-                    <Label>Type de Devis</Label>
-                    <Select value={quoteType} onValueChange={(value: any) => setQuoteType(value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="EXPRESS">Express (+20%)</SelectItem>
-                        <SelectItem value="STANDARD">Standard</SelectItem>
-                        <SelectItem value="PREMIUM">Premium (+15%)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
 
+                  {/* New Client Form */}
+                  <div className="border-t pt-4">
+                    <h3 className="font-medium mb-3">Ou créer un nouveau client</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="clientName">Nom complet *</Label>
+                        <Input
+                          id="clientName"
+                          value={newClientData.name}
+                          onChange={(e) => updateNewClientData('name', e.target.value)}
+                          placeholder="Nom et prénom du client"
+                          className={errors.client ? 'border-red-500' : ''}
+                        />
+                        {errors.client && <p className="text-red-500 text-xs mt-1">{errors.client}</p>}
+                      </div>
+                      <div>
+                        <Label htmlFor="clientPhone">Téléphone *</Label>
+                        <Input
+                          id="clientPhone"
+                          value={newClientData.phone}
+                          onChange={(e) => updateNewClientData('phone', e.target.value)}
+                          placeholder="+212 6XX XXX XXX"
+                          className={errors.phone ? 'border-red-500' : ''}
+                        />
+                        {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+                      </div>
+                      <div>
+                        <Label htmlFor="clientEmail">Email</Label>
+                        <Input
+                          id="clientEmail"
+                          type="email"
+                          value={newClientData.email}
+                          onChange={(e) => updateNewClientData('email', e.target.value)}
+                          placeholder="email@exemple.com"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="clientAddress">Adresse</Label>
+                        <Input
+                          id="clientAddress"
+                          value={newClientData.address}
+                          onChange={(e) => updateNewClientData('address', e.target.value)}
+                          placeholder="Adresse complète"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Service Configuration */}
+          {businessType === 'SERVICE' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Configuration des Services</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Quote Type */}
+                <div>
+                  <Label>Type de Devis</Label>
+                  <Select value={quoteType} onValueChange={(value: any) => setQuoteType(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EXPRESS">Express (Intervention rapide)</SelectItem>
+                      <SelectItem value="STANDARD">Standard (Délai normal)</SelectItem>
+                      <SelectItem value="PREMIUM">Premium (Service haut de gamme)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Services List */}
+                <div className="space-y-3">
                   {services.map((service, index) => (
-                    <div key={service.id} className="p-4 border border-gray-200 rounded-lg space-y-4">
-                      <div className="flex items-center justify-between">
+                    <div key={service.id} className="p-4 border rounded-lg bg-gray-50">
+                      <div className="flex items-center justify-between mb-3">
                         <h4 className="font-medium">Service {index + 1}</h4>
                         {services.length > 1 && (
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             onClick={() => removeService(service.id)}
                           >
-                            <Minus className="h-4 w-4" />
+                            <X className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
-                          <Label>Type de service</Label>
+                          <Label>Type de Service</Label>
                           <Select
                             value={service.type}
                             onValueChange={(value) => updateService(service.id, 'type', value)}
@@ -720,24 +779,26 @@ const NewQuoteForm = () => {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="GrandMénage">Grand Ménage</SelectItem>
-                              <SelectItem value="MénageRégulier">Ménage Régulier</SelectItem>
-                              <SelectItem value="NettoyageBureaux">Nettoyage Bureaux</SelectItem>
-                              <SelectItem value="NettoyageVitre">Nettoyage Vitres</SelectItem>
+                              {ENARVA_SERVICES.map((serviceType) => (
+                                <SelectItem key={serviceType} value={serviceType}>
+                                  {serviceType}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
-                        
+
                         <div>
                           <Label>Surface (m²)</Label>
                           <Input
                             type="number"
                             value={service.surface}
-                            onChange={(e) => updateService(service.id, 'surface', parseInt(e.target.value) || 0)}
-                            min="1"
+                            onChange={(e) => updateService(service.id, 'surface', parseFloat(e.target.value) || 0)}
+                            min="0"
+                            step="0.1"
                           />
                         </div>
-                        
+
                         <div>
                           <Label>Niveaux</Label>
                           <Input
@@ -748,20 +809,72 @@ const NewQuoteForm = () => {
                             max="10"
                           />
                         </div>
-                        
+
                         <div>
                           <Label>Distance (km)</Label>
                           <Input
                             type="number"
                             value={service.distance}
-                            onChange={(e) => updateService(service.id, 'distance', parseInt(e.target.value) || 0)}
+                            onChange={(e) => updateService(service.id, 'distance', parseFloat(e.target.value) || 0)}
                             min="0"
+                            step="0.1"
                           />
+                        </div>
+
+                        <div>
+                          <Label>Étage</Label>
+                          <Select
+                            value={service.etage}
+                            onValueChange={(value: any) => updateService(service.id, 'etage', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="RDC">Rez-de-chaussée</SelectItem>
+                              <SelectItem value="AvecAscenseur">Avec ascenseur</SelectItem>
+                              <SelectItem value="SansAscenseur">Sans ascenseur</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>Délai</Label>
+                          <Select
+                            value={service.delai}
+                            onValueChange={(value: any) => updateService(service.id, 'delai', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="STANDARD">Standard</SelectItem>
+                              <SelectItem value="URGENT">Urgent (+40%)</SelectItem>
+                              <SelectItem value="IMMEDIAT">Immédiat (+80%)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>Difficulté</Label>
+                          <Select
+                            value={service.difficulte}
+                            onValueChange={(value: any) => updateService(service.id, 'difficulte', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="STANDARD">Standard</SelectItem>
+                              <SelectItem value="DIFFICILE">Difficile (+20%)</SelectItem>
+                              <SelectItem value="EXTREME">Extrême (+50%)</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                     </div>
                   ))}
-                  
+
                   <Button
                     type="button"
                     variant="outline"
@@ -771,43 +884,139 @@ const NewQuoteForm = () => {
                     <Plus className="h-4 w-4 mr-2" />
                     Ajouter un Service
                   </Button>
-                </CardContent>
-              </Card>
-            )}
+                </div>
 
-            {/* Product Configuration */}
-            {businessType === 'PRODUCT' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Configuration des Produits</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {errors.products && (
-                    <div className="flex items-center gap-2 text-red-600 text-sm">
-                      <AlertCircle className="h-4 w-4" />
-                      {errors.products}
+                {errors.services && (
+                  <p className="text-red-500 text-sm">{errors.services}</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Product Configuration */}
+          {businessType === 'PRODUCT' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Configuration des Produits</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Product Category */}
+                <div>
+                  <Label>Catégorie de Produit</Label>
+                  <Select value={productCategory} onValueChange={setProductCategory}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner une catégorie" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EQUIPEMENT">Équipement de nettoyage</SelectItem>
+                      <SelectItem value="PRODUIT_CHIMIQUE">Produits chimiques</SelectItem>
+                      <SelectItem value="ACCESSOIRE">Accessoires</SelectItem>
+                      <SelectItem value="CONSOMMABLE">Consommables</SelectItem>
+                      <SelectItem value="AUTRE">Autre</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Products List */}
+                <div className="space-y-3">
+                  {productItems.map((product, index) => (
+                    <div key={product.id} className="p-4 border rounded-lg bg-gray-50">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium">Produit {index + 1}</h4>
+                        {productItems.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeProduct(product.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                          <Label>Nom du Produit</Label>
+                          <Input
+                            value={product.name}
+                            onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+                            placeholder="Nom du produit"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Quantité</Label>
+                          <Input
+                            type="number"
+                            value={product.qty}
+                            onChange={(e) => updateProduct(product.id, 'qty', parseFloat(e.target.value) || 0)}
+                            min="0"
+                            step="0.1"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Prix Unitaire (MAD)</Label>
+                          <Input
+                            type="number"
+                            value={product.unitPrice}
+                            onChange={(e) => updateProduct(product.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Description</Label>
+                          <Input
+                            value={product.description || ''}
+                            onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
+                            placeholder="Description du produit"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Référence</Label>
+                          <Input
+                            value={product.reference || ''}
+                            onChange={(e) => updateProduct(product.id, 'reference', e.target.value)}
+                            placeholder="REF-001"
+                          />
+                        </div>
+
+                        <div className="flex items-end">
+                          <div className="w-full">
+                            <Label>Total</Label>
+                            <Input
+                              value={`${(product.qty * product.unitPrice).toFixed(2)} MAD`}
+                              disabled
+                              className="bg-gray-100"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  
-                  <div>
-                    <Label>Catégorie</Label>
-                    <Select value={productCategory} onValueChange={setProductCategory}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner une catégorie" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="EQUIPEMENT_NETTOYAGE">Équipement de nettoyage</SelectItem>
-                        <SelectItem value="PRODUIT_ENTRETIEN">Produits d'entretien</SelectItem>
-                        <SelectItem value="ACCESSOIRE">Accessoires</SelectItem>
-                        <SelectItem value="CONSOMMABLE">Consommables</SelectItem>
-                        <SelectItem value="AUTRE">Autre</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  ))}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addProduct}
+                    className="w-full"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter un Produit
+                  </Button>
+                </div>
+
+                {/* Delivery Information */}
+                <div className="border-t pt-4 space-y-3">
+                  <h3 className="font-medium">Informations de Livraison</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <Label>Type de livraison</Label>
+                      <Label>Type de Livraison</Label>
                       <Select value={deliveryType} onValueChange={setDeliveryType}>
                         <SelectTrigger>
                           <SelectValue />
@@ -815,261 +1024,212 @@ const NewQuoteForm = () => {
                         <SelectContent>
                           <SelectItem value="STANDARD">Livraison standard</SelectItem>
                           <SelectItem value="EXPRESS">Livraison express</SelectItem>
-                          <SelectItem value="PICKUP">Retrait sur place</SelectItem>
+                          <SelectItem value="RETRAIT">Retrait sur site</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    
-                    {deliveryType !== 'PICKUP' && (
-                      <div>
-                        <Label>Adresse de livraison</Label>
+
+                    <div>
+                      <Label>Adresse de Livraison</Label>
+                      <Input
+                        value={deliveryAddress}
+                        onChange={(e) => setDeliveryAddress(e.target.value)}
+                        placeholder="Adresse de livraison"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Notes de Livraison</Label>
+                    <Textarea
+                      value={deliveryNotes}
+                      onChange={(e) => setDeliveryNotes(e.target.value)}
+                      placeholder="Instructions spéciales pour la livraison..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
+                {errors.products && (
+                  <p className="text-red-500 text-sm">{errors.products}</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Custom Line Items */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Éléments Personnalisés</CardTitle>
+              <p className="text-sm text-gray-600">
+                Ajoutez des services ou produits personnalisés au devis
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {editableLineItems.map((item) => (
+                <div key={item.id} className="p-4 border rounded-lg bg-gray-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium">Élément personnalisé</h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeEditableLineItem(item.id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                      <Label>Description</Label>
+                      <Input
+                        value={item.description}
+                        onChange={(e) => updateEditableLineItem(item.id, 'description', e.target.value)}
+                        placeholder="Description du service/produit"
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Quantité</Label>
+                      <Input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => updateEditableLineItem(item.id, 'quantity', parseFloat(e.target.value) || 1)}
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Prix Unitaire (MAD)</Label>
+                      <Input
+                        type="number"
+                        value={item.unitPrice}
+                        onChange={(e) => updateEditableLineItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Total</Label>
+                      <Input
+                        value={`${item.totalPrice.toFixed(2)} MAD`}
+                        disabled
+                        className="bg-gray-100"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <Label>Détails</Label>
+                    <Textarea
+                      value={item.detail || ''}
+                      onChange={(e) => updateEditableLineItem(item.id, 'detail', e.target.value)}
+                      placeholder="Détails supplémentaires..."
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addEditableLineItem}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter un Élément Personnalisé
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Quote Summary with Price Override */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Récapitulatif du Devis</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Line Items Preview */}
+                <div className="space-y-2">
+                  <h4 className="font-medium">Éléments du devis :</h4>
+                  {finalQuote.lineItems.map((item) => (
+                    <div key={item.id} className="flex justify-between text-sm py-1 border-b">
+                      <div className="flex-1">
+                        <span className="font-medium">{item.description}</span>
+                        {item.detail && <span className="text-gray-600 ml-2">({item.detail})</span>}
+                      </div>
+                      <span className="font-medium">{item.totalPrice.toFixed(2)} MAD</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Financial Summary */}
+                <div className="border-t pt-4 space-y-2">
+                  <div className="flex justify-between">
+                    <span>Sous-total HT :</span>
+                    <span>{finalQuote.subTotalHT.toFixed(2)} MAD</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>TVA (20%) :</span>
+                    <span>{finalQuote.vatAmount.toFixed(2)} MAD</span>
+                  </div>
+                  <div className="flex justify-between font-medium">
+                    <span>Total TTC :</span>
+                    <span>{finalQuote.totalTTC.toFixed(2)} MAD</span>
+                  </div>
+                  
+                  {/* Price Override Section */}
+                  <div className="border-t pt-3 space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="price-override"
+                        checked={enablePriceOverride}
+                        onCheckedChange={setEnablePriceOverride}
+                      />
+                      <Label htmlFor="price-override" className="text-sm">
+                        Modifier le prix final manuellement
+                      </Label>
+                    </div>
+
+                    {enablePriceOverride ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="final-price-override">Prix final personnalisé (MAD)</Label>
                         <Input
-                          value={deliveryAddress}
-                          onChange={(e) => setDeliveryAddress(e.target.value)}
-                          placeholder="Adresse de livraison"
+                          id="final-price-override"
+                          type="number"
+                          value={finalPriceOverride || ''}
+                          onChange={(e) => setFinalPriceOverride(parseFloat(e.target.value) || null)}
+                          placeholder={`Prix calculé: ${finalQuote.calculatedPrice} MAD`}
+                          min="0"
+                          step="0.01"
                         />
+                        <p className="text-xs text-gray-600">
+                          Prix calculé automatiquement : {finalQuote.calculatedPrice.toFixed(2)} MAD
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between text-lg font-bold text-blue-600">
+                        <span>Prix final :</span>
+                        <span>{finalQuote.finalPrice.toFixed(2)} MAD</span>
+                      </div>
+                    )}
+
+                    {enablePriceOverride && (
+                      <div className="flex justify-between text-lg font-bold text-blue-600">
+                        <span>Prix final :</span>
+                        <span>{finalQuote.finalPrice.toFixed(2)} MAD</span>
                       </div>
                     )}
                   </div>
-
-                  {deliveryType !== 'PICKUP' && (
-                    <div>
-                      <Label>Notes de livraison</Label>
-                      <Textarea
-                        value={deliveryNotes}
-                        onChange={(e) => setDeliveryNotes(e.target.value)}
-                        placeholder="Instructions spéciales pour la livraison"
-                        rows={2}
-                      />
-                    </div>
-                  )}
-
-                  {productItems.map((item, index) => (
-                    <div key={item.id} className="p-4 border border-gray-200 rounded-lg space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium">Produit {index + 1}</h4>
-                        {productItems.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeProductItem(item.id)}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <Label>Nom du produit</Label>
-                          <Input
-                            placeholder="Nom du produit"
-                            value={item.name}
-                            onChange={(e) => updateProductItem(item.id, 'name', e.target.value)}
-                          />
-                        </div>
-                        
-                        <div>
-                          <Label>Quantité</Label>
-                          <Input
-                            type="number"
-                            value={item.qty}
-                            onChange={(e) => updateProductItem(item.id, 'qty', parseInt(e.target.value) || 1)}
-                            min="1"
-                          />
-                        </div>
-                        
-                        <div>
-                          <Label>Prix unitaire (MAD)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={item.unitPrice}
-                            onChange={(e) => updateProductItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                            min="0"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label>Description</Label>
-                          <Textarea
-                            placeholder="Description du produit"
-                            value={item.description}
-                            onChange={(e) => updateProductItem(item.id, 'description', e.target.value)}
-                            rows={2}
-                          />
-                        </div>
-                        
-                        <div>
-                          <Label>Référence</Label>
-                          <Input
-                            placeholder="Référence produit"
-                            value={item.reference}
-                            onChange={(e) => updateProductItem(item.id, 'reference', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={addProductItem}
-                    className="w-full"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Ajouter un Produit
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-            
-          
-
-            {/* Custom Line Items */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Éléments Personnalisés</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {editableLineItems.map((item) => (
-                  <div key={item.id} className="p-4 border border-gray-200 rounded-lg space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">Élément personnalisé</h4>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeEditableLineItem(item.id)}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <Label>Description</Label>
-                        <Input
-                          placeholder="Description du service"
-                          value={item.description}
-                          onChange={(e) => {
-                            setEditableLineItems(current =>
-                              current.map(i => i.id === item.id ? { ...i, description: e.target.value } : i)
-                            )
-                          }}
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label>Quantité</Label>
-                        <Input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => handleLineItemChange(item.id, 'quantity', parseInt(e.target.value) || 1)}
-                          min="1"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label>Prix unitaire (MAD)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={item.unitPrice}
-                          onChange={(e) => handleLineItemChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                          min="0"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <Label>Détails</Label>
-                      <Textarea
-                        placeholder="Détails supplémentaires"
-                        value={item.detail}
-                        onChange={(e) => {
-                          setEditableLineItems(current =>
-                            current.map(i => i.id === item.id ? { ...i, detail: e.target.value } : i)
-                          )
-                        }}
-                        rows={2}
-                      />
-                    </div>
-                    
-                    <div className="text-right">
-                      <span className="text-lg font-semibold">
-                        Total: {formatCurrency(item.totalPrice)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addEditableLineItem}
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ajouter un Élément Personnalisé
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Column - Summary */}
-          <div className="space-y-6">
-            <Card className="sticky top-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Résumé du Devis
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {errors.lineItems && (
-                  <div className="flex items-center gap-2 text-red-600 text-sm">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.lineItems}
-                  </div>
-                )}
-                
-                {/* Line Items Summary */}
-                <div className="space-y-2">
-                  <h4 className="font-medium text-gray-900">Éléments du devis</h4>
-                  {finalQuote.lineItems.length > 0 ? (
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {finalQuote.lineItems.map((item) => (
-                        <div key={item.id} className="flex justify-between items-start text-sm p-2 bg-gray-50 rounded">
-                          <div className="flex-1">
-                            <div className="font-medium">{item.description}</div>
-                            {item.detail && (
-                              <div className="text-gray-600 text-xs">{item.detail}</div>
-                            )}
-                            <div className="text-gray-500 text-xs">
-                              {item.quantity} × {formatCurrency(item.unitPrice)}
-                            </div>
-                          </div>
-                          <div className="font-medium text-right">
-                            {formatCurrency(item.totalPrice)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-sm">Aucun élément ajouté</p>
-                  )}
                 </div>
 
-                <Separator />
-
                 {/* Expiration Date */}
-                <div className="space-y-2">
-                  <Label htmlFor="expiresAt">Date d'expiration</Label>
+                <div className="border-t pt-3">
+                  <Label htmlFor="expiresAt">Date d'expiration du devis</Label>
                   <Input
                     id="expiresAt"
                     type="date"
@@ -1077,36 +1237,20 @@ const NewQuoteForm = () => {
                     onChange={(e) => setExpiresAt(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
                   />
-                  <p className="text-xs text-gray-500">
-                    Par défaut: 30 jours à partir d'aujourd'hui
-                  </p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
 
-                <Separator />
-                        
-                {/* Financial Summary */}
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Total HT</span>
-                    <span className="font-medium">{formatCurrency(finalQuote.subTotalHT)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">TVA (20%)</span>
-                    <span className="font-medium">{formatCurrency(finalQuote.vatAmount)}</span>
-                  </div>
-                  <div className="flex justify-between text-lg font-bold text-blue-600 pt-2 border-t">
-                    <span>Total TTC</span>
-                    <span>{formatCurrency(finalQuote.finalPrice)}</span>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Submit Button */}
-                <Button 
-                  type="submit" 
-                  disabled={isLoading || (!selectedLead && !newClientData.name.trim()) || finalQuote.lineItems.length === 0}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11"
+          {/* Submit Section */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  size="lg"
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
                 >
                   {isLoading ? (
                     <>
@@ -1122,14 +1266,26 @@ const NewQuoteForm = () => {
                 </Button>
 
                 {/* Help Text */}
-                <div className="text-xs text-gray-500 space-y-1">
-                  <p>• Le devis sera automatiquement sauvegardé en brouillon</p>
+                <div className="text-xs text-gray-500 space-y-1 text-center sm:text-right">
+                  <p>• Le devis sera automatiquement sauvegardé</p>
                   <p>• Le statut du lead sera mis à jour vers "Devis envoyé"</p>
                   <p>• Une notification sera envoyée à l'équipe</p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+
+              {/* Error Display */}
+              {Object.keys(errors).length > 0 && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <h4 className="text-red-800 font-medium mb-2">Erreurs à corriger :</h4>
+                  <ul className="text-red-700 text-sm space-y-1">
+                    {Object.entries(errors).map(([field, message]) => (
+                      <li key={field}>• {message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </form>
     </div>
