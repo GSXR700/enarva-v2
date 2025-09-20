@@ -928,7 +928,7 @@ const NewQuoteForm = () => {
               </Card>
             )}
             
-            // NewQuoteForm.tsx - PART 6: CUSTOM LINE ITEMS AND SUMMARY
+          
 
             {/* Custom Line Items */}
             <Card>
