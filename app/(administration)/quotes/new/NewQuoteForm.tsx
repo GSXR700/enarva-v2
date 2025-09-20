@@ -498,12 +498,39 @@ const NewQuoteForm = () => {
         quotePayload.surface = services.reduce((acc, s) => acc + (s.surface * s.levels), 0)
         quotePayload.levels = services.reduce((acc, s) => Math.max(acc, s.levels), 1)
         
-        // Determine property type from services
+        // FIXED: Determine property type from services with correct enum values
+        const totalSurface = services.reduce((acc, s) => acc + (s.surface * s.levels), 0)
+        
+        // Map service types to proper property type enum values
         const hasApartment = services.some(s => s.type.toLowerCase().includes('appartement'))
-        const hasMaison = services.some(s => s.type.toLowerCase().includes('maison'))
-        quotePayload.propertyType = hasApartment ? 'APPARTEMENT' : hasMaison ? 'MAISON' : 'AUTRE'
+        const hasVilla = services.some(s => s.type.toLowerCase().includes('villa') || s.type.toLowerCase().includes('maison'))
+        const hasCommercial = services.some(s => s.type.toLowerCase().includes('bureau') || s.type.toLowerCase().includes('commercial'))
+        
+        let propertyType = 'OTHER' // Default to OTHER (correct enum value)
+        
+        if (hasApartment) {
+          // Determine apartment size based on surface
+          if (totalSurface <= 50) propertyType = 'APARTMENT_SMALL'
+          else if (totalSurface <= 100) propertyType = 'APARTMENT_MEDIUM'
+          else if (totalSurface <= 150) propertyType = 'APARTMENT_LARGE'
+          else propertyType = 'APARTMENT_MULTI'
+        } else if (hasVilla) {
+          // Determine villa size based on surface
+          if (totalSurface <= 100) propertyType = 'VILLA_SMALL'
+          else if (totalSurface <= 200) propertyType = 'VILLA_MEDIUM'
+          else propertyType = 'VILLA_LARGE'
+        } else if (hasCommercial) {
+          // Determine commercial type
+          if (services.some(s => s.type.toLowerCase().includes('bureau'))) {
+            propertyType = 'OFFICE'
+          } else {
+            propertyType = 'COMMERCIAL'
+          }
+        }
+        
+        quotePayload.propertyType = propertyType
       } else {
-        quotePayload.productCategory = productCategory || 'AUTRE'
+        quotePayload.productCategory = productCategory || 'OTHER'
         quotePayload.productDetails = {
           items: productItems.filter(item => item.name.trim()),
           category: productCategory
