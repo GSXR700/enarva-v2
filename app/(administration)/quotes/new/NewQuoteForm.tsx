@@ -292,8 +292,8 @@ const NewQuoteForm = () => {
       newErrors.client = "Veuillez sélectionner un client existant ou entrer le nom d'un nouveau client"
     }
 
-    // If creating new client, phone is required
-    if (hasNewClientName && !hasNewClientPhone) {
+    // If creating new client, phone is required (only validate if no selected lead)
+    if (!hasSelectedLead && hasNewClientName && !hasNewClientPhone) {
       newErrors.phone = "Le numéro de téléphone est requis pour un nouveau client"
     }
 
@@ -412,25 +412,36 @@ const NewQuoteForm = () => {
     setEditableLineItems(current => current.filter(item => item.id !== id))
   }
 
-  // Handle lead selection
+  // Handle lead selection - FIXED: Clear errors when selecting lead
   const selectLead = (lead: Lead) => {
     setSelectedLead(lead)
     setSearchQuery('')
     setShowSearchResults(false)
+    // CRITICAL: Clear new client data when selecting existing lead
     setNewClientData({ name: '', email: '', phone: '', address: '', company: '' })
-    setErrors(prev => ({ ...prev, client: '', phone: '' }))
+    // CRITICAL: Clear all client-related errors
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors.client
+      delete newErrors.phone
+      delete newErrors.name
+      delete newErrors.email
+      return newErrors
+    })
   }
 
   const clearSelectedLead = () => {
     setSelectedLead(null)
     setSearchQuery('')
     setShowSearchResults(false)
+    // Don't clear new client data when deselecting - user might want to keep it
   }
 
-  // Handle new client data changes
+  // Handle new client data changes - FIXED: Clear selected lead when typing new client
   const updateNewClientData = (field: string, value: string) => {
     setNewClientData(prev => ({ ...prev, [field]: value }))
     if (field === 'name' && value.trim()) {
+      // Clear selected lead if user starts typing new client name
       setSelectedLead(null)
       setErrors(prev => ({ ...prev, client: '' }))
     }
