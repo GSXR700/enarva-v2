@@ -728,11 +728,17 @@ export const completeQuoteValidationSchema = z.object({
   quoteNumber: z.string()
     .min(1, 'Numéro de devis requis')
     .max(50, 'Numéro de devis trop long')
-    .optional(), // Made optional for editing
+    .optional(),
 
-  leadId: z.string()
-    .min(1, 'Lead ID requis')
-    .optional(), // Made optional for editing
+  // Client selection - either existing lead or new client info
+  leadId: z.string().min(1, 'Lead ID requis').optional(),
+  newClientName: z.string().min(1, 'Nom du nouveau client requis').optional(),
+  newClientEmail: z.string().email('Email invalide').optional().nullable(),
+  newClientPhone: z.string()
+    .min(10, 'Numéro de téléphone invalide')
+    .max(20, 'Numéro de téléphone trop long')
+    .optional(),
+  newClientAddress: z.string().max(200, 'Adresse trop longue').optional().nullable(),
 
   status: z.enum(['DRAFT', 'SENT', 'VIEWED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'CANCELLED'])
     .default('DRAFT'),
@@ -815,6 +821,21 @@ export const completeQuoteValidationSchema = z.object({
 
   validatedAt: z.date().optional()
 }).refine((data) => {
+  // Either leadId or newClientName must be provided
+  return data.leadId || data.newClientName;
+}, {
+  message: "Un lead existant doit être sélectionné ou les informations d'un nouveau client doivent être fournies",
+  path: ["leadId"]
+}).refine((data) => {
+  // If newClientName is provided, phone should also be provided
+  if (data.newClientName && !data.newClientPhone) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Le numéro de téléphone est requis pour un nouveau client",
+  path: ["newClientPhone"]
+}).refine((data) => {
   // Check lineItems instead of services for SERVICE business type
   if (data.businessType === 'SERVICE') {
     return data.lineItems && data.lineItems.length > 0
@@ -843,6 +864,14 @@ export const completeQuoteValidationSchema = z.object({
 }, {
   message: "Le sous-total ne correspond pas à la somme des articles",
   path: ["subTotalHT"]
+})
+.refine((data) => {
+  // Validate totalTTC matches subTotalHT + vatAmount
+  const tolerance = 0.01 // Allow small rounding differences
+  return Math.abs((data.subTotalHT + data.vatAmount) - data.totalTTC) <= tolerance
+}, {
+  message: "Le total TTC ne correspond pas au sous-total plus la TVA",
+  path: ["totalTTC"]
 })
 
 // =============================================================================

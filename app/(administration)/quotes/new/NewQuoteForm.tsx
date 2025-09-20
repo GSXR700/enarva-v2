@@ -1,4 +1,4 @@
-// app/(administration)/quotes/new/NewQuoteForm.tsx
+// app/(administration)/quotes/new/NewQuoteForm.tsx - PART 1: IMPORTS AND STATE
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
@@ -10,8 +10,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
-import { Badge } from '@/components/ui/badge'
-import { Search, Plus, Minus, Package, Wrench, User, Calendar, Save } from 'lucide-react'
+//import { Badge } from '@/components/ui/badge'
+import { Search, Plus, Minus, Package, Wrench, User, Calendar, Save, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCurrency, generateQuote, ServiceInput } from '@/lib/utils'
 
@@ -44,6 +44,9 @@ interface LineItem {
   description: string
   detail?: string
   amount: number
+  quantity: number
+  unitPrice: number
+  totalPrice: number
   editable: boolean
 }
 
@@ -56,7 +59,13 @@ const NewQuoteForm = () => {
   // Core form state
   const [businessType, setBusinessType] = useState<QuoteBusinessType>('SERVICE')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
-  const [newClientName, setNewClientName] = useState('')
+  const [newClientData, setNewClientData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    company: ''
+  })
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Lead[]>([])
   const [isSearching, setIsSearching] = useState(false)
@@ -74,9 +83,9 @@ const NewQuoteForm = () => {
   // Product-specific state
   const [productCategory, setProductCategory] = useState<string>('')
   const [productItems, setProductItems] = useState<ProductItem[]>([
-    { id: '1', name: '', qty: 1, unitPrice: 0, description: '', reference: '' }
+    { id: Date.now().toString(), name: '', qty: 1, unitPrice: 0, description: '', reference: '' }
   ])
-  const [deliveryType, setDeliveryType] = useState<string>('STANDARD_DELIVERY')
+  const [deliveryType, setDeliveryType] = useState<string>('STANDARD')
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [deliveryNotes, setDeliveryNotes] = useState('')
 
@@ -85,8 +94,13 @@ const NewQuoteForm = () => {
     new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]
   )
 
-  // Manual debounced search function
-  const performSearch = useCallback(async (query: string) => {
+  // Error state
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // NewQuoteForm.tsx - PART 2: SEARCH AND CALCULATIONS
+
+  // Search functionality with debouncing
+  const searchLeads = useCallback(async (query: string) => {
     if (query.length < 2) {
       setSearchResults([])
       setShowSearchResults(false)
@@ -97,47 +111,65 @@ const NewQuoteForm = () => {
     try {
       const response = await fetch(`/api/leads/search?q=${encodeURIComponent(query)}`)
       if (response.ok) {
-        const results = await response.json()
-        setSearchResults(results)
+        const leads = await response.json()
+        const processedLeads = leads.map((lead: any) => ({
+          ...lead,
+          displayName: `${lead.firstName} ${lead.lastName}${lead.company ? ` (${lead.company})` : ''}`,
+          typeLabel: lead.leadType === 'PARTICULIER' ? 'Particulier' : 'Professionnel'
+        }))
+        setSearchResults(processedLeads)
         setShowSearchResults(true)
       }
     } catch (error) {
-      console.error('Erreur de recherche:', error)
+      console.error('Search error:', error)
+      toast.error('Erreur lors de la recherche')
     } finally {
       setIsSearching(false)
     }
   }, [])
 
-  // Handle search input changes with manual debouncing
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value)
-    
-    // Clear existing timeout
+  // Debounced search effect
+  useEffect(() => {
     if (searchTimeoutId) {
       clearTimeout(searchTimeoutId)
     }
-    
-    // Set new timeout for search
-    const timeoutId = setTimeout(() => {
-      performSearch(value)
-    }, 300)
-    
-    setSearchTimeoutId(timeoutId)
-  }
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutId) {
-        clearTimeout(searchTimeoutId)
+    const timeoutId = setTimeout(() => {
+      if (searchQuery && !selectedLead) {
+        searchLeads(searchQuery)
       }
-    }
-  }, [searchTimeoutId])
+    }, 300)
+
+    setSearchTimeoutId(timeoutId)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery, selectedLead, searchLeads])
 
   // Calculate quote for services
   const serviceQuoteCalculation = useMemo(() => {
     if (businessType === 'SERVICE') {
-      return generateQuote(services)
+      try {
+        const quote = generateQuote(services)
+        return {
+          lineItems: quote.lineItems.map((item, index) => ({
+            id: `service-${index}`,
+            description: item.description,
+            detail: item.detail || '',
+            amount: item.amount,
+            quantity: 1,
+            unitPrice: item.amount,
+            totalPrice: item.amount,
+            editable: true
+          })),
+          subTotalHT: quote.subTotalHT,
+          vatAmount: quote.vatAmount,
+          totalTTC: quote.totalTTC,
+          finalPrice: quote.finalPrice
+        }
+      } catch (error) {
+        console.error('Quote generation error:', error)
+        return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 }
+      }
     }
     return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 }
   }, [services, businessType])
@@ -145,125 +177,208 @@ const NewQuoteForm = () => {
   // Calculate quote for products
   const productQuoteCalculation = useMemo(() => {
     if (businessType === 'PRODUCT') {
-      const subTotalHT = productItems.reduce((acc, item) => acc + (item.qty * item.unitPrice), 0)
+      const validItems = productItems.filter(item => item.name.trim() && item.qty > 0 && item.unitPrice > 0)
+      const subTotalHT = validItems.reduce((acc, item) => acc + (item.qty * item.unitPrice), 0)
       const vatAmount = subTotalHT * 0.20
       let totalTTC = subTotalHT + vatAmount
-      if (totalTTC < 500) totalTTC = 500 // Minimum quote amount
+      if (totalTTC < 500) totalTTC = 500
       const finalPrice = Math.round(totalTTC / 10) * 10
 
-      const lineItems: LineItem[] = productItems
-        .filter(item => item.name && item.qty > 0 && item.unitPrice > 0)
-        .map(item => ({
-          id: item.id,
-          description: item.name,
-          detail: `${item.qty} × ${formatCurrency(item.unitPrice)} MAD${item.reference ? ` (Réf: ${item.reference})` : ''}`,
-          amount: item.qty * item.unitPrice,
-          editable: true
-        }))
+      const lineItems: LineItem[] = validItems.map(item => ({
+        id: item.id,
+        description: item.name,
+        detail: `${item.qty} × ${formatCurrency(item.unitPrice)}${item.reference ? ` (Réf: ${item.reference})` : ''}`,
+        amount: item.qty * item.unitPrice,
+        quantity: item.qty,
+        unitPrice: item.unitPrice,
+        totalPrice: item.qty * item.unitPrice,
+        editable: true
+      }))
 
       return { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice }
     }
     return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 }
   }, [productItems, businessType])
 
-  // Update editable line items when calculations change
-  useEffect(() => {
-    if (businessType === 'SERVICE') {
-      setEditableLineItems(serviceQuoteCalculation.lineItems)
-    } else {
-      setEditableLineItems(productQuoteCalculation.lineItems)
-    }
-  }, [serviceQuoteCalculation, productQuoteCalculation, businessType])
-
   // Final quote calculation
   const finalQuote = useMemo(() => {
-    const subTotalHT = editableLineItems.reduce((acc, item) => acc + item.amount, 0)
+    const baseQuote = businessType === 'SERVICE' ? serviceQuoteCalculation : productQuoteCalculation
+    
+    // Add custom editable line items
+    const allLineItems = [...baseQuote.lineItems, ...editableLineItems]
+    const subTotalHT = allLineItems.reduce((acc, item) => acc + item.totalPrice, 0)
     const vatAmount = subTotalHT * 0.20
     let totalTTC = subTotalHT + vatAmount
     if (totalTTC < 500) totalTTC = 500
     const finalPrice = Math.round(totalTTC / 10) * 10
-    return { lineItems: editableLineItems, subTotalHT, vatAmount, totalTTC, finalPrice }
-  }, [editableLineItems])
 
-  // Handle client selection
-  const handleSelectLead = (lead: Lead) => {
-    setSelectedLead(lead)
-    setSearchQuery(lead.displayName)
-    setNewClientName('')
-    setShowSearchResults(false)
+    return { lineItems: allLineItems, subTotalHT, vatAmount, totalTTC, finalPrice }
+  }, [serviceQuoteCalculation, productQuoteCalculation, editableLineItems, businessType])
+
+  // Form validation
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+
+    // Client validation
+    if (!selectedLead && !newClientData.name.trim()) {
+      newErrors.client = "Veuillez sélectionner un client existant ou entrer le nom d'un nouveau client"
+    }
+
+    // New client validation
+    if (newClientData.name.trim() && !newClientData.phone.trim()) {
+      newErrors.phone = "Le numéro de téléphone est requis pour un nouveau client"
+    }
+
+    // Line items validation
+    if (finalQuote.lineItems.length === 0) {
+      newErrors.lineItems = "Veuillez ajouter au moins un élément au devis"
+    }
+
+    // Service validation
+    if (businessType === 'SERVICE') {
+      const hasValidService = services.some(s => s.surface > 0)
+      if (!hasValidService) {
+        newErrors.services = "Veuillez configurer au moins un service avec une surface valide"
+      }
+    }
+
+    // Product validation
+    if (businessType === 'PRODUCT') {
+      const hasValidProduct = productItems.some(p => p.name.trim() && p.qty > 0 && p.unitPrice > 0)
+      if (!hasValidProduct) {
+        newErrors.products = "Veuillez ajouter au moins un produit valide"
+      }
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
-  const handleNewClient = () => {
-    setSelectedLead(null)
-    setNewClientName(searchQuery)
-    setShowSearchResults(false)
-  }
+  // NewQuoteForm.tsx - PART 3: EVENT HANDLERS
 
-  // Service handlers
-  const handleServiceChange = (id: number, field: keyof ServiceInputState, value: string | number) => {
-    setServices(currentServices =>
-      currentServices.map(s => s.id === id ? { ...s, [field]: value } : s)
+  // Handle service changes
+  const updateService = (id: number, field: keyof ServiceInput, value: any) => {
+    setServices(current =>
+      current.map(service =>
+        service.id === id ? { ...service, [field]: value } : service
+      )
     )
   }
 
   const addService = () => {
-    setServices([...services, { 
-      id: Date.now(), 
-      type: 'GrandMénage', 
-      surface: 50, 
-      levels: 1, 
-      distance: 5, 
-      etage: 'RDC', 
-      delai: 'STANDARD', 
-      difficulte: 'STANDARD' 
-    }])
+    setServices(current => [
+      ...current,
+      { id: Date.now(), type: 'GrandMénage', surface: 50, levels: 1, distance: 5, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }
+    ])
   }
 
   const removeService = (id: number) => {
-    setServices(services.filter(s => s.id !== id))
+    if (services.length > 1) {
+      setServices(current => current.filter(service => service.id !== id))
+    }
   }
 
-  // Product handlers
-  const handleProductChange = (id: string, field: keyof ProductItem, value: string | number) => {
-    setProductItems(currentItems =>
-      currentItems.map(item => item.id === id ? { ...item, [field]: value } : item)
+  // Handle product changes
+  const updateProductItem = (id: string, field: keyof ProductItem, value: any) => {
+    setProductItems(current =>
+      current.map(item =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
     )
   }
 
   const addProductItem = () => {
-    setProductItems([...productItems, {
-      id: Date.now().toString(),
-      name: '',
-      qty: 1,
-      unitPrice: 0,
-      description: '',
-      reference: ''
-    }])
+    setProductItems(current => [
+      ...current,
+      { id: Date.now().toString(), name: '', qty: 1, unitPrice: 0, description: '', reference: '' }
+    ])
   }
 
   const removeProductItem = (id: string) => {
-    setProductItems(productItems.filter(item => item.id !== id))
+    setProductItems(current => current.filter(item => item.id !== id))
   }
 
-  // Line item editor
-  const handleLineItemChange = (id: string, newAmount: number) => {
-    setEditableLineItems(currentItems =>
-      currentItems.map(item => item.id === id ? { ...item, amount: newAmount } : item)
+  // Handle editable line items
+  const handleLineItemChange = (id: string, field: string, value: number) => {
+    setEditableLineItems(current =>
+      current.map(item => {
+        if (item.id === id) {
+          const updatedItem = { ...item }
+          
+          if (field === 'unitPrice') {
+            updatedItem.unitPrice = Math.max(0, value)
+            updatedItem.totalPrice = updatedItem.unitPrice * updatedItem.quantity
+            updatedItem.amount = updatedItem.totalPrice
+          } else if (field === 'quantity') {
+            updatedItem.quantity = Math.max(1, value)
+            updatedItem.totalPrice = updatedItem.unitPrice * updatedItem.quantity
+            updatedItem.amount = updatedItem.totalPrice
+          } else if (field === 'amount') {
+            updatedItem.amount = Math.max(0, value)
+            updatedItem.totalPrice = updatedItem.amount
+            if (updatedItem.quantity > 0) {
+              updatedItem.unitPrice = updatedItem.totalPrice / updatedItem.quantity
+            }
+          }
+          
+          return updatedItem
+        }
+        return item
+      })
     )
   }
 
-  // IMPROVED Form submission with better error handling
+  const addEditableLineItem = () => {
+    const newItem: LineItem = {
+      id: `custom-${Date.now()}`,
+      description: 'Service personnalisé',
+      detail: '',
+      amount: 0,
+      quantity: 1,
+      unitPrice: 0,
+      totalPrice: 0,
+      editable: true
+    }
+    setEditableLineItems(current => [...current, newItem])
+  }
+
+  const removeEditableLineItem = (id: string) => {
+    setEditableLineItems(current => current.filter(item => item.id !== id))
+  }
+
+  // Handle lead selection
+  const selectLead = (lead: Lead) => {
+    setSelectedLead(lead)
+    setSearchQuery('')
+    setShowSearchResults(false)
+    setNewClientData({ name: '', email: '', phone: '', address: '', company: '' })
+    setErrors(prev => ({ ...prev, client: '', phone: '' }))
+  }
+
+  const clearSelectedLead = () => {
+    setSelectedLead(null)
+    setSearchQuery('')
+    setShowSearchResults(false)
+  }
+
+  // Handle new client data changes
+  const updateNewClientData = (field: string, value: string) => {
+    setNewClientData(prev => ({ ...prev, [field]: value }))
+    if (field === 'name' && value.trim()) {
+      setSelectedLead(null)
+      setErrors(prev => ({ ...prev, client: '' }))
+    }
+    if (field === 'phone' && value.trim()) {
+      setErrors(prev => ({ ...prev, phone: '' }))
+    }
+  }
+
+  // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Validation initiale
-    if (!selectedLead && !newClientName.trim()) {
-      toast.error("Veuillez sélectionner un client existant ou entrer le nom d'un nouveau client.")
-      return
-    }
-
-    if (finalQuote.lineItems.length === 0) {
-      toast.error("Veuillez ajouter au moins un élément au devis.")
+    if (!validateForm()) {
+      toast.error("Veuillez corriger les erreurs dans le formulaire")
       return
     }
 
@@ -271,160 +386,100 @@ const NewQuoteForm = () => {
     console.log('🚀 Starting quote creation process...')
 
     try {
-      // Préparation du payload de base
+      const quoteNumber = `DV-${businessType.substring(0, 3)}-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
+
       const quotePayload: any = {
-        quoteNumber: `DV-${businessType.substring(0, 3)}-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
+        quoteNumber,
         businessType,
-        lineItems: finalQuote.lineItems,
+        lineItems: finalQuote.lineItems.map(item => ({
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice
+        })),
         subTotalHT: finalQuote.subTotalHT,
         vatAmount: finalQuote.vatAmount,
         totalTTC: finalQuote.totalTTC,
         finalPrice: finalQuote.finalPrice,
-        expiresAt: expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 jours par défaut
+        expiresAt: expiresAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       }
 
-      // Gestion client existant vs nouveau client
+      // Handle existing vs new client
       if (selectedLead) {
         quotePayload.leadId = selectedLead.id
         console.log('📋 Using existing lead:', selectedLead.id)
       } else {
-        quotePayload.newClientName = newClientName.trim()
-        console.log('👤 Creating new client:', newClientName.trim())
+        quotePayload.newClientName = newClientData.name.trim()
+        quotePayload.newClientEmail = newClientData.email.trim() || null
+        quotePayload.newClientPhone = newClientData.phone.trim()
+        quotePayload.newClientAddress = newClientData.address.trim() || null
+        console.log('👤 Creating new client:', newClientData.name.trim())
       }
 
-      // Données spécifiques au type de business
+      // Add business-specific data
       if (businessType === 'SERVICE') {
         quotePayload.type = quoteType
         quotePayload.surface = services.reduce((acc, s) => acc + (s.surface * s.levels), 0)
         quotePayload.levels = services.reduce((acc, s) => Math.max(acc, s.levels), 1)
-        quotePayload.propertyType = selectedLead?.propertyType || 'OTHER'
-        console.log('🔧 Service quote configuration:', {
-          type: quoteType,
-          surface: quotePayload.surface,
-          levels: quotePayload.levels
-        })
+        
+        const hasApartment = services.some(s => s.type.includes('Appartement'))
+        const hasMaison = services.some(s => s.type.includes('Maison'))
+        quotePayload.propertyType = hasApartment ? 'APPARTEMENT' : hasMaison ? 'MAISON' : 'AUTRE'
       } else {
-        quotePayload.productCategory = productCategory
+        quotePayload.productCategory = productCategory || 'AUTRE'
         quotePayload.productDetails = {
-          items: productItems.filter(item => item.name && item.qty > 0),
-          delivery: {
-            type: deliveryType,
-            address: deliveryAddress,
-            notes: deliveryNotes
-          }
+          items: productItems.filter(item => item.name.trim()),
+          category: productCategory
         }
         quotePayload.deliveryType = deliveryType
-        quotePayload.deliveryAddress = deliveryAddress
-        quotePayload.deliveryNotes = deliveryNotes
-        console.log('📦 Product quote configuration:', {
-          category: productCategory,
-          itemsCount: quotePayload.productDetails.items.length,
-          deliveryType
-        })
+        quotePayload.deliveryAddress = deliveryAddress || null
+        quotePayload.deliveryNotes = deliveryNotes || null
       }
 
-      console.log('📤 Sending quote payload:', JSON.stringify(quotePayload, null, 2))
+      console.log('📤 Sending quote payload:', quotePayload)
 
-      // Appel API
       const response = await fetch('/api/quotes', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
         },
         body: JSON.stringify(quotePayload),
       })
 
-      console.log('📨 API Response status:', response.status)
-      console.log('📨 API Response headers:', Object.fromEntries(response.headers.entries()))
+      const responseData = await response.json()
 
-      // Gestion des erreurs HTTP
       if (!response.ok) {
-        let errorMessage = `Erreur HTTP ${response.status}`
-        
-        try {
-          const errorData = await response.text()
-          console.error('❌ API Error response:', errorData)
-          
-          // Tenter de parser le JSON si possible
-          try {
-            const parsedError = JSON.parse(errorData)
-            errorMessage = parsedError.message || parsedError.error || errorMessage
-          } catch {
-            // Si ce n'est pas du JSON, utiliser le texte brut
-            errorMessage = errorData || errorMessage
-          }
-        } catch (parseError) {
-          console.error('❌ Failed to parse error response:', parseError)
-        }
-        
-        throw new Error(errorMessage)
+        console.error('❌ Quote creation failed:', responseData)
+        throw new Error(responseData.message || responseData.error || 'Failed to create quote')
       }
 
-      // Traitement de la réponse de succès
-      const responseText = await response.text()
-      console.log('✅ API Success response:', responseText)
+      console.log('✅ Quote created successfully:', responseData)
+      toast.success(`Devis ${quoteNumber} créé avec succès!`)
       
-      let newQuote
-      try {
-        newQuote = JSON.parse(responseText)
-      } catch (parseError) {
-        console.error('❌ Failed to parse success response:', parseError)
-        throw new Error('Réponse invalide du serveur')
-      }
-
-      // Succès
-      const successMessage = businessType === 'SERVICE' 
-        ? `Devis de service ${newQuote.quoteNumber} créé avec succès!`
-        : `Devis de produit ${newQuote.quoteNumber} créé avec succès!`
-      
-      toast.success(successMessage, {
-        description: newClientName ? `Client "${newClientName}" créé automatiquement` : undefined,
-        duration: 4000
-      })
-      console.log('✅ Quote created successfully:', newQuote)
-
-      // Redirection vers le devis créé
-      setTimeout(() => {
-        router.push(`/quotes/${newQuote.id}`)
-      }, 1000)
+      router.push(`/quotes/${responseData.id}`)
 
     } catch (error) {
-      console.error('❌ Quote creation failed:', error)
-      
-      // Gestion d'erreur détaillée
-      let errorMessage = 'Échec de la création du devis'
-      
-      if (error instanceof Error) {
-        errorMessage = error.message
-      } else if (typeof error === 'string') {
-        errorMessage = error
-      }
-
-      // Affichage de l'erreur à l'utilisateur
-      toast.error(errorMessage, {
-        description: 'Vérifiez vos données et réessayez. Si le problème persiste, contactez le support.',
-        duration: 5000
-      })
-
+      console.error('❌ Error creating quote:', error)
+      toast.error(error instanceof Error ? error.message : 'Erreur lors de la création du devis')
     } finally {
       setIsLoading(false)
     }
   }
 
+  // NewQuoteForm.tsx - PART 4: MAIN UI JSX
+
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Nouveau Devis</h1>
-        <p className="text-gray-600 mt-2">
-          Créez un devis pour services ou produits avec un client existant ou nouveau
-        </p>
+        <p className="text-gray-600 mt-2">Créez un devis détaillé pour un client existant ou nouveau</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Client & Type Selection */}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Configuration */}
           <div className="lg:col-span-2 space-y-6">
+            
             {/* Business Type Selection */}
             <Card>
               <CardHeader>
@@ -435,36 +490,39 @@ const NewQuoteForm = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
+                  <div
+                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      businessType === 'SERVICE' 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
                     onClick={() => setBusinessType('SERVICE')}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      businessType === 'SERVICE'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  >
+                    <div className="flex items-center gap-3">
+                      <Wrench className="h-6 w-6 text-blue-600" />
+                      <div>
+                        <h3 className="font-semibold">Devis de Service</h3>
+                        <p className="text-sm text-gray-600">Nettoyage, entretien, maintenance</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div
+                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      businessType === 'PRODUCT' 
+                        ? 'border-blue-500 bg-blue-50' 
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <Wrench className="h-8 w-8" />
-                      <span className="font-medium">Service</span>
-                      <span className="text-sm text-gray-600">Nettoyage, maintenance, etc.</span>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setBusinessType('PRODUCT')}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      businessType === 'PRODUCT'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
                   >
-                    <div className="flex flex-col items-center gap-2">
-                      <Package className="h-8 w-8" />
-                      <span className="font-medium">Produit</span>
-                      <span className="text-sm text-gray-600">Mobilier, équipements, etc.</span>
+                    <div className="flex items-center gap-3">
+                      <Package className="h-6 w-6 text-green-600" />
+                      <div>
+                        <h3 className="font-semibold">Devis de Produit</h3>
+                        <p className="text-sm text-gray-600">Équipements, fournitures, matériel</p>
+                      </div>
                     </div>
-                  </button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -478,163 +536,173 @@ const NewQuoteForm = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="relative">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Rechercher un client existant ou entrer un nouveau nom..."
-                      value={searchQuery}
-                      onChange={(e) => handleSearchChange(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  
-                  {isSearching && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Search Results */}
-                {showSearchResults && searchResults.length > 0 && (
-                  <div className="border rounded-lg bg-white shadow-lg max-h-60 overflow-y-auto">
-                    {searchResults.map((lead) => (
-                      <button
-                        key={lead.id}
-                        type="button"
-                        onClick={() => handleSelectLead(lead)}
-                        className="w-full p-3 text-left hover:bg-gray-50 border-b last:border-b-0 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-gray-900">{lead.displayName}</p>
-                            <p className="text-sm text-gray-600">
-                              {lead.phone} {lead.email && `• ${lead.email}`}
-                            </p>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <Badge variant={lead.leadType === 'PARTICULIER' ? 'default' : 'secondary'}>
-                              {lead.typeLabel}
-                            </Badge>
-                            <span className="text-xs text-gray-500">{lead.status}</span>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+                {errors.client && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    {errors.client}
                   </div>
                 )}
-
-                {/* New Client Option */}
-                {searchQuery && !selectedLead && searchResults.length === 0 && !isSearching && (
-                  <div className="border rounded-lg p-4 bg-blue-50 border-blue-200">
-                    <p className="text-sm text-blue-800 mb-2">Aucun client trouvé.</p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleNewClient}
-                      className="text-blue-700 border-blue-300 hover:bg-blue-100"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Créer nouveau client: "{searchQuery}"
-                    </Button>
-                  </div>
-                )}
-
-                {/* Selected Client Display */}
-                {selectedLead && (
+                
+                {selectedLead ? (
                   <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium text-green-800">{selectedLead.displayName}</p>
-                        <p className="text-sm text-green-600">Client sélectionné</p>
+                        <h3 className="font-semibold text-green-800">
+                          {selectedLead.displayName}
+                        </h3>
+                        <p className="text-sm text-green-600">
+                          {selectedLead.phone} • {selectedLead.typeLabel}
+                        </p>
+                        {selectedLead.email && (
+                          <p className="text-sm text-green-600">{selectedLead.email}</p>
+                        )}
+                        {selectedLead.company && (
+                          <p className="text-sm text-green-600">{selectedLead.company}</p>
+                        )}
+                        {selectedLead.address && (
+                          <p className="text-sm text-green-600">{selectedLead.address}</p>
+                        )}
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedLead(null)
-                          setSearchQuery('')
-                        }}
-                        className="text-green-700 hover:bg-green-100"
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={clearSelectedLead}
+                        disabled={isLoading}
                       >
                         Changer
                       </Button>
                     </div>
                   </div>
-                )}
+                ) : (
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        placeholder="Rechercher un client par nom, email, téléphone..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      {isSearching && (
+                        <div className="absolute right-10 top-1/2 -translate-y-1/2">
+                          <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                      {showSearchResults && searchResults.length > 0 && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                          {searchResults.map(lead => (
+                            <div
+                              key={lead.id}
+                              className="p-3 hover:bg-gray-100 cursor-pointer"
+                              onClick={() => selectLead(lead)}
+                            >
+                              <h4 className="font-medium">{lead.displayName}</h4>
+                              <p className="text-sm text-gray-600">
+                                {lead.phone} • {lead.typeLabel}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
-                {/* New Client Display */}
-                {newClientName && !selectedLead && (
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-blue-800">Nouveau client: {newClientName}</p>
-                        <p className="text-sm text-blue-600">Sera créé avec le devis</p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setNewClientName('')
-                          setSearchQuery('')
-                        }}
-                        className="text-blue-700 hover:bg-blue-100"
-                      >
-                        Annuler
-                      </Button>
+                    <div className="text-center text-sm text-gray-500">— OU —</div>
+
+                    <div className="space-y-3">
+                      <Label>Nom du Nouveau Client</Label>
+                      <Input
+                        type="text"
+                        placeholder="Nom complet"
+                        value={newClientData.name}
+                        onChange={(e) => updateNewClientData('name', e.target.value)}
+                        disabled={isLoading}
+                      />
+                      {errors.phone && (
+                        <div className="flex items-center gap-2 text-red-600 text-sm">
+                          <AlertCircle className="h-4 w-4" />
+                          {errors.phone}
+                        </div>
+                      )}
+                      <Label>Contact du Nouveau Client</Label>
+                      <Input
+                        type="email"
+                        placeholder="Email (optionnel)"
+                        value={newClientData.email}
+                        onChange={(e) => updateNewClientData('email', e.target.value)}
+                        disabled={isLoading}
+                        className="mb-2"
+                      />
+                      <Input
+                        type="text"
+                        placeholder="Téléphone *"
+                        value={newClientData.phone}
+                        onChange={(e) => updateNewClientData('phone', e.target.value)}
+                        disabled={isLoading}
+                        className="mb-2"
+                      />
+                      <Textarea
+                        placeholder="Adresse (optionnel)"
+                        value={newClientData.address}
+                        onChange={(e) => updateNewClientData('address', e.target.value)}
+                        disabled={isLoading}
+                        className="mb-2"
+                        rows={2}
+                      />
+                      <Textarea
+                        placeholder="Société (optionnel)"
+                        value={newClientData.company}
+                        onChange={(e) => updateNewClientData('company', e.target.value)}
+                        disabled={isLoading}
+                        className="mb-2"
+                        rows={1}
+                      />
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
 
+            {/* Business Type Specific Configuration */}
+
             {/* Service Configuration */}
             {businessType === 'SERVICE' && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Wrench className="h-5 w-5" />
-                      Configuration des Services
-                    </div>
-                    <Button type="button" onClick={addService} size="sm" variant="outline">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Service
-                    </Button>
-                  </CardTitle>
+                  <CardTitle>Configuration des Services</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div>
-                      <Label htmlFor="quoteType">Type de Devis</Label>
-                      <Select value={quoteType} onValueChange={(value: any) => setQuoteType(value)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="EXPRESS">Express</SelectItem>
-                          <SelectItem value="STANDARD">Standard</SelectItem>
-                          <SelectItem value="PREMIUM">Premium</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  {errors.services && (
+                    <div className="flex items-center gap-2 text-red-600 text-sm">
+                      <AlertCircle className="h-4 w-4" />
+                      {errors.services}
                     </div>
+                  )}
+                  
+                  <div className="space-y-2">
+                    <Label>Type de Devis</Label>
+                    <Select value={quoteType} onValueChange={(value: any) => setQuoteType(value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EXPRESS">Express (+20%)</SelectItem>
+                        <SelectItem value="STANDARD">Standard</SelectItem>
+                        <SelectItem value="PREMIUM">Premium (+15%)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {services.map((service, index) => (
-                    <div key={service.id} className="border rounded-lg p-4 space-y-4">
+                    <div key={service.id} className="p-4 border border-gray-200 rounded-lg space-y-4">
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium">Service {index + 1}</h4>
                         {services.length > 1 && (
                           <Button
                             type="button"
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={() => removeService(service.id)}
-                            className="text-red-600 hover:bg-red-50"
                           >
                             <Minus className="h-4 w-4" />
                           </Button>
@@ -643,10 +711,10 @@ const NewQuoteForm = () => {
                       
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                          <Label>Type de Service</Label>
-                          <Select 
-                            value={service.type} 
-                            onValueChange={(value) => handleServiceChange(service.id, 'type', value)}
+                          <Label>Type de service</Label>
+                          <Select
+                            value={service.type}
+                            onValueChange={(value) => updateService(service.id, 'type', value)}
                           >
                             <SelectTrigger>
                               <SelectValue />
@@ -654,8 +722,8 @@ const NewQuoteForm = () => {
                             <SelectContent>
                               <SelectItem value="GrandMénage">Grand Ménage</SelectItem>
                               <SelectItem value="MénageRégulier">Ménage Régulier</SelectItem>
+                              <SelectItem value="NettoyageBureaux">Nettoyage Bureaux</SelectItem>
                               <SelectItem value="NettoyageVitre">Nettoyage Vitres</SelectItem>
-                              <SelectItem value="NettoyageBureau">Nettoyage Bureau</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -665,7 +733,7 @@ const NewQuoteForm = () => {
                           <Input
                             type="number"
                             value={service.surface}
-                            onChange={(e) => handleServiceChange(service.id, 'surface', parseInt(e.target.value) || 0)}
+                            onChange={(e) => updateService(service.id, 'surface', parseInt(e.target.value) || 0)}
                             min="1"
                           />
                         </div>
@@ -675,8 +743,9 @@ const NewQuoteForm = () => {
                           <Input
                             type="number"
                             value={service.levels}
-                            onChange={(e) => handleServiceChange(service.id, 'levels', parseInt(e.target.value) || 1)}
+                            onChange={(e) => updateService(service.id, 'levels', parseInt(e.target.value) || 1)}
                             min="1"
+                            max="10"
                           />
                         </div>
                         
@@ -685,13 +754,23 @@ const NewQuoteForm = () => {
                           <Input
                             type="number"
                             value={service.distance}
-                            onChange={(e) => handleServiceChange(service.id, 'distance', parseInt(e.target.value) || 0)}
+                            onChange={(e) => updateService(service.id, 'distance', parseInt(e.target.value) || 0)}
                             min="0"
                           />
                         </div>
                       </div>
                     </div>
                   ))}
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addService}
+                    className="w-full"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter un Service
+                  </Button>
                 </CardContent>
               </Card>
             )}
@@ -700,103 +779,94 @@ const NewQuoteForm = () => {
             {businessType === 'PRODUCT' && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Package className="h-5 w-5" />
-                      Configuration des Produits
-                    </div>
-                    <Button type="button" onClick={addProductItem} size="sm" variant="outline">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Produit
-                    </Button>
-                  </CardTitle>
+                  <CardTitle>Configuration des Produits</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <Label htmlFor="productCategory">Catégorie de Produits</Label>
-                      <Select value={productCategory} onValueChange={setProductCategory}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner une catégorie" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="FURNITURE">Mobilier</SelectItem>
-                          <SelectItem value="EQUIPMENT">Équipements</SelectItem>
-                          <SelectItem value="ELECTRONICS">Électronique</SelectItem>
-                          <SelectItem value="DECORATION">Décoration</SelectItem>
-                          <SelectItem value="TEXTILES">Textiles</SelectItem>
-                          <SelectItem value="LIGHTING">Éclairage</SelectItem>
-                          <SelectItem value="STORAGE">Rangement</SelectItem>
-                          <SelectItem value="KITCHEN_ITEMS">Articles de cuisine</SelectItem>
-                          <SelectItem value="BATHROOM_ITEMS">Articles salle de bain</SelectItem>
-                          <SelectItem value="OFFICE_SUPPLIES">Fournitures bureau</SelectItem>
-                          <SelectItem value="OTHER">Autres</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  {errors.products && (
+                    <div className="flex items-center gap-2 text-red-600 text-sm">
+                      <AlertCircle className="h-4 w-4" />
+                      {errors.products}
                     </div>
-                    
+                  )}
+                  
+                  <div>
+                    <Label>Catégorie</Label>
+                    <Select value={productCategory} onValueChange={setProductCategory}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner une catégorie" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EQUIPEMENT_NETTOYAGE">Équipement de nettoyage</SelectItem>
+                        <SelectItem value="PRODUIT_ENTRETIEN">Produits d'entretien</SelectItem>
+                        <SelectItem value="ACCESSOIRE">Accessoires</SelectItem>
+                        <SelectItem value="CONSOMMABLE">Consommables</SelectItem>
+                        <SelectItem value="AUTRE">Autre</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="deliveryType">Type de Livraison</Label>
+                      <Label>Type de livraison</Label>
                       <Select value={deliveryType} onValueChange={setDeliveryType}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="PICKUP">Récupération</SelectItem>
-                          <SelectItem value="STANDARD_DELIVERY">Livraison standard</SelectItem>
-                          <SelectItem value="EXPRESS_DELIVERY">Livraison express</SelectItem>
-                          <SelectItem value="SCHEDULED_DELIVERY">Livraison programmée</SelectItem>
-                          <SelectItem value="WHITE_GLOVE">Service premium</SelectItem>
+                          <SelectItem value="STANDARD">Livraison standard</SelectItem>
+                          <SelectItem value="EXPRESS">Livraison express</SelectItem>
+                          <SelectItem value="PICKUP">Retrait sur place</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
-
-                  {deliveryType !== 'PICKUP' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {deliveryType !== 'PICKUP' && (
                       <div>
-                        <Label htmlFor="deliveryAddress">Adresse de Livraison</Label>
+                        <Label>Adresse de livraison</Label>
                         <Input
                           value={deliveryAddress}
                           onChange={(e) => setDeliveryAddress(e.target.value)}
                           placeholder="Adresse de livraison"
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="deliveryNotes">Notes de Livraison</Label>
-                        <Input
-                          value={deliveryNotes}
-                          onChange={(e) => setDeliveryNotes(e.target.value)}
-                          placeholder="Instructions spéciales..."
-                        />
-                      </div>
+                    )}
+                  </div>
+
+                  {deliveryType !== 'PICKUP' && (
+                    <div>
+                      <Label>Notes de livraison</Label>
+                      <Textarea
+                        value={deliveryNotes}
+                        onChange={(e) => setDeliveryNotes(e.target.value)}
+                        placeholder="Instructions spéciales pour la livraison"
+                        rows={2}
+                      />
                     </div>
                   )}
 
                   {productItems.map((item, index) => (
-                    <div key={item.id} className="border rounded-lg p-4 space-y-4">
+                    <div key={item.id} className="p-4 border border-gray-200 rounded-lg space-y-4">
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium">Produit {index + 1}</h4>
                         {productItems.length > 1 && (
                           <Button
                             type="button"
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={() => removeProductItem(item.id)}
-                            className="text-red-600 hover:bg-red-50"
                           >
                             <Minus className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <Label>Nom du Produit</Label>
+                          <Label>Nom du produit</Label>
                           <Input
+                            placeholder="Nom du produit"
                             value={item.name}
-                            onChange={(e) => handleProductChange(item.id, 'name', e.target.value)}
-                            placeholder="Ex: Table en bois"
+                            onChange={(e) => updateProductItem(item.id, 'name', e.target.value)}
                           />
                         </div>
                         
@@ -805,112 +875,237 @@ const NewQuoteForm = () => {
                           <Input
                             type="number"
                             value={item.qty}
-                            onChange={(e) => handleProductChange(item.id, 'qty', parseInt(e.target.value) || 1)}
+                            onChange={(e) => updateProductItem(item.id, 'qty', parseInt(e.target.value) || 1)}
                             min="1"
                           />
                         </div>
                         
                         <div>
-                          <Label>Prix Unitaire (MAD)</Label>
+                          <Label>Prix unitaire (MAD)</Label>
                           <Input
                             type="number"
-                            value={item.unitPrice}
-                            onChange={(e) => handleProductChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                            min="0"
                             step="0.01"
+                            value={item.unitPrice}
+                            onChange={(e) => updateProductItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>Description</Label>
+                          <Textarea
+                            placeholder="Description du produit"
+                            value={item.description}
+                            onChange={(e) => updateProductItem(item.id, 'description', e.target.value)}
+                            rows={2}
                           />
                         </div>
                         
                         <div>
                           <Label>Référence</Label>
                           <Input
+                            placeholder="Référence produit"
                             value={item.reference}
-                            onChange={(e) => handleProductChange(item.id, 'reference', e.target.value)}
-                            placeholder="Réf. produit"
+                            onChange={(e) => updateProductItem(item.id, 'reference', e.target.value)}
                           />
                         </div>
                       </div>
-                      
-                      <div>
-                        <Label>Description</Label>
-                        <Textarea
-                          value={item.description}
-                          onChange={(e) => handleProductChange(item.id, 'description', e.target.value)}
-                          placeholder="Description détaillée du produit..."
-                          rows={2}
-                        />
-                      </div>
                     </div>
                   ))}
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addProductItem}
+                    className="w-full"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter un Produit
+                  </Button>
                 </CardContent>
               </Card>
             )}
+            
+            // NewQuoteForm.tsx - PART 6: CUSTOM LINE ITEMS AND SUMMARY
+
+            {/* Custom Line Items */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Éléments Personnalisés</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {editableLineItems.map((item) => (
+                  <div key={item.id} className="p-4 border border-gray-200 rounded-lg space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">Élément personnalisé</h4>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeEditableLineItem(item.id)}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label>Description</Label>
+                        <Input
+                          placeholder="Description du service"
+                          value={item.description}
+                          onChange={(e) => {
+                            setEditableLineItems(current =>
+                              current.map(i => i.id === item.id ? { ...i, description: e.target.value } : i)
+                            )
+                          }}
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label>Quantité</Label>
+                        <Input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => handleLineItemChange(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                          min="1"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label>Prix unitaire (MAD)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.unitPrice}
+                          onChange={(e) => handleLineItemChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label>Détails</Label>
+                      <Textarea
+                        placeholder="Détails supplémentaires"
+                        value={item.detail}
+                        onChange={(e) => {
+                          setEditableLineItems(current =>
+                            current.map(i => i.id === item.id ? { ...i, detail: e.target.value } : i)
+                          )
+                        }}
+                        rows={2}
+                      />
+                    </div>
+                    
+                    <div className="text-right">
+                      <span className="text-lg font-semibold">
+                        Total: {formatCurrency(item.totalPrice)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addEditableLineItem}
+                  className="w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter un Élément Personnalisé
+                </Button>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Right Column - Quote Summary */}
+          {/* Right Column - Summary */}
           <div className="space-y-6">
             <Card className="sticky top-6">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calendar className="h-5 w-5" />
-                  Récapitulatif du Devis
+                  Résumé du Devis
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="expiresAt">Date d'Expiration</Label>
+                {errors.lineItems && (
+                  <div className="flex items-center gap-2 text-red-600 text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    {errors.lineItems}
+                  </div>
+                )}
+                
+                {/* Line Items Summary */}
+                <div className="space-y-2">
+                  <h4 className="font-medium text-gray-900">Éléments du devis</h4>
+                  {finalQuote.lineItems.length > 0 ? (
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {finalQuote.lineItems.map((item) => (
+                        <div key={item.id} className="flex justify-between items-start text-sm p-2 bg-gray-50 rounded">
+                          <div className="flex-1">
+                            <div className="font-medium">{item.description}</div>
+                            {item.detail && (
+                              <div className="text-gray-600 text-xs">{item.detail}</div>
+                            )}
+                            <div className="text-gray-500 text-xs">
+                              {item.quantity} × {formatCurrency(item.unitPrice)}
+                            </div>
+                          </div>
+                          <div className="font-medium text-right">
+                            {formatCurrency(item.totalPrice)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm">Aucun élément ajouté</p>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Expiration Date */}
+                <div className="space-y-2">
+                  <Label htmlFor="expiresAt">Date d'expiration</Label>
                   <Input
+                    id="expiresAt"
                     type="date"
                     value={expiresAt}
                     onChange={(e) => setExpiresAt(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
                   />
+                  <p className="text-xs text-gray-500">
+                    Par défaut: 30 jours à partir d'aujourd'hui
+                  </p>
                 </div>
 
                 <Separator />
-
-                <div className="space-y-3">
-                  {finalQuote.lineItems.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
-                      <div className="flex-1">
-                        <p className="font-medium text-sm text-slate-900">{item.description}</p>
-                        <p className="text-xs text-slate-500">{item.detail}</p>
-                      </div>
-                      <div className="text-right">
-                        <Input
-                          type="number"
-                          value={item.amount}
-                          onChange={(e) => handleLineItemChange(item.id, parseFloat(e.target.value) || 0)}
-                          className="w-20 h-8 text-right text-sm"
-                          step="0.01"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                  
-                  <Separator />
-                  
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">Total HT</span>
-                      <span className="font-medium">{formatCurrency(finalQuote.subTotalHT)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">TVA (20%)</span>
-                      <span className="font-medium">{formatCurrency(finalQuote.vatAmount)}</span>
-                    </div>
-                    <div className="flex justify-between text-lg font-bold text-blue-600 pt-2 border-t">
-                      <span>Total TTC</span>
-                      <span>{formatCurrency(finalQuote.finalPrice)}</span>
-                    </div>
+                        
+                {/* Financial Summary */}
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Total HT</span>
+                    <span className="font-medium">{formatCurrency(finalQuote.subTotalHT)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">TVA (20%)</span>
+                    <span className="font-medium">{formatCurrency(finalQuote.vatAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold text-blue-600 pt-2 border-t">
+                    <span>Total TTC</span>
+                    <span>{formatCurrency(finalQuote.finalPrice)}</span>
                   </div>
                 </div>
 
                 <Separator />
 
+                {/* Submit Button */}
                 <Button 
                   type="submit" 
-                  disabled={isLoading || (!selectedLead && !newClientName.trim()) || finalQuote.lineItems.length === 0}
+                  disabled={isLoading || (!selectedLead && !newClientData.name.trim()) || finalQuote.lineItems.length === 0}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white h-11"
                 >
                   {isLoading ? (
@@ -925,6 +1120,13 @@ const NewQuoteForm = () => {
                     </>
                   )}
                 </Button>
+
+                {/* Help Text */}
+                <div className="text-xs text-gray-500 space-y-1">
+                  <p>• Le devis sera automatiquement sauvegardé en brouillon</p>
+                  <p>• Le statut du lead sera mis à jour vers "Devis envoyé"</p>
+                  <p>• Une notification sera envoyée à l'équipe</p>
+                </div>
               </CardContent>
             </Card>
           </div>
