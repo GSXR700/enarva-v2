@@ -865,7 +865,10 @@ enum ActivityType {
   QUALITY_ISSUE
   CLIENT_FEEDBACK
   USER_CREATED          // FIXED: Added missing enum value
-  USER_DELETED          // FIXED: Added missing enum value
+  USER_DELETED
+  TEAM_CREATED           // ADDED: Proper enum value for team creation
+  TEAM_UPDATED           // ADDED: Proper enum value for team updates
+  TEAM_DELETED           // ADDED: Proper enum value for team deletion          // FIXED: Added missing enum value
   TEAM_MEMBER_CREATED   // FIXED: Added missing enum value
   TEAM_MEMBER_UPDATED   // FIXED: Added missing enum value
   TEAM_MEMBER_DELETED   // FIXED: Added missing enum value

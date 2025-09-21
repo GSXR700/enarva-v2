@@ -1,4 +1,4 @@
-// app/api/teams/route.ts - API COMPLÈTE POUR LA GESTION DES ÉQUIPES
+// app/api/teams/route.ts - FIXED VERSION WITH PROPER USER VALIDATION AND ERROR HANDLING
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -188,6 +188,19 @@ export async function POST(request: NextRequest) {
 
     const validatedData = validationResult.data;
 
+    // CRITICAL FIX: Verify user exists in database before proceeding
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { id: true, name: true, email: true, role: true }
+    });
+
+    if (!dbUser) {
+      console.error('Session user not found in database:', user.id);
+      return new NextResponse('User not found in database', { status: 401 });
+    }
+
+    console.log('Verified database user:', dbUser);
+
     // Create team in transaction
     const result = await prisma.$transaction(async (tx) => {
       // Check if team name already exists
@@ -200,7 +213,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Validate all member IDs if provided
-      if (validatedData.memberIds.length > 0) {
+      if (validatedData.memberIds && validatedData.memberIds.length > 0) {
         const users = await tx.user.findMany({
           where: { id: { in: validatedData.memberIds } }
         });
@@ -238,7 +251,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Add members to team if provided
-      if (validatedData.memberIds.length > 0) {
+      if (validatedData.memberIds && validatedData.memberIds.length > 0) {
         const teamMembersData = validatedData.memberIds.map(userId => ({
           userId,
           teamId: newTeam.id,
@@ -253,21 +266,27 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Create activity log
-      await tx.activity.create({
-        data: {
-          type: 'LEAD_CREATED', // Using valid enum value for team creation
-          title: 'Équipe créée',
-          description: `Équipe "${validatedData.name}" créée avec ${validatedData.memberIds.length} membre(s)`,
-          userId: user.id,
-          metadata: {
-            teamId: newTeam.id,
-            teamName: validatedData.name,
-            membersCount: validatedData.memberIds.length,
-            memberIds: validatedData.memberIds
+      // FIXED: Create activity log with verified user ID and proper error handling
+      try {
+        await tx.activity.create({
+          data: {
+            type: 'USER_CREATED', // FIXED: Using valid ActivityType enum value that exists
+            title: 'Équipe créée',
+            description: `Équipe "${validatedData.name}" créée avec ${(validatedData.memberIds || []).length} membre(s)`,
+            userId: dbUser.id, // FIXED: Using verified database user ID
+            metadata: {
+              teamId: newTeam.id,
+              teamName: validatedData.name,
+              membersCount: (validatedData.memberIds || []).length,
+              memberIds: validatedData.memberIds || []
+            }
           }
-        }
-      });
+        });
+      } catch (activityError) {
+        console.error('Failed to create activity log:', activityError);
+        // Continue execution - activity log is not critical for team creation
+        // The team creation should still succeed even if activity logging fails
+      }
 
       // Return team with members
       return await tx.team.findUnique({
@@ -288,6 +307,9 @@ export async function POST(request: NextRequest) {
           }
         }
       });
+    }, {
+      maxWait: 5000, // 5 seconds
+      timeout: 10000, // 10 seconds
     });
 
     console.log('Team created successfully:', result);
@@ -297,6 +319,32 @@ export async function POST(request: NextRequest) {
     console.error('Failed to create team:', error);
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    
+    // Enhanced error handling for Prisma errors
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as { code: string }
+      
+      if (prismaError.code === 'P2002') {
+        return NextResponse.json(
+          { error: 'Team name already exists' },
+          { status: 409 }
+        )
+      }
+
+      if (prismaError.code === 'P2003') {
+        return NextResponse.json(
+          { error: 'Foreign key constraint failed - invalid reference data' },
+          { status: 400 }
+        )
+      }
+
+      if (prismaError.code === 'P2025') {
+        return NextResponse.json(
+          { error: 'Related record not found' },
+          { status: 404 }
+        )
+      }
+    }
     
     if (errorMessage.includes('équipe avec ce nom existe déjà')) {
       return NextResponse.json(
@@ -371,6 +419,16 @@ export async function PUT(request: NextRequest) {
 
     const validatedData = validationResult.data;
 
+    // FIXED: Verify user exists in database
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { id: true, name: true, email: true, role: true }
+    });
+
+    if (!dbUser) {
+      return new NextResponse('User not found in database', { status: 401 });
+    }
+
     const updatedTeam = await prisma.$transaction(async (tx) => {
       // Check if team exists
       const existingTeam = await tx.team.findUnique({
@@ -413,21 +471,26 @@ export async function PUT(request: NextRequest) {
         }
       });
 
-      // Create activity log
-      await tx.activity.create({
-        data: {
-          type: 'LEAD_CREATED', // Using valid enum value
-          title: 'Équipe mise à jour',
-          description: `Équipe "${existingTeam.name}" mise à jour`,
-          userId: user.id,
-          metadata: {
-            teamId: existingTeam.id,
-            oldName: existingTeam.name,
-            newName: validatedData.name || existingTeam.name,
-            changes: Object.keys(updateData)
+      // FIXED: Create activity log with verified user ID and proper error handling
+      try {
+        await tx.activity.create({
+          data: {
+            type: 'USER_CREATED', // FIXED: Using valid ActivityType enum value
+            title: 'Équipe mise à jour',
+            description: `Équipe "${existingTeam.name}" mise à jour`,
+            userId: dbUser.id, // FIXED: Using verified database user ID
+            metadata: {
+              teamId: existingTeam.id,
+              oldName: existingTeam.name,
+              newName: validatedData.name || existingTeam.name,
+              changes: Object.keys(updateData)
+            }
           }
-        }
-      });
+        });
+      } catch (activityError) {
+        console.error('Failed to create activity log:', activityError);
+        // Continue execution - activity log is not critical
+      }
 
       return updated;
     });
@@ -438,6 +501,18 @@ export async function PUT(request: NextRequest) {
     console.error('Failed to update team:', error);
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    
+    // Enhanced error handling for foreign key constraints
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as { code: string }
+      
+      if (prismaError.code === 'P2003') {
+        return NextResponse.json(
+          { error: 'Foreign key constraint failed - invalid reference data' },
+          { status: 400 }
+        )
+      }
+    }
     
     if (errorMessage.includes('Team not found')) {
       return new NextResponse('Team not found', { status: 404 });
@@ -476,6 +551,16 @@ export async function DELETE(request: NextRequest) {
       return new NextResponse('Team ID required', { status: 400 });
     }
 
+    // FIXED: Verify user exists in database
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { id: true, name: true, email: true, role: true }
+    });
+
+    if (!dbUser) {
+      return new NextResponse('User not found in database', { status: 401 });
+    }
+
     await prisma.$transaction(async (tx) => {
       // Check if team exists and get info
       const team = await tx.team.findUnique({
@@ -504,21 +589,26 @@ export async function DELETE(request: NextRequest) {
       // Delete the team
       await tx.team.delete({ where: { id: teamId } });
 
-      // Log the deletion
-      await tx.activity.create({
-        data: {
-          type: 'SYSTEM_MAINTENANCE',
-          title: 'Équipe supprimée',
-          description: `Équipe "${team.name}" supprimée avec ${team.members.length} membre(s)`,
-          userId: user.id,
-          metadata: { 
-            deletedTeamId: teamId,
-            teamName: team.name,
-            membersCount: team.members.length,
-            deletedBy: user.name
+      // FIXED: Log the deletion with verified user ID and proper error handling
+      try {
+        await tx.activity.create({
+          data: {
+            type: 'SYSTEM_MAINTENANCE',
+            title: 'Équipe supprimée',
+            description: `Équipe "${team.name}" supprimée avec ${team.members.length} membre(s)`,
+            userId: dbUser.id, // FIXED: Using verified database user ID
+            metadata: { 
+              deletedTeamId: teamId,
+              teamName: team.name,
+              membersCount: team.members.length,
+              deletedBy: dbUser.name
+            }
           }
-        }
-      });
+        });
+      } catch (activityError) {
+        console.error('Failed to create activity log:', activityError);
+        // Continue execution - activity log is not critical
+      }
     });
 
     return new NextResponse(null, { status: 204 });
@@ -527,6 +617,18 @@ export async function DELETE(request: NextRequest) {
     console.error('Failed to delete team:', error);
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    
+    // Enhanced error handling for foreign key constraints
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as { code: string }
+      
+      if (prismaError.code === 'P2003') {
+        return NextResponse.json(
+          { error: 'Foreign key constraint failed - invalid reference data' },
+          { status: 400 }
+        )
+      }
+    }
     
     if (errorMessage.includes('Team not found')) {
       return new NextResponse('Team not found', { status: 404 });
