@@ -262,24 +262,27 @@ export default function QuoteDetailPage() {
             variant="ghost"
             size="sm"
             onClick={() => router.back()}
-            className="p-2"
+            className="h-10 w-10 p-0 rounded-full"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-5 w-5" />
           </Button>
           
-          <div className="flex-1 mx-3 text-center">
-            <h1 className="text-lg font-bold truncate">{quote.quoteNumber}</h1>
-            <Badge className={`${statusConfig.color} text-xs border mt-1`}>
-              <StatusIcon className="w-3 h-3 mr-1" />
-              {statusConfig.label}
-            </Badge>
+          <div className="flex-1 mx-4 text-center">
+            <h1 className="text-lg font-bold text-gray-900">{quote.quoteNumber}</h1>
+            <div className="flex items-center justify-center gap-2 mt-1">
+              <Badge className={`${statusConfig.color} text-xs border`}>
+                <StatusIcon className="w-3 h-3 mr-1" />
+                {statusConfig.label}
+              </Badge>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">Créé le {formatDate(quote.createdAt)}</p>
           </div>
 
           {/* Mobile Actions */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <MoreVertical className="h-4 w-4" />
+              <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-full">
+                <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -338,53 +341,53 @@ export default function QuoteDetailPage() {
       <div className="hidden lg:block bg-white border-b">
         <div className="max-w-4xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
               <Button
                 variant="ghost"
                 onClick={() => router.back()}
-                className="flex items-center gap-2"
+                className="h-10 w-10 p-0 rounded-full hover:bg-gray-100"
               >
-                <ArrowLeft className="h-4 w-4" />
-                Retour
+                <ArrowLeft className="h-5 w-5" />
               </Button>
               
               <div>
-                <h1 className="text-3xl font-bold">{quote.quoteNumber}</h1>
-                <p className="text-gray-600">Créé le {formatDate(quote.createdAt)}</p>
+                <h1 className="text-3xl font-bold text-gray-900">{quote.quoteNumber}</h1>
+                <div className="flex items-center gap-3 mt-2">
+                  <p className="text-gray-600">Créé le {formatDate(quote.createdAt)}</p>
+                  <Badge className={`${statusConfig.color} border`}>
+                    <StatusIcon className="w-4 h-4 mr-1" />
+                    {statusConfig.label}
+                  </Badge>
+                </div>
               </div>
-              
-              <Badge className={`${statusConfig.color} border`}>
-                <StatusIcon className="w-4 h-4 mr-1" />
-                {statusConfig.label}
-              </Badge>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 onClick={handleDownload}
-                className="flex items-center gap-2"
+                className="h-10 w-10 p-0 rounded-full border-gray-300 hover:bg-gray-50"
+                title="Télécharger PDF"
               >
-                <Download className="h-4 w-4" />
-                Télécharger
+                <Download className="h-5 w-5" />
               </Button>
               
               <Link href={`/quotes/${quoteId}/edit`}>
                 <Button
                   variant="outline"
-                  className="flex items-center gap-2"
+                  className="h-10 w-10 p-0 rounded-full border-gray-300 hover:bg-gray-50"
+                  title="Modifier le devis"
                 >
-                  <Edit className="h-4 w-4" />
-                  Modifier
+                  <Edit className="h-5 w-5" />
                 </Button>
               </Link>
 
               <Button
                 variant="outline"
-                className="flex items-center gap-2"
+                className="h-10 w-10 p-0 rounded-full border-gray-300 hover:bg-gray-50"
+                title="Partager"
               >
-                <Share2 className="h-4 w-4" />
-                Partager
+                <Share2 className="h-5 w-5" />
               </Button>
 
               {isAdmin && (
@@ -392,10 +395,10 @@ export default function QuoteDetailPage() {
                   <AlertDialogTrigger asChild>
                     <Button
                       variant="outline"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                      className="h-10 w-10 p-0 rounded-full border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                      title="Supprimer le devis"
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Supprimer
+                      <Trash2 className="h-5 w-5" />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>

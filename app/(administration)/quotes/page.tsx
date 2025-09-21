@@ -5,19 +5,22 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Input } from '@/components/ui/input'
 import { 
   Download, 
   Edit, 
   Trash2, 
-  PlusCircle, 
+  Plus, 
   FileText, 
   User, 
-  Calendar,
   CheckCircle,
   Clock,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Search,
+  Filter,
+  MoreVertical,
+  Eye
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { QuoteStatus } from '@prisma/client'
@@ -34,6 +37,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Quote {
   id: string
@@ -42,56 +51,81 @@ interface Quote {
   finalPrice: number
   createdAt: string
   expiresAt: string
+  businessType: 'SERVICE' | 'PRODUCT'
   lead: {
     id: string
     firstName: string
     lastName: string
     company?: string
     leadType: string
+    phone: string
   }
 }
 
-// Status color helpers
-const getStatusColor = (status: QuoteStatus) => {
-  switch (status) {
-    case 'DRAFT': return 'bg-gray-100 text-gray-800'
-    case 'SENT': return 'bg-blue-100 text-blue-800'
-    case 'ACCEPTED': return 'bg-green-100 text-green-800'
-    case 'REJECTED': return 'bg-red-100 text-red-800'
-    case 'EXPIRED': return 'bg-orange-100 text-orange-800'
-    default: return 'bg-gray-100 text-gray-800'
+// Status configurations
+const getStatusConfig = (status: QuoteStatus) => {
+  const configs: Record<QuoteStatus, {
+    color: string;
+    icon: React.ComponentType<any>;
+    label: string;
+    priority: number;
+  }> = {
+    DRAFT: { 
+      color: 'bg-gray-100 text-gray-800 border-gray-200', 
+      icon: FileText, 
+      label: 'Brouillon',
+      priority: 1
+    },
+    SENT: { 
+      color: 'bg-blue-100 text-blue-800 border-blue-200', 
+      icon: Clock, 
+      label: 'Envoyé',
+      priority: 2
+    },
+    ACCEPTED: { 
+      color: 'bg-green-100 text-green-800 border-green-200', 
+      icon: CheckCircle, 
+      label: 'Accepté',
+      priority: 4
+    },
+    REJECTED: { 
+      color: 'bg-red-100 text-red-800 border-red-200', 
+      icon: XCircle, 
+      label: 'Refusé',
+      priority: 3
+    },
+    EXPIRED: { 
+      color: 'bg-orange-100 text-orange-800 border-orange-200', 
+      icon: AlertCircle, 
+      label: 'Expiré',
+      priority: 5
+    },
+    VIEWED: { 
+      color: 'bg-blue-100 text-blue-800 border-blue-200', 
+      icon: Eye, 
+      label: 'Consulté',
+      priority: 2
+    },
+    CANCELLED: { 
+      color: 'bg-gray-100 text-gray-800 border-gray-200', 
+      icon: XCircle, 
+      label: 'Annulé',
+      priority: 6
+    }
   }
-}
-
-const getStatusIcon = (status: QuoteStatus) => {
-  switch (status) {
-    case 'DRAFT': return <FileText className="w-4 h-4" />
-    case 'SENT': return <Clock className="w-4 h-4" />
-    case 'ACCEPTED': return <CheckCircle className="w-4 h-4" />
-    case 'REJECTED': return <XCircle className="w-4 h-4" />
-    case 'EXPIRED': return <AlertCircle className="w-4 h-4" />
-    default: return <FileText className="w-4 h-4" />
-  }
-}
-
-const translate = (status: QuoteStatus) => {
-  switch (status) {
-    case 'DRAFT': return 'Brouillon'
-    case 'SENT': return 'Envoyé'
-    case 'ACCEPTED': return 'Accepté'
-    case 'REJECTED': return 'Refusé'
-    case 'EXPIRED': return 'Expiré'
-    default: return status
-  }
+  return configs[status] || configs.DRAFT
 }
 
 export default function QuotesPage() {
   const { data: session } = useSession()
   const [quotes, setQuotes] = useState<Quote[]>([])
+  const [filteredQuotes, setFilteredQuotes] = useState<Quote[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [deletingQuoteId, setDeletingQuoteId] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<QuoteStatus | 'ALL'>('ALL')
 
-  // Check if user is admin (required for delete)
+  // Check if user is admin
   const isAdmin = session?.user && (session.user as any).role === 'ADMIN'
 
   const fetchQuotes = async () => {
@@ -100,6 +134,7 @@ export default function QuotesPage() {
       if (response.ok) {
         const data = await response.json()
         setQuotes(data)
+        setFilteredQuotes(data)
       } else {
         toast.error('Erreur lors du chargement des devis')
       }
@@ -115,8 +150,30 @@ export default function QuotesPage() {
     fetchQuotes()
   }, [])
 
+  // Filter and search functionality
+  useEffect(() => {
+    let filtered = quotes
+
+    // Filter by status
+    if (statusFilter !== 'ALL') {
+      filtered = filtered.filter(quote => quote.status === statusFilter)
+    }
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(quote => 
+        quote.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        `${quote.lead.firstName} ${quote.lead.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        quote.lead.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        quote.lead.phone.includes(searchTerm)
+      )
+    }
+
+    setFilteredQuotes(filtered)
+  }, [quotes, statusFilter, searchTerm])
+
   // Handle PDF download
-  const handleDownload = async (quoteId: string) => {
+  const handleDownload = async (quoteId: string, quoteNumber: string) => {
     try {
       const response = await fetch(`/api/quotes/${quoteId}/download`)
       if (response.ok) {
@@ -124,7 +181,7 @@ export default function QuotesPage() {
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `devis-${quoteId}.pdf`
+        a.download = `devis-${quoteNumber}.pdf`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
@@ -154,7 +211,6 @@ export default function QuotesPage() {
       })
 
       if (response.ok) {
-        // Remove the quote from local state
         setQuotes(current => current.filter(quote => quote.id !== quoteId))
         toast.success(`Devis ${quoteNumber} supprimé avec succès`)
       } else {
@@ -171,209 +227,452 @@ export default function QuotesPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+            <div className="h-12 bg-gray-200 rounded"></div>
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-24 bg-gray-200 rounded"></div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Devis</h1>
-          <p className="text-gray-600">Gérez tous vos devis et propositions commerciales</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Header */}
+      <div className="lg:hidden bg-white border-b sticky top-0 z-10 px-4 py-3">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Devis</h1>
+            <p className="text-sm text-gray-600">{filteredQuotes.length} devis</p>
+          </div>
+          <Link href="/quotes/new">
+            <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-4 w-4 mr-1" />
+              Nouveau
+            </Button>
+          </Link>
         </div>
-        <Link href="/quotes/new">
-          <Button className="bg-blue-600 hover:bg-blue-700">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Nouveau Devis
-          </Button>
-        </Link>
+
+        {/* Mobile Search & Filter */}
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Rechercher un devis..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 h-9"
+            />
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 px-3">
+                <Filter className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setStatusFilter('ALL')}>
+                Tous les statuts
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter('DRAFT')}>
+                Brouillons
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter('SENT')}>
+                Envoyés
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter('ACCEPTED')}>
+                Acceptés
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter('REJECTED')}>
+                Refusés
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter('EXPIRED')}>
+                Expirés
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      {/* Quotes Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Liste des Devis ({quotes.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Numéro</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Montant</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {quotes.length > 0 ? (
-                quotes.map((quote) => (
-                  <TableRow key={quote.id}>
-                    <TableCell>
-                      <Link 
-                        href={`/quotes/${quote.id}`}
-                        className="font-medium text-blue-600 hover:text-blue-800"
-                      >
-                        {quote.quoteNumber}
-                      </Link>
-                      <div className="text-xs text-gray-500 mt-1">
-                        <Calendar className="w-3 h-3 inline mr-1" />
-                        {formatDate(quote.createdAt)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <div className="font-medium">
-                            {quote.lead.firstName} {quote.lead.lastName}
+      {/* Desktop Header */}
+      <div className="hidden lg:block bg-white border-b">
+        <div className="max-w-6xl mx-auto px-6 py-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Devis</h1>
+              <p className="text-gray-600 mt-1">Gérez vos devis et propositions commerciales</p>
+            </div>
+            <Link href="/quotes/new">
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="mr-2 h-4 w-4" />
+                Nouveau Devis
+              </Button>
+            </Link>
+          </div>
+
+          {/* Desktop Search & Filter */}
+          <div className="flex gap-4">
+            <div className="flex-1 max-w-md relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Rechercher par numéro, client, téléphone..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filtrer par statut
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setStatusFilter('ALL')}>
+                  Tous les statuts
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter('DRAFT')}>
+                  Brouillons
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter('SENT')}>
+                  Envoyés
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter('ACCEPTED')}>
+                  Acceptés
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter('REJECTED')}>
+                  Refusés
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter('EXPIRED')}>
+                  Expirés
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-6xl mx-auto p-4 lg:p-6">
+        {filteredQuotes.length === 0 ? (
+          <Card>
+            <CardContent className="py-12">
+              <div className="text-center">
+                <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {searchTerm || statusFilter !== 'ALL' ? 'Aucun devis trouvé' : 'Aucun devis'}
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  {searchTerm || statusFilter !== 'ALL' 
+                    ? 'Essayez de modifier vos critères de recherche' 
+                    : 'Commencez par créer votre premier devis'
+                  }
+                </p>
+                {!searchTerm && statusFilter === 'ALL' && (
+                  <Link href="/quotes/new">
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Créer un devis
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3 lg:space-y-4">
+            {/* Mobile Quote Cards */}
+            <div className="lg:hidden space-y-3">
+              {filteredQuotes.map((quote) => {
+                const statusConfig = getStatusConfig(quote.status)
+                const StatusIcon = statusConfig.icon
+                
+                return (
+                  <Card key={quote.id} className="bg-white">
+                    <CardContent className="p-4">
+                      {/* Quote Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <Link 
+                            href={`/quotes/${quote.id}`}
+                            className="font-semibold text-blue-600 hover:text-blue-800 text-sm"
+                          >
+                            {quote.quoteNumber}
+                          </Link>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge className={`${statusConfig.color} text-xs border`}>
+                              <StatusIcon className="w-3 h-3 mr-1" />
+                              {statusConfig.label}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {quote.businessType === 'SERVICE' ? 'Service' : 'Produit'}
+                            </Badge>
                           </div>
-                          {quote.lead.company && (
-                            <div className="text-xs text-gray-500">
-                              {quote.lead.company}
+                        </div>
+
+                        {/* Mobile Actions Menu */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/quotes/${quote.id}`} className="flex items-center">
+                                <Eye className="mr-2 h-4 w-4" />
+                                Voir
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDownload(quote.id, quote.quoteNumber)}
+                            >
+                              <Download className="mr-2 h-4 w-4" />
+                              Télécharger
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/quotes/${quote.id}/edit`} className="flex items-center">
+                                <Edit className="mr-2 h-4 w-4" />
+                                Modifier
+                              </Link>
+                            </DropdownMenuItem>
+                            {isAdmin && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem 
+                                    onSelect={(e) => e.preventDefault()}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Supprimer
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Supprimer le devis <strong>{quote.quoteNumber}</strong> ?
+                                      <br />Cette action est irréversible.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDelete(quote.id, quote.quoteNumber)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Supprimer
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {/* Client Info */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-gray-400" />
+                          <span className="font-medium text-sm">
+                            {quote.lead.firstName} {quote.lead.lastName}
+                          </span>
+                        </div>
+                        
+                        {quote.lead.company && (
+                          <div className="text-xs text-gray-600 ml-6">
+                            {quote.lead.company}
+                          </div>
+                        )}
+                        
+                        <div className="text-xs text-gray-600 ml-6">
+                          {quote.lead.phone}
+                        </div>
+
+                        {/* Amount and Date */}
+                        <div className="flex items-center justify-between mt-3 pt-2 border-t">
+                          <div>
+                            <div className="text-lg font-bold text-green-600">
+                              {formatCurrency(quote.finalPrice)}
                             </div>
-                          )}
-                          <Badge variant="outline" className="text-xs mt-1">
-                            {quote.lead.leadType === 'PARTICULIER' ? 'Particulier' : 'Professionnel'}
-                          </Badge>
+                            <div className="text-xs text-gray-500">
+                              Expire le {formatDate(quote.expiresAt)}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-gray-500">
+                              Créé le
+                            </div>
+                            <div className="text-xs font-medium">
+                              {formatDate(quote.createdAt)}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-semibold text-green-600">
-                        {formatCurrency(quote.finalPrice)}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Expire le {formatDate(quote.expiresAt)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(quote.status)}>
-                        <div className="flex items-center gap-1">
-                          {getStatusIcon(quote.status)}
-                          {translate(quote.status)}
-                        </div>
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDownload(quote.id)}
-                          title="Télécharger le PDF"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Link href={`/quotes/${quote.id}/edit`}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            title="Modifier le devis"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        
-                        {/* Delete Button with Confirmation Dialog */}
-                        {isAdmin && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                title="Supprimer le devis"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                disabled={deletingQuoteId === quote.id}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Êtes-vous sûr de vouloir supprimer le devis <strong>{quote.quoteNumber}</strong> ?
-                                  <br />
-                                  Client: {quote.lead.firstName} {quote.lead.lastName}
-                                  <br />
-                                  Montant: {formatCurrency(quote.finalPrice)}
-                                  <br /><br />
-                                  <span className="text-red-600 font-medium">
-                                    Cette action est irréversible.
-                                  </span>
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(quote.id, quote.quoteNumber)}
-                                  className="bg-red-600 hover:bg-red-700"
-                                  disabled={deletingQuoteId === quote.id}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="hidden lg:block">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Liste des Devis ({filteredQuotes.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Devis</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Client</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Type</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Montant</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Statut</th>
+                          <th className="text-right py-3 px-4 font-medium text-gray-900">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredQuotes.map((quote) => {
+                          const statusConfig = getStatusConfig(quote.status)
+                          const StatusIcon = statusConfig.icon
+                          
+                          return (
+                            <tr key={quote.id} className="border-b hover:bg-gray-50">
+                              <td className="py-4 px-4">
+                                <Link 
+                                  href={`/quotes/${quote.id}`}
+                                  className="font-medium text-blue-600 hover:text-blue-800"
                                 >
-                                  {deletingQuoteId === quote.id ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
-                                      Suppression...
-                                    </>
-                                  ) : (
-                                    'Supprimer'
+                                  {quote.quoteNumber}
+                                </Link>
+                                <div className="text-sm text-gray-500 mt-1">
+                                  {formatDate(quote.createdAt)}
+                                </div>
+                              </td>
+                              <td className="py-4 px-4">
+                                <div className="font-medium">
+                                  {quote.lead.firstName} {quote.lead.lastName}
+                                </div>
+                                {quote.lead.company && (
+                                  <div className="text-sm text-gray-500">
+                                    {quote.lead.company}
+                                  </div>
+                                )}
+                                <div className="text-sm text-gray-500">
+                                  {quote.lead.phone}
+                                </div>
+                                <Badge variant="outline" className="text-xs mt-1">
+                                  {quote.lead.leadType === 'PARTICULIER' ? 'Particulier' : 'Professionnel'}
+                                </Badge>
+                              </td>
+                              <td className="py-4 px-4">
+                                <Badge variant="outline">
+                                  {quote.businessType === 'SERVICE' ? 'Service' : 'Produit'}
+                                </Badge>
+                              </td>
+                              <td className="py-4 px-4">
+                                <div className="font-semibold text-green-600">
+                                  {formatCurrency(quote.finalPrice)}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  Expire le {formatDate(quote.expiresAt)}
+                                </div>
+                              </td>
+                              <td className="py-4 px-4">
+                                <Badge className={`${statusConfig.color} border`}>
+                                  <StatusIcon className="w-4 h-4 mr-1" />
+                                  {statusConfig.label}
+                                </Badge>
+                              </td>
+                              <td className="py-4 px-4">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Link href={`/quotes/${quote.id}`}>
+                                    <Button variant="ghost" size="sm" title="Voir le devis">
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                  </Link>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDownload(quote.id, quote.quoteNumber)}
+                                    title="Télécharger le PDF"
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                  <Link href={`/quotes/${quote.id}/edit`}>
+                                    <Button variant="ghost" size="sm" title="Modifier le devis">
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  </Link>
+                                  {isAdmin && (
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          title="Supprimer le devis"
+                                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Êtes-vous sûr de vouloir supprimer le devis <strong>{quote.quoteNumber}</strong> ?
+                                            <br />
+                                            Client: {quote.lead.firstName} {quote.lead.lastName}
+                                            <br />
+                                            Montant: {formatCurrency(quote.finalPrice)}
+                                            <br /><br />
+                                            <span className="text-red-600 font-medium">
+                                              Cette action est irréversible.
+                                            </span>
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() => handleDelete(quote.id, quote.quoteNumber)}
+                                            className="bg-red-600 hover:bg-red-700"
+                                            disabled={deletingQuoteId === quote.id}
+                                          >
+                                            {deletingQuoteId === quote.id ? 'Suppression...' : 'Supprimer'}
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
                                   )}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                        
-                        {/* Show disabled delete button for non-admins */}
-                        {!isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            title="Seuls les administrateurs peuvent supprimer des devis"
-                            className="text-gray-400 cursor-not-allowed"
-                            disabled
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
-                    <div className="text-muted-foreground">
-                      <PlusCircle className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                      <p className="text-lg font-medium">Aucun devis trouvé</p>
-                      <p className="text-sm mt-1">
-                        Commencez par créer votre premier devis
-                      </p>
-                      <Link href="/quotes/new" className="mt-4 inline-block">
-                        <Button>
-                          <PlusCircle className="mr-2 h-4 w-4" />
-                          Créer un devis
-                        </Button>
-                      </Link>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
