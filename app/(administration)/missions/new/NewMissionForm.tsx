@@ -37,6 +37,11 @@ interface TeamLeader {
   phone?: string
   experience: string
   availability: string
+  user?: {
+    id: string
+    name: string
+    email: string
+  }
 }
 
 interface MissionFormData {
@@ -57,8 +62,10 @@ interface MissionFormData {
 export default function NewMissionForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const preselectedQuoteId = searchParams.get('quoteId')
-  const missionType = searchParams.get('type') || 'SERVICE'
+  
+  // FIX: Safe parameter extraction
+  const preselectedQuoteId = searchParams?.get('quoteId') || ''
+  const missionType = searchParams?.get('type') || 'SERVICE'
 
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [teamLeaders, setTeamLeaders] = useState<TeamLeader[]>([])
@@ -69,7 +76,7 @@ export default function NewMissionForm() {
   const [formData, setFormData] = useState<MissionFormData>({
     leadId: '',
     leadName: '',
-    quoteId: preselectedQuoteId || '',
+    quoteId: preselectedQuoteId,
     teamLeaderId: '',
     address: '',
     coordinates: '',
@@ -97,11 +104,13 @@ export default function NewMissionForm() {
         if (quotesResponse.ok) {
           const quotesData = await quotesResponse.json()
           console.log('📋 Fetched quotes:', quotesData.length)
-          setQuotes(quotesData)
+          // FIX: Handle both array and object responses
+          const quotesArray = Array.isArray(quotesData) ? quotesData : (quotesData.quotes || quotesData.data || [])
+          setQuotes(quotesArray)
           
           // Auto-select preselected quote if provided
           if (preselectedQuoteId) {
-            const preselectedQuote = quotesData.find((q: Quote) => q.id === preselectedQuoteId)
+            const preselectedQuote = quotesArray.find((q: Quote) => q.id === preselectedQuoteId)
             if (preselectedQuote) {
               selectQuote(preselectedQuote)
             }
@@ -111,12 +120,27 @@ export default function NewMissionForm() {
           toast.error('Erreur lors du chargement des devis')
         }
 
-        // Fetch team leaders
-        const teamResponse = await fetch('/api/team-members?role=TEAM_LEADER&availability=AVAILABLE')
-        if (teamResponse.ok) {
-          const teamData = await teamResponse.json()
-          setTeamLeaders(teamData)
-        } else {
+        // FIX: Enhanced team leaders fetching with fallback
+        try {
+          const teamResponse = await fetch('/api/team-members?role=TEAM_LEADER&availability=AVAILABLE')
+          if (teamResponse.ok) {
+            const teamData = await teamResponse.json()
+            // FIX: Handle different response structures
+            const teamArray = Array.isArray(teamData) ? teamData : (teamData.teamMembers || teamData.data || [])
+            setTeamLeaders(teamArray)
+          } else {
+            // FIX: Fallback to users endpoint if team-members fails
+            const usersResponse = await fetch('/api/users?role=TEAM_LEADER')
+            if (usersResponse.ok) {
+              const usersData = await usersResponse.json()
+              const usersArray = Array.isArray(usersData) ? usersData : (usersData.users || usersData.data || [])
+              setTeamLeaders(usersArray)
+            } else {
+              toast.error('Erreur lors du chargement des chefs d\'équipe')
+            }
+          }
+        } catch (teamError) {
+          console.error('Error fetching team leaders:', teamError)
           toast.error('Erreur lors du chargement des chefs d\'équipe')
         }
       } catch (error) {
@@ -132,16 +156,24 @@ export default function NewMissionForm() {
 
   // Auto-prefill form when quote is selected
   const selectQuote = (quote: Quote) => {
+    if (!quote) return // FIX: Safety check
+    
     console.log('🎯 Selected quote:', quote)
     setSelectedQuote(quote)
+    
+    // FIX: Safe property access
+    const lead = quote.lead || {}
+    const firstName = lead.firstName || ''
+    const lastName = lead.lastName || ''
+    const company = lead.company ? ` (${lead.company})` : ''
     
     // Auto-prefill form with quote data
     setFormData(prev => ({
       ...prev,
-      quoteId: quote.id,
-      leadId: quote.lead.id,
-      leadName: `${quote.lead.firstName} ${quote.lead.lastName}${quote.lead.company ? ` (${quote.lead.company})` : ''}`,
-      address: quote.lead.address || '',
+      quoteId: quote.id || '',
+      leadId: lead.id || '',
+      leadName: `${firstName} ${lastName}${company}`.trim() || 'Client inconnu',
+      address: lead.address || '',
       // Set default duration based on quote surface
       estimatedDuration: quote.surface ? Math.max(2, Math.ceil(quote.surface / 50)).toString() : '4'
     }))
@@ -238,6 +270,8 @@ export default function NewMissionForm() {
   }
 
   const getQuoteStatusBadge = (quote: Quote) => {
+    if (!quote) return null // FIX: Safety check
+    
     return (
       <div className="flex items-center gap-2 text-sm">
         <Badge variant="outline" className="text-green-600 border-green-200">
@@ -256,6 +290,8 @@ export default function NewMissionForm() {
   }
 
   const getTeamLeaderBadge = (leader: TeamLeader) => {
+    if (!leader) return null // FIX: Safety check
+    
     const colors = {
       JUNIOR: 'bg-blue-100 text-blue-800',
       INTERMEDIATE: 'bg-yellow-100 text-yellow-800', 
@@ -345,10 +381,10 @@ export default function NewMissionForm() {
                             <SelectItem key={quote.id} value={quote.id}>
                               <div className="flex flex-col">
                                 <div className="font-medium">
-                                  {quote.quoteNumber} - {quote.lead.firstName} {quote.lead.lastName}
+                                  {quote.quoteNumber} - {quote.lead?.firstName || ''} {quote.lead?.lastName || ''}
                                 </div>
                                 <div className="text-sm text-gray-500">
-                                  {formatCurrency(quote.finalPrice)} • {quote.lead.address || 'Adresse à définir'}
+                                  {formatCurrency(quote.finalPrice)} • {quote.lead?.address || 'Adresse à définir'}
                                 </div>
                               </div>
                             </SelectItem>
@@ -358,7 +394,7 @@ export default function NewMissionForm() {
                     </div>
 
                     {/* Selected Quote Preview */}
-                    {selectedQuote && (
+                    {selectedQuote && selectedQuote.lead && (
                       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                         <h4 className="font-medium text-blue-900 mb-2">Devis sélectionné</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -427,17 +463,24 @@ export default function NewMissionForm() {
                           Aucun chef d'équipe disponible
                         </SelectItem>
                       ) : (
-                        teamLeaders.map(leader => (
-                          <SelectItem key={leader.id} value={leader.id}>
-                            <div className="flex items-center justify-between w-full">
-                              <div>
-                                <div className="font-medium">{leader.name}</div>
-                                <div className="text-sm text-gray-500">{leader.email}</div>
+                        teamLeaders.map(leader => {
+                          // FIX: Handle different response structures for team leaders
+                          const leaderId = leader.id || leader.user?.id || ''
+                          const leaderName = leader.name || leader.user?.name || 'Chef d\'équipe'
+                          const leaderEmail = leader.email || leader.user?.email || ''
+                          
+                          return (
+                            <SelectItem key={leaderId} value={leaderId}>
+                              <div className="flex items-center justify-between w-full">
+                                <div>
+                                  <div className="font-medium">{leaderName}</div>
+                                  <div className="text-sm text-gray-500">{leaderEmail}</div>
+                                </div>
+                                {getTeamLeaderBadge(leader)}
                               </div>
-                              {getTeamLeaderBadge(leader)}
-                            </div>
-                          </SelectItem>
-                        ))
+                            </SelectItem>
+                          )
+                        })
                       )}
                     </SelectContent>
                   </Select>
