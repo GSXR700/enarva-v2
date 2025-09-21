@@ -1,531 +1,593 @@
-// app/(administration)/missions/new/NewMissionForm.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, AlertCircle } from 'lucide-react'
-import { Quote, User as TeamMember, Lead, Priority } from '@prisma/client'
+import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, Calendar, Clock, MapPin, User, Users, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
+import { formatCurrency } from '@/lib/utils'
 
-type QuoteWithLead = Quote & { lead: Lead };
-type TaskTemplate = { id: string; name: string; };
+interface Quote {
+  id: string
+  quoteNumber: string
+  finalPrice: number
+  surface?: number
+  propertyType?: string
+  lead: {
+    id: string
+    firstName: string
+    lastName: string
+    phone: string
+    email?: string
+    address?: string
+    company?: string
+  }
+}
+
+interface TeamLeader {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  experience: string
+  availability: string
+}
+
+interface MissionFormData {
+  leadId: string
+  leadName: string
+  quoteId: string
+  teamLeaderId: string
+  address: string
+  coordinates: string
+  scheduledDate: string
+  estimatedDuration: string
+  priority: string
+  type: string
+  accessNotes: string
+  adminNotes: string
+}
 
 export default function NewMissionForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  
-  // Get URL parameters
-  const missionType = searchParams.get('type') as 'TECHNICAL_VISIT' | 'SERVICE' || 'SERVICE';
-  const quoteIdFromParams = searchParams.get('quoteId');
-  const leadIdFromParams = searchParams.get('leadId');
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const preselectedQuoteId = searchParams.get('quoteId')
+  const missionType = searchParams.get('type') || 'SERVICE'
 
-  // State for form data - Fix: estimatedDuration as number, not string
-  const [formData, setFormData] = useState({
-    quoteId: quoteIdFromParams || '',
-    leadId: leadIdFromParams || '',
+  const [quotes, setQuotes] = useState<Quote[]>([])
+  const [teamLeaders, setTeamLeaders] = useState<TeamLeader[]>([])
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [formData, setFormData] = useState<MissionFormData>({
+    leadId: '',
     leadName: '',
+    quoteId: preselectedQuoteId || '',
+    teamLeaderId: '',
     address: '',
     coordinates: '',
     scheduledDate: '',
-    estimatedDuration: missionType === 'TECHNICAL_VISIT' ? 1 : 2,
-    priority: Priority.NORMAL,
-    teamLeaderId: '',
-    accessNotes: '',
+    estimatedDuration: '4',
+    priority: 'NORMAL',
     type: missionType,
-    taskTemplateId: '',
-    adminNotes: '',
-    qualityScore: '',
-    issuesFound: '',
-  });
+    accessNotes: '',
+    adminNotes: ''
+  })
 
-  // State for dropdown options - ALWAYS INITIALIZE AS ARRAYS
-  const [teamLeaders, setTeamLeaders] = useState<TeamMember[]>([]);
-  const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
-  const [quotes, setQuotes] = useState<QuoteWithLead[]>([]);
-  
-  // Loading and error states
-  const [isLoading, setIsLoading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Safe array handler to ensure we always get arrays
-  const ensureArray = (data: any): any[] => {
-    if (Array.isArray(data)) return data;
-    if (data && typeof data === 'object') {
-      // Check common API response formats
-      if (Array.isArray(data.data)) return data.data;
-      if (Array.isArray(data.users)) return data.users;
-      if (Array.isArray(data.teamLeaders)) return data.teamLeaders;
-      if (Array.isArray(data.templates)) return data.templates;
-      if (Array.isArray(data.quotes)) return data.quotes;
-    }
-    console.warn('Expected array but got:', typeof data, data);
-    return []; // Always return empty array as fallback
-  };
-
-  // Fetch specific lead data directly
-  const fetchSpecificLead = async (leadId: string) => {
-    try {
-      const response = await fetch(`/api/leads/${leadId}`);
-      if (!response.ok) {
-        throw new Error('Lead not found');
-      }
-      const lead = await response.json();
-      
-      // Update form data with lead information
-      setFormData(prev => ({
-        ...prev,
-        leadId: lead.id,
-        leadName: `${lead.firstName} ${lead.lastName}`,
-        address: lead.address || '',
-        coordinates: lead.gpsLocation || ''
-      }));
-      
-      return lead;
-    } catch (error) {
-      console.error('Error fetching lead:', error);
-      throw error;
-    }
-  };
-
-  // Fetch specific quote data directly
-  const fetchSpecificQuote = async (quoteId: string) => {
-    try {
-      const response = await fetch(`/api/quotes/${quoteId}`);
-      if (!response.ok) {
-        throw new Error('Quote not found');
-      }
-      const quote = await response.json();
-      
-      // Update form data with quote/lead information
-      setFormData(prev => ({
-        ...prev,
-        quoteId: quote.id,
-        leadId: quote.leadId,
-        leadName: `${quote.lead.firstName} ${quote.lead.lastName}`,
-        address: quote.lead.address || '',
-        coordinates: quote.lead.gpsLocation || ''
-      }));
-      
-      return quote;
-    } catch (error) {
-      console.error('Error fetching quote:', error);
-      throw error;
-    }
-  };
-
-  // Safe fetch function that properly handles errors
-  const safeFetch = async (url: string): Promise<{ success: boolean; data?: any; error?: string }> => {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        return { success: false, error: `HTTP ${response.status}` };
-      }
-      const data = await response.json();
-      return { success: true, data };
-    } catch (error) {
-      console.error(`Failed to fetch ${url}:`, error);
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  };
-
-  // Initialize form data based on URL parameters
+  // Fetch quotes and team leaders
   useEffect(() => {
-    const initializeForm = async () => {
-      setIsInitializing(true);
-      setError(null);
-
+    const fetchData = async () => {
+      setIsLoading(true)
       try {
-        console.log('Initializing form with type:', missionType);
-
-        // Always fetch team leaders and templates (these are needed for dropdowns)
-        const [usersResult, templatesResult] = await Promise.all([
-          safeFetch('/api/users?role=TEAM_LEADER'),
-          safeFetch('/api/task-templates')
-        ]);
-
-        // Handle team leaders response
-        if (usersResult.success && usersResult.data) {
-          const leaders = ensureArray(usersResult.data);
-          console.log('Team leaders loaded:', leaders.length);
-          setTeamLeaders(leaders);
-        } else {
-          console.warn('Failed to fetch team leaders:', usersResult.error);
-          setTeamLeaders([]);
-        }
-
-        // Handle task templates response
-        if (templatesResult.success && templatesResult.data) {
-          const templates = ensureArray(templatesResult.data);
-          console.log('Task templates loaded:', templates.length);
-          setTaskTemplates(templates);
-        } else {
-          console.warn('Failed to fetch task templates:', templatesResult.error);
-          setTaskTemplates([]);
-        }
-
-        // Handle different initialization scenarios
-        if (missionType === 'TECHNICAL_VISIT' && leadIdFromParams) {
-          // For technical visits, fetch the specific lead
-          console.log('Fetching lead for technical visit:', leadIdFromParams);
-          await fetchSpecificLead(leadIdFromParams);
-          
-        } else if (missionType === 'SERVICE') {
-          // For service missions, we need quotes
-          const quotesResult = await safeFetch('/api/quotes?status=ACCEPTED');
-          if (quotesResult.success && quotesResult.data) {
-            const quotesArray = ensureArray(quotesResult.data);
-            console.log('Quotes loaded:', quotesArray.length);
-            setQuotes(quotesArray);
-            
-            // If a specific quote is provided, fetch it
-            if (quoteIdFromParams) {
-              console.log('Fetching specific quote:', quoteIdFromParams);
-              await fetchSpecificQuote(quoteIdFromParams);
-            }
-          } else {
-            console.warn('Failed to fetch quotes:', quotesResult.error);
-            setQuotes([]);
+        // Fetch accepted quotes with real-time data
+        const quotesResponse = await fetch('/api/quotes?status=ACCEPTED', {
+          cache: 'no-store', // Ensure fresh data
+          headers: {
+            'Cache-Control': 'no-cache',
           }
-        }
+        })
         
-      } catch (err: any) {
-        console.error('Failed to initialize form:', err);
-        setError(`Failed to load form data: ${err.message}`);
-        toast.error(`Failed to load form data: ${err.message}`);
+        if (quotesResponse.ok) {
+          const quotesData = await quotesResponse.json()
+          console.log('📋 Fetched quotes:', quotesData.length)
+          setQuotes(quotesData)
+          
+          // Auto-select preselected quote if provided
+          if (preselectedQuoteId) {
+            const preselectedQuote = quotesData.find((q: Quote) => q.id === preselectedQuoteId)
+            if (preselectedQuote) {
+              selectQuote(preselectedQuote)
+            }
+          }
+        } else {
+          console.error('Failed to fetch quotes:', quotesResponse.status)
+          toast.error('Erreur lors du chargement des devis')
+        }
+
+        // Fetch team leaders
+        const teamResponse = await fetch('/api/team-members?role=TEAM_LEADER&availability=AVAILABLE')
+        if (teamResponse.ok) {
+          const teamData = await teamResponse.json()
+          setTeamLeaders(teamData)
+        } else {
+          toast.error('Erreur lors du chargement des chefs d\'équipe')
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error)
+        toast.error('Erreur lors du chargement des données')
       } finally {
-        setIsInitializing(false);
-      }
-    };
-
-    initializeForm();
-  }, [missionType, leadIdFromParams, quoteIdFromParams]);
-
-  const handleSelectChange = (id: keyof typeof formData, value: string) => {
-    const finalValue = value === 'none' ? '' : value;
-    
-    // Fix: Proper type conversion for numeric fields
-    let processedValue: any = finalValue;
-    
-    if (id === 'estimatedDuration') {
-      processedValue = parseFloat(value) || 0;
-    }
-
-    setFormData(prev => ({ ...prev, [id]: processedValue as any }));
-
-    // Handle quote selection for service missions
-    if (id === 'quoteId' && value !== 'none') {
-      const selectedQuote = quotes.find(q => q.id === value);
-      if (selectedQuote) {
-        setFormData(prev => ({
-          ...prev,
-          quoteId: value,
-          leadId: selectedQuote.leadId,
-          leadName: `${selectedQuote.lead.firstName} ${selectedQuote.lead.lastName}`,
-          address: selectedQuote.lead.address || '',
-          coordinates: selectedQuote.lead.gpsLocation || ''
-        }));
+        setIsLoading(false)
       }
     }
-  };
+
+    fetchData()
+  }, [preselectedQuoteId])
+
+  // Auto-prefill form when quote is selected
+  const selectQuote = (quote: Quote) => {
+    console.log('🎯 Selected quote:', quote)
+    setSelectedQuote(quote)
+    
+    // Auto-prefill form with quote data
+    setFormData(prev => ({
+      ...prev,
+      quoteId: quote.id,
+      leadId: quote.lead.id,
+      leadName: `${quote.lead.firstName} ${quote.lead.lastName}${quote.lead.company ? ` (${quote.lead.company})` : ''}`,
+      address: quote.lead.address || '',
+      // Set default duration based on quote surface
+      estimatedDuration: quote.surface ? Math.max(2, Math.ceil(quote.surface / 50)).toString() : '4'
+    }))
+
+    toast.success(`Informations du devis ${quote.quoteNumber} pré-remplies`)
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target;
+    const { id, value } = e.target
+    setFormData(prev => ({ ...prev, [id]: value }))
+  }
+
+  const handleSelectChange = (field: keyof MissionFormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
     
-    // Fix: Proper handling of numeric inputs
-    let processedValue: any = value;
-    
-    if (id === 'estimatedDuration') {
-      processedValue = parseFloat(value) || 0;
+    // Handle quote selection
+    if (field === 'quoteId' && value) {
+      const quote = quotes.find(q => q.id === value)
+      if (quote) {
+        selectQuote(quote)
+      }
     }
-    
-    setFormData(prev => ({ ...prev, [id]: processedValue }));
-  };
+  }
+
+  const validateForm = () => {
+    const errors: string[] = []
+
+    if (missionType === 'SERVICE' && !formData.quoteId) {
+      errors.push('Veuillez sélectionner un devis')
+    }
+    if (!formData.teamLeaderId) {
+      errors.push('Veuillez sélectionner un chef d\'équipe')
+    }
+    if (!formData.address.trim()) {
+      errors.push('Veuillez indiquer l\'adresse d\'intervention')
+    }
+    if (!formData.scheduledDate) {
+      errors.push('Veuillez indiquer la date et l\'heure prévues')
+    }
+    if (!formData.estimatedDuration || parseFloat(formData.estimatedDuration) < 0.5) {
+      errors.push('La durée estimée doit être d\'au moins 30 minutes')
+    }
+
+    if (errors.length > 0) {
+      toast.error(`Erreurs de validation:\n${errors.join('\n')}`)
+      return false
+    }
+
+    return true
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     
-    setIsLoading(true);
-    setError(null);
+    if (!validateForm()) return
 
-    // Comprehensive client-side validation
-    const validationErrors = [];
-    if (!formData.leadId) validationErrors.push('Client non identifié');
-    if (!formData.teamLeaderId) validationErrors.push('Chef d\'équipe non sélectionné');
-    if (!formData.address) validationErrors.push('Adresse manquante');
-    if (!formData.scheduledDate) validationErrors.push('Date/heure manquante');
-    if (!formData.estimatedDuration || formData.estimatedDuration <= 0) {
-      validationErrors.push('Durée estimée manquante ou invalide');
-    }
-
-    // For service missions, quote is required
-    if (missionType === 'SERVICE' && !formData.quoteId) {
-      validationErrors.push('Devis non sélectionné');
-    }
-
-    if (validationErrors.length > 0) {
-      const errorMsg = `Champs requis manquants: ${validationErrors.join(', ')}`;
-      toast.error(errorMsg);
-      setIsLoading(false);
-      return;
-    }
+    setIsSubmitting(true)
 
     try {
-      // Fix: Ensure proper datetime format with seconds
-      const scheduledDateTime = formData.scheduledDate.includes(':00') 
-        ? formData.scheduledDate 
-        : `${formData.scheduledDate}:00`;
-
-      const payload = {
+      const missionData = {
         ...formData,
-        scheduledDate: scheduledDateTime,
-        estimatedDuration: Number(formData.estimatedDuration), // Ensure it's a number
-        quoteId: formData.quoteId || undefined,
-        taskTemplateId: formData.taskTemplateId || undefined,
-      };
+        estimatedDuration: parseFloat(formData.estimatedDuration),
+        // Convert to ISO string for the API
+        scheduledDate: new Date(formData.scheduledDate).toISOString(),
+      }
 
-      console.log('Submitting payload:', payload);
+      console.log('📤 Submitting mission data:', missionData)
 
       const response = await fetch('/api/missions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(missionData),
+      })
 
-      const responseData = await response.json();
-      
+      const responseData = await response.json()
+
       if (!response.ok) {
-        throw new Error(responseData.details || responseData.error || "Échec de la création de la mission.");
+        throw new Error(responseData.message || responseData.error || 'Failed to create mission')
       }
-      
-      toast.success(`Mission de type "${missionType === 'TECHNICAL_VISIT' ? 'Visite Technique' : 'Service'}" créée avec succès !`);
-      router.push('/missions');
-      
-    } catch (err: any) {
-      console.error('Mission creation error:', err);
-      setError(err.message);
-      toast.error(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  // Show loading state while initializing
-  if (isInitializing) {
+      console.log('✅ Mission created successfully:', responseData)
+      toast.success('Mission créée avec succès!')
+      
+      router.push(`/missions/${responseData.id}`)
+
+    } catch (error) {
+      console.error('❌ Error creating mission:', error)
+      toast.error(error instanceof Error ? error.message : 'Erreur lors de la création de la mission')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const getQuoteStatusBadge = (quote: Quote) => {
     return (
-      <div className="container mx-auto p-6 max-w-4xl">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-64 mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-96 mb-8"></div>
-          <div className="h-96 bg-gray-200 rounded"></div>
-        </div>
+      <div className="flex items-center gap-2 text-sm">
+        <Badge variant="outline" className="text-green-600 border-green-200">
+          Accepté
+        </Badge>
+        <span className="text-gray-500">•</span>
+        <span className="font-medium text-green-600">{formatCurrency(quote.finalPrice)}</span>
+        {quote.surface && (
+          <>
+            <span className="text-gray-500">•</span>
+            <span className="text-gray-600">{quote.surface}m²</span>
+          </>
+        )}
       </div>
-    );
+    )
+  }
+
+  const getTeamLeaderBadge = (leader: TeamLeader) => {
+    const colors = {
+      JUNIOR: 'bg-blue-100 text-blue-800',
+      INTERMEDIATE: 'bg-yellow-100 text-yellow-800', 
+      SENIOR: 'bg-green-100 text-green-800',
+      EXPERT: 'bg-purple-100 text-purple-800'
+    }
+    
+    return (
+      <Badge variant="outline" className={colors[leader.experience as keyof typeof colors] || 'bg-gray-100 text-gray-800'}>
+        {leader.experience}
+      </Badge>
+    )
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="mb-8">
-        <div className="flex items-center gap-4 mb-4">
-          <Link href="/missions">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Retour aux Missions
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              onClick={() => router.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour
             </Button>
-          </Link>
-        </div>
-        
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            {missionType === 'TECHNICAL_VISIT' ? "Planifier une Visite Technique" : "Planifier une Nouvelle Mission"}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            {missionType === 'TECHNICAL_VISIT' ? "Assignez un chef d'équipe pour une évaluation sur site." : "Sélectionnez un devis accepté et assignez une équipe."}
-          </p>
+            
+            <div>
+              <h1 className="text-2xl font-bold">
+                {missionType === 'TECHNICAL_VISIT' ? 'Nouvelle Visite Technique' : 'Nouvelle Mission'}
+              </h1>
+              <p className="text-gray-600">
+                {missionType === 'TECHNICAL_VISIT' 
+                  ? 'Planifier une visite technique sur site'
+                  : 'Créer une mission à partir d\'un devis accepté'
+                }
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card className="thread-card">
-          <CardHeader>
-            <CardTitle>Détails de la Mission</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {missionType === 'SERVICE' && (
+      {/* Content */}
+      <div className="container mx-auto px-4 py-6 max-w-4xl">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Quote Selection */}
+          {missionType === 'SERVICE' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Sélection du Devis
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isLoading ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-gray-600 mt-2">Chargement des devis...</p>
+                  </div>
+                ) : quotes.length === 0 ? (
+                  <div className="text-center py-8">
+                    <AlertTriangle className="h-12 w-12 text-orange-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun devis accepté</h3>
+                    <p className="text-gray-600 mb-4">
+                      Il n'y a actuellement aucun devis accepté pour créer une mission.
+                    </p>
+                    <Button onClick={() => router.push('/quotes')} variant="outline">
+                      Voir tous les devis
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <Label htmlFor="quoteId">Devis Accepté * ({quotes.length} disponible{quotes.length > 1 ? 's' : ''})</Label>
+                      <Select 
+                        value={formData.quoteId} 
+                        onValueChange={(value) => handleSelectChange('quoteId', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un devis accepté..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {quotes.map(quote => (
+                            <SelectItem key={quote.id} value={quote.id}>
+                              <div className="flex flex-col">
+                                <div className="font-medium">
+                                  {quote.quoteNumber} - {quote.lead.firstName} {quote.lead.lastName}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {formatCurrency(quote.finalPrice)} • {quote.lead.address || 'Adresse à définir'}
+                                </div>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Selected Quote Preview */}
+                    {selectedQuote && (
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <h4 className="font-medium text-blue-900 mb-2">Devis sélectionné</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <div className="text-gray-600">Client</div>
+                            <div className="font-medium">
+                              {selectedQuote.lead.firstName} {selectedQuote.lead.lastName}
+                            </div>
+                            {selectedQuote.lead.company && (
+                              <div className="text-gray-600">{selectedQuote.lead.company}</div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-gray-600">Contact</div>
+                            <div className="font-medium">{selectedQuote.lead.phone}</div>
+                            {selectedQuote.lead.email && (
+                              <div className="text-gray-600">{selectedQuote.lead.email}</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          {getQuoteStatusBadge(selectedQuote)}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Mission Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Détails de la Mission
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Client Info */}
                 <div>
-                  <Label htmlFor="quoteId">Devis Accepté *</Label>
-                  <Select value={formData.quoteId} onValueChange={(value) => handleSelectChange('quoteId', value)} required>
-                    <SelectTrigger><SelectValue placeholder="Sélectionner un devis..." /></SelectTrigger>
+                  <Label>Client</Label>
+                  <Input 
+                    value={formData.leadName} 
+                    disabled 
+                    placeholder="Sélectionnez un devis pour voir le client..."
+                    className="bg-gray-50"
+                  />
+                </div>
+
+                {/* Team Leader */}
+                <div>
+                  <Label htmlFor="teamLeaderId">Chef d'Équipe *</Label>
+                  <Select 
+                    value={formData.teamLeaderId} 
+                    onValueChange={(value) => handleSelectChange('teamLeaderId', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un chef d'équipe..." />
+                    </SelectTrigger>
                     <SelectContent>
-                      {quotes.length > 0 ? (
-                        quotes.map(quote => (
-                          <SelectItem key={quote.id} value={quote.id}>
-                            {quote.quoteNumber} - {quote.lead.firstName} {quote.lead.lastName}
+                      {teamLeaders.length === 0 ? (
+                        <SelectItem value="no-leaders" disabled>
+                          Aucun chef d'équipe disponible
+                        </SelectItem>
+                      ) : (
+                        teamLeaders.map(leader => (
+                          <SelectItem key={leader.id} value={leader.id}>
+                            <div className="flex items-center justify-between w-full">
+                              <div>
+                                <div className="font-medium">{leader.name}</div>
+                                <div className="text-sm text-gray-500">{leader.email}</div>
+                              </div>
+                              {getTeamLeaderBadge(leader)}
+                            </div>
                           </SelectItem>
                         ))
-                      ) : (
-                        <SelectItem value="no-quotes" disabled>
-                          Aucun devis accepté disponible
-                        </SelectItem>
                       )}
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-              
-              <div>
-                <Label>Client</Label>
-                <Input 
-                  value={formData.leadName} 
-                  disabled 
-                  placeholder="Client sera automatiquement identifié..." 
-                  className={formData.leadName ? "text-foreground" : "text-muted-foreground"}
-                />
-              </div>
 
-              <div>
-                <Label htmlFor="address">Adresse d'intervention *</Label>
-                <Input 
-                  id="address" 
-                  value={formData.address} 
-                  onChange={handleChange} 
-                  required 
-                  placeholder="Adresse sera automatiquement remplie..."
-                  className={formData.address ? "text-foreground" : "text-muted-foreground"}
-                />
-              </div>
+                {/* Address */}
+                <div className="md:col-span-2">
+                  <Label htmlFor="address">Adresse d'Intervention *</Label>
+                  <Input 
+                    id="address" 
+                    value={formData.address} 
+                    onChange={handleChange} 
+                    placeholder="Adresse sera remplie automatiquement avec le devis..."
+                    className={formData.address ? 'bg-white' : 'bg-gray-50'}
+                  />
+                </div>
 
-              <div>
-                <Label htmlFor="coordinates">Coordonnées GPS</Label>
-                <Input 
-                  id="coordinates" 
-                  value={formData.coordinates} 
-                  onChange={handleChange}
-                  placeholder="Automatique ou manuel..."
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="scheduledDate">Date et Heure *</Label>
-                <Input 
-                  id="scheduledDate" 
-                  type="datetime-local" 
-                  value={formData.scheduledDate} 
-                  onChange={handleChange} 
-                  required 
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="estimatedDuration">Durée Estimée (heures) *</Label>
-                <Input 
-                  id="estimatedDuration" 
-                  type="number" 
-                  min="0.5" 
-                  step="0.5"
-                  value={formData.estimatedDuration} 
-                  onChange={handleChange} 
-                  required 
-                  placeholder="Ex: 2.5"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="priority">Priorité</Label>
-                <Select value={formData.priority} onValueChange={(value) => handleSelectChange('priority', value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="LOW">Basse</SelectItem>
-                    <SelectItem value="NORMAL">Normale</SelectItem>
-                    <SelectItem value="HIGH">Élevée</SelectItem>
-                    <SelectItem value="CRITICAL">Critique</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="teamLeaderId">Chef d'Équipe *</Label>
-                <Select value={formData.teamLeaderId} onValueChange={(value) => handleSelectChange('teamLeaderId', value)} required>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner un chef d'équipe..." /></SelectTrigger>
-                  <SelectContent>
-                    {teamLeaders.length > 0 ? (
-                      teamLeaders.map(leader => (
-                        <SelectItem key={leader.id} value={leader.id}>
-                          {leader.name || leader.email}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-leaders" disabled>
-                        Aucun chef d'équipe disponible
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="taskTemplateId">Modèle de Tâches</Label>
-                <Select value={formData.taskTemplateId} onValueChange={(value) => handleSelectChange('taskTemplateId', value)}>
-                  <SelectTrigger><SelectValue placeholder="Optionnel..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Aucun modèle</SelectItem>
-                    {taskTemplates.length > 0 ? (
-                      taskTemplates.map(template => (
-                        <SelectItem key={template.id} value={template.id}>
-                          {template.name}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-templates" disabled>
-                        Aucun modèle disponible
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="accessNotes">Notes d'Accès</Label>
-              <Textarea 
-                id="accessNotes" 
-                value={formData.accessNotes} 
-                onChange={handleChange}
-                placeholder="Informations d'accès, codes, étage, etc..."
-                rows={3}
-              />
-            </div>
-
-            {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-md flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-red-800 font-medium">Erreur</p>
-                  <p className="text-red-700 text-sm">{error}</p>
+                {/* Coordinates */}
+                <div className="md:col-span-2">
+                  <Label htmlFor="coordinates">Coordonnées GPS (optionnel)</Label>
+                  <Input 
+                    id="coordinates" 
+                    value={formData.coordinates} 
+                    onChange={handleChange} 
+                    placeholder="Latitude, Longitude (ex: 33.5731, -7.5898)"
+                  />
                 </div>
               </div>
-            )}
+            </CardContent>
+          </Card>
 
-            <div className="flex justify-end pt-6">
-              <Button 
-                type="submit" 
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8" 
-                disabled={isLoading || !formData.leadName || !formData.address}
-              >
-                {isLoading ? 'Planification...' : (missionType === 'TECHNICAL_VISIT' ? 'Planifier la Visite' : 'Planifier la Mission')}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </form>
+          {/* Scheduling */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Planification
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="scheduledDate">Date et Heure *</Label>
+                  <Input 
+                    id="scheduledDate" 
+                    type="datetime-local" 
+                    value={formData.scheduledDate} 
+                    onChange={handleChange} 
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="estimatedDuration">Durée Estimée (heures) *</Label>
+                  <Input 
+                    id="estimatedDuration" 
+                    type="number" 
+                    value={formData.estimatedDuration} 
+                    onChange={handleChange} 
+                    min="0.5" 
+                    max="24" 
+                    step="0.5"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="priority">Priorité</Label>
+                  <Select 
+                    value={formData.priority} 
+                    onValueChange={(value) => handleSelectChange('priority', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="LOW">Faible</SelectItem>
+                      <SelectItem value="NORMAL">Normale</SelectItem>
+                      <SelectItem value="HIGH">Haute</SelectItem>
+                      <SelectItem value="CRITICAL">Critique</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Additional Notes */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Notes Additionnelles
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="accessNotes">Instructions d'Accès</Label>
+                <Textarea 
+                  id="accessNotes" 
+                  value={formData.accessNotes} 
+                  onChange={handleChange} 
+                  placeholder="Code d'accès, étage, instructions spéciales..."
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="adminNotes">Notes Administratives</Label>
+                <Textarea 
+                  id="adminNotes" 
+                  value={formData.adminNotes} 
+                  onChange={handleChange} 
+                  placeholder="Notes internes pour l'équipe..."
+                  rows={3}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Submit */}
+          <div className="flex gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              Annuler
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting || (missionType === 'SERVICE' && quotes.length === 0)}
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Création...
+                </>
+              ) : (
+                <>
+                  <Users className="h-4 w-4 mr-2" />
+                  Créer la Mission
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
-  );
+  )
 }
