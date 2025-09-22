@@ -1,4 +1,4 @@
-// app/api/users/available/route.ts - GET AVAILABLE USERS FOR TEAM ASSIGNMENT
+// app/api/users/available/route.ts - FIXED TO PROPERLY SHOW TEAM LEADERS
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -15,39 +15,27 @@ export async function GET(request: NextRequest) {
     }
 
     const user = session.user as ExtendedUser;
-    if (!['ADMIN', 'MANAGER'].includes(user.role)) {
-      return new NextResponse('Forbidden', { status: 403 });
+    if (!user.id) {
+      return new NextResponse('User ID missing', { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
-    const excludeTeamId = searchParams.get('excludeTeamId'); // Optional: exclude users already in this team
-    const role = searchParams.get('role'); // Optional: filter by role
-    const search = searchParams.get('search') || ''; // Optional: search by name/email
+    const excludeTeamId = searchParams.get('excludeTeamId');
+    const role = searchParams.get('role');
+    const search = searchParams.get('search');
+    const includeAssigned = searchParams.get('includeAssigned') === 'true';
 
-    // Build where clause for available users
+    console.log('Fetching available users with params:', {
+      excludeTeamId,
+      role,
+      search,
+      includeAssigned
+    });
+
+    // Build the where clause for filtering users
     const where: any = {
-      // Users who don't have active team memberships OR are not in the excluded team
-      OR: [
-        {
-          // Users with no active team memberships
-          teamMemberships: {
-            none: {
-              isActive: true
-            }
-          }
-        },
-        {
-          // Users who are in teams but not in the excluded team (for editing existing teams)
-          teamMemberships: {
-            every: {
-              OR: [
-                { isActive: false },
-                ...(excludeTeamId ? [{ teamId: { not: excludeTeamId } }] : [])
-              ]
-            }
-          }
-        }
-      ]
+      // Don't exclude users based on team memberships by default
+      // We'll handle this logic separately
     };
 
     // Add role filter if specified
@@ -63,7 +51,8 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const availableUsers = await prisma.user.findMany({
+    // Get all users matching basic criteria
+    const allUsers = await prisma.user.findMany({
       where,
       select: {
         id: true,
@@ -91,26 +80,56 @@ export async function GET(request: NextRequest) {
       ]
     });
 
-    // Filter out users who already have active team memberships (unless we're editing and they're in the current team)
-    const filteredUsers = availableUsers.filter(user => {
+    console.log(`Found ${allUsers.length} users before filtering`);
+
+    // Filter users based on availability logic
+    const availableUsers = allUsers.filter(user => {
       const activeTeamMemberships = user.teamMemberships.filter(tm => tm.isActive);
       
+      // If includeAssigned is true, include all users regardless of team membership
+      if (includeAssigned) {
+        return true;
+      }
+      
+      // Special handling for team leaders - they are often available even if assigned
+      if (user.role === 'TEAM_LEADER') {
+        // Team leaders are available if:
+        // 1. They have no team memberships, OR
+        // 2. They're not in the excluded team (if specified), OR  
+        // 3. They're available for mission assignment
+        if (activeTeamMemberships.length === 0) {
+          return true; // Team leader with no team - available
+        }
+        
+        if (excludeTeamId) {
+          // If we're excluding a specific team, show team leaders not in that team
+          return !activeTeamMemberships.some(tm => tm.teamId === excludeTeamId);
+        }
+        
+        // For mission creation, team leaders are generally available
+        return true;
+      }
+      
+      // For non-team leaders
       if (activeTeamMemberships.length === 0) {
         // User has no active team memberships - available
         return true;
       }
       
       if (excludeTeamId) {
-        // User has active memberships but not in the team we're editing - not available
+        // User has active memberships but we're excluding a team - 
+        // show users who are ONLY in the excluded team (for editing that team)
         return activeTeamMemberships.every(tm => tm.teamId === excludeTeamId);
       }
       
-      // User has active team memberships and we're not editing - not available
+      // Default: users with existing team memberships are not available for new teams
       return false;
     });
 
+    console.log(`Filtered to ${availableUsers.length} available users`);
+
     // Transform data for frontend consumption
-    const transformedUsers = filteredUsers.map(user => ({
+    const transformedUsers = availableUsers.map(user => ({
       id: user.id,
       name: user.name || 'Unnamed User',
       email: user.email || 'No email',
@@ -118,15 +137,31 @@ export async function GET(request: NextRequest) {
       image: user.image,
       onlineStatus: user.onlineStatus,
       lastSeen: user.lastSeen,
-      currentTeam: user.teamMemberships.find(tm => tm.isActive)?.team || null
+      currentTeam: user.teamMemberships.find(tm => tm.isActive)?.team || null,
+      teamCount: user.teamMemberships.filter(tm => tm.isActive).length
     }));
+
+    // Separate team leaders for easier frontend handling
+    const teamLeaders = transformedUsers.filter(u => u.role === 'TEAM_LEADER');
+    const otherUsers = transformedUsers.filter(u => u.role !== 'TEAM_LEADER');
+
+    console.log(`Team leaders found: ${teamLeaders.length}`);
+    console.log('Team leaders:', teamLeaders.map(tl => `${tl.name} (${tl.email})`));
 
     return NextResponse.json({
       users: transformedUsers,
+      teamLeaders, // Separate list for easy access
+      otherUsers, // Non-team leaders
       total: transformedUsers.length,
       filters: {
         roles: ['ADMIN', 'MANAGER', 'TEAM_LEADER', 'TECHNICIAN', 'AGENT'],
         statuses: ['ONLINE', 'OFFLINE', 'AWAY', 'BUSY']
+      },
+      summary: {
+        totalUsers: transformedUsers.length,
+        teamLeaders: teamLeaders.length,
+        availableForAssignment: transformedUsers.filter(u => u.teamCount === 0).length,
+        withExistingTeams: transformedUsers.filter(u => u.teamCount > 0).length
       }
     });
 

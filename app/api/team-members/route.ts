@@ -1,8 +1,8 @@
-// app/api/team-members/route.ts - COMPLETE FIXED VERSION (No TypeScript Errors)
+// app/api/team-members/route.ts - COMPLETE FIXED VERSION WITH TYPESCRIPT STRICT TYPING
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { ExtendedUser } from '@/types/next-auth';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -31,12 +31,13 @@ const createTeamMemberSchema = z.object({
   experience: z.enum(['JUNIOR', 'INTERMEDIATE', 'SENIOR', 'EXPERT']).default('JUNIOR'),
   availability: z.enum(['AVAILABLE', 'BUSY', 'OFF_DUTY', 'VACATION']).default('AVAILABLE'),
   
-  // Critical missing field with proper validation
+  // Critical missing field with proper validation - FIXED for TypeScript strict typing
   hourlyRate: z.number()
     .min(0, 'Hourly rate must be positive')
     .max(1000, 'Hourly rate too high')
     .optional()
-    .nullable(),
+    .nullable()
+    .transform(val => val ?? null), // IMPORTANT: Convert undefined to null for Prisma
     
   isActive: z.boolean().default(true)
 }).refine((data) => {
@@ -49,16 +50,59 @@ const createTeamMemberSchema = z.object({
   message: "Hourly rate is required for Senior and Expert levels",
   path: ["hourlyRate"]
 }).refine((data) => {
-  // Custom validation: team leaders should have management specialty
-  if (data.role === 'TEAM_LEADER' && !data.specialties?.includes('TEAM_MANAGEMENT')) {
+  // Custom validation: team leaders should have team management specialty
+  if (data.role === 'TEAM_LEADER' && (!data.specialties || !data.specialties.includes('TEAM_MANAGEMENT'))) {
     return false;
   }
   return true;
 }, {
-  message: "Team leaders must have 'Team Management' specialty",
+  message: "Team leaders must have 'TEAM_MANAGEMENT' specialty",
   path: ["specialties"]
 });
 
+// Add existing users to team schema - FIXED for TypeScript strict typing
+const addExistingUserToTeamSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  teamId: z.string().min(1, 'Team ID is required'),
+  specialties: z.array(z.enum([
+    'GENERAL_CLEANING', 'WINDOW_SPECIALIST', 'FLOOR_SPECIALIST',
+    'LUXURY_SURFACES', 'EQUIPMENT_HANDLING', 'TEAM_MANAGEMENT',
+    'QUALITY_CONTROL', 'DETAIL_FINISHING'
+  ])).default([]),
+  experience: z.enum(['JUNIOR', 'INTERMEDIATE', 'SENIOR', 'EXPERT']).default('JUNIOR'),
+  availability: z.enum(['AVAILABLE', 'BUSY', 'OFF_DUTY', 'VACATION']).default('AVAILABLE'),
+  hourlyRate: z.number()
+    .min(0, 'Hourly rate must be positive')
+    .max(1000, 'Hourly rate too high')
+    .optional()
+    .nullable()
+    .transform(val => val ?? null), // IMPORTANT: Convert undefined to null for Prisma
+  isActive: z.boolean().default(true)
+});
+
+// Type-safe helper function for creating team member data
+function createTeamMemberData(input: {
+  userId: string;
+  teamId: string;
+  specialties: string[];
+  experience: string;
+  availability: string;
+  hourlyRate: number | null;
+  isActive: boolean;
+}): Prisma.TeamMemberUncheckedCreateInput {
+  return {
+    userId: input.userId,
+    teamId: input.teamId,
+    specialties: input.specialties as any,
+    experience: input.experience as any,
+    availability: input.availability as any,
+    hourlyRate: input.hourlyRate, // Already null if undefined due to transform
+    isActive: input.isActive,
+    joinedAt: new Date()
+  };
+}
+
+// GET /api/team-members - Fetch team members with enhanced filtering
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -68,84 +112,94 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const search = searchParams.get('search') || '';
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
     const teamId = searchParams.get('teamId');
     const role = searchParams.get('role');
     const availability = searchParams.get('availability');
+    const isActive = searchParams.get('isActive');
+    const search = searchParams.get('search');
 
     const skip = (page - 1) * limit;
 
-    // Build dynamic where clause
+    // Build where clause for filtering
     const where: any = {};
-    
+
+    if (teamId) where.teamId = teamId;
+    if (availability) where.availability = availability;
+    if (isActive !== null) where.isActive = isActive === 'true';
+
+    // Add user role filtering
+    if (role) {
+      where.user = { role };
+    }
+
+    // Add search filtering
     if (search) {
       where.user = {
+        ...where.user,
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } }
         ]
       };
     }
-    
-    if (teamId) where.teamId = teamId;
-    if (role) where.user = { ...where.user, role };
-    if (availability) where.availability = availability;
 
-    // Get total count for pagination
-    const total = await prisma.teamMember.count({ where });
-
-    // Fetch team members with enhanced data (FIXED: removed non-existent fields)
-    const teamMembers = await prisma.teamMember.findMany({
-      where,
-      skip,
-      take: limit,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            image: true,
-            onlineStatus: true,
-            lastSeen: true
+    const [teamMembers, total] = await Promise.all([
+      prisma.teamMember.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+              image: true,
+              onlineStatus: true,
+              lastSeen: true
+            }
+          },
+          team: {
+            select: {
+              id: true,
+              name: true,
+              description: true
+            }
+          },
+          tasks: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              estimatedTime: true,
+              actualTime: true,
+              completedAt: true
+            }
           }
         },
-        team: {
-          select: {
-            id: true,
-            name: true,
-            description: true
-          }
-        },
-        tasks: {
-          select: {
-            id: true,
-            status: true,
-            estimatedTime: true,
-            actualTime: true,
-            completedAt: true
-          }
-        }
-      },
-      orderBy: [
-        { joinedAt: 'desc' }  // FIXED: Use joinedAt instead of createdAt
-      ]
-    });
+        orderBy: [
+          { isActive: 'desc' },
+          { user: { role: 'desc' } },
+          { user: { name: 'asc' } }
+        ],
+        skip,
+        take: limit
+      }),
+      prisma.teamMember.count({ where })
+    ]);
 
-    // Enhanced team member data with performance metrics (FIXED: proper type handling)
+    // Enhance team members with performance metrics
     const enhancedTeamMembers = teamMembers.map(member => {
-      const completedTasks = member.tasks.filter((t: any) => t.status === 'COMPLETED').length;
+      const completedTasks = member.tasks.filter(task => task.status === 'COMPLETED').length;
       const totalTasks = member.tasks.length;
-      
+
       return {
         ...member,
         stats: {
-          totalTasks,
           completedTasks,
-          completionRate: totalTasks > 0 
-            ? (completedTasks / totalTasks * 100).toFixed(1)
+          totalTasks,
+          completionRate: totalTasks > 0 ? 
+            (completedTasks / totalTasks * 100).toFixed(1)
             : '0.0'
         },
         performance: {
@@ -178,6 +232,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// POST /api/team-members - Create new team member OR add existing user to team
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -198,10 +253,119 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('Creating team member with data:', body);
 
-    // Validate the input with enhanced schema
+    // Check if this is adding an existing user to a team
+    if (body.userId && !body.name && !body.email && !body.password) {
+      // This is adding an existing user to a team
+      const validationResult = addExistingUserToTeamSchema.safeParse(body);
+      if (!validationResult.success) {
+        console.error('Validation errors for existing user:', validationResult.error.errors);
+        return NextResponse.json(
+          { 
+            error: 'Validation failed', 
+            details: validationResult.error.errors.map(err => ({
+              field: err.path.join('.'),
+              message: err.message
+            }))
+          },
+          { status: 400 }
+        );
+      }
+
+      const validatedData = validationResult.data;
+
+      const result = await prisma.$transaction(async (tx) => {
+        // Verify the user exists
+        const existingUser = await tx.user.findUnique({
+          where: { id: validatedData.userId }
+        });
+
+        if (!existingUser) {
+          throw new Error('User not found');
+        }
+
+        // Verify the team exists
+        const team = await tx.team.findUnique({
+          where: { id: validatedData.teamId }
+        });
+
+        if (!team) {
+          throw new Error('Team not found');
+        }
+
+        // Check if user is already a member of this team
+        const existingMembership = await tx.teamMember.findUnique({
+          where: {
+            userId_teamId: {
+              userId: validatedData.userId,
+              teamId: validatedData.teamId
+            }
+          }
+        });
+
+        if (existingMembership) {
+          throw new Error('User is already a member of this team');
+        }
+
+        // Create team membership - FIXED for TypeScript strict typing
+        const teamMemberData = createTeamMemberData({
+          userId: validatedData.userId,
+          teamId: validatedData.teamId,
+          specialties: validatedData.specialties,
+          experience: validatedData.experience,
+          availability: validatedData.availability,
+          hourlyRate: validatedData.hourlyRate,
+          isActive: validatedData.isActive
+        });
+
+        const newTeamMember = await tx.teamMember.create({
+          data: teamMemberData,
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                image: true
+              }
+            },
+            team: {
+              select: {
+                id: true,
+                name: true,
+                description: true
+              }
+            }
+          }
+        });
+
+        // Create activity log
+        await tx.activity.create({
+          data: {
+            type: 'TEAM_MEMBER_CREATED',
+            title: 'Membre ajouté à l\'équipe',
+            description: `${existingUser.name} ajouté à l'équipe ${team.name}`,
+            userId: user.id,
+            metadata: {
+              teamMemberId: newTeamMember.id,
+              userId: validatedData.userId,
+              teamId: validatedData.teamId,
+              userRole: existingUser.role
+            }
+          }
+        });
+
+        return newTeamMember;
+      });
+
+      console.log('Existing user added to team successfully:', result);
+      return NextResponse.json(result, { status: 201 });
+    }
+
+    // This is creating a new user AND adding them to a team
     const validationResult = createTeamMemberSchema.safeParse(body);
     if (!validationResult.success) {
-      console.error('Validation errors:', validationResult.error.errors);
+      console.error('Validation errors for new user:', validationResult.error.errors);
       return NextResponse.json(
         { 
           error: 'Validation failed', 
@@ -216,204 +380,57 @@ export async function POST(request: NextRequest) {
 
     const validatedData = validationResult.data;
 
-    // Check if email already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: validatedData.email }
-    });
-
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'A user with this email already exists' },
-        { status: 409 }
-      );
-    }
-
-    // Check if team exists
-    const team = await prisma.team.findUnique({
-      where: { id: validatedData.teamId }
-    });
-
-    if (!team) {
-      return NextResponse.json(
-        { error: 'Team not found' },
-        { status: 404 }
-      );
-    }
-
-    // Hash the password with stronger hashing
-    const hashedPassword = await bcrypt.hash(validatedData.password, 12);
-
-    // Create user and team member in a robust transaction
     const result = await prisma.$transaction(async (tx) => {
-      try {
-        // Create the user first
-        const newUser = await tx.user.create({
-          data: {
-            name: validatedData.name,
-            email: validatedData.email,
-            hashedPassword,
-            role: validatedData.role,
-            onlineStatus: 'OFFLINE',
-          },
-        });
+      // Check if email already exists
+      const existingUser = await tx.user.findUnique({
+        where: { email: validatedData.email }
+      });
 
-        // Create the team member record with ALL required fields
-        const newTeamMember = await tx.teamMember.create({
-          data: {
-            userId: newUser.id,
-            teamId: validatedData.teamId,
-            specialties: validatedData.specialties || [],
-            experience: validatedData.experience,
-            availability: validatedData.availability,
-            hourlyRate: validatedData.hourlyRate || null,
-            isActive: validatedData.isActive,
-          },
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true,
-                image: true,
-                onlineStatus: true,
-                lastSeen: true
-              }
-            },
-            team: {
-              select: {
-                id: true,
-                name: true,
-                description: true
-              }
-            }
-          }
-        });
-
-        // Create activity log with proper enum value
-        await tx.activity.create({
-          data: {
-            type: 'TEAM_MEMBER_CREATED', // Use proper ActivityType enum value
-            title: 'Nouveau membre d\'équipe créé',
-            description: `${newUser.name} a été ajouté à l'équipe ${team.name}`,
-            userId: user.id,
-            metadata: {
-              newUserId: newUser.id,
-              teamId: validatedData.teamId,
-              role: validatedData.role,
-              specialties: validatedData.specialties,
-              experience: validatedData.experience
-            }
-          }
-        });
-
-        return newTeamMember;
-      } catch (error) {
-        console.error('Transaction error:', error);
-        throw error;
-      }
-    }, {
-      maxWait: 5000, // 5 seconds
-      timeout: 10000, // 10 seconds
-    });
-
-    console.log('Team member created successfully:', result);
-    return NextResponse.json(result, { status: 201 });
-
-  } catch (error) {
-    console.error('Failed to create team member:', error);
-    
-    // Enhanced error handling
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-    
-    // Handle specific Prisma errors
-    if (error && typeof error === 'object' && 'code' in error) {
-      const prismaError = error as { code: string }
-      
-      if (prismaError.code === 'P2002') {
-        return NextResponse.json(
-          { error: 'Email address already exists or user is already a team member' },
-          { status: 409 }
-        )
+      if (existingUser) {
+        throw new Error(`User with email ${validatedData.email} already exists`);
       }
 
-      if (prismaError.code === 'P2003') {
-        return NextResponse.json(
-          { error: 'Invalid team ID provided' },
-          { status: 400 }
-        )
+      // Verify the team exists
+      const team = await tx.team.findUnique({
+        where: { id: validatedData.teamId }
+      });
+
+      if (!team) {
+        throw new Error('Team not found');
       }
 
-      if (prismaError.code === 'P2025') {
-        return NextResponse.json(
-          { error: 'Related record not found' },
-          { status: 404 }
-        )
-      }
-    }
+      // Hash password
+      const hashedPassword = await bcrypt.hash(validatedData.password, 12);
 
-    return NextResponse.json(
-      { error: 'Failed to create team member', details: errorMessage },
-      { status: 500 }
-    );
-  } finally {
-    await prisma.$disconnect();
-  }
-}
-
-// PATCH method for updating team members
-export async function PATCH(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return new NextResponse('Unauthorized', { status: 401 });
-    }
-
-    const user = session.user as ExtendedUser;
-    if (!user.id) {
-      return new NextResponse('User ID missing', { status: 401 });
-    }
-
-    if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
-      return new NextResponse('Forbidden', { status: 403 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const teamMemberId = searchParams.get('id');
-    
-    if (!teamMemberId) {
-      return new NextResponse('Team member ID required', { status: 400 });
-    }
-
-    const body = await request.json();
-    const updateData: any = {};
-
-    // Handle user data updates
-    const userData: any = {};
-    if (body.name) userData.name = body.name;
-    if (body.email) userData.email = body.email;
-    if (body.role) userData.role = body.role;
-
-    // Handle team member data updates
-    if (body.specialties !== undefined) updateData.specialties = body.specialties;
-    if (body.experience !== undefined) updateData.experience = body.experience;
-    if (body.availability !== undefined) updateData.availability = body.availability;
-    if (body.hourlyRate !== undefined) updateData.hourlyRate = body.hourlyRate;
-    if (body.isActive !== undefined) updateData.isActive = body.isActive;
-
-    const updatedTeamMember = await prisma.$transaction(async (tx) => {
-      // Update user data if provided
-      if (Object.keys(userData).length > 0) {
-        await tx.user.update({
-          where: { id: body.userId },
-          data: userData
-        });
+      // FIXED: Ensure team leaders have team management specialty
+      let specialties = validatedData.specialties || [];
+      if (validatedData.role === 'TEAM_LEADER' && !specialties.includes('TEAM_MANAGEMENT')) {
+        specialties = [...specialties, 'TEAM_MANAGEMENT'];
       }
 
-      // Update team member data
-      return await tx.teamMember.update({
-        where: { id: teamMemberId },
-        data: updateData,
+      // Create the user first
+      const newUser = await tx.user.create({
+        data: {
+          name: validatedData.name,
+          email: validatedData.email,
+          hashedPassword,
+          role: validatedData.role
+        }
+      });
+
+      // Then create team membership - FIXED for TypeScript strict typing
+      const teamMemberData = createTeamMemberData({
+        userId: newUser.id,
+        teamId: validatedData.teamId,
+        specialties,
+        experience: validatedData.experience,
+        availability: validatedData.availability,
+        hourlyRate: validatedData.hourlyRate,
+        isActive: validatedData.isActive
+      });
+
+      const newTeamMember = await tx.teamMember.create({
+        data: teamMemberData,
         include: {
           user: {
             select: {
@@ -421,9 +438,7 @@ export async function PATCH(request: NextRequest) {
               name: true,
               email: true,
               role: true,
-              image: true,
-              onlineStatus: true,
-              lastSeen: true
+              image: true
             }
           },
           team: {
@@ -435,13 +450,104 @@ export async function PATCH(request: NextRequest) {
           }
         }
       });
+
+      // Create activity log
+      await tx.activity.create({
+        data: {
+          type: 'TEAM_MEMBER_CREATED',
+          title: 'Nouveau membre créé',
+          description: `${validatedData.name} créé comme ${validatedData.role} dans l'équipe ${team.name}`,
+          userId: user.id,
+          metadata: {
+            teamMemberId: newTeamMember.id,
+            newUserId: newUser.id,
+            teamId: validatedData.teamId,
+            userRole: validatedData.role
+          }
+        }
+      });
+
+      return newTeamMember;
+    }, {
+      maxWait: 5000,
+      timeout: 10000,
     });
 
-    return NextResponse.json(updatedTeamMember);
+    console.log('New team member created successfully:', result);
+    return NextResponse.json(result, { status: 201 });
 
   } catch (error) {
-    console.error('Failed to update team member:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    console.error('Failed to create team member:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    
+    if (errorMessage.includes('User with email') && errorMessage.includes('already exists')) {
+      return NextResponse.json(
+        { 
+          error: 'Email already exists', 
+          details: errorMessage,
+          suggestion: 'Please use a different email address or add the existing user to the team instead.'
+        },
+        { status: 409 }
+      );
+    }
+
+    if (errorMessage.includes('Team not found')) {
+      return NextResponse.json(
+        { 
+          error: 'Team not found', 
+          details: 'The specified team does not exist.',
+          suggestion: 'Please select a valid team or create a new team first.'
+        },
+        { status: 404 }
+      );
+    }
+
+    if (errorMessage.includes('User not found')) {
+      return NextResponse.json(
+        { 
+          error: 'User not found', 
+          details: 'The specified user does not exist.',
+          suggestion: 'Please select a valid user.'
+        },
+        { status: 404 }
+      );
+    }
+
+    if (errorMessage.includes('already a member of this team')) {
+      return NextResponse.json(
+        { 
+          error: 'User already in team', 
+          details: errorMessage,
+          suggestion: 'This user is already a member of the specified team.'
+        },
+        { status: 409 }
+      );
+    }
+
+    // Handle Prisma constraint errors
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as { code: string };
+      
+      if (prismaError.code === 'P2002') {
+        return NextResponse.json(
+          { error: 'Constraint violation - user may already exist or be in team' },
+          { status: 409 }
+        );
+      }
+
+      if (prismaError.code === 'P2003') {
+        return NextResponse.json(
+          { error: 'Invalid reference - user or team not found' },
+          { status: 400 }
+        );
+      }
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to create team member', details: errorMessage },
+      { status: 500 }
+    );
   } finally {
     await prisma.$disconnect();
   }

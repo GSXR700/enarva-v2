@@ -15,7 +15,11 @@
     "generate:icons": "node scripts/generate-icons.js",
     "pwa:build": "npm run generate:icons && next build",
     "pwa:audit": "npx lighthouse http://localhost:3000 --preset=desktop --output=html --output-path=./lighthouse-report.html",
-    "pwa:test": "npm run build && npm start & npx wait-on http://localhost:3000 && npm run pwa:audit"
+    "pwa:test": "npm run build && npm start & npx wait-on http://localhost:3000 && npm run pwa:audit",
+    "fix-team-leaders": "node scripts/fix-team-leaders.js",
+    "create-default-leader": "node scripts/fix-team-leaders.js create-default", 
+    "verify-system": "node scripts/verify-system.js",
+    "quick-fix": "node scripts/verify-system.js quick-fix"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
