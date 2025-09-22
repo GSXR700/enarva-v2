@@ -1,636 +1,861 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { useForm, Controller } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { toast } from 'sonner'
+import { DndProvider } from 'react-dnd'
+import { HTML5Backend } from 'react-dnd-html5-backend'
+import { useDrag, useDrop } from 'react-dnd'
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  User,
+  Users,
+  Plus,
+  Trash2,
+  GripVertical,
+  FileText,
+  CheckSquare,
+  AlertCircle
+} from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Calendar, Clock, MapPin, User, Users, AlertTriangle } from 'lucide-react'
-import { toast } from 'sonner'
-import { formatCurrency } from '@/lib/utils'
+import { Progress } from '@/components/ui/progress'
+import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
-interface Quote {
+// Types
+interface Lead {
   id: string
-  quoteNumber: string
-  finalPrice: number
-  surface?: number
-  propertyType?: string
-  lead: {
-    id: string
-    firstName: string
-    lastName: string
-    phone: string
-    email?: string
-    address?: string
-    company?: string
-  }
+  firstName: string
+  lastName: string
+  phone: string
+  email?: string
+  address?: string
+  company?: string
+}
+
+interface TaskTemplate {
+  id: string
+  name: string
+  description?: string
+  category: string
+  tasks: TaskItem[]
+}
+
+interface TaskItem {
+  title: string
+  description?: string
+  category: string
+  type?: string
+  priority?: string
+  estimatedTime?: number
+}
+
+interface CustomTask {
+  id: string
+  title: string
+  description?: string
+  category: string
+  type: string
+  priority: string
+  estimatedTime?: number | undefined  // Fix: Allow undefined
+  status: 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'VALIDATED'
 }
 
 interface TeamLeader {
   id: string
   name: string
   email: string
-  phone?: string
-  experience: string
-  availability: string
-  user?: {
-    id: string
-    name: string
-    email: string
-  }
+  role: string
 }
 
-interface MissionFormData {
-  leadId: string
-  leadName: string
-  quoteId: string
-  teamLeaderId: string
-  address: string
-  coordinates: string
-  scheduledDate: string
-  estimatedDuration: string
-  priority: string
-  type: string
-  accessNotes: string
-  adminNotes: string
+interface Team {
+  id: string
+  name: string
+  description?: string
+}
+
+// Validation Schema
+const missionSchema = z.object({
+  leadId: z.string().min(1, 'Please select a lead'),
+  scheduledDate: z.string().min(1, 'Please select a scheduled date'),
+  estimatedDuration: z.number().min(0.5, 'Duration must be at least 30 minutes').max(24, 'Duration cannot exceed 24 hours'),
+  address: z.string().min(1, 'Address is required'),
+  coordinates: z.string().optional(),
+  accessNotes: z.string().optional(),
+  priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']),
+  type: z.enum(['SERVICE', 'TECHNICAL_VISIT', 'DELIVERY', 'INTERNAL', 'RECURRING']),
+  teamLeaderId: z.string().optional(),
+  teamId: z.string().optional(),
+  adminNotes: z.string().optional(),
+})
+
+type MissionFormData = z.infer<typeof missionSchema>
+
+// Draggable Task Component
+const DraggableTask = ({ 
+  task, 
+  index, 
+  moveTask, 
+  updateTask, 
+  removeTask 
+}: {
+  task: CustomTask
+  index: number
+  moveTask: (dragIndex: number, hoverIndex: number) => void
+  updateTask: (index: number, updates: Partial<CustomTask>) => void
+  removeTask: (index: number) => void
+}) => {
+  const [{ isDragging }, drag] = useDrag({
+    type: 'task',
+    item: { index },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  })
+
+  const [, drop] = useDrop({
+    accept: 'task',
+    hover: (item: { index: number }) => {
+      if (item.index !== index) {
+        moveTask(item.index, index)
+        item.index = index
+      }
+    },
+  })
+
+  const ref = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      drag(drop(node))
+    }
+  }, [drag, drop])
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'COMPLETED': return 'bg-green-100 text-green-800'
+      case 'IN_PROGRESS': return 'bg-blue-100 text-blue-800'
+      case 'VALIDATED': return 'bg-purple-100 text-purple-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'CRITICAL': return 'bg-red-100 text-red-800'
+      case 'HIGH': return 'bg-orange-100 text-orange-800'
+      case 'NORMAL': return 'bg-blue-100 text-blue-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  return (
+    <div
+      ref={ref}
+      className={`bg-white p-4 rounded-lg border-2 transition-all ${
+        isDragging ? 'opacity-50 border-dashed' : 'border-solid hover:border-blue-300'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 mt-1 cursor-move">
+          <GripVertical className="h-4 w-4 text-gray-400" />
+        </div>
+        
+        <div className="flex-1 space-y-3">
+          <div className="flex items-start justify-between">
+            <Input
+              value={task.title}
+              onChange={(e) => updateTask(index, { title: e.target.value })}
+              placeholder="Titre de la tâche"
+              className="font-medium"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => removeTask(index)}
+              className="text-red-500 hover:text-red-700 ml-2"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <Textarea
+            value={task.description || ''}
+            onChange={(e) => updateTask(index, { description: e.target.value })}
+            placeholder="Description (optionnelle)"
+            className="min-h-[60px]"
+          />
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <Select
+              value={task.category}
+              onValueChange={(value) => updateTask(index, { category: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Catégorie" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="GENERAL">Général</SelectItem>
+                <SelectItem value="BATHROOM_SANITARY">Salle de bain</SelectItem>
+                <SelectItem value="KITCHEN">Cuisine</SelectItem>
+                <SelectItem value="WINDOWS_JOINERY">Fenêtres</SelectItem>
+                <SelectItem value="FLOORS">Sols</SelectItem>
+                <SelectItem value="WALLS_BASEBOARDS">Murs</SelectItem>
+                <SelectItem value="LIVING_SPACES">Espaces de vie</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={task.type}
+              onValueChange={(value) => updateTask(index, { type: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="EXECUTION">Exécution</SelectItem>
+                <SelectItem value="QUALITY_CHECK">Contrôle qualité</SelectItem>
+                <SelectItem value="DOCUMENTATION">Documentation</SelectItem>
+                <SelectItem value="CLIENT_INTERACTION">Interaction client</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={task.priority}
+              onValueChange={(value) => updateTask(index, { priority: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Priorité" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="LOW">Basse</SelectItem>
+                <SelectItem value="NORMAL">Normale</SelectItem>
+                <SelectItem value="HIGH">Haute</SelectItem>
+                <SelectItem value="CRITICAL">Critique</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Input
+              type="number"
+              value={task.estimatedTime || ''}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || undefined;
+                updateTask(index, { estimatedTime: value });
+              }}
+              placeholder="Temps (min)"
+              min="1"
+              max="480"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={getStatusColor(task.status)}>
+              {task.status}
+            </Badge>
+            <Badge variant="outline" className={getPriorityColor(task.priority)}>
+              {task.priority}
+            </Badge>
+            {task.estimatedTime && (
+              <Badge variant="outline">
+                <Clock className="h-3 w-3 mr-1" />
+                {task.estimatedTime} min
+              </Badge>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function NewMissionForm() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  
-  // FIX: Safe parameter extraction
-  const preselectedQuoteId = searchParams?.get('quoteId') || ''
-  const missionType = searchParams?.get('type') || 'SERVICE'
-
-  const [quotes, setQuotes] = useState<Quote[]>([])
-  const [teamLeaders, setTeamLeaders] = useState<TeamLeader[]>([])
-  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [teamLeaders, setTeamLeaders] = useState<TeamLeader[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
+  const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([])
+  const [customTasks, setCustomTasks] = useState<CustomTask[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('')
 
-  const [formData, setFormData] = useState<MissionFormData>({
-    leadId: '',
-    leadName: '',
-    quoteId: preselectedQuoteId,
-    teamLeaderId: '',
-    address: '',
-    coordinates: '',
-    scheduledDate: '',
-    estimatedDuration: '4',
-    priority: 'NORMAL',
-    type: missionType,
-    accessNotes: '',
-    adminNotes: ''
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors }
+  } = useForm<MissionFormData>({
+    resolver: zodResolver(missionSchema),
+    defaultValues: {
+      priority: 'NORMAL',
+      type: 'SERVICE',
+      estimatedDuration: 2
+    }
   })
 
-  // Fetch quotes and team leaders
+  // Fetch data on component mount
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true)
       try {
-        // Fetch accepted quotes with real-time data
-        const quotesResponse = await fetch('/api/quotes?status=ACCEPTED', {
-          cache: 'no-store', // Ensure fresh data
-          headers: {
-            'Cache-Control': 'no-cache',
-          }
-        })
-        
-        if (quotesResponse.ok) {
-          const quotesData = await quotesResponse.json()
-          console.log('📋 Fetched quotes:', quotesData.length)
-          // FIX: Handle both array and object responses
-          const quotesArray = Array.isArray(quotesData) ? quotesData : (quotesData.quotes || quotesData.data || [])
-          setQuotes(quotesArray)
-          
-          // Auto-select preselected quote if provided
-          if (preselectedQuoteId) {
-            const preselectedQuote = quotesArray.find((q: Quote) => q.id === preselectedQuoteId)
-            if (preselectedQuote) {
-              selectQuote(preselectedQuote)
-            }
-          }
-        } else {
-          console.error('Failed to fetch quotes:', quotesResponse.status)
-          toast.error('Erreur lors du chargement des devis')
+        const [leadsRes, teamLeadersRes, teamsRes, templatesRes] = await Promise.all([
+          fetch('/api/leads'),
+          fetch('/api/users/available?role=TEAM_LEADER'),
+          fetch('/api/teams'),
+          fetch('/api/task-templates')
+        ])
+
+        if (leadsRes.ok) {
+          const leadsData = await leadsRes.json()
+          setLeads(leadsData.leads || leadsData)
         }
 
-        // FIX: Enhanced team leaders fetching with fallback
-        try {
-          const teamResponse = await fetch('/api/team-members?role=TEAM_LEADER&availability=AVAILABLE')
-          if (teamResponse.ok) {
-            const teamData = await teamResponse.json()
-            // FIX: Handle different response structures
-            const teamArray = Array.isArray(teamData) ? teamData : (teamData.teamMembers || teamData.data || [])
-            setTeamLeaders(teamArray)
-          } else {
-            // FIX: Fallback to users endpoint if team-members fails
-            const usersResponse = await fetch('/api/users?role=TEAM_LEADER')
-            if (usersResponse.ok) {
-              const usersData = await usersResponse.json()
-              const usersArray = Array.isArray(usersData) ? usersData : (usersData.users || usersData.data || [])
-              setTeamLeaders(usersArray)
-            } else {
-              toast.error('Erreur lors du chargement des chefs d\'équipe')
-            }
-          }
-        } catch (teamError) {
-          console.error('Error fetching team leaders:', teamError)
-          toast.error('Erreur lors du chargement des chefs d\'équipe')
+        if (teamLeadersRes.ok) {
+          const teamLeadersData = await teamLeadersRes.json()
+          setTeamLeaders(teamLeadersData.teamLeaders || teamLeadersData.users || [])
+        }
+
+        if (teamsRes.ok) {
+          const teamsData = await teamsRes.json()
+          setTeams(teamsData.teams || teamsData)
+        }
+
+        if (templatesRes.ok) {
+          const templatesData = await templatesRes.json()
+          setTaskTemplates(templatesData)
         }
       } catch (error) {
         console.error('Error fetching data:', error)
         toast.error('Erreur lors du chargement des données')
-      } finally {
-        setIsLoading(false)
       }
     }
 
     fetchData()
-  }, [preselectedQuoteId])
+  }, [])
 
-  // Auto-prefill form when quote is selected
-  const selectQuote = (quote: Quote) => {
-    if (!quote) return // FIX: Safety check
-    
-    console.log('🎯 Selected quote:', quote)
-    setSelectedQuote(quote)
-    
-    // FIX: Safe property access
-    const lead = quote.lead || {}
-    const firstName = lead.firstName || ''
-    const lastName = lead.lastName || ''
-    const company = lead.company ? ` (${lead.company})` : ''
-    
-    // Auto-prefill form with quote data
-    setFormData(prev => ({
-      ...prev,
-      quoteId: quote.id || '',
-      leadId: lead.id || '',
-      leadName: `${firstName} ${lastName}${company}`.trim() || 'Client inconnu',
-      address: lead.address || '',
-      // Set default duration based on quote surface
-      estimatedDuration: quote.surface ? Math.max(2, Math.ceil(quote.surface / 50)).toString() : '4'
+  // Calculate task progress
+  const taskProgress = customTasks.length > 0 
+    ? (customTasks.filter(task => task.status === 'COMPLETED' || task.status === 'VALIDATED').length / customTasks.length) * 100
+    : 0
+
+  const totalEstimatedTime = customTasks.reduce((total, task) => total + (task.estimatedTime || 0), 0)
+
+  // Task management functions
+  const addCustomTask = () => {
+    const newTask: CustomTask = {
+      id: `temp-${Date.now()}`,
+      title: 'Nouvelle tâche',
+      description: '',
+      category: 'GENERAL',
+      type: 'EXECUTION',
+      priority: 'NORMAL',
+      status: 'ASSIGNED'
+    }
+    setCustomTasks(prev => [...prev, newTask])
+  }
+
+  const removeTask = (index: number) => {
+    setCustomTasks(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const updateTask = (index: number, updates: Partial<CustomTask>) => {
+    setCustomTasks(prev => 
+      prev.map((task, i) => i === index ? { ...task, ...updates } : task)
+    )
+  }
+
+  const moveTask = useCallback((dragIndex: number, hoverIndex: number) => {
+    setCustomTasks(prev => {
+      const newTasks = [...prev]
+      const dragTask = newTasks[dragIndex]
+      if (!dragTask) return prev  // Fix: Add safety check
+      newTasks.splice(dragIndex, 1)
+      newTasks.splice(hoverIndex, 0, dragTask)
+      return newTasks
+    })
+  }, [])
+
+  // Apply task template
+  const applyTemplate = (templateId: string) => {
+    const template = taskTemplates.find(t => t.id === templateId)
+    if (!template || !Array.isArray(template.tasks)) return
+
+    const newTasks: CustomTask[] = template.tasks.map((item: TaskItem, index: number) => ({
+      id: `template-${templateId}-${index}`,
+      title: item.title,
+      description: item.description || '',
+      category: item.category,
+      type: item.type || 'EXECUTION',
+      priority: item.priority || 'NORMAL',
+      status: 'ASSIGNED' as const,
+      estimatedTime: item.estimatedTime || undefined  // Fix: Explicit undefined
     }))
 
-    toast.success(`Informations du devis ${quote.quoteNumber} pré-remplies`)
+    setCustomTasks(prev => [...prev, ...newTasks])
+    setSelectedTemplate('')
+    toast.success(`Modèle "${template.name}" appliqué avec succès`)
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target
-    setFormData(prev => ({ ...prev, [id]: value }))
-  }
-
-  const handleSelectChange = (field: keyof MissionFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+  // Form submission
+  const onSubmit = async (data: MissionFormData) => {
+    setIsLoading(true)
     
-    // Handle quote selection
-    if (field === 'quoteId' && value) {
-      const quote = quotes.find(q => q.id === value)
-      if (quote) {
-        selectQuote(quote)
-      }
-    }
-  }
-
-  const validateForm = () => {
-    const errors: string[] = []
-
-    if (missionType === 'SERVICE' && !formData.quoteId) {
-      errors.push('Veuillez sélectionner un devis')
-    }
-    if (!formData.teamLeaderId) {
-      errors.push('Veuillez sélectionner un chef d\'équipe')
-    }
-    if (!formData.address.trim()) {
-      errors.push('Veuillez indiquer l\'adresse d\'intervention')
-    }
-    if (!formData.scheduledDate) {
-      errors.push('Veuillez indiquer la date et l\'heure prévues')
-    }
-    if (!formData.estimatedDuration || parseFloat(formData.estimatedDuration) < 0.5) {
-      errors.push('La durée estimée doit être d\'au moins 30 minutes')
-    }
-
-    if (errors.length > 0) {
-      toast.error(`Erreurs de validation:\n${errors.join('\n')}`)
-      return false
-    }
-
-    return true
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!validateForm()) return
-
-    setIsSubmitting(true)
-
     try {
+      // Prepare mission data
       const missionData = {
-        ...formData,
-        estimatedDuration: parseFloat(formData.estimatedDuration),
-        // Convert to ISO string for the API
-        scheduledDate: new Date(formData.scheduledDate).toISOString(),
+        ...data,
+        tasks: customTasks.map(task => ({
+          title: task.title,
+          description: task.description,
+          category: task.category,
+          type: task.type,
+          priority: task.priority,
+          estimatedTime: task.estimatedTime,
+          status: 'ASSIGNED'
+        }))
       }
-
-      console.log('📤 Submitting mission data:', missionData)
 
       const response = await fetch('/api/missions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(missionData),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(missionData)
       })
 
-      const responseData = await response.json()
-
       if (!response.ok) {
-        throw new Error(responseData.message || responseData.error || 'Failed to create mission')
+        const errorData = await response.json()
+        throw new Error(errorData.details || errorData.error || 'Failed to create mission')
       }
 
-      console.log('✅ Mission created successfully:', responseData)
+      const mission = await response.json()
       toast.success('Mission créée avec succès!')
-      
-      router.push(`/missions/${responseData.id}`)
-
-    } catch (error) {
-      console.error('❌ Error creating mission:', error)
-      toast.error(error instanceof Error ? error.message : 'Erreur lors de la création de la mission')
+      router.push(`/missions/${mission.id}`)
+    } catch (error: any) {
+      console.error('Error creating mission:', error)
+      toast.error(error.message || 'Erreur lors de la création de la mission')
     } finally {
-      setIsSubmitting(false)
+      setIsLoading(false)
     }
-  }
-
-  const getQuoteStatusBadge = (quote: Quote) => {
-    if (!quote) return null // FIX: Safety check
-    
-    return (
-      <div className="flex items-center gap-2 text-sm">
-        <Badge variant="outline" className="text-green-600 border-green-200">
-          Accepté
-        </Badge>
-        <span className="text-gray-500">•</span>
-        <span className="font-medium text-green-600">{formatCurrency(quote.finalPrice)}</span>
-        {quote.surface && (
-          <>
-            <span className="text-gray-500">•</span>
-            <span className="text-gray-600">{quote.surface}m²</span>
-          </>
-        )}
-      </div>
-    )
-  }
-
-  const getTeamLeaderBadge = (leader: TeamLeader) => {
-    if (!leader) return null // FIX: Safety check
-    
-    const colors = {
-      JUNIOR: 'bg-blue-100 text-blue-800',
-      INTERMEDIATE: 'bg-yellow-100 text-yellow-800', 
-      SENIOR: 'bg-green-100 text-green-800',
-      EXPERT: 'bg-purple-100 text-purple-800'
-    }
-    
-    return (
-      <Badge variant="outline" className={colors[leader.experience as keyof typeof colors] || 'bg-gray-100 text-gray-800'}>
-        {leader.experience}
-      </Badge>
-    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => router.back()}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Retour
-            </Button>
-            
-            <div>
-              <h1 className="text-2xl font-bold">
-                {missionType === 'TECHNICAL_VISIT' ? 'Nouvelle Visite Technique' : 'Nouvelle Mission'}
-              </h1>
-              <p className="text-gray-600">
-                {missionType === 'TECHNICAL_VISIT' 
-                  ? 'Planifier une visite technique sur site'
-                  : 'Créer une mission à partir d\'un devis accepté'
-                }
-              </p>
-            </div>
+    <DndProvider backend={HTML5Backend}>
+      <div className="main-content space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              Nouvelle Mission
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Créez une nouvelle mission avec des tâches personnalisées
+            </p>
           </div>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Quote Selection */}
-          {missionType === 'SERVICE' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Sélection du Devis
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isLoading ? (
-                  <div className="text-center py-4">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-gray-600 mt-2">Chargement des devis...</p>
-                  </div>
-                ) : quotes.length === 0 ? (
-                  <div className="text-center py-8">
-                    <AlertTriangle className="h-12 w-12 text-orange-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun devis accepté</h3>
-                    <p className="text-gray-600 mb-4">
-                      Il n'y a actuellement aucun devis accepté pour créer une mission.
-                    </p>
-                    <Button onClick={() => router.push('/quotes')} variant="outline">
-                      Voir tous les devis
-                    </Button>
-                  </div>
-                ) : (
-                  <>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Form */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Basic Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Informations de Base
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="quoteId">Devis Accepté * ({quotes.length} disponible{quotes.length > 1 ? 's' : ''})</Label>
-                      <Select 
-                        value={formData.quoteId} 
-                        onValueChange={(value) => handleSelectChange('quoteId', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner un devis accepté..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {quotes.map(quote => (
-                            <SelectItem key={quote.id} value={quote.id}>
-                              <div className="flex flex-col">
-                                <div className="font-medium">
-                                  {quote.quoteNumber} - {quote.lead?.firstName || ''} {quote.lead?.lastName || ''}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  {formatCurrency(quote.finalPrice)} • {quote.lead?.address || 'Adresse à définir'}
-                                </div>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="leadId">Client *</Label>
+                      <Controller
+                        name="leadId"
+                        control={control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner un client" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {leads.map(lead => (
+                                <SelectItem key={lead.id} value={lead.id}>
+                                  <div>
+                                    <div className="font-medium">
+                                      {lead.firstName} {lead.lastName}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                      {lead.phone} • {lead.company || 'Particulier'}
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      {errors.leadId && (
+                        <p className="text-sm text-red-500 mt-1">{errors.leadId.message}</p>
+                      )}
                     </div>
 
-                    {/* Selected Quote Preview */}
-                    {selectedQuote && selectedQuote.lead && (
-                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <h4 className="font-medium text-blue-900 mb-2">Devis sélectionné</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <div className="text-gray-600">Client</div>
-                            <div className="font-medium">
-                              {selectedQuote.lead.firstName} {selectedQuote.lead.lastName}
-                            </div>
-                            {selectedQuote.lead.company && (
-                              <div className="text-gray-600">{selectedQuote.lead.company}</div>
-                            )}
-                          </div>
-                          <div>
-                            <div className="text-gray-600">Contact</div>
-                            <div className="font-medium">{selectedQuote.lead.phone}</div>
-                            {selectedQuote.lead.email && (
-                              <div className="text-gray-600">{selectedQuote.lead.email}</div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="mt-3">
-                          {getQuoteStatusBadge(selectedQuote)}
-                        </div>
-                      </div>
+                    <div>
+                      <Label htmlFor="scheduledDate">Date et Heure *</Label>
+                      <Input
+                        id="scheduledDate"
+                        type="datetime-local"
+                        {...register('scheduledDate')}
+                      />
+                      {errors.scheduledDate && (
+                        <p className="text-sm text-red-500 mt-1">{errors.scheduledDate.message}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="estimatedDuration">Durée Estimée (heures) *</Label>
+                      <Input
+                        id="estimatedDuration"
+                        type="number"
+                        step="0.5"
+                        min="0.5"
+                        max="24"
+                        {...register('estimatedDuration', { valueAsNumber: true })}
+                      />
+                      {errors.estimatedDuration && (
+                        <p className="text-sm text-red-500 mt-1">{errors.estimatedDuration.message}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="priority">Priorité</Label>
+                      <Controller
+                        name="priority"
+                        control={control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="LOW">Basse</SelectItem>
+                              <SelectItem value="NORMAL">Normale</SelectItem>
+                              <SelectItem value="HIGH">Haute</SelectItem>
+                              <SelectItem value="CRITICAL">Critique</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="address">Adresse *</Label>
+                    <Input
+                      id="address"
+                      placeholder="Adresse complète du lieu d'intervention"
+                      {...register('address')}
+                    />
+                    {errors.address && (
+                      <p className="text-sm text-red-500 mt-1">{errors.address.message}</p>
                     )}
-                  </>
-                )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="accessNotes">Notes d'Accès</Label>
+                    <Textarea
+                      id="accessNotes"
+                      placeholder="Instructions spéciales, codes d'accès, etc."
+                      {...register('accessNotes')}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Team Assignment */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Attribution d'Équipe
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="teamLeaderId">Chef d'Équipe</Label>
+                      <Controller
+                        name="teamLeaderId"
+                        control={control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ''}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Attribution automatique" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {teamLeaders.map(leader => (
+                                <SelectItem key={leader.id} value={leader.id}>
+                                  <div className="flex items-center gap-2">
+                                    <User className="h-4 w-4" />
+                                    <div>
+                                      <div className="font-medium">{leader.name}</div>
+                                      <div className="text-sm text-muted-foreground">{leader.email}</div>
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="teamId">Équipe</Label>
+                      <Controller
+                        name="teamId"
+                        control={control}
+                        render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ''}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner une équipe" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {teams.map(team => (
+                                <SelectItem key={team.id} value={team.id}>
+                                  <div>
+                                    <div className="font-medium">{team.name}</div>
+                                    {team.description && (
+                                      <div className="text-sm text-muted-foreground">{team.description}</div>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Progress Card */}
+              {customTasks.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CheckSquare className="h-5 w-5" />
+                      Progression
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span>Tâches terminées</span>
+                        <span>{Math.round(taskProgress)}%</span>
+                      </div>
+                      <Progress value={taskProgress} className="h-2" />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Total tâches</span>
+                        <div className="font-medium">{customTasks.length}</div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Temps estimé</span>
+                        <div className="font-medium">{totalEstimatedTime} min</div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Assignées</span>
+                        <Badge variant="outline">
+                          {customTasks.filter(t => t.status === 'ASSIGNED').length}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>En cours</span>
+                        <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                          {customTasks.filter(t => t.status === 'IN_PROGRESS').length}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Terminées</span>
+                        <Badge variant="outline" className="bg-green-100 text-green-800">
+                          {customTasks.filter(t => t.status === 'COMPLETED').length}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Quick Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Actions Rapides</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={addCustomTask}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter une tâche
+                  </Button>
+                  
+                  <div>
+                    <Select 
+                      value={selectedTemplate} 
+                      onValueChange={setSelectedTemplate}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Modèles de tâches" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {taskTemplates.map(template => (
+                          <SelectItem key={template.id} value={template.id}>
+                            <div>
+                              <div className="font-medium">{template.name}</div>
+                              {template.description && (
+                                <div className="text-sm text-muted-foreground">
+                                  {template.description}
+                                </div>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    {selectedTemplate && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full mt-2"
+                        onClick={() => applyTemplate(selectedTemplate)}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Appliquer le modèle
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Tasks Management */}
+          {customTasks.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckSquare className="h-5 w-5" />
+                    Tâches de la Mission ({customTasks.length})
+                  </CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addCustomTask}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {customTasks.map((task, index) => (
+                    <DraggableTask
+                      key={task.id}
+                      task={task}
+                      index={index}
+                      moveTask={moveTask}
+                      updateTask={updateTask}
+                      removeTask={removeTask}
+                    />
+                  ))}
+                </div>
               </CardContent>
             </Card>
           )}
 
-          {/* Mission Details */}
+          {/* Admin Notes */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Détails de la Mission
-              </CardTitle>
+              <CardTitle>Notes Administratives</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Client Info */}
-                <div>
-                  <Label>Client</Label>
-                  <Input 
-                    value={formData.leadName} 
-                    disabled 
-                    placeholder="Sélectionnez un devis pour voir le client..."
-                    className="bg-gray-50"
-                  />
-                </div>
-
-                {/* Team Leader */}
-                <div>
-                  <Label htmlFor="teamLeaderId">Chef d'Équipe *</Label>
-                  <Select 
-                    value={formData.teamLeaderId} 
-                    onValueChange={(value) => handleSelectChange('teamLeaderId', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un chef d'équipe..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teamLeaders.length === 0 ? (
-                        <SelectItem value="no-leaders" disabled>
-                          Aucun chef d'équipe disponible
-                        </SelectItem>
-                      ) : (
-                        teamLeaders.map(leader => {
-                          // FIX: Handle different response structures for team leaders
-                          const leaderId = leader.id || leader.user?.id || ''
-                          const leaderName = leader.name || leader.user?.name || 'Chef d\'équipe'
-                          const leaderEmail = leader.email || leader.user?.email || ''
-                          
-                          return (
-                            <SelectItem key={leaderId} value={leaderId}>
-                              <div className="flex items-center justify-between w-full">
-                                <div>
-                                  <div className="font-medium">{leaderName}</div>
-                                  <div className="text-sm text-gray-500">{leaderEmail}</div>
-                                </div>
-                                {getTeamLeaderBadge(leader)}
-                              </div>
-                            </SelectItem>
-                          )
-                        })
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Address */}
-                <div className="md:col-span-2">
-                  <Label htmlFor="address">Adresse d'Intervention *</Label>
-                  <Input 
-                    id="address" 
-                    value={formData.address} 
-                    onChange={handleChange} 
-                    placeholder="Adresse sera remplie automatiquement avec le devis..."
-                    className={formData.address ? 'bg-white' : 'bg-gray-50'}
-                  />
-                </div>
-
-                {/* Coordinates */}
-                <div className="md:col-span-2">
-                  <Label htmlFor="coordinates">Coordonnées GPS (optionnel)</Label>
-                  <Input 
-                    id="coordinates" 
-                    value={formData.coordinates} 
-                    onChange={handleChange} 
-                    placeholder="Latitude, Longitude (ex: 33.5731, -7.5898)"
-                  />
-                </div>
-              </div>
+            <CardContent>
+              <Textarea
+                placeholder="Notes internes pour l'équipe administrative..."
+                {...register('adminNotes')}
+              />
             </CardContent>
           </Card>
 
-          {/* Scheduling */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Planification
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="scheduledDate">Date et Heure *</Label>
-                  <Input 
-                    id="scheduledDate" 
-                    type="datetime-local" 
-                    value={formData.scheduledDate} 
-                    onChange={handleChange} 
-                    min={new Date().toISOString().slice(0, 16)}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="estimatedDuration">Durée Estimée (heures) *</Label>
-                  <Input 
-                    id="estimatedDuration" 
-                    type="number" 
-                    value={formData.estimatedDuration} 
-                    onChange={handleChange} 
-                    min="0.5" 
-                    max="24" 
-                    step="0.5"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="priority">Priorité</Label>
-                  <Select 
-                    value={formData.priority} 
-                    onValueChange={(value) => handleSelectChange('priority', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="LOW">Faible</SelectItem>
-                      <SelectItem value="NORMAL">Normale</SelectItem>
-                      <SelectItem value="HIGH">Haute</SelectItem>
-                      <SelectItem value="CRITICAL">Critique</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Additional Notes */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Notes Additionnelles
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="accessNotes">Instructions d'Accès</Label>
-                <Textarea 
-                  id="accessNotes" 
-                  value={formData.accessNotes} 
-                  onChange={handleChange} 
-                  placeholder="Code d'accès, étage, instructions spéciales..."
-                  rows={3}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="adminNotes">Notes Administratives</Label>
-                <Textarea 
-                  id="adminNotes" 
-                  value={formData.adminNotes} 
-                  onChange={handleChange} 
-                  placeholder="Notes internes pour l'équipe..."
-                  rows={3}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Submit */}
-          <div className="flex gap-4">
+          {/* Form Actions */}
+          <div className="flex items-center justify-between pt-6 border-t">
             <Button
               type="button"
               variant="outline"
               onClick={() => router.back()}
-              disabled={isSubmitting}
-              className="flex-1"
+              disabled={isLoading}
             >
               Annuler
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || (missionType === 'SERVICE' && quotes.length === 0)}
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Création...
-                </>
-              ) : (
-                <>
-                  <Users className="h-4 w-4 mr-2" />
-                  Créer la Mission
-                </>
+            
+            <div className="flex items-center gap-3">
+              {customTasks.length === 0 && (
+                <Alert className="max-w-md">
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  <AlertDescription>
+                    Aucune tâche ajoutée. Ajoutez des tâches ou un modèle pour suivre le progrès.
+                  </AlertDescription>
+                </Alert>
               )}
-            </Button>
+              
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="min-w-[120px]"
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    Création...
+                  </div>
+                ) : (
+                  'Créer la Mission'
+                )}
+              </Button>
+            </div>
           </div>
         </form>
       </div>
-    </div>
+    </DndProvider>
   )
 }

@@ -1,7 +1,8 @@
-// services/mission.service.ts - COMPLETE ERROR-FREE VERSION
+// services/mission.service.ts - FIXED TYPESCRIPT ERRORS VERSION
 import { PrismaClient, Mission, MissionStatus, Priority, MissionType, TaskStatus, TaskCategory } from '@prisma/client';
 
-const prisma = new PrismaClient();
+// Create a single prisma instance
+const prismaInstance = new PrismaClient();
 
 class AppError extends Error {
   public statusCode: number;
@@ -92,7 +93,7 @@ export class MissionService {
   private prisma: PrismaClient;
 
   constructor() {
-    this.prisma = prisma;
+    this.prisma = prismaInstance;
   }
 
   public async getAllMissions(
@@ -397,7 +398,7 @@ export class MissionService {
         },
         qualityChecks: {
           orderBy: {
-            checkedAt: 'desc' // ✅ CORRECT - checkedAt exists in QualityCheck model
+            checkedAt: 'desc'
           }
         },
         conversation: {
@@ -449,13 +450,58 @@ export class MissionService {
         throw new AppError(404, 'Lead not found.', true);
       }
 
+      // Enhanced team leader validation with auto-assignment if needed
+      let finalTeamLeaderId = teamLeaderId;
+      
       if (teamLeaderId) {
         const teamLeader = await tx.user.findUnique({
           where: { id: teamLeaderId },
+          include: {
+            teamMemberships: {
+              where: { isActive: true },
+              include: { team: true }
+            }
+          }
         });
 
         if (!teamLeader || teamLeader.role !== 'TEAM_LEADER') {
           throw new AppError(404, 'Team leader not found or invalid role.', true);
+        }
+      } else {
+        // Auto-assign an available team leader
+        const availableTeamLeaders = await tx.user.findMany({
+          where: {
+            role: 'TEAM_LEADER',
+            teamMemberships: {
+              some: {
+                isActive: true,
+                availability: 'AVAILABLE'
+              }
+            }
+          },
+          include: {
+            teamMemberships: {
+              where: { isActive: true },
+              include: { team: true }
+            }
+          },
+          take: 1
+        });
+
+        if (availableTeamLeaders.length === 0) {
+          // Final fallback - any team leader
+          const anyTeamLeaders = await tx.user.findMany({
+            where: { role: 'TEAM_LEADER' },
+            take: 1
+          });
+
+          if (anyTeamLeaders.length === 0) {
+            throw new AppError(400, 'No team leaders found. Please create a team leader first.', true);
+          }
+
+          finalTeamLeaderId = anyTeamLeaders[0]!.id;
+        } else {
+          finalTeamLeaderId = availableTeamLeaders[0]!.id;
         }
       }
 
@@ -492,7 +538,7 @@ export class MissionService {
           missionNumber,
           leadId,
           quoteId: quoteId ?? null,
-          teamLeaderId: teamLeaderId ?? null,
+          teamLeaderId: finalTeamLeaderId ?? null,  // Fix: Ensure not undefined
           teamId: data.teamId ?? null,
           scheduledDate: new Date(data.scheduledDate),
           estimatedDuration: estimatedDurationMinutes,
@@ -550,10 +596,10 @@ export class MissionService {
 
       await tx.activity.create({
         data: {
-          type: 'MISSION_STARTED',
+          type: 'MISSION_SCHEDULED',
           title: 'Mission créée',
           description: `Mission ${missionNumber} créée pour ${lead.firstName} ${lead.lastName}`,
-          userId: teamLeaderId || 'system',
+          userId: finalTeamLeaderId || 'system',
           leadId,
           metadata: {
             missionId: mission.id,
@@ -684,7 +730,7 @@ export class MissionService {
       if (data.status && data.status !== existingMission.status) {
         await tx.activity.create({
           data: {
-            type: 'MISSION_STARTED',
+            type: 'MISSION_STATUS_UPDATED',
             title: 'Statut de mission mis à jour',
             description: `Mission ${existingMission.missionNumber} - statut changé de ${existingMission.status} à ${data.status}`,
             userId: data.adminValidatedBy || 'system',
@@ -736,7 +782,7 @@ export class MissionService {
 
       await tx.activity.create({
         data: {
-          type: 'MISSION_COMPLETED',
+          type: 'SYSTEM_MAINTENANCE',
           title: 'Mission supprimée',
           description: `Mission ${mission.missionNumber} supprimée`,
           userId: deletedBy,
@@ -910,7 +956,7 @@ export class MissionService {
 
       await tx.activity.create({
         data: {
-          type: 'MISSION_STARTED',
+          type: 'MISSION_STATUS_UPDATED',
           title: 'Statut de mission mis à jour',
           description: `Mission ${existingMission.missionNumber} - statut changé de ${existingMission.status} à ${status}`,
           userId: updatedBy,

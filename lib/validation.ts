@@ -495,15 +495,6 @@ export const completeMissionValidationSchema = z.object({
     .nullable(),
 
 }).refine((data) => {
-  // Custom validation: Either teamLeaderId OR teamId must be provided for service missions
-  if (data.type === 'SERVICE' && !data.teamLeaderId && !data.teamId) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Un chef d'équipe ou une équipe doit être assigné pour les missions de service",
-  path: ["teamLeaderId"]
-}).refine((data) => {
   // Custom validation: Service missions should have a quote
   if (data.type === 'SERVICE' && !data.quoteId) {
     return false;
@@ -512,6 +503,7 @@ export const completeMissionValidationSchema = z.object({
 }, {
   message: "Un devis est requis pour les missions de service",
   path: ["quoteId"]
+  
 }).refine((data) => {
   // Custom validation: End time should be after start time
   if (data.actualStartTime && data.actualEndTime) {
@@ -709,16 +701,7 @@ export const missionCreationValidationSchema = z.object({
   taskTemplateId: z.string().optional().nullable(),
   adminNotes: z.string().optional().nullable(),
 
-}).refine((data) => {
-  // Either teamLeaderId OR teamId must be provided
-  if (!data.teamLeaderId && !data.teamId) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Un chef d'équipe ou une équipe doit être assigné",
-  path: ["teamLeaderId"]
-});
+}); // Remove the .refine() validation that requires team leader
 
 // =============================================================================
 // QUOTE VALIDATION - FIXED
