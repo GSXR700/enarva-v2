@@ -6,7 +6,7 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, AlertCircle, Chrome, Facebook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -143,7 +143,20 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-300 dark:border-gray-700"></div></div>
+                <div className="relative flex justify-center text-sm"><span className="bg-white/60 px-2 text-gray-500 dark:bg-gray-900/80 dark:text-gray-400">Ou continuer avec</span></div>
+              </div>
+              <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Button variant="outline" disabled={isLoading} onClick={() => signIn('google', { callbackUrl: '/' })}>
+                  <Chrome className="mr-3 h-5 w-5" /> Google
+                </Button>
+                <Button variant="outline" disabled={isLoading} onClick={() => signIn('facebook', { callbackUrl: '/' })}>
+                  <Facebook className="mr-3 h-5 w-5" /> Facebook
+                </Button>
+              </div>
+            </div>
           </div>
           <div className="mt-6 text-center">
             <p className="text-xs text-gray-400 dark:text-gray-500">
