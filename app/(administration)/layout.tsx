@@ -44,17 +44,14 @@ export default function AdministrationLayout({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex h-screen bg-background overflow-hidden">
+      <div className="flex h-screen bg-background">
         <Sidebar isOpen={isSidebarOpen} setOpen={setSidebarOpen} />
 
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar onMenuClick={() => setSidebarOpen(true)} />
 
-          {/* FIXED: Single main wrapper with proper spacing */}
           <main className="flex-1 overflow-y-auto custom-scrollbar bg-background">
-            <div className="main-content">
-              {children}
-            </div>
+            {children}
           </main>
         </div>
         <Toaster position="bottom-right" />
