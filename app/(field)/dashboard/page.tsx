@@ -369,74 +369,80 @@ export default function FieldDashboardPage() {
               {todayMissions.map((mission) => {
                 const progress = getMissionProgress(mission);
                 return (
-                  <Card key={mission.id} className="group relative overflow-hidden bg-gradient-to-r from-white to-orange-50/50 border border-orange-200 shadow-lg hover:shadow-2xl transition-all duration-300">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h4 className="font-bold text-lg text-gray-900 mb-1">
-                            {mission.missionNumber}
-                          </h4>
-                          <p className="text-gray-600 font-medium">
-                            {mission.lead.firstName} {mission.lead.lastName}
-                          </p>
-                        </div>
-                        <Badge className={`flex items-center gap-1 ${getStatusColor(mission.status)} shadow-lg`}>
-                          {getStatusIcon(mission.status)}
-                          {translate(mission.status as any)}
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-3 mb-4">
-                        <div className="flex items-center gap-3 text-gray-600">
-                          <MapPin className="w-5 h-5 text-orange-500" />
-                          <span className="font-medium truncate">{mission.lead.address}</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-gray-600">
-                          <Clock className="w-5 h-5 text-orange-500" />
-                          <span className="font-medium">
-                            {formatDate(mission.scheduledDate)} à {formatTime(mission.scheduledDate)}
-                          </span>
-                        </div>
-                        {mission.tasks?.length > 0 && (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-sm font-medium text-gray-700">
-                              <span>Progression</span>
-                              <span>{progress}%</span>
+                  <Link href={`/missions/${mission.id}`} key={mission.id} className="block">
+                    <Card className="group relative overflow-hidden bg-gradient-to-r from-white to-orange-50/50 border border-orange-200 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <h4 className="font-bold text-lg text-gray-900 mb-1">
+                              {mission.missionNumber}
+                            </h4>
+                            <p className="text-gray-600 font-medium mb-2">
+                              {mission.lead.firstName} {mission.lead.lastName}
+                            </p>
+                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                              <MapPin className="w-4 h-4 text-orange-500" />
+                              <span className="truncate">{mission.lead.address}</span>
                             </div>
-                            <Progress value={progress} className="h-2" />
                           </div>
-                        )}
-                      </div>
+                          <Badge className={`flex items-center gap-1 ${getStatusColor(mission.status)} shadow-lg`}>
+                            {getStatusIcon(mission.status)}
+                            <span className="hidden sm:inline">{translate(mission.status as any)}</span>
+                          </Badge>
+                        </div>
 
-                      <div className="flex gap-3">
-                        {mission.status === 'SCHEDULED' && currentUser?.role === 'TEAM_LEADER' && (
-                          <Link href={`/missions/${mission.id}/execute`} className="flex-1">
-                            <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-200 hover:shadow-xl transition-all duration-300">
-                              <Play className="w-4 h-4 mr-2" />
-                              Démarrer Mission
-                              <ArrowRight className="w-4 h-4 ml-2" />
-                            </Button>
-                          </Link>
-                        )}
-                        {mission.status === 'IN_PROGRESS' && (
-                          <Link href={`/missions/${mission.id}/execute`} className="flex-1">
-                            <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
-                              <Pause className="w-4 h-4 mr-2" />
-                              Continuer Mission
-                              <ArrowRight className="w-4 h-4 ml-2" />
-                            </Button>
-                          </Link>
-                        )}
-                        <Link href={`/missions/${mission.id}`} className="flex-1">
-                          <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
-                            <Eye className="w-4 h-4 mr-2" />
-                            Voir Détails
-                            <ArrowRight className="w-4 h-4 ml-2" />
+                        <div className="space-y-3 mb-4">
+                          <div className="flex items-center gap-3 text-gray-600">
+                            <Clock className="w-4 h-4 text-orange-500" />
+                            <span className="font-medium text-sm">
+                              {formatDate(mission.scheduledDate)} à {formatTime(mission.scheduledDate)}
+                            </span>
+                          </div>
+                          {mission.tasks?.length > 0 && (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-sm font-medium text-gray-700">
+                                <span>Progression</span>
+                                <span>{progress}%</span>
+                              </div>
+                              <Progress value={progress} className="h-2" />
+                              <p className="text-xs text-gray-500">
+                                {mission.tasks.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length} / {mission.tasks.length} tâches
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                          {mission.status === 'SCHEDULED' && currentUser?.role === 'TEAM_LEADER' && (
+                            <Link href={`/missions/${mission.id}/execute`} className="flex-1">
+                              <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-200 hover:shadow-xl transition-all duration-300">
+                                <Play className="w-4 h-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Démarrer</span>
+                              </Button>
+                            </Link>
+                          )}
+                          {mission.status === 'IN_PROGRESS' && (
+                            <Link href={`/missions/${mission.id}/execute`} className="flex-1">
+                              <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
+                                <Pause className="w-4 h-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Continuer</span>
+                              </Button>
+                            </Link>
+                          )}
+                          <Button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.location.href = `/missions/${mission.id}`;
+                            }}
+                            className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-200 hover:shadow-xl transition-all duration-300"
+                          >
+                            <Eye className="w-4 h-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Détails</span>
                           </Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
                 );
               })}
             </div>
@@ -694,7 +700,7 @@ export default function FieldDashboardPage() {
       {/* Floating Action Buttons for Mobile */}
       {currentUser?.role === 'TEAM_LEADER' && activeMissions.length > 0 && (
         <div className="fixed bottom-6 right-6 lg:hidden">
-          <Link href="/planning">
+          <Link href="/missions">
             <Button className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl shadow-2xl shadow-blue-300 hover:shadow-blue-400 transition-all duration-300 transform hover:scale-110">
               <Calendar className="w-8 h-8 text-white" />
             </Button>
@@ -702,9 +708,9 @@ export default function FieldDashboardPage() {
         </div>
       )}
 
-      {todayMissions.length > 0 && (
+      {todayMissions.length > 0 && todayMissions[0]?.id && (
         <div className="fixed bottom-24 right-6 lg:hidden">
-          <Link href={todayMissions[0]?.id ? `/missions/${todayMissions[0].id}/execute` : '#'}>
+          <Link href={`/missions/${todayMissions[0].id}/execute`}>
             <Button className="w-14 h-14 bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-2xl shadow-green-300 hover:shadow-green-400 transition-all duration-300 transform hover:scale-110">
               <Play className="w-6 h-6 text-white" />
             </Button>
