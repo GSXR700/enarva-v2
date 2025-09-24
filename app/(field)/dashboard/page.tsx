@@ -529,7 +529,7 @@ export default function FieldDashboardPage() {
                         <Link href={`/missions/${mission.id}`} className="flex-1">
                           <Button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-200 hover:shadow-xl transition-all duration-300">
                             <Eye className="w-4 h-4 mr-2" />
-                            Voir Détails
+                            Détails
                             <ArrowRight className="w-4 h-4 ml-2" />
                           </Button>
                         </Link>
