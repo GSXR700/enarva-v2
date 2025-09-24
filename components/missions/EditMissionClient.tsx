@@ -25,7 +25,7 @@ interface TaskWithId {
   category: TaskCategory;
   type: TaskType;
   status: TaskStatus;
-  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
+  //priority: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
   estimatedTime?: number | null;
   actualTime?: number | null;
   assignedToId?: string | null;
@@ -206,23 +206,7 @@ const DraggableTask = ({
           </Select>
         </div>
 
-        <div>
-          <Label className="text-xs">Priorité</Label>
-          <Select
-            value={task.priority}
-            onValueChange={(value) => updateTask(index, 'priority', value)}
-          >
-            <SelectTrigger className="h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="LOW">Basse</SelectItem>
-              <SelectItem value="NORMAL">Normale</SelectItem>
-              <SelectItem value="HIGH">Haute</SelectItem>
-              <SelectItem value="CRITICAL">Critique</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        
 
         <div>
           <Label className="text-xs">Statut</Label>
@@ -397,7 +381,7 @@ export default function EditMissionClient() {
         category: 'GENERAL',
         type: 'EXECUTION',
         status: 'ASSIGNED',
-        priority: 'NORMAL',
+        //priority: 'NORMAL',
         estimatedTime: null,
         actualTime: null,
         assignedToId: null,
@@ -495,7 +479,7 @@ export default function EditMissionClient() {
           category: task.category,
           type: task.type,
           status: task.status,
-          priority: task.priority,
+          //priority: task.priority,
           estimatedTime: task.estimatedTime,
           actualTime: task.actualTime,
           assignedToId: task.assignedToId,

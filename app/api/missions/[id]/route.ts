@@ -38,7 +38,6 @@ const missionUpdateSchema = z.object({
     category: z.nativeEnum(TaskCategory),
     type: z.nativeEnum(TaskType),
     status: z.nativeEnum(TaskStatus).default('ASSIGNED'),
-    priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).optional(),
     estimatedTime: z.number().min(0).optional().nullable(),
     actualTime: z.number().min(0).optional().nullable(),
     assignedToId: z.string().optional().nullable(),
@@ -331,7 +330,7 @@ async function handleMissionUpdate(
       if (validatedData.issuesFound !== undefined) dataToUpdate.issuesFound = validatedData.issuesFound;
       if (validatedData.correctionRequired !== undefined) dataToUpdate.correctionRequired = validatedData.correctionRequired;
 
-      // FIXED: Better task handling with error checking
+      // FIXED: Better task handling with field filtering
       if (validatedData.tasks !== undefined) {
         console.log('Updating tasks:', validatedData.tasks.length, 'tasks provided');
         
@@ -348,6 +347,7 @@ async function handleMissionUpdate(
               throw new Error(`Task at index ${index} must have a title`);
             }
             
+            // FIXED: Only include fields that exist in Prisma Task model
             return {
               missionId: id,
               title: task.title.trim(),
@@ -355,7 +355,7 @@ async function handleMissionUpdate(
               category: task.category,
               type: task.type,
               status: task.status || 'ASSIGNED',
-              priority: task.priority || 'NORMAL',
+              // Remove priority and other fields that don't exist in schema
               estimatedTime: task.estimatedTime || null,
               actualTime: task.actualTime || null,
               assignedToId: task.assignedToId || null,
