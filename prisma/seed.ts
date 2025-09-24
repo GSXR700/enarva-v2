@@ -1,19 +1,18 @@
 // prisma/seed.ts
-import { PrismaClient } from '@prisma/client'
-import { seedTaskTemplates } from './seed/task-templates/index'; // Import the new seeder
+import { PrismaClient } from '@prisma/client';
+import { seedTaskTemplates } from './seed/task-templates/index';
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 async function main() {
-  console.log(`Début du seeding...`)
+  console.log(`Début du seeding...`);
 
-  // Nettoyage de la base de données dans le bon ordre pour éviter les erreurs de contraintes
+  // It's critical to clean old data to prevent conflicts and ensure a fresh seed.
   console.log('Suppression des anciennes données...');
-  await prisma.taskTemplate.deleteMany(); // Important: Clean old templates
-  
+  await prisma.taskTemplate.deleteMany();
   console.log('Anciennes données supprimées.');
-  
-  // --- CALL THE NEW TASK TEMPLATE SEEDER ---
+
+  // Execute the dedicated seeder for task templates.
   await seedTaskTemplates(prisma);
 
   console.log('Seeding terminé avec succès.');
@@ -21,9 +20,9 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error(e)
-    process.exit(1)
+    console.error(e);
+    process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect()
-  })
+    await prisma.$disconnect();
+  });
