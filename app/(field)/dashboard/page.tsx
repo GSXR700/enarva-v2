@@ -694,7 +694,7 @@ export default function FieldDashboardPage() {
       {/* Floating Action Buttons for Mobile */}
       {currentUser?.role === 'TEAM_LEADER' && activeMissions.length > 0 && (
         <div className="fixed bottom-6 right-6 lg:hidden">
-          <Link href="/missions">
+          <Link href="/planning">
             <Button className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl shadow-2xl shadow-blue-300 hover:shadow-blue-400 transition-all duration-300 transform hover:scale-110">
               <Calendar className="w-8 h-8 text-white" />
             </Button>
