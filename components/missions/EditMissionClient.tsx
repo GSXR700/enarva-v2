@@ -25,7 +25,6 @@ interface TaskWithId {
   category: TaskCategory;
   type: TaskType;
   status: TaskStatus;
-  //priority: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
   estimatedTime?: number | null;
   actualTime?: number | null;
   assignedToId?: string | null;
@@ -206,8 +205,6 @@ const DraggableTask = ({
           </Select>
         </div>
 
-        
-
         <div>
           <Label className="text-xs">Statut</Label>
           <Select
@@ -381,7 +378,6 @@ export default function EditMissionClient() {
         category: 'GENERAL',
         type: 'EXECUTION',
         status: 'ASSIGNED',
-        //priority: 'NORMAL',
         estimatedTime: null,
         actualTime: null,
         assignedToId: null,
@@ -445,7 +441,6 @@ export default function EditMissionClient() {
       category: item.category || 'GENERAL',
       type: item.type || 'EXECUTION',
       status: 'ASSIGNED',
-      priority: item.priority || 'NORMAL',
       estimatedTime: item.estimatedTime || null,
       actualTime: null,
       assignedToId: null,
@@ -479,7 +474,6 @@ export default function EditMissionClient() {
           category: task.category,
           type: task.type,
           status: task.status,
-          //priority: task.priority,
           estimatedTime: task.estimatedTime,
           actualTime: task.actualTime,
           assignedToId: task.assignedToId,
@@ -507,8 +501,15 @@ export default function EditMissionClient() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.details || errorData.error || `HTTP ${response.status}`);
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorData.details || errorMessage;
+          console.error('API Error Details:', errorData);
+        } catch (parseError) {
+          console.error('Could not parse error response:', parseError);
+        }
+        throw new Error(errorMessage);
       }
 
       const updatedMission = await response.json();
@@ -518,7 +519,8 @@ export default function EditMissionClient() {
       router.push('/missions');
     } catch (error: any) {
       console.error('Error updating mission:', error);
-      toast.error(error.message || 'Erreur lors de la sauvegarde');
+      const errorMessage = error.message || 'Erreur lors de la sauvegarde';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
