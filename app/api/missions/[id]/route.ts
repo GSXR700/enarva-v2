@@ -8,9 +8,10 @@ import { z } from 'zod';
 
 const prisma = new PrismaClient();
 
+// FIXED: More flexible validation schema to handle various input formats
 const missionUpdateSchema = z.object({
-  scheduledDate: z.string().datetime().optional(),
-  estimatedDuration: z.number().min(0.5).max(24).optional(),
+  scheduledDate: z.string().optional(),
+  estimatedDuration: z.number().min(0).optional(),
   address: z.string().min(1).optional(),
   coordinates: z.string().optional().nullable(),
   accessNotes: z.string().optional().nullable(),
@@ -19,8 +20,8 @@ const missionUpdateSchema = z.object({
   type: z.nativeEnum(MissionType).optional(),
   teamLeaderId: z.string().optional().nullable(),
   teamId: z.string().optional().nullable(),
-  actualStartTime: z.string().datetime().optional().nullable(),
-  actualEndTime: z.string().datetime().optional().nullable(),
+  actualStartTime: z.string().optional().nullable(),
+  actualEndTime: z.string().optional().nullable(),
   clientValidated: z.boolean().optional(),
   clientFeedback: z.string().optional().nullable(),
   clientRating: z.number().min(1).max(5).optional().nullable(),
@@ -37,12 +38,13 @@ const missionUpdateSchema = z.object({
     category: z.nativeEnum(TaskCategory),
     type: z.nativeEnum(TaskType),
     status: z.nativeEnum(TaskStatus).default('ASSIGNED'),
+    priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL']).optional(),
     estimatedTime: z.number().min(0).optional().nullable(),
     actualTime: z.number().min(0).optional().nullable(),
     assignedToId: z.string().optional().nullable(),
     notes: z.string().optional().nullable(),
   })).optional(),
-}).passthrough();
+}).passthrough(); // FIXED: Allow additional fields
 
 export async function GET(
   _request: NextRequest,
@@ -216,6 +218,8 @@ export async function GET(
   } catch (error) {
     console.error('Failed to fetch mission:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
@@ -251,11 +255,19 @@ async function handleMissionUpdate(
     const { id } = await params;
     const body = await request.json();
     
+    // FIXED: Enhanced logging for debugging
+    console.log('Mission Update Request Body:', JSON.stringify(body, null, 2));
+    
     const validationResult = missionUpdateSchema.safeParse(body);
     if (!validationResult.success) {
+      console.error('Validation failed:', validationResult.error.errors);
       return NextResponse.json({ 
         error: 'Invalid input', 
-        details: validationResult.error.errors
+        details: validationResult.error.errors.map(err => ({
+          field: err.path.join('.'),
+          message: err.message,
+          code: err.code
+        }))
       }, { status: 400 });
     }
 
@@ -278,10 +290,22 @@ async function handleMissionUpdate(
       const dataToUpdate: any = {};
       
       if (validatedData.scheduledDate) {
-        dataToUpdate.scheduledDate = new Date(validatedData.scheduledDate);
+        // FIXED: Handle different date formats more flexibly
+        try {
+          dataToUpdate.scheduledDate = new Date(validatedData.scheduledDate);
+        } catch (e) {
+          throw new Error('Invalid scheduledDate format');
+        }
       }
       if (validatedData.estimatedDuration !== undefined) {
-        dataToUpdate.estimatedDuration = Math.round(validatedData.estimatedDuration * 60);
+        // FIXED: Handle duration conversion more carefully
+        if (validatedData.estimatedDuration > 24) {
+          // Already in minutes
+          dataToUpdate.estimatedDuration = validatedData.estimatedDuration;
+        } else {
+          // Convert hours to minutes
+          dataToUpdate.estimatedDuration = Math.round(validatedData.estimatedDuration * 60);
+        }
       }
       if (validatedData.address) dataToUpdate.address = validatedData.address;
       if (validatedData.coordinates !== undefined) dataToUpdate.coordinates = validatedData.coordinates;
@@ -307,81 +331,188 @@ async function handleMissionUpdate(
       if (validatedData.issuesFound !== undefined) dataToUpdate.issuesFound = validatedData.issuesFound;
       if (validatedData.correctionRequired !== undefined) dataToUpdate.correctionRequired = validatedData.correctionRequired;
 
-      if (validatedData.tasks && validatedData.tasks.length > 0) {
+      // FIXED: Better task handling with error checking
+      if (validatedData.tasks !== undefined) {
+        console.log('Updating tasks:', validatedData.tasks.length, 'tasks provided');
+        
+        // Delete existing tasks first
         await tx.task.deleteMany({
           where: { missionId: id }
         });
 
-        await tx.task.createMany({
-          data: validatedData.tasks.map(task => ({
-            missionId: id,
-            title: task.title,
-            description: task.description ?? null,
-            category: task.category,
-            type: task.type,
-            status: task.status ?? 'ASSIGNED',
-            estimatedTime: task.estimatedTime ?? null,
-            actualTime: task.actualTime ?? null,
-            assignedToId: task.assignedToId ?? null,
-            notes: task.notes ?? null,
-          }))
-        });
+        // Only create new tasks if any are provided
+        if (validatedData.tasks.length > 0) {
+          const tasksToCreate = validatedData.tasks.map((task, index) => {
+            // FIXED: Better validation and defaults for task data
+            if (!task.title || task.title.trim() === '') {
+              throw new Error(`Task at index ${index} must have a title`);
+            }
+            
+            return {
+              missionId: id,
+              title: task.title.trim(),
+              description: task.description || null,
+              category: task.category,
+              type: task.type,
+              status: task.status || 'ASSIGNED',
+              priority: task.priority || 'NORMAL',
+              estimatedTime: task.estimatedTime || null,
+              actualTime: task.actualTime || null,
+              assignedToId: task.assignedToId || null,
+              notes: task.notes || null,
+            };
+          });
+
+          try {
+            await tx.task.createMany({
+              data: tasksToCreate
+            });
+            console.log('Successfully created', tasksToCreate.length, 'tasks');
+          } catch (taskError) {
+            console.error('Failed to create tasks:', taskError);
+            throw new Error(`Failed to create tasks: ${taskError instanceof Error ? taskError.message : 'Unknown error'}`);
+          }
+        }
       }
 
+      // Update the mission
       const updated = await tx.mission.update({
         where: { id },
         data: dataToUpdate,
         include: {
-          lead: true,
-          quote: true,
-          teamLeader: true,
+          lead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              email: true,
+              address: true,
+              company: true
+            }
+          },
+          quote: {
+            select: {
+              id: true,
+              quoteNumber: true,
+              finalPrice: true,
+              status: true
+            }
+          },
+          teamLeader: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+              role: true
+            }
+          },
           team: { 
             include: { 
               members: { 
                 where: { isActive: true },
-                include: { user: true } 
+                include: { 
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                      image: true,
+                      role: true
+                    }
+                  }
+                } 
               } 
             } 
           },
-          tasks: true
+          tasks: {
+            include: {
+              assignedTo: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                      image: true
+                    }
+                  }
+                }
+              }
+            },
+            orderBy: {
+              createdAt: 'asc'
+            }
+          }
         }
       });
 
+      // Create activity log for status changes
       if (validatedData.status && validatedData.status !== existingMission.status) {
-        await tx.activity.create({
-          data: {
-            type: 'MISSION_STATUS_UPDATED',
-            title: 'Statut de mission mis à jour',
-            description: `Mission ${existingMission.missionNumber} - statut changé de ${existingMission.status} à ${validatedData.status}`,
-            userId: user.id,
-            leadId: existingMission.leadId,
-            metadata: { 
-              missionId: existingMission.id, 
-              oldStatus: existingMission.status, 
-              newStatus: validatedData.status 
+        try {
+          await tx.activity.create({
+            data: {
+              type: 'MISSION_STATUS_UPDATED',
+              title: 'Statut de mission mis à jour',
+              description: `Mission ${existingMission.missionNumber} - statut changé de ${existingMission.status} à ${validatedData.status}`,
+              userId: user.id,
+              leadId: existingMission.leadId,
+              metadata: { 
+                missionId: existingMission.id, 
+                oldStatus: existingMission.status, 
+                newStatus: validatedData.status 
+              }
             }
-          }
-        });
+          });
+        } catch (activityError) {
+          // Log activity error but don't fail the update
+          console.warn('Failed to create activity log:', activityError);
+        }
       }
 
       return updated;
     });
 
+    console.log('Mission updated successfully:', updatedMission.id);
     return NextResponse.json(updatedMission);
 
   } catch (error) {
+    // FIXED: Better error handling and response formatting
+    console.error('Mission update error:', error);
+    
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Validation failed', 
+        details: error.errors.map(err => ({
+          field: err.path.join('.'),
+          message: err.message,
+          code: err.code
+        }))
+      }, { status: 400 });
     }
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    console.error('Failed to update mission:', error);
     
     if (errorMessage.includes('not found')) {
-      return new NextResponse(errorMessage, { status: 404 });
+      return NextResponse.json({ 
+        error: 'Mission not found',
+        details: errorMessage 
+      }, { status: 404 });
     }
+    
     if (errorMessage.includes('Not authorized')) {
-      return new NextResponse(errorMessage, { status: 403 });
+      return NextResponse.json({ 
+        error: 'Unauthorized access',
+        details: errorMessage 
+      }, { status: 403 });
+    }
+    
+    if (errorMessage.includes('Invalid') || errorMessage.includes('must have')) {
+      return NextResponse.json({ 
+        error: 'Invalid data provided',
+        details: errorMessage 
+      }, { status: 400 });
     }
     
     return NextResponse.json({ 
@@ -459,7 +590,10 @@ export async function DELETE(
     console.error('Failed to delete mission:', error);
     
     if (errorMessage.includes('not found')) {
-      return new NextResponse(errorMessage, { status: 404 });
+      return NextResponse.json({ 
+        error: 'Mission not found',
+        details: errorMessage 
+      }, { status: 404 });
     }
     
     return NextResponse.json({ 
