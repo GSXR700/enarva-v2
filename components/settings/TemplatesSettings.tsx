@@ -12,7 +12,7 @@ import { Plus, Trash2, Edit, Save, X, FileText, Loader2 } from 'lucide-react'
 import { TaskCategory } from '@prisma/client'
 import { toast } from 'sonner'
 
-// Type definitions
+// Type definitions - FIXED to match database structure
 type TaskTemplateItem = {
   id?: string
   title: string
@@ -23,7 +23,18 @@ type TaskTemplate = {
   id: string
   name: string
   description?: string | null
-  items: TaskTemplateItem[]
+  tasks: TaskTemplateItem[] | any // JSON field from database
+  category: TaskCategory
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+type FormTaskTemplate = {
+  id: string
+  name: string
+  description?: string | null | undefined // Allow undefined to match exactOptionalPropertyTypes
+  items: TaskTemplateItem[] // UI representation
 }
 
 const initialFormState = {
@@ -46,8 +57,39 @@ const categoryLabels: { [key in TaskCategory]: string } = {
   LOGISTICS_ACCESS: 'Logistique et Accès'
 }
 
+// FIXED: Helper function to extract tasks from database JSON format
+const extractTasksFromTemplate = (template: TaskTemplate): TaskTemplateItem[] => {
+  if (!template.tasks) return []
+  
+  // If tasks is already an array, return it
+  if (Array.isArray(template.tasks)) {
+    return template.tasks
+  }
+  
+  // If it's a JSON object, try different structures
+  if (typeof template.tasks === 'object') {
+    // Check for nested structure like { items: { create: [...] } }
+    if (template.tasks.items && template.tasks.items.create && Array.isArray(template.tasks.items.create)) {
+      return template.tasks.items.create
+    }
+    
+    // Check for direct items structure like { items: [...] }
+    if (template.tasks.items && Array.isArray(template.tasks.items)) {
+      return template.tasks.items
+    }
+    
+    // Check if it's directly an array of tasks
+    if (Object.values(template.tasks).every((item: any) => item && typeof item.title === 'string')) {
+      return Object.values(template.tasks) as TaskTemplateItem[]
+    }
+  }
+  
+  return []
+}
+
 export function TemplatesSettings() {
   const [templates, setTemplates] = useState<TaskTemplate[]>([])
+  const [displayTemplates, setDisplayTemplates] = useState<FormTaskTemplate[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [formState, setFormState] = useState(initialFormState)
@@ -56,15 +98,28 @@ export function TemplatesSettings() {
     fetchTemplates()
   }, [])
 
+  // FIXED: Process templates for display
+  useEffect(() => {
+    const processedTemplates: FormTaskTemplate[] = templates.map(template => ({
+      id: template.id,
+      name: template.name,
+      description: template.description || undefined, // Convert null to undefined for consistency
+      items: extractTasksFromTemplate(template)
+    }))
+    setDisplayTemplates(processedTemplates)
+  }, [templates])
+
   const fetchTemplates = async () => {
     setIsLoading(true)
     try {
       const response = await fetch('/api/task-templates')
       if (!response.ok) throw new Error('Impossible de charger les modèles')
       const data = await response.json()
+      console.log('Fetched templates:', data) // Debug log
       setTemplates(data)
     } catch (error: any) {
       toast.error(error.message)
+      console.error('Error fetching templates:', error)
     } finally {
       setIsLoading(false)
     }
@@ -72,7 +127,6 @@ export function TemplatesSettings() {
 
   const handleItemChange = (index: number, field: keyof TaskTemplateItem, value: string) => {
     const updatedItems = [...formState.items]
-    // Fixed: Ensure the item has required properties before updating
     const currentItem = updatedItems[index]
     if (field === 'title') {
       updatedItems[index] = { 
@@ -104,7 +158,7 @@ export function TemplatesSettings() {
     }))
   }
 
-  const handleSelectTemplateForEdit = (template: TaskTemplate) => {
+  const handleSelectTemplateForEdit = (template: FormTaskTemplate) => {
     setFormState({
       id: template.id,
       name: template.name,
@@ -137,7 +191,8 @@ export function TemplatesSettings() {
       const templateData = {
         name: formState.name.trim(),
         description: formState.description.trim() || null,
-        items: filteredItems
+        tasks: filteredItems, // Send as 'tasks' to match database field
+        category: filteredItems[0]?.category || 'GENERAL'
       }
 
       const url = formState.id ? `/api/task-templates/${formState.id}` : '/api/task-templates'
@@ -188,7 +243,7 @@ export function TemplatesSettings() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-enarva-start" />
-            Modèles Existants
+            Modèles Existants ({displayTemplates.length})
           </CardTitle>
           <CardDescription>
             Sélectionnez un modèle pour le modifier ou créez-en un nouveau.
@@ -199,15 +254,15 @@ export function TemplatesSettings() {
             <div className="flex items-center justify-center h-48">
               <Loader2 className="h-6 w-6 animate-spin text-enarva-start" />
             </div>
-          ) : templates.length === 0 ? (
+          ) : displayTemplates.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>Aucun modèle disponible</p>
-              <p className="text-sm">Créez votre premier modèle</p>
+              <p className="text-sm">Créez votre premier modèle ci-dessous</p>
             </div>
           ) : (
             <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar">
-              {templates.map((template) => (
+              {displayTemplates.map((template) => (
                 <div
                   key={template.id}
                   className="p-4 border border-border rounded-lg hover:border-enarva-start/50 transition-colors cursor-pointer group"
@@ -223,9 +278,25 @@ export function TemplatesSettings() {
                           {template.description}
                         </p>
                       )}
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {template.items?.length || 0} tâche(s)
-                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-enarva-start/10 text-enarva-start text-xs font-medium">
+                          {template.items.length} tâche{template.items.length !== 1 ? 's' : ''}
+                        </span>
+                        {template.items.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            • Prêt à utiliser
+                          </span>
+                        )}
+                      </div>
+                      {/* Show task preview */}
+                      {template.items && template.items.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs text-muted-foreground">
+                            Exemple: {template.items[0]?.title}
+                            {template.items.length > 1 && ` +${template.items.length - 1} autre${template.items.length > 2 ? 's' : ''}`}
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
@@ -293,7 +364,13 @@ export function TemplatesSettings() {
             </div>
 
             <div className="space-y-2">
-              <Label>Tâches du modèle</Label>
+              <div className="flex items-center justify-between">
+                <Label>Tâches du modèle ({formState.items.length})</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Ajouter une tâche
+                </Button>
+              </div>
               <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar">
                 {formState.items.map((item, index) => (
                   <div key={index} className="flex gap-2">
@@ -319,52 +396,40 @@ export function TemplatesSettings() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {formState.items.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeItem(index)}
-                        className="flex-shrink-0"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeItem(index)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={addItem}
-                className="w-full"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Ajouter une tâche
-              </Button>
             </div>
 
-            <div className="flex gap-2 pt-4">
-              <Button
-                type="submit"
-                disabled={isSaving}
-                className="flex-1"
-              >
+            <div className="flex gap-2">
+              <Button type="submit" disabled={isSaving}>
                 {isSaving ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Sauvegarde...
+                  </>
                 ) : (
-                  <Save className="w-4 h-4 mr-2" />
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    {formState.id ? 'Mettre à jour' : 'Créer le modèle'}
+                  </>
                 )}
-                {formState.id ? 'Mettre à jour' : 'Créer le modèle'}
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={resetForm}
-              >
-                <X className="w-4 h-4 mr-2" />
-                Annuler
-              </Button>
+              {formState.id && (
+                <Button type="button" variant="outline" onClick={resetForm}>
+                  <X className="w-4 h-4 mr-2" />
+                  Annuler
+                </Button>
+              )}
             </div>
           </form>
         </CardContent>
