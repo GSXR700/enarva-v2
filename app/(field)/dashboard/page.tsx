@@ -211,7 +211,7 @@ export default function FieldDashboardPage() {
               Tableau de Bord Terrain
             </h1>
             <p className="text-gray-600 mt-1">
-              Bonjour {currentUser?.name} 👋, voici vos missions du jour
+              Bonjour {currentUser?.name}, voici vos missions du jour
             </p>
           </div>
           {notifications.length > 0 && (
@@ -300,60 +300,56 @@ export default function FieldDashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <Link href="/missions">
-              <div className="group relative overflow-hidden bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
+            <Link href="/missions" className="block">
+              <Button className="w-full h-auto p-6 bg-gradient-to-br from-white to-gray-50 border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 text-gray-900 hover:text-blue-600 transform hover:-translate-y-1">
                 <div className="flex flex-col items-center text-center space-y-3">
-                  <div className="w-14 h-14 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 group-hover:scale-110 transition-transform">
+                  <div className="w-14 h-14 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
                     <Calendar className="w-7 h-7 text-white" />
                   </div>
-                  <span className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                  <span className="font-semibold">
                     Toutes les Missions
                   </span>
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
+              </Button>
             </Link>
 
-            <Link href="/profile">
-              <div className="group relative overflow-hidden bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
+            <Link href="/profile" className="block">
+              <Button className="w-full h-auto p-6 bg-gradient-to-br from-white to-gray-50 border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 text-gray-900 hover:text-green-600 transform hover:-translate-y-1">
                 <div className="flex flex-col items-center text-center space-y-3">
-                  <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-200 group-hover:scale-110 transition-transform">
+                  <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-200">
                     <Users className="w-7 h-7 text-white" />
                   </div>
-                  <span className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors">
+                  <span className="font-semibold">
                     Mon Profil
                   </span>
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
+              </Button>
             </Link>
 
-            <Link href="/field-reports">
-              <div className="group relative overflow-hidden bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
+            <Link href="/field-reports" className="block">
+              <Button className="w-full h-auto p-6 bg-gradient-to-br from-white to-gray-50 border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 text-gray-900 hover:text-purple-600 transform hover:-translate-y-1">
                 <div className="flex flex-col items-center text-center space-y-3">
-                  <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-200 group-hover:scale-110 transition-transform">
+                  <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-200">
                     <Camera className="w-7 h-7 text-white" />
                   </div>
-                  <span className="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">
+                  <span className="font-semibold">
                     Mes Rapports
                   </span>
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
+              </Button>
             </Link>
 
-            <Link href="/help">
-              <div className="group relative overflow-hidden bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
+            <Link href="/help" className="block">
+              <Button className="w-full h-auto p-6 bg-gradient-to-br from-white to-gray-50 border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 text-gray-900 hover:text-red-600 transform hover:-translate-y-1">
                 <div className="flex flex-col items-center text-center space-y-3">
-                  <div className="w-14 h-14 bg-gradient-to-r from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-200 group-hover:scale-110 transition-transform">
+                  <div className="w-14 h-14 bg-gradient-to-r from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-200">
                     <HeadphonesIcon className="w-7 h-7 text-white" />
                   </div>
-                  <span className="font-semibold text-gray-900 group-hover:text-red-600 transition-colors">
+                  <span className="font-semibold">
                     Support
                   </span>
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
+              </Button>
             </Link>
           </div>
         </CardContent>
@@ -373,65 +369,64 @@ export default function FieldDashboardPage() {
               {todayMissions.map((mission) => {
                 const progress = getMissionProgress(mission);
                 return (
-                  <div key={mission.id} className="group relative overflow-hidden bg-gradient-to-r from-white to-orange-50/50 p-6 rounded-2xl border border-orange-200 shadow-lg hover:shadow-2xl transition-all duration-300">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <h4 className="font-bold text-lg text-gray-900 mb-1">
-                          {mission.missionNumber}
-                        </h4>
-                        <p className="text-gray-600 font-medium">
-                          {mission.lead.firstName} {mission.lead.lastName}
-                        </p>
-                      </div>
-                      <Badge className={`flex items-center gap-1 ${getStatusColor(mission.status)} shadow-lg`}>
-                        {getStatusIcon(mission.status)}
-                        {translate(mission.status as any)}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-3 mb-4">
-                      <div className="flex items-center gap-3 text-gray-600">
-                        <MapPin className="w-5 h-5 text-orange-500" />
-                        <span className="font-medium truncate">{mission.lead.address}</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-gray-600">
-                        <Clock className="w-5 h-5 text-orange-500" />
-                        <span className="font-medium">
-                          {formatDate(mission.scheduledDate)} à {formatTime(mission.scheduledDate)}
-                        </span>
-                      </div>
-                      {mission.tasks?.length > 0 && (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm font-medium text-gray-700">
-                            <span>Progression</span>
-                            <span>{progress}%</span>
-                          </div>
-                          <Progress value={progress} className="h-2" />
+                  <Card key={mission.id} className="group relative overflow-hidden bg-gradient-to-r from-white to-orange-50/50 border border-orange-200 shadow-lg hover:shadow-2xl transition-all duration-300">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h4 className="font-bold text-lg text-gray-900 mb-1">
+                            {mission.missionNumber}
+                          </h4>
+                          <p className="text-gray-600 font-medium">
+                            {mission.lead.firstName} {mission.lead.lastName}
+                          </p>
                         </div>
-                      )}
-                    </div>
+                        <Badge className={`flex items-center gap-1 ${getStatusColor(mission.status)} shadow-lg`}>
+                          {getStatusIcon(mission.status)}
+                          {translate(mission.status as any)}
+                        </Badge>
+                      </div>
 
-                    <div className="flex gap-3">
-                      {mission.status === 'SCHEDULED' && currentUser?.role === 'TEAM_LEADER' && (
-                        <Link href={`/missions/${mission.id}/execute`} className="flex-1">
-                          <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-200 hover:shadow-xl transition-all duration-300">
-                            <Play className="w-4 h-4 mr-2" />
-                            Démarrer Mission
-                            <ArrowRight className="w-4 h-4 ml-2" />
-                          </Button>
-                        </Link>
-                      )}
-                      {mission.status === 'IN_PROGRESS' && (
-                        <Link href={`/missions/${mission.id}/execute`} className="flex-1">
-                          <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
-                            <Pause className="w-4 h-4 mr-2" />
-                            Continuer Mission
-                            <ArrowRight className="w-4 h-4 ml-2" />
-                          </Button>
-                        </Link>
-                      )}
-                      {(mission.status === 'SCHEDULED' && currentUser?.role !== 'TEAM_LEADER') || 
-                       (mission.status !== 'SCHEDULED' && mission.status !== 'IN_PROGRESS') && (
+                      <div className="space-y-3 mb-4">
+                        <div className="flex items-center gap-3 text-gray-600">
+                          <MapPin className="w-5 h-5 text-orange-500" />
+                          <span className="font-medium truncate">{mission.lead.address}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-gray-600">
+                          <Clock className="w-5 h-5 text-orange-500" />
+                          <span className="font-medium">
+                            {formatDate(mission.scheduledDate)} à {formatTime(mission.scheduledDate)}
+                          </span>
+                        </div>
+                        {mission.tasks?.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm font-medium text-gray-700">
+                              <span>Progression</span>
+                              <span>{progress}%</span>
+                            </div>
+                            <Progress value={progress} className="h-2" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-3">
+                        {mission.status === 'SCHEDULED' && currentUser?.role === 'TEAM_LEADER' && (
+                          <Link href={`/missions/${mission.id}/execute`} className="flex-1">
+                            <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-200 hover:shadow-xl transition-all duration-300">
+                              <Play className="w-4 h-4 mr-2" />
+                              Démarrer Mission
+                              <ArrowRight className="w-4 h-4 ml-2" />
+                            </Button>
+                          </Link>
+                        )}
+                        {mission.status === 'IN_PROGRESS' && (
+                          <Link href={`/missions/${mission.id}/execute`} className="flex-1">
+                            <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
+                              <Pause className="w-4 h-4 mr-2" />
+                              Continuer Mission
+                              <ArrowRight className="w-4 h-4 ml-2" />
+                            </Button>
+                          </Link>
+                        )}
                         <Link href={`/missions/${mission.id}`} className="flex-1">
                           <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
                             <Eye className="w-4 h-4 mr-2" />
@@ -439,11 +434,9 @@ export default function FieldDashboardPage() {
                             <ArrowRight className="w-4 h-4 ml-2" />
                           </Button>
                         </Link>
-                      )}
-                    </div>
-
-                    <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                  </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
@@ -470,73 +463,73 @@ export default function FieldDashboardPage() {
               {activeMissions.map((mission) => {
                 const progress = getMissionProgress(mission);
                 return (
-                  <div key={mission.id} className="group relative overflow-hidden bg-gradient-to-br from-white to-blue-50/50 p-6 rounded-2xl border border-blue-200 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <h4 className="font-bold text-lg text-gray-900 mb-1">
-                          {mission.missionNumber}
-                        </h4>
-                        <p className="text-gray-600 font-medium">
-                          {mission.lead.firstName} {mission.lead.lastName}
-                        </p>
-                      </div>
-                      <Badge className={`flex items-center gap-1 ${getStatusColor(mission.status)} shadow-lg`}>
-                        {getStatusIcon(mission.status)}
-                        {translate(mission.status as any)}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-3 mb-4">
-                      <div className="flex items-center gap-3 text-gray-600">
-                        <MapPin className="w-5 h-5 text-blue-500" />
-                        <span className="font-medium truncate">{mission.lead.address}</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-gray-600">
-                        <Clock className="w-5 h-5 text-blue-500" />
-                        <span className="font-medium">{formatDate(mission.scheduledDate)}</span>
-                      </div>
-                      {mission.tasks?.length > 0 && (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm font-medium text-gray-700">
-                            <span>Progression</span>
-                            <span>{progress}%</span>
-                          </div>
-                          <Progress value={progress} className="h-2" />
-                          <p className="text-sm text-gray-600">
-                            {mission.tasks.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length} / {mission.tasks.length} tâches terminées
+                  <Card key={mission.id} className="group relative overflow-hidden bg-gradient-to-br from-white to-blue-50/50 border border-blue-200 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h4 className="font-bold text-lg text-gray-900 mb-1">
+                            {mission.missionNumber}
+                          </h4>
+                          <p className="text-gray-600 font-medium">
+                            {mission.lead.firstName} {mission.lead.lastName}
                           </p>
                         </div>
-                      )}
-                    </div>
+                        <Badge className={`flex items-center gap-1 ${getStatusColor(mission.status)} shadow-lg`}>
+                          {getStatusIcon(mission.status)}
+                          {translate(mission.status as any)}
+                        </Badge>
+                      </div>
 
-                    <div className="flex gap-3">
-                      {mission.status === 'SCHEDULED' && currentUser?.role === 'TEAM_LEADER' && (
-                        <Link href={`/missions/${mission.id}/execute`} className="flex-1">
-                          <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-200 hover:shadow-xl transition-all duration-300">
-                            <Play className="w-4 h-4 mr-2" />
-                            Démarrer
+                      <div className="space-y-3 mb-4">
+                        <div className="flex items-center gap-3 text-gray-600">
+                          <MapPin className="w-5 h-5 text-blue-500" />
+                          <span className="font-medium truncate">{mission.lead.address}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-gray-600">
+                          <Clock className="w-5 h-5 text-blue-500" />
+                          <span className="font-medium">{formatDate(mission.scheduledDate)}</span>
+                        </div>
+                        {mission.tasks?.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm font-medium text-gray-700">
+                              <span>Progression</span>
+                              <span>{progress}%</span>
+                            </div>
+                            <Progress value={progress} className="h-2" />
+                            <p className="text-sm text-gray-600">
+                              {mission.tasks.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length} / {mission.tasks.length} tâches terminées
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-3">
+                        {mission.status === 'SCHEDULED' && currentUser?.role === 'TEAM_LEADER' && (
+                          <Link href={`/missions/${mission.id}/execute`} className="flex-1">
+                            <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-200 hover:shadow-xl transition-all duration-300">
+                              <Play className="w-4 h-4 mr-2" />
+                              Démarrer
+                            </Button>
+                          </Link>
+                        )}
+                        {mission.status === 'IN_PROGRESS' && (
+                          <Link href={`/missions/${mission.id}/execute`} className="flex-1">
+                            <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
+                              <Pause className="w-4 h-4 mr-2" />
+                              Continuer
+                            </Button>
+                          </Link>
+                        )}
+                        <Link href={`/missions/${mission.id}`} className="flex-1">
+                          <Button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-200 hover:shadow-xl transition-all duration-300">
+                            <Eye className="w-4 h-4 mr-2" />
+                            Voir Détails
+                            <ArrowRight className="w-4 h-4 ml-2" />
                           </Button>
                         </Link>
-                      )}
-                      {mission.status === 'IN_PROGRESS' && (
-                        <Link href={`/missions/${mission.id}/execute`} className="flex-1">
-                          <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
-                            <Pause className="w-4 h-4 mr-2" />
-                            Continuer
-                          </Button>
-                        </Link>
-                      )}
-                      <Link href={`/missions/${mission.id}`} className="flex-1">
-                        <Button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-200 hover:shadow-xl transition-all duration-300">
-                          <Eye className="w-4 h-4 mr-2" />
-                          Voir Détails
-                          <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
-                      </Link>
-                    </div>
-
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                  </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
@@ -563,55 +556,55 @@ export default function FieldDashboardPage() {
               {pendingMissions.map((mission) => {
                 const progress = getMissionProgress(mission);
                 return (
-                  <div key={mission.id} className="group relative overflow-hidden bg-gradient-to-r from-white to-purple-50/50 p-6 rounded-2xl border border-purple-200 shadow-lg hover:shadow-2xl transition-all duration-300">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-bold text-lg text-gray-900 mb-1">
-                          {mission.missionNumber}
-                        </h4>
-                        <p className="text-gray-600 font-medium mb-2">
-                          {mission.lead.firstName} {mission.lead.lastName}
-                        </p>
-                        <div className="flex items-center gap-2 text-sm text-purple-600">
-                          <Clock className="w-4 h-4" />
-                          {formatDate(mission.scheduledDate)}
+                  <Card key={mission.id} className="group relative overflow-hidden bg-gradient-to-r from-white to-purple-50/50 border border-purple-200 shadow-lg hover:shadow-2xl transition-all duration-300">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-bold text-lg text-gray-900 mb-1">
+                            {mission.missionNumber}
+                          </h4>
+                          <p className="text-gray-600 font-medium mb-2">
+                            {mission.lead.firstName} {mission.lead.lastName}
+                          </p>
+                          <div className="flex items-center gap-2 text-sm text-purple-600">
+                            <Clock className="w-4 h-4" />
+                            {formatDate(mission.scheduledDate)}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <Badge className={`flex items-center gap-1 mb-2 ${getStatusColor(mission.status)} shadow-lg`}>
-                          {getStatusIcon(mission.status)}
-                          {translate(mission.status as any)}
-                        </Badge>
-                        <div className="flex gap-2">
-                          <Link href={`/missions/${mission.id}`}>
-                            <Button size="sm" className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg">
-                              <Eye className="w-4 h-4 mr-2" />
-                              Voir
-                            </Button>
-                          </Link>
-                          {(mission.status === 'QUALITY_CHECK' || mission.status === 'CLIENT_VALIDATION') && currentUser?.role === 'TEAM_LEADER' && (
-                            <Link href={`/missions/${mission.id}/validate`}>
-                              <Button size="sm" variant="outline" className="border-purple-300 text-purple-600 hover:bg-purple-50">
-                                <CheckCircle className="w-4 h-4" />
+                        <div className="flex flex-col items-end">
+                          <Badge className={`flex items-center gap-1 mb-2 ${getStatusColor(mission.status)} shadow-lg`}>
+                            {getStatusIcon(mission.status)}
+                            {translate(mission.status as any)}
+                          </Badge>
+                          <div className="flex gap-2">
+                            <Link href={`/missions/${mission.id}`}>
+                              <Button size="sm" className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg">
+                                <Eye className="w-4 h-4 mr-2" />
+                                Voir
                               </Button>
                             </Link>
-                          )}
+                            {(mission.status === 'QUALITY_CHECK' || mission.status === 'CLIENT_VALIDATION') && currentUser?.role === 'TEAM_LEADER' && (
+                              <Link href={`/missions/${mission.id}/validate`}>
+                                <Button size="sm" variant="outline" className="border-purple-300 text-purple-600 hover:bg-purple-50">
+                                  <CheckCircle className="w-4 h-4" />
+                                </Button>
+                              </Link>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {mission.tasks?.length > 0 && (
-                      <div className="mt-4 pt-4 border-t border-purple-200">
-                        <div className="flex items-center justify-between text-sm font-medium text-purple-700 mb-2">
-                          <span>Progression</span>
-                          <span>{progress}%</span>
+                      {mission.tasks?.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-purple-200">
+                          <div className="flex items-center justify-between text-sm font-medium text-purple-700 mb-2">
+                            <span>Progression</span>
+                            <span>{progress}%</span>
+                          </div>
+                          <Progress value={progress} className="h-2" />
                         </div>
-                        <Progress value={progress} className="h-2" />
-                      </div>
-                    )}
-
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                  </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
@@ -698,24 +691,23 @@ export default function FieldDashboardPage() {
         </Card>
       )}
 
-      {/* Floating Action Button for Mobile - Only for Team Leaders */}
+      {/* Floating Action Buttons for Mobile */}
       {currentUser?.role === 'TEAM_LEADER' && activeMissions.length > 0 && (
         <div className="fixed bottom-6 right-6 lg:hidden">
           <Link href="/missions">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-300 hover:shadow-blue-400 transition-all duration-300 transform hover:scale-110">
+            <Button className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl shadow-2xl shadow-blue-300 hover:shadow-blue-400 transition-all duration-300 transform hover:scale-110">
               <Calendar className="w-8 h-8 text-white" />
-            </div>
+            </Button>
           </Link>
         </div>
       )}
 
-      {/* Floating Quick Execute Button for Active Missions */}
-      {todayMissions.length > 0 && todayMissions[0]?.id && (
+      {todayMissions.length > 0 && (
         <div className="fixed bottom-24 right-6 lg:hidden">
-          <Link href={`/missions/${todayMissions[0].id}/execute`}>
-            <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-2xl shadow-green-300 hover:shadow-green-400 transition-all duration-300 transform hover:scale-110">
+          <Link href={todayMissions[0]?.id ? `/missions/${todayMissions[0].id}/execute` : '#'}>
+            <Button className="w-14 h-14 bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-2xl shadow-green-300 hover:shadow-green-400 transition-all duration-300 transform hover:scale-110">
               <Play className="w-6 h-6 text-white" />
-            </div>
+            </Button>
           </Link>
         </div>
       )}
