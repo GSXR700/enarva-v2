@@ -518,6 +518,8 @@ export const completeMissionValidationSchema = z.object({
 });
 
 // Mission update validation schema (more flexible)
+// lib/validation.ts - CORRECTED Mission Update Validation Schema
+
 export const missionUpdateValidationSchema = z.object({
   status: z.enum([
     'SCHEDULED', 'IN_PROGRESS', 'QUALITY_CHECK', 'CLIENT_VALIDATION',
@@ -530,18 +532,37 @@ export const missionUpdateValidationSchema = z.object({
     'SERVICE', 'TECHNICAL_VISIT', 'DELIVERY', 'INTERNAL', 'RECURRING'
   ]).optional(),
 
-  scheduledDate: z.string()
-    .datetime()
-    .optional(),
+  // FIXED: More flexible date handling for scheduledDate
+  scheduledDate: z.union([
+    z.string().datetime(), // ISO datetime string
+    z.string().refine(val => {
+      // Handle datetime-local format from HTML inputs
+      if (!val) return true;
+      try {
+        const date = new Date(val);
+        return !isNaN(date.getTime());
+      } catch {
+        return false;
+      }
+    }, { message: "Format de date invalide" }),
+    z.date().transform(d => d.toISOString())
+  ]).optional(),
 
-  estimatedDuration: z.number()
-    .min(0.5, 'Durée minimale: 30 minutes')
-    .max(24, 'Durée maximale: 24 heures')
-    .optional(),
+  // FIXED: Allow both hours and minutes, with better validation
+  estimatedDuration: z.union([
+    z.number().min(0.5, 'Durée minimale: 30 minutes').max(1440, 'Durée maximale: 1440 minutes (24h)'),
+    z.string().transform(val => {
+      const num = parseFloat(val);
+      if (isNaN(num) || num < 0.5) {
+        throw new Error('Durée invalide');
+      }
+      return num;
+    })
+  ]).optional(),
 
   address: z.string()
     .min(1, 'Adresse requise')
-    .max(200, 'Adresse trop longue')
+    .max(500, 'Adresse trop longue') // Increased from 200 to 500
     .optional(),
 
   coordinates: z.string()
@@ -562,15 +583,51 @@ export const missionUpdateValidationSchema = z.object({
     .optional()
     .nullable(),
 
-  actualStartTime: z.string()
-    .datetime()
-    .optional()
-    .nullable(),
+  // FIXED: More flexible datetime handling for actualStartTime
+  actualStartTime: z.union([
+    z.string().datetime(),
+    z.string().refine(val => {
+      if (!val) return true; // null/empty is allowed
+      try {
+        const date = new Date(val);
+        return !isNaN(date.getTime());
+      } catch {
+        return false;
+      }
+    }, { message: "Format de date/heure invalide" }),
+    z.null(),
+    z.literal('') // Allow empty string which will be transformed to null
+  ]).optional().nullable().transform(val => {
+    if (!val || val === '') return null;
+    try {
+      return new Date(val).toISOString();
+    } catch {
+      return null;
+    }
+  }),
 
-  actualEndTime: z.string()
-    .datetime()
-    .optional()
-    .nullable(),
+  // FIXED: More flexible datetime handling for actualEndTime
+  actualEndTime: z.union([
+    z.string().datetime(),
+    z.string().refine(val => {
+      if (!val) return true; // null/empty is allowed
+      try {
+        const date = new Date(val);
+        return !isNaN(date.getTime());
+      } catch {
+        return false;
+      }
+    }, { message: "Format de date/heure invalide" }),
+    z.null(),
+    z.literal('') // Allow empty string which will be transformed to null
+  ]).optional().nullable().transform(val => {
+    if (!val || val === '') return null;
+    try {
+      return new Date(val).toISOString();
+    } catch {
+      return null;
+    }
+  }),
 
   clientValidated: z.boolean()
     .optional(),
@@ -614,7 +671,7 @@ export const missionUpdateValidationSchema = z.object({
     .optional()
     .nullable(),
 
-  // Task updates
+  // FIXED: Updated task validation to match your Prisma schema
   tasks: z.array(z.object({
     id: z.string().optional(), // For existing tasks
     title: z.string().min(1, 'Titre requis'),
@@ -627,13 +684,24 @@ export const missionUpdateValidationSchema = z.object({
     status: z.enum(['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'VALIDATED', 'REJECTED'])
       .default('ASSIGNED'),
     priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'CRITICAL'])
-      .default('NORMAL'),
-    estimatedTime: z.number()
-      .min(0)
+      .default('NORMAL')
+      .optional(), // Make priority optional since it might not always be provided
+    estimatedTime: z.union([
+      z.number().min(0),
+      z.string().transform(val => {
+        const num = parseInt(val);
+        return isNaN(num) ? null : num;
+      })
+    ])
       .optional()
       .nullable(),
-    actualTime: z.number()
-      .min(0)
+    actualTime: z.union([
+      z.number().min(0),
+      z.string().transform(val => {
+        const num = parseInt(val);
+        return isNaN(num) ? null : num;
+      })
+    ])
       .optional()
       .nullable(),
     assignedToId: z.string()
@@ -648,14 +716,42 @@ export const missionUpdateValidationSchema = z.object({
 }).passthrough().refine((data) => {
   // Custom validation: End time should be after start time
   if (data.actualStartTime && data.actualEndTime) {
-    const startTime = new Date(data.actualStartTime);
-    const endTime = new Date(data.actualEndTime);
-    return endTime > startTime;
+    try {
+      const startTime = new Date(data.actualStartTime);
+      const endTime = new Date(data.actualEndTime);
+      
+      // Both dates must be valid
+      if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+        return false;
+      }
+      
+      return endTime > startTime;
+    } catch {
+      return false;
+    }
   }
   return true;
 }, {
   message: "L'heure de fin doit être après l'heure de début",
   path: ["actualEndTime"]
+}).refine((data) => {
+  // Custom validation: Scheduled date should not be in the past (optional check)
+  if (data.scheduledDate) {
+    try {
+      const scheduledDate = new Date(data.scheduledDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Start of today
+      
+      // Allow scheduled date to be today or in the future
+      return scheduledDate >= today;
+    } catch {
+      return true; // If date parsing fails, let other validation handle it
+    }
+  }
+  return true;
+}, {
+  message: "La date programmée ne peut pas être dans le passé",
+  path: ["scheduledDate"]
 });
 
 // Mission creation schema (stricter validation)
