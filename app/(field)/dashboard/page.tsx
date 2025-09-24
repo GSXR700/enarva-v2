@@ -30,8 +30,8 @@ import {
   Target,
   TrendingUp,
   BarChart3,
-  PlusCircle,
-  HeadphonesIcon
+  HeadphonesIcon,
+  Pause
 } from 'lucide-react';
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
 import Pusher from 'pusher-js';
@@ -328,7 +328,7 @@ export default function FieldDashboardPage() {
               </div>
             </Link>
 
-            <Link href="/reports">
+            <Link href="/field-reports">
               <div className="group relative overflow-hidden bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
                 <div className="flex flex-col items-center text-center space-y-3">
                   <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-200 group-hover:scale-110 transition-transform">
@@ -412,13 +412,34 @@ export default function FieldDashboardPage() {
                     </div>
 
                     <div className="flex gap-3">
-                      <Link href={`/missions/${mission.id}`} className="flex-1">
-                        <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
-                          <Eye className="w-4 h-4 mr-2" />
-                          Voir Détails
-                          <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
-                      </Link>
+                      {mission.status === 'SCHEDULED' && currentUser?.role === 'TEAM_LEADER' && (
+                        <Link href={`/missions/${mission.id}/execute`} className="flex-1">
+                          <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-200 hover:shadow-xl transition-all duration-300">
+                            <Play className="w-4 h-4 mr-2" />
+                            Démarrer Mission
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </Button>
+                        </Link>
+                      )}
+                      {mission.status === 'IN_PROGRESS' && (
+                        <Link href={`/missions/${mission.id}/execute`} className="flex-1">
+                          <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
+                            <Pause className="w-4 h-4 mr-2" />
+                            Continuer Mission
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </Button>
+                        </Link>
+                      )}
+                      {(mission.status === 'SCHEDULED' && currentUser?.role !== 'TEAM_LEADER') || 
+                       (mission.status !== 'SCHEDULED' && mission.status !== 'IN_PROGRESS') && (
+                        <Link href={`/missions/${mission.id}`} className="flex-1">
+                          <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
+                            <Eye className="w-4 h-4 mr-2" />
+                            Voir Détails
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </Button>
+                        </Link>
+                      )}
                     </div>
 
                     <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
@@ -489,6 +510,22 @@ export default function FieldDashboardPage() {
                     </div>
 
                     <div className="flex gap-3">
+                      {mission.status === 'SCHEDULED' && currentUser?.role === 'TEAM_LEADER' && (
+                        <Link href={`/missions/${mission.id}/execute`} className="flex-1">
+                          <Button className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-200 hover:shadow-xl transition-all duration-300">
+                            <Play className="w-4 h-4 mr-2" />
+                            Démarrer
+                          </Button>
+                        </Link>
+                      )}
+                      {mission.status === 'IN_PROGRESS' && (
+                        <Link href={`/missions/${mission.id}/execute`} className="flex-1">
+                          <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
+                            <Pause className="w-4 h-4 mr-2" />
+                            Continuer
+                          </Button>
+                        </Link>
+                      )}
                       <Link href={`/missions/${mission.id}`} className="flex-1">
                         <Button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-200 hover:shadow-xl transition-all duration-300">
                           <Eye className="w-4 h-4 mr-2" />
@@ -527,13 +564,6 @@ export default function FieldDashboardPage() {
                 const progress = getMissionProgress(mission);
                 return (
                   <div key={mission.id} className="group relative overflow-hidden bg-gradient-to-r from-white to-purple-50/50 p-6 rounded-2xl border border-purple-200 shadow-lg hover:shadow-2xl transition-all duration-300">
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center justify-between text-sm font-medium text-purple-700">
-                        <span>Progression</span>
-                        <span>{progress}%</span>
-                      </div>
-                      <Progress value={progress} className="h-2" />
-                    </div>
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <h4 className="font-bold text-lg text-gray-900 mb-1">
@@ -552,14 +582,33 @@ export default function FieldDashboardPage() {
                           {getStatusIcon(mission.status)}
                           {translate(mission.status as any)}
                         </Badge>
-                        <Link href={`/missions/${mission.id}`}>
-                          <Button size="sm" className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg">
-                            <Eye className="w-4 h-4 mr-2" />
-                            Voir
-                          </Button>
-                        </Link>
+                        <div className="flex gap-2">
+                          <Link href={`/missions/${mission.id}`}>
+                            <Button size="sm" className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg">
+                              <Eye className="w-4 h-4 mr-2" />
+                              Voir
+                            </Button>
+                          </Link>
+                          {(mission.status === 'QUALITY_CHECK' || mission.status === 'CLIENT_VALIDATION') && currentUser?.role === 'TEAM_LEADER' && (
+                            <Link href={`/missions/${mission.id}/validate`}>
+                              <Button size="sm" variant="outline" className="border-purple-300 text-purple-600 hover:bg-purple-50">
+                                <CheckCircle className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                          )}
+                        </div>
                       </div>
                     </div>
+
+                    {mission.tasks?.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-purple-200">
+                        <div className="flex items-center justify-between text-sm font-medium text-purple-700 mb-2">
+                          <span>Progression</span>
+                          <span>{progress}%</span>
+                        </div>
+                        <Progress value={progress} className="h-2" />
+                      </div>
+                    )}
 
                     <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                   </div>
@@ -649,14 +698,27 @@ export default function FieldDashboardPage() {
         </Card>
       )}
 
-      {/* Floating Action Button for Mobile */}
-      <div className="fixed bottom-6 right-6 lg:hidden">
-        <Link href="/missions">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-300 hover:shadow-blue-400 transition-all duration-300 transform hover:scale-110">
-            <PlusCircle className="w-8 h-8 text-white" />
-          </div>
-        </Link>
-      </div>
+      {/* Floating Action Button for Mobile - Only for Team Leaders */}
+      {currentUser?.role === 'TEAM_LEADER' && activeMissions.length > 0 && (
+        <div className="fixed bottom-6 right-6 lg:hidden">
+          <Link href="/missions">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-300 hover:shadow-blue-400 transition-all duration-300 transform hover:scale-110">
+              <Calendar className="w-8 h-8 text-white" />
+            </div>
+          </Link>
+        </div>
+      )}
+
+      {/* Floating Quick Execute Button for Active Missions */}
+      {todayMissions.length > 0 && todayMissions[0]?.id && (
+        <div className="fixed bottom-24 right-6 lg:hidden">
+          <Link href={`/missions/${todayMissions[0].id}/execute`}>
+            <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-2xl shadow-green-300 hover:shadow-green-400 transition-all duration-300 transform hover:scale-110">
+              <Play className="w-6 h-6 text-white" />
+            </div>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
