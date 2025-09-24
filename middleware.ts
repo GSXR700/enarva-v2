@@ -1,8 +1,7 @@
-// middleware.ts - FIXED ROLE-BASED ROUTING
+// middleware.ts - FIXED ROLE-BASED ROUTING WITH MISSION ACCESS
 import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
-
 
 export async function middleware(req: NextRequest) {
   const token = await getToken({ req, ...(process.env.NEXTAUTH_SECRET ? { secret: process.env.NEXTAUTH_SECRET } : {}) });
@@ -37,13 +36,23 @@ export async function middleware(req: NextRequest) {
 
   const userRole = token.role as string;
 
-  // Define route patterns more precisely
-  const adminRoutes = [
+  // Routes that ALL authenticated users can access
+  const sharedRoutes = [
+    '/api/', // All API routes
+    '/missions', // Mission routes - accessible by field workers
+    '/profile',
+    '/help',
+    '/field-reports'
+  ];
+
+  // Admin-only routes
+  const adminOnlyRoutes = [
     '/(administration)',
     '/leads',
-    '/quotes', 
-    '/missions',
-    '/teams',
+    '/quotes/new',
+    '/quotes/edit',
+    '/teams/new',
+    '/teams/edit',
     '/inventory',
     '/billing',
     '/analytics',
@@ -52,38 +61,41 @@ export async function middleware(req: NextRequest) {
     '/settings'
   ];
 
-  // Field/Technician routes - these contain "dashboard" or "(field)"
+  // Field-specific routes (dashboard, field reports, etc)
   const fieldRoutes = [
     '/(field)',
     '/dashboard' // This is the field dashboard
   ];
 
-  const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route)) || pathname === '/';
+  // Check if current route is shared (accessible by everyone)
+  const isSharedRoute = sharedRoutes.some(route => pathname.startsWith(route));
+  if (isSharedRoute) {
+    return NextResponse.next();
+  }
+
+  // Check route types
+  const isAdminOnlyRoute = adminOnlyRoutes.some(route => pathname.startsWith(route)) || pathname === '/';
   const isFieldRoute = fieldRoutes.some(route => pathname.startsWith(route));
 
   // Role-based access control
   if (userRole === 'ADMIN' || userRole === 'MANAGER') {
-    // Admins and Managers should use admin interface
+    // Admins and Managers can access admin routes but get redirected from field routes
     if (isFieldRoute) {
-      // Redirect field routes to admin dashboard
       return NextResponse.redirect(new URL('/', req.url));
     }
-    // Allow access to admin routes
     return NextResponse.next();
   }
 
   if (userRole === 'TECHNICIAN' || userRole === 'TEAM_LEADER') {
-    // Technicians and Team Leaders should use field interface
-    if (isAdminRoute) {
-      // Redirect admin routes to field dashboard  
+    // Field workers can access field routes and shared routes but not admin-only routes
+    if (isAdminOnlyRoute) {
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
-    // Allow access to field routes
     return NextResponse.next();
   }
 
   if (userRole === 'AGENT') {
-    // Agents can access both, but default to admin interface
+    // Agents can access everything
     return NextResponse.next();
   }
 
