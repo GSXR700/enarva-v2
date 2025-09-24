@@ -10,460 +10,653 @@ import { Progress } from '@/components/ui/progress';
 import { Mission, Lead, Task } from '@prisma/client';
 import { formatDate, formatTime, translate } from '@/lib/utils';
 import {
-  MapPin,
-  Clock,
-  Play,
-  CheckCircle,
-  AlertTriangle,
-  Calendar,
-  Users,
-  Camera,
-  ThumbsUp,
-  Eye,
-  Bell,
-  Pause
+  MapPin,
+  Clock,
+  Play,
+  CheckCircle,
+  AlertTriangle,
+  Calendar,
+  Users,
+  Camera,
+  ThumbsUp,
+  Eye,
+  Bell,
+  ArrowRight,
+  Star,
+  Timer,
+  Award,
+  Activity,
+  Zap,
+  Target,
+  TrendingUp,
+  BarChart3,
+  PlusCircle,
+  HeadphonesIcon
 } from 'lucide-react';
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
 import Pusher from 'pusher-js';
 import { toast } from 'sonner';
 
 type TaskWithDetails = Task & {
-  beforePhotos?: string[];
-  afterPhotos?: string[];
-  clientApproved?: boolean;
+  beforePhotos?: string[];
+  afterPhotos?: string[];
+  clientApproved?: boolean;
 };
 
 type MissionWithDetails = Mission & {
-  lead: Lead;
-  tasks: TaskWithDetails[];
+  lead: Lead;
+  tasks: TaskWithDetails[];
 };
 
 export default function FieldDashboardPage() {
-  const currentUser = useCurrentUser();
-  const [myMissions, setMyMissions] = useState<MissionWithDetails[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const currentUser = useCurrentUser();
+  const [myMissions, setMyMissions] = useState<MissionWithDetails[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const fetchMissions = useCallback(async () => {
-    if (!currentUser?.id) {
-      console.log('No current user ID available');
-      return;
-    }
+  const fetchMissions = useCallback(async () => {
+    if (!currentUser?.id) {
+      console.log('No current user ID available');
+      return;
+    }
 
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/missions');
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch missions');
-      }
-      
-      const data = await response.json();
-      
-      // FIX: Handle the API response structure correctly
-      // The API returns { missions: [...], total: ..., page: ... }
-      const allMissions: MissionWithDetails[] = Array.isArray(data) ? data : data.missions || [];
-      
-      console.log('Fetched missions:', allMissions);
-      console.log('Current user ID:', currentUser.id);
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/missions');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch missions');
+      }
+      
+      const data = await response.json();
+      
+      // Handle the API response structure correctly
+      const allMissions: MissionWithDetails[] = Array.isArray(data) ? 
+        data : data.missions || [];
+      
+      // Filter missions assigned to current user
+      const assignedMissions = allMissions.filter(
+        mission =>
+          mission.teamLeaderId === currentUser.id ||
+          (mission.status !== 'COMPLETED' && mission.status !== 'CANCELLED')
+      );
 
-      // Filter missions assigned to current user or that need attention
-      const assignedMissions = allMissions.filter(
-        mission =>
-          mission.teamLeaderId === currentUser.id || // FIX: Use currentUser.id
-          (mission.status !== 'COMPLETED' && mission.status !== 'CANCELLED')
-      );
+      setMyMissions(assignedMissions);
+      
+    } catch (error) {
+      console.error('Error fetching missions:', error);
+      toast.error('Erreur lors de la récupération des missions');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentUser?.id]);
 
-      console.log('Assigned missions:', assignedMissions);
-      setMyMissions(assignedMissions);
-      
-    } catch (error) {
-      console.error('Error fetching missions:', error);
-      toast.error('Erreur lors de la récupération des missions');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentUser?.id]);
+  useEffect(() => {
+    if (!currentUser?.id) {
+      fetchMissions();
+      return;
+    }
 
-  useEffect(() => {
-    if (!currentUser?.id) {
-      fetchMissions();
-      return; // Quitte tôt si l'utilisateur n'est pas là
-    }
+    fetchMissions();
 
-    fetchMissions();
+    // Setup Pusher for real-time notifications
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+    });
 
-    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-    });
+    const channelName = `user-${currentUser.id}`;
+    const channel = pusher.subscribe(channelName);
 
-    const channelName = `user-${currentUser.id}`;
-    const channel = pusher.subscribe(channelName);
+    channel.bind('mission-new', (newMission: Mission) => {
+      toast.success(`Nouvelle mission assignée: ${newMission.missionNumber}`);
+      fetchMissions();
+    });
 
-    channel.bind('mission-new', (newMission: Mission) => {
-      toast.success(`Nouvelle mission assignée: ${newMission.missionNumber}`);
-      fetchMissions();
-    });
+    channel.bind('mission-validation', (data: any) => {
+      const message = data.approved
+        ? `Mission ${data.missionNumber} validée !`
+        : `Mission ${data.missionNumber} nécessite des corrections`;
+      
+      toast.info(message);
+      
+      setNotifications(prev => [
+        {
+          id: Date.now(),
+          type: data.approved ? 'success' : 'warning',
+          message,
+          missionId: data.missionId
+        },
+        ...prev.slice(0, 4)
+      ]);
+    });
 
-    channel.bind('mission-validation', (data: any) => {
-      const message = data.approved
-        ? `Mission ${data.missionNumber} validée !`
-        : `Mission ${data.missionNumber} nécessite des corrections`;
-      
-      toast.info(message);
-      
-      setNotifications(prev => [
-        {
-          id: Date.now(),
-          type: data.approved ? 'success' : 'warning',
-          message,
-          missionNumber: data.missionNumber,
-          issuesFound: data.issuesFound || null,
-          timestamp: new Date()
-        },
-        ...prev.slice(0, 4)
-      ]);
-      
-      fetchMissions();
-    });
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [currentUser?.id, fetchMissions]);
 
-    // La fonction de nettoyage est maintenant toujours retournée
-    return () => {
-      channel.unbind_all();
-      channel.unsubscribe();
-      pusher.disconnect();
-    };
-  }, [currentUser?.id, fetchMissions]);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'SCHEDULED':
+        return 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-blue-200';
+      case 'IN_PROGRESS':
+        return 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-orange-200';
+      case 'COMPLETED':
+        return 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-green-200';
+      case 'QUALITY_CHECK':
+        return 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-purple-200';
+      case 'CLIENT_VALIDATION':
+        return 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-indigo-200';
+      default:
+        return 'bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow-gray-200';
+    }
+  };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'SCHEDULED': return 'bg-blue-100 text-blue-800';
-      case 'IN_PROGRESS': return 'bg-yellow-100 text-yellow-800';
-      case 'QUALITY_CHECK': return 'bg-purple-100 text-purple-800';
-      case 'CLIENT_VALIDATION': return 'bg-orange-100 text-orange-800';
-      case 'COMPLETED': return 'bg-green-100 text-green-800';
-      case 'CANCELLED': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'SCHEDULED':
+        return <Calendar className="w-4 h-4" />;
+      case 'IN_PROGRESS':
+        return <Play className="w-4 h-4" />;
+      case 'COMPLETED':
+        return <CheckCircle className="w-4 h-4" />;
+      case 'QUALITY_CHECK':
+        return <Eye className="w-4 h-4" />;
+      case 'CLIENT_VALIDATION':
+        return <ThumbsUp className="w-4 h-4" />;
+      default:
+        return <AlertTriangle className="w-4 h-4" />;
+    }
+  };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'SCHEDULED': return <Calendar className="w-4 h-4" />;
-      case 'IN_PROGRESS': return <Play className="w-4 h-4" />;
-      case 'QUALITY_CHECK': return <Eye className="w-4 h-4" />;
-      case 'CLIENT_VALIDATION': return <ThumbsUp className="w-4 h-4" />;
-      case 'COMPLETED': return <CheckCircle className="w-4 h-4" />;
-      case 'CANCELLED': return <AlertTriangle className="w-4 h-4" />;
-      default: return <Clock className="w-4 h-4" />;
-    }
-  };
+  const getMissionProgress = (mission: MissionWithDetails) => {
+    if (!mission.tasks?.length) return 0;
+    const completedTasks = mission.tasks.filter(
+      task => task.status === 'COMPLETED' || task.status === 'VALIDATED'
+    ).length;
+    return Math.round((completedTasks / mission.tasks.length) * 100);
+  };
 
-  const getMissionStatusInfo = (mission: MissionWithDetails) => {
-    if (!mission.tasks || mission.tasks.length === 0) {
-      return { completedTasks: 0, totalTasks: 0, progress: 0 };
-    }
+  if (isLoading) {
+    return <TableSkeleton title="Chargement de votre tableau de bord..." />;
+  }
 
-    const totalTasks = mission.tasks.length;
-    const completedTasks = mission.tasks.filter(task => 
-      task.status === 'COMPLETED' || task.status === 'VALIDATED'
-    ).length;
-    const progress = Math.round((completedTasks / totalTasks) * 100);
+  const activeMissions = myMissions.filter(m =>
+    ['SCHEDULED', 'IN_PROGRESS'].includes(m.status)
+  );
+  const pendingMissions = myMissions.filter(m =>
+    ['QUALITY_CHECK', 'CLIENT_VALIDATION'].includes(m.status)
+  );
+  const completedMissions = myMissions.filter(m =>
+    m.status === 'COMPLETED'
+  );
 
-    return { completedTasks, totalTasks, progress };
-  };
+  const getTodayMissions = () => {
+    const today = new Date();
+    return activeMissions.filter(mission => {
+      const missionDate = new Date(mission.scheduledDate);
+      return missionDate.toDateString() === today.toDateString();
+    });
+  };
 
-  if (isLoading) {
-    return <TableSkeleton title="Chargement de vos missions..." />;
-  }
+  const todayMissions = getTodayMissions();
 
-  const activeMissions = myMissions.filter(m =>
-    ['SCHEDULED', 'IN_PROGRESS'].includes(m.status)
-  );
-  const pendingMissions = myMissions.filter(m =>
-    ['QUALITY_CHECK', 'CLIENT_VALIDATION'].includes(m.status)
-  );
-  const completedMissions = myMissions.filter(m =>
-    m.status === 'COMPLETED'
-  );
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/30 p-4 space-y-6">
+      {/* Enhanced Header Section */}
+      <div className="relative">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-blue-900 bg-clip-text text-transparent">
+              Tableau de Bord Terrain
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Bonjour {currentUser?.name} 👋, voici vos missions du jour
+            </p>
+          </div>
+          {notifications.length > 0 && (
+            <div className="relative">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
+                <Bell className="w-6 h-6 text-white" />
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+                  {notifications.length}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
-  return (
-    <div className="main-content space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            Tableau de Bord Terrain
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Bonjour {currentUser?.name}, voici vos missions du jour
-          </p>
-        </div>
-        {notifications.length > 0 && (
-          <div className="relative">
-            <Bell className="w-6 h-6 text-muted-foreground" />
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-              {notifications.length}
-            </span>
-          </div>
-        )}
-      </div>
+      {/* Modern Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-white to-blue-50/50 border-0 shadow-lg shadow-blue-100/50 hover:shadow-xl transition-all duration-300 group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Missions Actives</p>
+                <p className="text-3xl font-bold text-orange-600">{activeMissions.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200 group-hover:scale-110 transition-transform">
+                <Activity className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          </CardContent>
+        </Card>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Missions Actives</p>
-                <p className="text-2xl font-bold text-orange-600">{activeMissions.length}</p>
-              </div>
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Play className="w-6 h-6 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <Card className="relative overflow-hidden bg-gradient-to-br from-white to-blue-50/50 border-0 shadow-lg shadow-blue-100/50 hover:shadow-xl transition-all duration-300 group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">En Attente</p>
+                <p className="text-3xl font-bold text-blue-600">{pendingMissions.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 group-hover:scale-110 transition-transform">
+                <Timer className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          </CardContent>
+        </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">En Attente</p>
-                <p className="text-2xl font-bold text-blue-600">{pendingMissions.length}</p>
-              </div>
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Clock className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <Card className="relative overflow-hidden bg-gradient-to-br from-white to-green-50/50 border-0 shadow-lg shadow-green-100/50 hover:shadow-xl transition-all duration-300 group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Terminées</p>
+                <p className="text-3xl font-bold text-green-600">{completedMissions.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-200 group-hover:scale-110 transition-transform">
+                <Award className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          </CardContent>
+        </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Terminées</p>
-                <p className="text-2xl font-bold text-green-600">{completedMissions.length}</p>
-              </div>
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <Card className="relative overflow-hidden bg-gradient-to-br from-white to-purple-50/50 border-0 shadow-lg shadow-purple-100/50 hover:shadow-xl transition-all duration-300 group">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">Aujourd'hui</p>
+                <p className="text-3xl font-bold text-purple-600">{todayMissions.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-200 group-hover:scale-110 transition-transform">
+                <Target className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Notifications */}
-      {notifications.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="w-5 h-5" />
-              Notifications Récentes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {notifications.map((notif) => (
-                <div key={notif.id} className={`p-3 rounded-lg border-l-4 ${
-                  notif.type === 'success' 
-                    ? 'border-l-green-500 bg-green-50' 
-                    : 'border-l-orange-500 bg-orange-50'
-                }`}>
-                  <p className="font-medium">{notif.message}</p>
-                  {notif.issuesFound && (
-                    <p className="text-sm text-muted-foreground">{notif.issuesFound}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Quick Actions Section */}
+      <Card className="bg-gradient-to-r from-white via-white to-blue-50/30 border-0 shadow-xl shadow-blue-100/30">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
+            <Zap className="w-6 h-6 text-blue-600" />
+            Actions Rapides
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Link href="/missions">
+              <div className="group relative overflow-hidden bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-14 h-14 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 group-hover:scale-110 transition-transform">
+                    <Calendar className="w-7 h-7 text-white" />
+                  </div>
+                  <span className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                    Toutes les Missions
+                  </span>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </Link>
 
-      {/* Active Missions */}
-      {activeMissions.length > 0 && (
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Missions Actives</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {activeMissions.map((mission) => {
-              const statusInfo = getMissionStatusInfo(mission);
-              
-              return (
-                <Card key={mission.id} className="thread-card hover:shadow-lg transition-all">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{mission.missionNumber}</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          {mission.lead.firstName} {mission.lead.lastName}
-                        </p>
-                      </div>
-                      <Badge className={`flex items-center gap-1 ${getStatusColor(mission.status)}`}>
-                        {getStatusIcon(mission.status)}
-                        {translate(mission.status as any)}
-                      </Badge>
-                    </div>
-                  </CardHeader>
+            <Link href="/profile">
+              <div className="group relative overflow-hidden bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-14 h-14 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg shadow-green-200 group-hover:scale-110 transition-transform">
+                    <Users className="w-7 h-7 text-white" />
+                  </div>
+                  <span className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors">
+                    Mon Profil
+                  </span>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </Link>
 
-                  <CardContent className="space-y-4">
-                    {/* Mission Details */}
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-muted-foreground" />
-                        <span className="truncate">{mission.address}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span>{formatDate(mission.scheduledDate)} à {formatTime(mission.scheduledDate)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-muted-foreground" />
-                        <span>{statusInfo.totalTasks} tâches</span>
-                      </div>
-                    </div>
+            <Link href="/reports">
+              <div className="group relative overflow-hidden bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-14 h-14 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-200 group-hover:scale-110 transition-transform">
+                    <Camera className="w-7 h-7 text-white" />
+                  </div>
+                  <span className="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">
+                    Mes Rapports
+                  </span>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </Link>
 
-                    {/* Progress */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Progression</span>
-                        <span>{statusInfo.completedTasks}/{statusInfo.totalTasks}</span>
-                      </div>
-                      <Progress value={statusInfo.progress} className="w-full" />
-                    </div>
+            <Link href="/help">
+              <div className="group relative overflow-hidden bg-gradient-to-br from-white to-gray-50 p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1">
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-14 h-14 bg-gradient-to-r from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-200 group-hover:scale-110 transition-transform">
+                    <HeadphonesIcon className="w-7 h-7 text-white" />
+                  </div>
+                  <span className="font-semibold text-gray-900 group-hover:text-red-600 transition-colors">
+                    Support
+                  </span>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-2 pt-2">
-                      {mission.status === 'SCHEDULED' && (
-                        <Link href={`/missions/${mission.id}/execute`} className="flex-1">
-                          <Button size="sm" className="w-full">
-                            <Play className="w-4 h-4 mr-2" />
-                            Démarrer
-                          </Button>
-                        </Link>
-                      )}
-                      {mission.status === 'IN_PROGRESS' && (
-                        <Link href={`/missions/${mission.id}/execute`} className="flex-1">
-                          <Button variant="outline" size="sm" className="w-full">
-                            <Pause className="w-4 h-4 mr-2" />
-                            Continuer
-                          </Button>
-                        </Link>
-                      )}
-                      <Link href={`/missions/${mission.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Today's Missions */}
+      {todayMissions.length > 0 && (
+        <Card className="bg-gradient-to-r from-white via-white to-orange-50/30 border-0 shadow-xl shadow-orange-100/30">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
+              <Star className="w-6 h-6 text-orange-600" />
+              Missions d'Aujourd'hui
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {todayMissions.map((mission) => {
+                const progress = getMissionProgress(mission);
+                return (
+                  <div key={mission.id} className="group relative overflow-hidden bg-gradient-to-r from-white to-orange-50/50 p-6 rounded-2xl border border-orange-200 shadow-lg hover:shadow-2xl transition-all duration-300">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h4 className="font-bold text-lg text-gray-900 mb-1">
+                          {mission.missionNumber}
+                        </h4>
+                        <p className="text-gray-600 font-medium">
+                          {mission.lead.firstName} {mission.lead.lastName}
+                        </p>
+                      </div>
+                      <Badge className={`flex items-center gap-1 ${getStatusColor(mission.status)} shadow-lg`}>
+                        {getStatusIcon(mission.status)}
+                        {translate(mission.status as any)}
+                      </Badge>
+                    </div>
 
-      {/* Pending Missions */}
-      {pendingMissions.length > 0 && (
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Missions en Attente de Validation</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {pendingMissions.map((mission) => {
-              
-              return (
-                <Card key={mission.id} className="thread-card">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{mission.missionNumber}</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          {mission.lead.firstName} {mission.lead.lastName}
-                        </p>
-                      </div>
-                      <Badge className={`flex items-center gap-1 ${getStatusColor(mission.status)}`}>
-                        {getStatusIcon(mission.status)}
-                        {translate(mission.status as any)}
-                      </Badge>
-                    </div>
-                  </CardHeader>
+                    <div className="space-y-3 mb-4">
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <MapPin className="w-5 h-5 text-orange-500" />
+                        <span className="font-medium truncate">{mission.lead.address}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <Clock className="w-5 h-5 text-orange-500" />
+                        <span className="font-medium">
+                          {formatDate(mission.scheduledDate)} à {formatTime(mission.scheduledDate)}
+                        </span>
+                      </div>
+                      {mission.tasks?.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm font-medium text-gray-700">
+                            <span>Progression</span>
+                            <span>{progress}%</span>
+                          </div>
+                          <Progress value={progress} className="h-2" />
+                        </div>
+                      )}
+                    </div>
 
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-muted-foreground" />
-                        <span className="truncate">{mission.address}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span>{formatDate(mission.scheduledDate)}</span>
-                      </div>
-                    </div>
+                    <div className="flex gap-3">
+                      <Link href={`/missions/${mission.id}`} className="flex-1">
+                        <Button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg shadow-orange-200 hover:shadow-xl transition-all duration-300">
+                          <Eye className="w-4 h-4 mr-2" />
+                          Voir Détails
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </Link>
+                    </div>
 
-                    <div className="flex gap-2">
-                      <Link href={`/missions/${mission.id}`} className="flex-1">
-                        <Button variant="outline" size="sm" className="w-full">
-                          <Eye className="w-4 h-4 mr-2" />
-                          Voir Détails
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                    <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* No Missions */}
-      {myMissions.length === 0 && (
-        <Card className="text-center py-12">
-          <CardContent>
-            <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Aucune mission assignée</h3>
-            <p className="text-muted-foreground mb-4">
-              Vous n'avez actuellement aucune mission assignée. Contactez votre responsable pour plus d'informations.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Active Missions */}
+      {activeMissions.length > 0 && (
+        <Card className="bg-gradient-to-r from-white via-white to-blue-50/30 border-0 shadow-xl shadow-blue-100/30">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
+                <Activity className="w-6 h-6 text-blue-600" />
+                Missions Actives
+              </CardTitle>
+              <Badge className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-full shadow-lg">
+                {activeMissions.length}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {activeMissions.map((mission) => {
+                const progress = getMissionProgress(mission);
+                return (
+                  <div key={mission.id} className="group relative overflow-hidden bg-gradient-to-br from-white to-blue-50/50 p-6 rounded-2xl border border-blue-200 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h4 className="font-bold text-lg text-gray-900 mb-1">
+                          {mission.missionNumber}
+                        </h4>
+                        <p className="text-gray-600 font-medium">
+                          {mission.lead.firstName} {mission.lead.lastName}
+                        </p>
+                      </div>
+                      <Badge className={`flex items-center gap-1 ${getStatusColor(mission.status)} shadow-lg`}>
+                        {getStatusIcon(mission.status)}
+                        {translate(mission.status as any)}
+                      </Badge>
+                    </div>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Actions Rapides</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Link href="/missions">
-              <Button variant="outline" className="w-full h-20 flex flex-col gap-2">
-                <Calendar className="w-6 h-6" />
-                <span className="text-sm">Toutes les Missions</span>
-              </Button>
-            </Link>
-            <Link href="/profile">
-              <Button variant="outline" className="w-full h-20 flex flex-col gap-2">
-                <Users className="w-6 h-6" />
-                <span className="text-sm">Mon Profil</span>
-              </Button>
-            </Link>
-            <Link href="/reports">
-              <Button variant="outline" className="w-full h-20 flex flex-col gap-2">
-                <Camera className="w-6 h-6" />
-                <span className="text-sm">Mes Rapports</span>
-              </Button>
-            </Link>
-            <Link href="/help">
-              <Button variant="outline" className="w-full h-20 flex flex-col gap-2">
-                <AlertTriangle className="w-6 h-6" />
-                <span className="text-sm">Support</span>
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+                    <div className="space-y-3 mb-4">
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <MapPin className="w-5 h-5 text-blue-500" />
+                        <span className="font-medium truncate">{mission.lead.address}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-gray-600">
+                        <Clock className="w-5 h-5 text-blue-500" />
+                        <span className="font-medium">{formatDate(mission.scheduledDate)}</span>
+                      </div>
+                      {mission.tasks?.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm font-medium text-gray-700">
+                            <span>Progression</span>
+                            <span>{progress}%</span>
+                          </div>
+                          <Progress value={progress} className="h-2" />
+                          <p className="text-sm text-gray-600">
+                            {mission.tasks.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length} / {mission.tasks.length} tâches terminées
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Link href={`/missions/${mission.id}`} className="flex-1">
+                        <Button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-200 hover:shadow-xl transition-all duration-300">
+                          <Eye className="w-4 h-4 mr-2" />
+                          Voir Détails
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </Link>
+                    </div>
+
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pending Missions */}
+      {pendingMissions.length > 0 && (
+        <Card className="bg-gradient-to-r from-white via-white to-purple-50/30 border-0 shadow-xl shadow-purple-100/30">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
+                <Timer className="w-6 h-6 text-purple-600" />
+                Missions en Attente
+              </CardTitle>
+              <Badge className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-1 rounded-full shadow-lg">
+                {pendingMissions.length}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {pendingMissions.map((mission) => {
+                const progress = getMissionProgress(mission);
+                return (
+                  <div key={mission.id} className="group relative overflow-hidden bg-gradient-to-r from-white to-purple-50/50 p-6 rounded-2xl border border-purple-200 shadow-lg hover:shadow-2xl transition-all duration-300">
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between text-sm font-medium text-purple-700">
+                        <span>Progression</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <Progress value={progress} className="h-2" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-bold text-lg text-gray-900 mb-1">
+                          {mission.missionNumber}
+                        </h4>
+                        <p className="text-gray-600 font-medium mb-2">
+                          {mission.lead.firstName} {mission.lead.lastName}
+                        </p>
+                        <div className="flex items-center gap-2 text-sm text-purple-600">
+                          <Clock className="w-4 h-4" />
+                          {formatDate(mission.scheduledDate)}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <Badge className={`flex items-center gap-1 mb-2 ${getStatusColor(mission.status)} shadow-lg`}>
+                          {getStatusIcon(mission.status)}
+                          {translate(mission.status as any)}
+                        </Badge>
+                        <Link href={`/missions/${mission.id}`}>
+                          <Button size="sm" className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg">
+                            <Eye className="w-4 h-4 mr-2" />
+                            Voir
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No Missions State */}
+      {myMissions.length === 0 && (
+        <Card className="bg-gradient-to-br from-white via-gray-50 to-blue-50/50 border-0 shadow-xl text-center py-16">
+          <CardContent>
+            <div className="max-w-md mx-auto space-y-6">
+              <div className="w-20 h-20 bg-gradient-to-r from-gray-400 to-gray-500 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
+                <Calendar className="w-10 h-10 text-white" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                  Aucune mission assignée
+                </h3>
+                <p className="text-gray-600 text-lg leading-relaxed">
+                  Vous n'avez actuellement aucune mission assignée.<br />
+                  Contactez votre responsable pour plus d'informations.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link href="/help">
+                  <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-200 px-8">
+                    <HeadphonesIcon className="w-4 h-4 mr-2" />
+                    Contacter le Support
+                  </Button>
+                </Link>
+                <Button 
+                  variant="outline" 
+                  onClick={() => fetchMissions()}
+                  className="border-2 border-gray-300 hover:bg-gray-50 px-8"
+                >
+                  <Activity className="w-4 h-4 mr-2" />
+                  Actualiser
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Performance Summary */}
+      {completedMissions.length > 0 && (
+        <Card className="bg-gradient-to-r from-white via-white to-green-50/30 border-0 shadow-xl shadow-green-100/30">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
+              <TrendingUp className="w-6 h-6 text-green-600" />
+              Résumé des Performances
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-2xl border border-green-200 shadow-lg">
+                <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-green-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-200">
+                  <CheckCircle className="w-8 h-8 text-white" />
+                </div>
+                <p className="text-3xl font-bold text-green-600 mb-1">{completedMissions.length}</p>
+                <p className="text-sm font-medium text-green-700">Missions Terminées</p>
+              </div>
+              
+              <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border border-blue-200 shadow-lg">
+                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
+                  <BarChart3 className="w-8 h-8 text-white" />
+                </div>
+                <p className="text-3xl font-bold text-blue-600 mb-1">
+                  {Math.round((completedMissions.length / Math.max(myMissions.length, 1)) * 100)}%
+                </p>
+                <p className="text-sm font-medium text-blue-700">Taux de Réussite</p>
+              </div>
+              
+              <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl border border-purple-200 shadow-lg">
+                <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-200">
+                  <Star className="w-8 h-8 text-white" />
+                </div>
+                <p className="text-3xl font-bold text-purple-600 mb-1">4.8</p>
+                <p className="text-sm font-medium text-purple-700">Note Moyenne</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Floating Action Button for Mobile */}
+      <div className="fixed bottom-6 right-6 lg:hidden">
+        <Link href="/missions">
+          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-blue-300 hover:shadow-blue-400 transition-all duration-300 transform hover:scale-110">
+            <PlusCircle className="w-8 h-8 text-white" />
+          </div>
+        </Link>
+      </div>
+    </div>
+  );
 }
