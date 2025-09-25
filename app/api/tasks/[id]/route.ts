@@ -1,9 +1,9 @@
+// app/api/tasks/[id]/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { PrismaClient } from '@prisma/client';
 import { ExtendedUser } from '@/types/next-auth';
-//import { TaskStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -84,7 +84,7 @@ async function handleTaskUpdate(
     const { id } = await params;
     const body = await request.json();
 
-    console.log('🔧 Task Update Request:', { taskId: id, body, userId: user.id });
+    console.log('🔧 Task Update Request:', { taskId: id, body, userId: user.id, userRole: user.role });
 
     const existingTask = await prisma.task.findUnique({
       where: { id },
@@ -103,18 +103,25 @@ async function handleTaskUpdate(
       return new NextResponse('Task not found', { status: 404 });
     }
 
-    // Authorization check
+    // Authorization check - Team Leaders can manage their mission tasks, Technicians can update their own tasks
     const isAuthorized = (
       user.role === 'ADMIN' ||
       user.role === 'MANAGER' ||
-      existingTask.mission.teamLeaderId === user.id
+      existingTask.mission.teamLeaderId === user.id ||
+      (user.role === 'TECHNICIAN' && existingTask.assignedToId && await isUserAssignedToTask(user.id, existingTask.assignedToId))
     );
 
     if (!isAuthorized) {
-      return new NextResponse('Forbidden', { status: 403 });
+      console.error('❌ Authorization failed:', {
+        userRole: user.role,
+        userId: user.id,
+        missionTeamLeader: existingTask.mission.teamLeaderId,
+        taskAssignedTo: existingTask.assignedToId
+      });
+      return new NextResponse('Forbidden - You can only update tasks assigned to you or your team', { status: 403 });
     }
 
-    // Build update data
+    // Build update data using ONLY fields that exist in the schema
     const updateData: any = {};
 
     // Handle status changes
@@ -122,46 +129,32 @@ async function handleTaskUpdate(
       updateData.status = body.status;
       
       // Auto-set timestamps based on status
-      if (body.status === 'IN_PROGRESS' && existingTask.status !== 'IN_PROGRESS') {
-        updateData.startedAt = new Date();
-      } else if (body.status === 'COMPLETED' && existingTask.status !== 'COMPLETED') {
+      if (body.status === 'COMPLETED' && existingTask.status !== 'COMPLETED') {
         updateData.completedAt = new Date();
       } else if (body.status === 'VALIDATED' && existingTask.status !== 'VALIDATED') {
         updateData.validatedAt = new Date();
       }
     }
 
-    // Handle other fields
+    // Handle fields that exist in the schema
     if (body.notes !== undefined) updateData.notes = body.notes;
     if (body.actualTime !== undefined) updateData.actualTime = body.actualTime;
     if (body.estimatedTime !== undefined) updateData.estimatedTime = body.estimatedTime;
-    if (body.startedAt !== undefined) updateData.startedAt = body.startedAt ? new Date(body.startedAt) : null;
-    if (body.completedAt !== undefined) updateData.completedAt = body.completedAt ? new Date(body.completedAt) : null;
-    if (body.validatedAt !== undefined) updateData.validatedAt = body.validatedAt ? new Date(body.validatedAt) : null;
-
-    // Handle assignment - Convert User ID to TeamMember ID if needed
-    if (body.assignedToId !== undefined) {
-      if (body.assignedToId) {
-        // Check if it's a User ID or TeamMember ID
-        const isUserId = body.assignedToId.length < 30; // Simple heuristic
-        
-        if (isUserId) {
-          // Find the corresponding TeamMember
-          const teamMember = await prisma.teamMember.findFirst({
-            where: {
-              userId: body.assignedToId,
-              isActive: true
-            }
-          });
-          
-          updateData.assignedToId = teamMember?.id || null;
-        } else {
-          updateData.assignedToId = body.assignedToId;
-        }
-      } else {
-        updateData.assignedToId = null;
-      }
+    
+    // Handle existing datetime fields
+    if (body.completedAt !== undefined) {
+      updateData.completedAt = body.completedAt ? new Date(body.completedAt) : null;
     }
+    if (body.validatedAt !== undefined) {
+      updateData.validatedAt = body.validatedAt ? new Date(body.validatedAt) : null;
+    }
+
+    // Handle assignment
+    if (body.assignedToId !== undefined) {
+      updateData.assignedToId = body.assignedToId;
+    }
+
+    console.log('🔧 Final update data:', updateData);
 
     const updatedTask = await prisma.task.update({
       where: { id },
@@ -206,6 +199,7 @@ async function handleTaskUpdate(
             actualEndTime: new Date()
           }
         });
+        console.log('🎉 All tasks completed - Mission moved to QUALITY_CHECK');
       }
     }
 
@@ -221,6 +215,20 @@ async function handleTaskUpdate(
     );
   } finally {
     await prisma.$disconnect();
+  }
+}
+
+// Helper function to check if user is assigned to a task
+async function isUserAssignedToTask(userId: string, taskAssignedToId: string): Promise<boolean> {
+  try {
+    const teamMember = await prisma.teamMember.findUnique({
+      where: { id: taskAssignedToId },
+      select: { userId: true }
+    });
+    return teamMember?.userId === userId;
+  } catch (error) {
+    console.error('Error checking task assignment:', error);
+    return false;
   }
 }
 

@@ -136,7 +136,7 @@ export default function MissionExecutePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           status: 'IN_PROGRESS',
-          startedAt: new Date().toISOString()
+          //startedAt: new Date().toISOString()
         })
       })
       if (!response.ok) throw new Error('Failed to start task')
