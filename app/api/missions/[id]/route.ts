@@ -1,10 +1,10 @@
-// app/api/missions/[id]/route.ts - FIXED WITH MODULAR VALIDATION
+// app/api/missions/[id]/route.ts - FIXED WITH CORRECT QUALITYCHECK FIELDS
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { PrismaClient } from '@prisma/client';
 import { ExtendedUser } from '@/types/next-auth';
-import { validateMissionUpdate } from '@/lib/validations/mission-validation';
+import { validateMissionUpdate } from '@/lib/validations';
 
 const prisma = new PrismaClient();
 
@@ -110,17 +110,32 @@ export async function GET(
           }
         },
         qualityChecks: {
-          include: {
-            mission: {
-              select: {
-                id: true,
-                missionNumber: true
-              }
-            }
+          select: {
+            id: true,
+            type: true, // FIXED: Use 'type' instead of 'checkType'
+            status: true,
+            checkedBy: true, // FIXED: This is a string field, not a relation
+            checkedAt: true,
+            notes: true,
+            photos: true,
+            issues: true,
+            validatedAt: true
+          },
+          orderBy: {
+            checkedAt: 'desc'
           }
         },
         fieldReport: {
-          include: {
+          select: {
+            id: true,
+            generalObservations: true,
+            clientFeedback: true,
+            issuesEncountered: true,
+            materialsUsed: true,
+            hoursWorked: true,
+            beforePhotos: true,
+            afterPhotos: true,
+            submissionDate: true,
             submittedBy: {
               select: {
                 id: true,
@@ -131,7 +146,11 @@ export async function GET(
           }
         },
         inventoryUsed: {
-          include: {
+          select: {
+            id: true,
+            quantity: true,
+            notes: true,
+            usedAt: true,
             inventory: {
               select: {
                 id: true,
@@ -140,6 +159,20 @@ export async function GET(
                 unitPrice: true
               }
             }
+          },
+          orderBy: {
+            usedAt: 'desc'
+          }
+        },
+        invoice: {
+          select: {
+            id: true,
+            invoiceNumber: true,
+            amount: true,
+            status: true,
+            description: true,
+            issueDate: true,
+            dueDate: true
           }
         },
         conversation: {
@@ -219,7 +252,7 @@ async function handleMissionUpdate(
     
     console.log('Mission Update Request Body:', JSON.stringify(body, null, 2));
     
-    // FIXED: Use modular validation instead of inline schema
+    // Use modular validation from centralized index
     const validationResult = validateMissionUpdate(body);
     if (!validationResult.success) {
       console.error('Validation failed:', validationResult.error.errors);
@@ -249,7 +282,7 @@ async function handleMissionUpdate(
         throw new Error('Not authorized to update this mission');
       }
 
-      // FIXED: Build update data more cleanly using validated data
+      // Build update data more cleanly using validated data
       const dataToUpdate: any = {};
       
       // Handle date fields with proper conversion
@@ -257,10 +290,12 @@ async function handleMissionUpdate(
         dataToUpdate.scheduledDate = new Date(validatedData.scheduledDate);
       }
       if (validatedData.actualStartTime !== undefined) {
-        dataToUpdate.actualStartTime = validatedData.actualStartTime ? new Date(validatedData.actualStartTime) : null;
+        dataToUpdate.actualStartTime = validatedData.actualStartTime ? 
+          new Date(validatedData.actualStartTime) : null;
       }
       if (validatedData.actualEndTime !== undefined) {
-        dataToUpdate.actualEndTime = validatedData.actualEndTime ? new Date(validatedData.actualEndTime) : null;
+        dataToUpdate.actualEndTime = validatedData.actualEndTime ? 
+          new Date(validatedData.actualEndTime) : null;
       }
 
       // Handle duration - the validation already handles conversion
@@ -285,7 +320,7 @@ async function handleMissionUpdate(
         }
       });
 
-      // FIXED: Handle tasks with proper field filtering for Prisma schema
+      // Handle tasks with proper field filtering for Prisma schema
       if (validatedData.tasks !== undefined) {
         console.log('Updating tasks:', validatedData.tasks.length, 'tasks provided');
         
@@ -301,7 +336,7 @@ async function handleMissionUpdate(
               throw new Error(`Task at index ${index} must have a title`);
             }
             
-            // FIXED: Map to exact Prisma schema fields
+            // Map to exact Prisma schema fields
             return {
               missionId: id,
               title: task.title.trim(),
@@ -323,7 +358,8 @@ async function handleMissionUpdate(
             console.log('Successfully created', tasksToCreate.length, 'tasks');
           } catch (taskError) {
             console.error('Failed to create tasks:', taskError);
-            throw new Error(`Failed to create tasks: ${taskError instanceof Error ? taskError.message : 'Unknown error'}`);
+            throw new Error(`Failed to create tasks: ${taskError instanceof Error ? 
+              taskError.message : 'Unknown error'}`);
           }
         }
       }
@@ -401,7 +437,7 @@ async function handleMissionUpdate(
         }
       });
 
-      // Create activity log for status changes
+      // Create activity log for status changes with valid activity type
       if (validatedData.status && validatedData.status !== existingMission.status) {
         try {
           await tx.activity.create({
@@ -471,26 +507,46 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
     const user = session?.user as ExtendedUser;
-    if (!user?.id || user.role !== 'ADMIN') {
-      return new NextResponse('Forbidden - Admin access required', { status: 403 });
+    
+    if (!user?.id) {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
+
+    if (!['ADMIN', 'MANAGER'].includes(user.role)) {
+      return new NextResponse('Forbidden - Admin or Manager access required', { status: 403 });
+    }
+    
     const { id } = await params;
 
     await prisma.$transaction(async (tx) => {
       const mission = await tx.mission.findUnique({
         where: { id },
+        select: {
+          id: true,
+          missionNumber: true,
+          leadId: true
+        }
       });
 
       if (!mission) {
         throw new Error('Mission not found');
       }
 
-      // Clean up related records
+      // Clean up related records in correct order
+      
+      // Delete tasks first
       await tx.task.deleteMany({ where: { missionId: id } });
+
+      // Delete quality checks
       await tx.qualityCheck.deleteMany({ where: { missionId: id } });
+
+      // Delete inventory usage
       await tx.inventoryUsage.deleteMany({ where: { missionId: id } });
+
+      // Delete expenses
       await tx.expense.deleteMany({ where: { missionId: id } });
       
+      // Handle conversation and messages
       const conversation = await tx.conversation.findUnique({ 
         where: { missionId: id } 
       });
@@ -503,30 +559,41 @@ export async function DELETE(
         });
       }
       
+      // Delete field report
       await tx.fieldReport.deleteMany({ where: { missionId: id } });
+
+      // Delete invoice
       await tx.invoice.deleteMany({ where: { missionId: id } });
       
-      // Delete the mission
+      // Delete the mission itself
       await tx.mission.delete({ where: { id } });
 
-      // Log the deletion
-      await tx.activity.create({
-        data: {
-          type: 'SYSTEM_MAINTENANCE',
-          title: 'Mission supprimée',
-          description: `Mission ${mission.missionNumber} supprimée`,
-          userId: user.id,
-          leadId: mission.leadId,
-          metadata: {
-            deletedMissionId: id,
-            missionNumber: mission.missionNumber,
-            deletedBy: user.name
+      // Create activity log with valid activity type
+      try {
+        await tx.activity.create({
+          data: {
+            type: 'SYSTEM_MAINTENANCE',
+            title: 'Mission supprimée',
+            description: `Mission ${mission.missionNumber} supprimée par ${user.name}`,
+            userId: user.id,
+            leadId: mission.leadId,
+            metadata: {
+              deletedMissionId: id,
+              missionNumber: mission.missionNumber,
+              deletedBy: user.name,
+              deletionType: 'mission_deletion'
+            }
           }
-        }
-      });
+        });
+      } catch (activityError) {
+        console.warn('Failed to create deletion activity log:', activityError);
+      }
     });
 
-    return new NextResponse(null, { status: 204 });
+    return NextResponse.json({ 
+      message: 'Mission deleted successfully',
+      deletedMissionId: id 
+    });
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
