@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { ExtendedUser } from '@/types/next-auth';
 import { missionService, CreateMissionInput } from '@/services/mission.service';
-import { validateMissionCreation } from '@/lib/validation';
+import { validateMissionCreation } from '@/lib/validations';
 import { withErrorHandler, AppError } from '@/lib/error-handler';
 
 // GET /api/missions - Fetch missions with filters and pagination

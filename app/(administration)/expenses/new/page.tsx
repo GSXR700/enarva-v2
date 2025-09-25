@@ -15,7 +15,7 @@ import { ArrowLeft, Plus } from 'lucide-react';
 import { Lead, Mission } from '@prisma/client';
 import { toast } from 'sonner';
 import { useEdgeStore } from '@/lib/edgestore';
-import { cleanExpenseData } from '@/lib/validation';
+import { cleanExpenseData } from '@/lib/validations';
 
 // Define expense structure for categories and subcategories
 const expenseStructure = {

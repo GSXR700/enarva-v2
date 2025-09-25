@@ -1,49 +1,12 @@
-// app/api/missions/[id]/route.ts - CORRECTED VERSION
+// app/api/missions/[id]/route.ts - FIXED WITH MODULAR VALIDATION
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { PrismaClient, MissionStatus, Priority, MissionType, TaskCategory, TaskType, TaskStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { ExtendedUser } from '@/types/next-auth';
-import { z } from 'zod';
+import { validateMissionUpdate } from '@/lib/validations/mission-validation';
 
 const prisma = new PrismaClient();
-
-// FIXED: More flexible validation schema to handle various input formats
-const missionUpdateSchema = z.object({
-  scheduledDate: z.string().optional(),
-  estimatedDuration: z.number().min(0).optional(),
-  address: z.string().min(1).optional(),
-  coordinates: z.string().optional().nullable(),
-  accessNotes: z.string().optional().nullable(),
-  priority: z.nativeEnum(Priority).optional(),
-  status: z.nativeEnum(MissionStatus).optional(),
-  type: z.nativeEnum(MissionType).optional(),
-  teamLeaderId: z.string().optional().nullable(),
-  teamId: z.string().optional().nullable(),
-  actualStartTime: z.string().optional().nullable(),
-  actualEndTime: z.string().optional().nullable(),
-  clientValidated: z.boolean().optional(),
-  clientFeedback: z.string().optional().nullable(),
-  clientRating: z.number().min(1).max(5).optional().nullable(),
-  adminValidated: z.boolean().optional(),
-  adminValidatedBy: z.string().optional().nullable(),
-  adminNotes: z.string().optional().nullable(),
-  qualityScore: z.number().min(1).max(5).optional().nullable(),
-  issuesFound: z.string().optional().nullable(),
-  correctionRequired: z.boolean().optional(),
-  tasks: z.array(z.object({
-    id: z.string().optional(),
-    title: z.string().min(1),
-    description: z.string().optional().nullable(),
-    category: z.nativeEnum(TaskCategory),
-    type: z.nativeEnum(TaskType),
-    status: z.nativeEnum(TaskStatus).default('ASSIGNED'),
-    estimatedTime: z.number().min(0).optional().nullable(),
-    actualTime: z.number().min(0).optional().nullable(),
-    assignedToId: z.string().optional().nullable(),
-    notes: z.string().optional().nullable(),
-  })).optional(),
-}).passthrough(); // FIXED: Allow additional fields
 
 export async function GET(
   _request: NextRequest,
@@ -254,10 +217,10 @@ async function handleMissionUpdate(
     const { id } = await params;
     const body = await request.json();
     
-    // FIXED: Enhanced logging for debugging
     console.log('Mission Update Request Body:', JSON.stringify(body, null, 2));
     
-    const validationResult = missionUpdateSchema.safeParse(body);
+    // FIXED: Use modular validation instead of inline schema
+    const validationResult = validateMissionUpdate(body);
     if (!validationResult.success) {
       console.error('Validation failed:', validationResult.error.errors);
       return NextResponse.json({ 
@@ -286,51 +249,43 @@ async function handleMissionUpdate(
         throw new Error('Not authorized to update this mission');
       }
 
+      // FIXED: Build update data more cleanly using validated data
       const dataToUpdate: any = {};
       
+      // Handle date fields with proper conversion
       if (validatedData.scheduledDate) {
-        // FIXED: Handle different date formats more flexibly
-        try {
-          dataToUpdate.scheduledDate = new Date(validatedData.scheduledDate);
-        } catch (e) {
-          throw new Error('Invalid scheduledDate format');
-        }
+        dataToUpdate.scheduledDate = new Date(validatedData.scheduledDate);
       }
-      if (validatedData.estimatedDuration !== undefined) {
-        // FIXED: Handle duration conversion more carefully
-        if (validatedData.estimatedDuration > 24) {
-          // Already in minutes
-          dataToUpdate.estimatedDuration = validatedData.estimatedDuration;
-        } else {
-          // Convert hours to minutes
-          dataToUpdate.estimatedDuration = Math.round(validatedData.estimatedDuration * 60);
-        }
-      }
-      if (validatedData.address) dataToUpdate.address = validatedData.address;
-      if (validatedData.coordinates !== undefined) dataToUpdate.coordinates = validatedData.coordinates;
-      if (validatedData.accessNotes !== undefined) dataToUpdate.accessNotes = validatedData.accessNotes;
-      if (validatedData.priority) dataToUpdate.priority = validatedData.priority;
-      if (validatedData.status) dataToUpdate.status = validatedData.status;
-      if (validatedData.type) dataToUpdate.type = validatedData.type;
-      if (validatedData.teamLeaderId !== undefined) dataToUpdate.teamLeaderId = validatedData.teamLeaderId;
-      if (validatedData.teamId !== undefined) dataToUpdate.teamId = validatedData.teamId;
       if (validatedData.actualStartTime !== undefined) {
         dataToUpdate.actualStartTime = validatedData.actualStartTime ? new Date(validatedData.actualStartTime) : null;
       }
       if (validatedData.actualEndTime !== undefined) {
         dataToUpdate.actualEndTime = validatedData.actualEndTime ? new Date(validatedData.actualEndTime) : null;
       }
-      if (validatedData.clientValidated !== undefined) dataToUpdate.clientValidated = validatedData.clientValidated;
-      if (validatedData.clientFeedback !== undefined) dataToUpdate.clientFeedback = validatedData.clientFeedback;
-      if (validatedData.clientRating !== undefined) dataToUpdate.clientRating = validatedData.clientRating;
-      if (validatedData.adminValidated !== undefined) dataToUpdate.adminValidated = validatedData.adminValidated;
-      if (validatedData.adminValidatedBy !== undefined) dataToUpdate.adminValidatedBy = validatedData.adminValidatedBy;
-      if (validatedData.adminNotes !== undefined) dataToUpdate.adminNotes = validatedData.adminNotes;
-      if (validatedData.qualityScore !== undefined) dataToUpdate.qualityScore = validatedData.qualityScore;
-      if (validatedData.issuesFound !== undefined) dataToUpdate.issuesFound = validatedData.issuesFound;
-      if (validatedData.correctionRequired !== undefined) dataToUpdate.correctionRequired = validatedData.correctionRequired;
 
-      // FIXED: Better task handling with field filtering
+      // Handle duration - the validation already handles conversion
+      if (validatedData.estimatedDuration !== undefined) {
+        // If it's already in minutes (> 24), keep as is. Otherwise convert hours to minutes
+        dataToUpdate.estimatedDuration = validatedData.estimatedDuration > 24 
+          ? validatedData.estimatedDuration 
+          : Math.round(validatedData.estimatedDuration * 60);
+      }
+
+      // Simple field mappings - these are already validated
+      const simpleFields = [
+        'address', 'coordinates', 'accessNotes', 'priority', 'status', 'type',
+        'teamLeaderId', 'teamId', 'clientValidated', 'clientFeedback', 'clientRating',
+        'adminValidated', 'adminValidatedBy', 'adminNotes', 'qualityScore', 
+        'issuesFound', 'correctionRequired'
+      ];
+
+      simpleFields.forEach(field => {
+        if (validatedData[field] !== undefined) {
+          dataToUpdate[field] = validatedData[field];
+        }
+      });
+
+      // FIXED: Handle tasks with proper field filtering for Prisma schema
       if (validatedData.tasks !== undefined) {
         console.log('Updating tasks:', validatedData.tasks.length, 'tasks provided');
         
@@ -339,15 +294,14 @@ async function handleMissionUpdate(
           where: { missionId: id }
         });
 
-        // Only create new tasks if any are provided
+        // Create new tasks if any are provided
         if (validatedData.tasks.length > 0) {
           const tasksToCreate = validatedData.tasks.map((task, index) => {
-            // FIXED: Better validation and defaults for task data
             if (!task.title || task.title.trim() === '') {
               throw new Error(`Task at index ${index} must have a title`);
             }
             
-            // FIXED: Only include fields that exist in Prisma Task model
+            // FIXED: Map to exact Prisma schema fields
             return {
               missionId: id,
               title: task.title.trim(),
@@ -355,7 +309,6 @@ async function handleMissionUpdate(
               category: task.category,
               type: task.type,
               status: task.status || 'ASSIGNED',
-              // Remove priority and other fields that don't exist in schema
               estimatedTime: task.estimatedTime || null,
               actualTime: task.actualTime || null,
               assignedToId: task.assignedToId || null,
@@ -466,7 +419,6 @@ async function handleMissionUpdate(
             }
           });
         } catch (activityError) {
-          // Log activity error but don't fail the update
           console.warn('Failed to create activity log:', activityError);
         }
       }
@@ -478,19 +430,7 @@ async function handleMissionUpdate(
     return NextResponse.json(updatedMission);
 
   } catch (error) {
-    // FIXED: Better error handling and response formatting
     console.error('Mission update error:', error);
-    
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ 
-        error: 'Validation failed', 
-        details: error.errors.map(err => ({
-          field: err.path.join('.'),
-          message: err.message,
-          code: err.code
-        }))
-      }, { status: 400 });
-    }
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     
@@ -545,6 +485,7 @@ export async function DELETE(
         throw new Error('Mission not found');
       }
 
+      // Clean up related records
       await tx.task.deleteMany({ where: { missionId: id } });
       await tx.qualityCheck.deleteMany({ where: { missionId: id } });
       await tx.inventoryUsage.deleteMany({ where: { missionId: id } });
@@ -565,8 +506,10 @@ export async function DELETE(
       await tx.fieldReport.deleteMany({ where: { missionId: id } });
       await tx.invoice.deleteMany({ where: { missionId: id } });
       
+      // Delete the mission
       await tx.mission.delete({ where: { id } });
 
+      // Log the deletion
       await tx.activity.create({
         data: {
           type: 'SYSTEM_MAINTENANCE',

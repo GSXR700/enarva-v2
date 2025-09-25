@@ -14,7 +14,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { Lead, Mission, Expense } from '@prisma/client';
 import { toast } from 'sonner';
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
-import { cleanExpenseData } from '@/lib/validation';
+import { cleanExpenseData } from '@/lib/validations';
 
 const expenseStructure = {
   OPERATIONS: ["Produits de nettoyage", "Consommables", "Matériel & outils", "Produits jardinage", "Produits piscine", "Produits antinuisible", "Sous-traitance", "Énergie & fluides"],

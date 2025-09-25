@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { leadService } from '@/services/lead.service';
-import { validateCompleteLeadInput } from '@/lib/validation';
+import { validateCompleteLeadInput } from '@/lib/validations';
 import { errorHandler } from '@/lib/error-handler';
 import { applyRateLimit } from '@/lib/rate-limit';
 import { LeadStatus, Prisma } from '@prisma/client';
