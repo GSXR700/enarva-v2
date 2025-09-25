@@ -1,4 +1,4 @@
-// app/api/missions/[id]/route.ts - FIXED WITH CORRECT QUALITYCHECK FIELDS
+// app/api/missions/[id]/route.ts - FIXED DEBUGGING VERSION
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -112,9 +112,9 @@ export async function GET(
         qualityChecks: {
           select: {
             id: true,
-            type: true, // FIXED: Use 'type' instead of 'checkType'
+            type: true,
             status: true,
-            checkedBy: true, // FIXED: This is a string field, not a relation
+            checkedBy: true,
             checkedAt: true,
             notes: true,
             photos: true,
@@ -250,21 +250,52 @@ async function handleMissionUpdate(
     const { id } = await params;
     const body = await request.json();
     
-    console.log('Mission Update Request Body:', JSON.stringify(body, null, 2));
+    // ENHANCED DEBUGGING: Log the exact payload being sent
+    console.log('🔍 DEBUGGING - Mission Update Request Body:');
+    console.log('🔍 Full payload:', JSON.stringify(body, null, 2));
+    console.log('🔍 Keys in payload:', Object.keys(body));
+    console.log('🔍 actualStartTime:', body.actualStartTime);
+    console.log('🔍 actualEndTime:', body.actualEndTime);
+    console.log('🔍 scheduledDate:', body.scheduledDate);
+    console.log('🔍 tasks array length:', body.tasks?.length || 0);
     
-    // Use modular validation from centralized index
+    // DEBUGGING: Test validation step by step
+    console.log('🔍 About to run validateMissionUpdate...');
     const validationResult = validateMissionUpdate(body);
+    
     if (!validationResult.success) {
-      console.error('Validation failed:', validationResult.error.errors);
+      // ENHANCED ERROR LOGGING - FIXED TypeScript issues
+      console.error('🚨 VALIDATION FAILED - Full error details:');
+      console.error('🚨 Error object:', validationResult.error);
+      console.error('🚨 Error issues:', validationResult.error.issues);
+      
+      // Create detailed error response - FIXED to avoid TypeScript errors
+      const detailedErrors = validationResult.error.issues.map(issue => ({
+        field: issue.path.join('.'),
+        message: issue.message,
+        code: issue.code,
+        // Only include received/expected if they exist
+        ...(('received' in issue) && { received: issue.received }),
+        ...(('expected' in issue) && { expected: issue.expected })
+      }));
+      
+      console.error('🚨 Formatted errors:', detailedErrors);
+      
       return NextResponse.json({ 
         error: 'Invalid input', 
-        details: validationResult.error.errors.map(err => ({
-          field: err.path.join('.'),
-          message: err.message,
-          code: err.code
-        }))
+        details: detailedErrors,
+        rawErrors: validationResult.error.issues,
+        payloadKeys: Object.keys(body), // Just send keys, not full payload for security
+        debugInfo: {
+          hasActualStartTime: 'actualStartTime' in body,
+          hasActualEndTime: 'actualEndTime' in body,
+          hasScheduledDate: 'scheduledDate' in body,
+          hasTask: Array.isArray(body.tasks)
+        }
       }, { status: 400 });
     }
+
+    console.log('✅ Validation passed! Validated data keys:', Object.keys(validationResult.data));
 
     const validatedData = validationResult.data;
 
@@ -282,7 +313,6 @@ async function handleMissionUpdate(
         throw new Error('Not authorized to update this mission');
       }
 
-      // Build update data more cleanly using validated data
       const dataToUpdate: any = {};
       
       // Handle date fields with proper conversion
@@ -298,15 +328,14 @@ async function handleMissionUpdate(
           new Date(validatedData.actualEndTime) : null;
       }
 
-      // Handle duration - the validation already handles conversion
+      // Handle duration
       if (validatedData.estimatedDuration !== undefined) {
-        // If it's already in minutes (> 24), keep as is. Otherwise convert hours to minutes
         dataToUpdate.estimatedDuration = validatedData.estimatedDuration > 24 
           ? validatedData.estimatedDuration 
           : Math.round(validatedData.estimatedDuration * 60);
       }
 
-      // Simple field mappings - these are already validated
+      // Simple field mappings
       const simpleFields = [
         'address', 'coordinates', 'accessNotes', 'priority', 'status', 'type',
         'teamLeaderId', 'teamId', 'clientValidated', 'clientFeedback', 'clientRating',
@@ -320,23 +349,20 @@ async function handleMissionUpdate(
         }
       });
 
-      // Handle tasks with proper field filtering for Prisma schema
+      // Handle tasks
       if (validatedData.tasks !== undefined) {
         console.log('Updating tasks:', validatedData.tasks.length, 'tasks provided');
         
-        // Delete existing tasks first
         await tx.task.deleteMany({
           where: { missionId: id }
         });
 
-        // Create new tasks if any are provided
         if (validatedData.tasks.length > 0) {
           const tasksToCreate = validatedData.tasks.map((task, index) => {
             if (!task.title || task.title.trim() === '') {
               throw new Error(`Task at index ${index} must have a title`);
             }
             
-            // Map to exact Prisma schema fields
             return {
               missionId: id,
               title: task.title.trim(),
@@ -437,7 +463,7 @@ async function handleMissionUpdate(
         }
       });
 
-      // Create activity log for status changes with valid activity type
+      // Create activity log
       if (validatedData.status && validatedData.status !== existingMission.status) {
         try {
           await tx.activity.create({
@@ -462,11 +488,11 @@ async function handleMissionUpdate(
       return updated;
     });
 
-    console.log('Mission updated successfully:', updatedMission.id);
+    console.log('✅ Mission updated successfully:', updatedMission.id);
     return NextResponse.json(updatedMission);
 
   } catch (error) {
-    console.error('Mission update error:', error);
+    console.error('🚨 Mission update error:', error);
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     
@@ -532,21 +558,11 @@ export async function DELETE(
         throw new Error('Mission not found');
       }
 
-      // Clean up related records in correct order
-      
-      // Delete tasks first
       await tx.task.deleteMany({ where: { missionId: id } });
-
-      // Delete quality checks
       await tx.qualityCheck.deleteMany({ where: { missionId: id } });
-
-      // Delete inventory usage
       await tx.inventoryUsage.deleteMany({ where: { missionId: id } });
-
-      // Delete expenses
       await tx.expense.deleteMany({ where: { missionId: id } });
       
-      // Handle conversation and messages
       const conversation = await tx.conversation.findUnique({ 
         where: { missionId: id } 
       });
@@ -559,16 +575,10 @@ export async function DELETE(
         });
       }
       
-      // Delete field report
       await tx.fieldReport.deleteMany({ where: { missionId: id } });
-
-      // Delete invoice
       await tx.invoice.deleteMany({ where: { missionId: id } });
-      
-      // Delete the mission itself
       await tx.mission.delete({ where: { id } });
 
-      // Create activity log with valid activity type
       try {
         await tx.activity.create({
           data: {
