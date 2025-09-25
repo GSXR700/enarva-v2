@@ -237,26 +237,27 @@ const DraggableTask = ({
             className="h-8"
           />
         </div>
-
         <div>
-          <Label className="text-xs">Assignée à</Label>
-          <Select
-            value={task.assignedToId || 'unassigned'}
-            onValueChange={(value) => updateTask(index, 'assignedToId', value === 'unassigned' ? null : value)}
-          >
-            <SelectTrigger className="h-8">
-              <SelectValue placeholder="Non assignée" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unassigned">Non assignée</SelectItem>
-              {teamMembers.map((member) => (
-                <SelectItem key={member.id} value={member.user.id}>
-                  {member.user.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+  <Label className="text-xs">Assignée à</Label>
+  <Select
+    value={task.assignedToId || 'unassigned'}
+    onValueChange={(value) => updateTask(index, 'assignedToId', value === 'unassigned' ? null : value)}
+  >
+    <SelectTrigger className="h-8">
+      <SelectValue placeholder="Non assignée" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="unassigned">Non assignée</SelectItem>
+      {teamMembers.map((member) => (
+        <SelectItem key={member.id} value={member.id}> {/* Use member.id not member.user.id */}
+          {member.user.name}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+</div>
+
+        
       </div>
 
       <div>

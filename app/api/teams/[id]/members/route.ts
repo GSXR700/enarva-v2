@@ -1,6 +1,5 @@
-// app/api/teams/[id]/members/route.ts - GET TEAM MEMBERS BY TEAM ID
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { PrismaClient } from '@prisma/client';
 
@@ -29,13 +28,16 @@ export async function GET(
             id: true,
             name: true,
             email: true,
+            image: true,
             role: true,
             onlineStatus: true
           }
         }
       },
       orderBy: {
-        joinedAt: 'desc'
+        user: {
+          name: 'asc'
+        }
       }
     });
 
@@ -44,5 +46,7 @@ export async function GET(
   } catch (error) {
     console.error('Failed to fetch team members:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
+  } finally {
+    await prisma.$disconnect();
   }
 }

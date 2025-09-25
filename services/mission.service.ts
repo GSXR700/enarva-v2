@@ -799,40 +799,78 @@ export class MissionService {
       }
 
       // Handle tasks if provided
-      if (data.tasks && Array.isArray(data.tasks)) {
-        console.log('🔧 Updating tasks:', data.tasks.length, 'tasks provided');
-        
-        try {
-          // Delete existing tasks
-          await tx.task.deleteMany({
-            where: { missionId: id }
-          });
-
-          // Create new tasks
-          if (data.tasks.length > 0) {
-            const tasksToCreate = data.tasks.map((task: any) => ({
-              missionId: id,
-              title: task.title,
-              description: task.description || null,
-              category: task.category || 'GENERAL',
-              type: task.type || 'EXECUTION',
-              status: task.status || 'ASSIGNED',
-              estimatedTime: task.estimatedTime || null,
-              actualTime: task.actualTime || null,
-              assignedToId: task.assignedToId || null,
-              notes: task.notes || null,
-            }));
-
-            await tx.task.createMany({
-              data: tasksToCreate
+        if (data.tasks && Array.isArray(data.tasks)) {
+          console.log('🔧 Updating tasks:', data.tasks.length, 'tasks provided');
+          
+          try {
+            // Delete existing tasks
+            await tx.task.deleteMany({
+              where: { missionId: id }
             });
-            console.log('✅ Successfully updated tasks');
+
+            // Create new tasks
+            if (data.tasks.length > 0) {
+              const tasksToCreate = data.tasks.map((task: any) => {
+                // Handle assignment - convert User ID to TeamMember ID if needed
+                let assignedToId = task.assignedToId;
+                
+                if (assignedToId && assignedToId.length < 30) {
+                  // This looks like a User ID, need to find the corresponding TeamMember
+                  // We'll handle this in a separate query
+                  assignedToId = null; // Will be updated after creation
+                }
+                
+                return {
+                  missionId: id,
+                  title: task.title,
+                  description: task.description || null,
+                  category: task.category || 'GENERAL',
+                  type: task.type || 'EXECUTION',
+                  status: task.status || 'ASSIGNED',
+                  estimatedTime: task.estimatedTime || null,
+                  actualTime: task.actualTime || null,
+                  assignedToId: assignedToId,
+                  notes: task.notes || null,
+                };
+              });
+
+              await tx.task.createMany({
+                data: tasksToCreate
+              });
+
+              // Handle User ID to TeamMember ID conversion for assignments
+              const createdTasks = await tx.task.findMany({
+                where: { missionId: id }
+              });
+
+              for (let i = 0; i < data.tasks.length; i++) {
+                const originalTask = data.tasks[i];
+                const createdTask = createdTasks[i];
+                
+                if (originalTask.assignedToId && originalTask.assignedToId.length < 30) {
+                  // Find the TeamMember for this User ID
+                  const teamMember = await tx.teamMember.findFirst({
+                    where: {
+                      userId: originalTask.assignedToId,
+                      isActive: true
+                    }
+                  });
+                  
+                  if (teamMember && createdTask) {
+                    await tx.task.update({
+                      where: { id: createdTask.id },
+                      data: { assignedToId: teamMember.id }
+                    });
+                  }
+                }
+              }
+
+              console.log('✅ Successfully updated tasks with proper assignments');
+            }
+          } catch (taskError) {
+            console.error('❌ Failed to update tasks:', taskError);
           }
-        } catch (taskError) {
-          console.error('❌ Failed to update tasks:', taskError);
-          // Don't fail the entire update if tasks fail
         }
-      }
 
       console.log('🔧 Final update data:', Object.keys(updateData));
 
