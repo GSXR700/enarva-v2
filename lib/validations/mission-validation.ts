@@ -1,4 +1,4 @@
-// lib/validations/mission-validation.ts - COMPLETE FIX WITH MISSING FIELDS
+// lib/validations/mission-validation.ts - COMPLETE FIX MATCHING YOUR PRISMA SCHEMA
 import { z } from 'zod';
 import { MissionStatus, Priority, MissionType, TaskCategory, TaskType, TaskStatus } from '@prisma/client';
 
@@ -17,7 +17,6 @@ const taskValidationSchema = z.object({
   category: z.nativeEnum(TaskCategory),
   type: z.nativeEnum(TaskType),
   status: z.nativeEnum(TaskStatus).default('ASSIGNED'),
-  priority: z.nativeEnum(Priority).default('NORMAL').optional(),
   estimatedTime: z.union([
     z.number().min(0),
     z.string().transform(val => {
@@ -40,15 +39,24 @@ const taskValidationSchema = z.object({
     .optional()
     .nullable()
     .transform(val => val === '' ? null : val),
+  completedAt: z.union([
+    z.string().datetime(),
+    z.date().transform(d => d.toISOString())
+  ]).optional().nullable(),
+  validatedAt: z.union([
+    z.string().datetime(),
+    z.date().transform(d => d.toISOString())
+  ]).optional().nullable(),
 });
 
-// FIXED: Complete mission update validation schema with ALL missing fields
+// COMPLETE mission update validation schema matching ALL Prisma fields
 export const missionUpdateValidationSchema = z.object({
+  // Basic fields
   status: z.nativeEnum(MissionStatus).optional(),
   priority: z.nativeEnum(Priority).optional(),
   type: z.nativeEnum(MissionType).optional(),
 
-  // Date handling
+  // Date fields
   scheduledDate: z.union([
     z.string().datetime(),
     z.string().refine(val => {
@@ -63,7 +71,6 @@ export const missionUpdateValidationSchema = z.object({
     z.date().transform(d => d.toISOString())
   ]).optional(),
 
-  // FIXED: Add missing actualStartTime and actualEndTime
   actualStartTime: z.union([
     z.string().datetime(),
     z.string().refine(val => {
@@ -104,6 +111,7 @@ export const missionUpdateValidationSchema = z.object({
     })
   ]).optional(),
 
+  // Location fields
   address: z.string()
     .min(1, 'Adresse requise')
     .max(500, 'Adresse trop longue')
@@ -119,6 +127,7 @@ export const missionUpdateValidationSchema = z.object({
     .nullable()
     .transform(val => val === '' ? null : val),
 
+  // Relationship fields
   teamLeaderId: z.string()
     .optional()
     .nullable()
@@ -129,7 +138,17 @@ export const missionUpdateValidationSchema = z.object({
     .nullable()
     .transform(val => val === '' ? null : val),
 
-  // FIXED: Add all missing validation fields from your Prisma schema
+  leadId: z.string().optional(),
+
+  quoteId: z.string()
+    .optional()
+    .nullable()
+    .transform(val => val === '' ? null : val),
+
+  // Technical visit report (JSON field)
+  technicalVisitReport: z.any().optional().nullable(),
+
+  // Validation & Feedback fields
   clientValidated: z.boolean().optional(),
   clientFeedback: z.string()
     .optional()
@@ -143,7 +162,7 @@ export const missionUpdateValidationSchema = z.object({
     })
   ]).optional().nullable(),
 
-  adminValidated: z.boolean().optional(),
+  adminValidated: z.boolean().optional().nullable(),
   adminValidatedBy: z.string()
     .optional()
     .nullable()
@@ -182,27 +201,7 @@ export const missionUpdateValidationSchema = z.object({
   // Tasks array
   tasks: z.array(taskValidationSchema).optional(),
 
-}).passthrough().refine((data) => {
-  // Custom validation: End time should be after start time
-  if (data.actualStartTime && data.actualEndTime) {
-    try {
-      const startTime = new Date(data.actualStartTime);
-      const endTime = new Date(data.actualEndTime);
-      
-      if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-        return false;
-      }
-      
-      return endTime > startTime;
-    } catch {
-      return false;
-    }
-  }
-  return true;
-}, {
-  message: "L'heure de fin doit être après l'heure de début",
-  path: ["actualEndTime"]
-});
+}).passthrough(); // CRITICAL: Allow extra fields to pass through
 
 // Mission creation schema (stricter validation)
 export const missionCreationValidationSchema = z.object({
@@ -246,67 +245,12 @@ export const missionCreationValidationSchema = z.object({
   type: z.nativeEnum(MissionType).default('SERVICE'),
   taskTemplateId: z.string().optional().nullable(),
   adminNotes: z.string().optional().nullable(),
-});
+}).passthrough();
 
-// Complete mission validation schema (for full creation with all fields)
-export const completeMissionValidationSchema = z.object({
-  missionNumber: z.string()
-    .min(1, 'Numéro de mission requis')
-    .max(50, 'Numéro de mission trop long')
-    .optional(),
-
-  status: z.nativeEnum(MissionStatus).default('SCHEDULED'),
-  priority: z.nativeEnum(Priority).default('NORMAL'),
-  type: z.nativeEnum(MissionType).default('SERVICE'),
-
+// Complete mission validation schema
+export const completeMissionValidationSchema = missionUpdateValidationSchema.extend({
+  missionNumber: z.string().optional(),
   leadId: z.string().min(1, 'Lead ID requis'),
-  
-  scheduledDate: z.string()
-    .min(1, 'Date programmée requise')
-    .refine((date) => {
-      try {
-        const scheduledDate = new Date(date);
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
-        return !isNaN(scheduledDate.getTime()) && scheduledDate >= now;
-      } catch (error) {
-        return false;
-      }
-    }, {
-      message: "La date programmée ne peut pas être dans le passé ou est invalide"
-    }),
-
-  estimatedDuration: z.number()
-    .min(0.5, 'Durée minimale: 30 minutes')
-    .max(24, 'Durée maximale: 24 heures'),
-
-  address: z.string()
-    .min(1, 'Adresse requise')
-    .max(500, 'Adresse trop longue'),
-
-  coordinates: z.string().optional().nullable().transform(val => val === '' ? null : val),
-  accessNotes: z.string().optional().nullable().transform(val => val === '' ? null : val),
-  quoteId: z.string().optional().nullable(),
-  teamLeaderId: z.string().optional().nullable(),
-  teamId: z.string().optional().nullable(),
-  taskTemplateId: z.string().optional().nullable(),
-
-  actualStartTime: z.string().datetime().optional().nullable(),
-  actualEndTime: z.string().datetime().optional().nullable(),
-
-  clientValidated: z.boolean().default(false),
-  clientFeedback: z.string().optional().nullable().transform(val => val === '' ? null : val),
-  clientRating: z.number().min(1).max(5).optional().nullable(),
-  adminValidated: z.boolean().optional().nullable(),
-  adminValidatedBy: z.string().optional().nullable().transform(val => val === '' ? null : val),
-  adminNotes: z.string().optional().nullable().transform(val => val === '' ? null : val),
-  qualityScore: z.number().min(0).max(100).optional().nullable(),
-  issuesFound: z.string().optional().nullable().transform(val => val === '' ? null : val),
-  correctionRequired: z.boolean().optional(),
-  invoiceGenerated: z.boolean().default(false),
-  invoiceId: z.string().optional().nullable().transform(val => val === '' ? null : val),
-
-  tasks: z.array(taskValidationSchema).optional(),
 });
 
 // =============================================================================
@@ -410,6 +354,12 @@ export function cleanMissionData(data: any) {
   delete cleaned.quote;
   delete cleaned.teamLeader;
   delete cleaned.team;
+  delete cleaned.qualityChecks;
+  delete cleaned.inventoryUsed;
+  delete cleaned.expenses;
+  delete cleaned.invoice;
+  delete cleaned.conversation;
+  delete cleaned.fieldReport;
 
   return cleaned;
 }
