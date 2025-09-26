@@ -11,10 +11,38 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Save } from 'lucide-react';
-import { Lead, Mission, Expense } from '@prisma/client';
+import { Mission, Expense } from '@prisma/client';
 import { toast } from 'sonner';
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
-import { cleanExpenseData } from '@/lib/validations';
+
+// Import the validation function - update path as needed
+// Note: If cleanExpenseData is not available, we'll implement basic validation inline
+const cleanExpenseData = (data: any) => {
+  const cleaned = { ...data };
+  
+  // Convert amount to number
+  if (cleaned.amount && typeof cleaned.amount === 'string') {
+    const amount = parseFloat(cleaned.amount);
+    cleaned.amount = isNaN(amount) ? 0 : amount;
+  }
+
+  // Handle date fields
+  ['date', 'rentalStartDate', 'rentalEndDate'].forEach(field => {
+    if (cleaned[field] && typeof cleaned[field] === 'string') {
+      cleaned[field] = new Date(cleaned[field]);
+    }
+  });
+
+  // Convert empty strings to null for optional fields
+  const optionalFields = ['vendor', 'description', 'proofUrl', 'missionId', 'leadId'];
+  optionalFields.forEach(field => {
+    if (cleaned[field] === '' || cleaned[field] === 'none') {
+      cleaned[field] = null;
+    }
+  });
+
+  return cleaned;
+};
 
 const expenseStructure = {
   OPERATIONS: ["Produits de nettoyage", "Consommables", "Matériel & outils", "Produits jardinage", "Produits piscine", "Produits antinuisible", "Sous-traitance", "Énergie & fluides"],
@@ -34,7 +62,6 @@ export default function EditExpensePage() {
     const expenseId = params.id as string;
     
     const [missions, setMissions] = useState<Mission[]>([]);
-    const [leads, setLeads] = useState<Lead[]>([]);
     
     const [formData, setFormData] = useState<Partial<Expense>>({});
     const [isLoading, setIsLoading] = useState(true);
@@ -43,30 +70,34 @@ export default function EditExpensePage() {
     const fetchExpenseData = useCallback(async () => {
         if (!expenseId) return;
         try {
-            const [expenseRes, missionsRes, leadsRes] = await Promise.all([
+            const [expenseRes, missionsRes] = await Promise.all([
                 fetch(`/api/expenses/${expenseId}`),
                 fetch('/api/missions'),
-                fetch('/api/leads'),
             ]);
             
             if (!expenseRes.ok) throw new Error("Dépense non trouvée.");
 
             const expenseData = await expenseRes.json();
+            const missionsData = await missionsRes.json();
             
             // Process the expense data for form display
             setFormData({
                 ...expenseData,
                 // Convert Date objects to strings for date inputs
-                date: new Date(expenseData.date).toISOString().split('T')[0],
+                date: expenseData.date ? new Date(expenseData.date).toISOString().split('T')[0] : '',
                 rentalStartDate: expenseData.rentalStartDate ? new Date(expenseData.rentalStartDate).toISOString().split('T')[0] : '',
                 rentalEndDate: expenseData.rentalEndDate ? new Date(expenseData.rentalEndDate).toISOString().split('T')[0] : '',
                 // Convert null values to 'none' for Select components to fix Radix UI issue
                 missionId: expenseData.missionId || 'none',
-                leadId: expenseData.leadId || 'none',
+                // Ensure amount is a string for the input
+                amount: expenseData.amount ? expenseData.amount.toString() : '',
+                // Ensure string values for text inputs
+                vendor: expenseData.vendor || '',
+                description: expenseData.description || ''
             });
             
-            setMissions(await missionsRes.json());
-            setLeads(await leadsRes.json());
+            // Handle different response formats for missions
+            setMissions(Array.isArray(missionsData) ? missionsData : (missionsData.missions || missionsData.data || []));
         } catch (err: any) {
             toast.error(err.message);
             router.push('/expenses');
@@ -97,12 +128,11 @@ export default function EditExpensePage() {
         setIsSaving(true);
 
         try {
-            // Prepare the data using the validation function from lib/validation.ts
+            // Prepare the data using the validation function
             const cleanedData = cleanExpenseData({
                 ...formData,
                 // Convert 'none' back to null/empty string for validation processing
                 missionId: formData.missionId === 'none' ? '' : formData.missionId,
-                leadId: formData.leadId === 'none' ? '' : formData.leadId,
             });
 
             const response = await fetch(`/api/expenses/${expenseId}`, {
@@ -111,7 +141,10 @@ export default function EditExpensePage() {
                 body: JSON.stringify(cleanedData),
             });
             
-            if (!response.ok) throw new Error('Échec de la mise à jour de la dépense.');
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Échec de la mise à jour de la dépense.');
+            }
             
             toast.success("Dépense mise à jour avec succès !");
             router.push('/expenses');
@@ -140,160 +173,224 @@ export default function EditExpensePage() {
                 <div>
                     <h1 className="text-2xl md:text-3xl font-bold">Modifier une Dépense</h1>
                     <p className="text-muted-foreground mt-1">
-                        Mise à jour de la dépense du {formData.date ? new Date(formData.date).toLocaleDateString() : ''}
+                        Mise à jour de la dépense du {formData.date ? 
+                            new Date(formData.date).toLocaleDateString('fr-FR') : 'N/A'
+                        }
                     </p>
                 </div>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="space-y-6">
                 <Card className="thread-card">
                     <CardHeader>
-                        <CardTitle>Détails de la Dépense</CardTitle>
+                        <CardTitle>Informations Générales</CardTitle>
                     </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Date */}
+                            <div>
+                                <Label htmlFor="date">Date de la dépense *</Label>
+                                <Input
+                                    id="date"
+                                    type="date"
+                                    value={typeof formData.date === 'string' ? formData.date : ''}
+                                    onChange={handleChange}
+                                    required
+                                />
+                            </div>
+
+                            {/* Amount */}
+                            <div>
+                                <Label htmlFor="amount">Montant (MAD) *</Label>
+                                <Input
+                                    id="amount"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={typeof formData.amount === 'string' ? formData.amount : (formData.amount?.toString() || '')}
+                                    onChange={handleChange}
+                                    placeholder="0.00"
+                                    required
+                                />
+                            </div>
+
+                            {/* Category */}
+                            <div>
+                                <Label>Catégorie *</Label>
+                                <Select 
+                                    value={formData.category || ''} 
+                                    onValueChange={(value) => handleSelectChange('category', value)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Sélectionnez une catégorie" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="OPERATIONS">Opérations</SelectItem>
+                                        <SelectItem value="REVENTE_NEGOCE">Revente & Négoce</SelectItem>
+                                        <SelectItem value="RESSOURCES_HUMAINES">Ressources Humaines</SelectItem>
+                                        <SelectItem value="ADMINISTRATIF_FINANCIER">Administratif & Financier</SelectItem>
+                                        <SelectItem value="MARKETING_COMMERCIAL">Marketing & Commercial</SelectItem>
+                                        <SelectItem value="LOGISTIQUE_MOBILITE">Logistique & Mobilité</SelectItem>
+                                        <SelectItem value="INFRASTRUCTURES_LOCAUX">Infrastructures & Locaux</SelectItem>
+                                        <SelectItem value="LOCATIONS">Locations</SelectItem>
+                                        <SelectItem value="EXCEPTIONNELLES_DIVERSES">Exceptionnelles & Diverses</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Subcategory */}
+                            <div>
+                                <Label>Sous-catégorie *</Label>
+                                <Select 
+                                    value={formData.subCategory || ''} 
+                                    onValueChange={(value) => handleSelectChange('subCategory', value)}
+                                    disabled={!formData.category}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Sélectionnez d'abord une catégorie" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {formData.category && expenseStructure[formData.category as keyof typeof expenseStructure]?.map((subCat) => (
+                                            <SelectItem key={subCat} value={subCat}>
+                                                {subCat}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Payment Method */}
+                            <div>
+                                <Label>Mode de paiement *</Label>
+                                <Select 
+                                    value={formData.paymentMethod || ''} 
+                                    onValueChange={(value) => handleSelectChange('paymentMethod', value)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Sélectionnez un mode de paiement" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="CASH">Espèces</SelectItem>
+                                        <SelectItem value="VIREMENT">Virement</SelectItem>
+                                        <SelectItem value="CARTE">Carte</SelectItem>
+                                        <SelectItem value="CHEQUE">Chèque</SelectItem>
+                                        <SelectItem value="MOBILE">Mobile</SelectItem>
+                                        <SelectItem value="AUTRE">Autre</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Vendor */}
+                            <div>
+                                <Label htmlFor="vendor">Fournisseur</Label>
+                                <Input
+                                    id="vendor"
+                                    type="text"
+                                    value={formData.vendor || ''}
+                                    onChange={handleChange}
+                                    placeholder="Nom du fournisseur"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Description */}
                         <div>
-                            <Label htmlFor="date">Date</Label>
-                            <Input 
-                                id="date" 
-                                type="date" 
-                                value={formData.date?.toString() || ''} 
-                                onChange={handleChange} 
-                                required 
+                            <Label htmlFor="description">Description</Label>
+                            <Textarea
+                                id="description"
+                                value={formData.description || ''}
+                                onChange={handleChange}
+                                placeholder="Description détaillée de la dépense"
+                                rows={3}
                             />
                         </div>
-                        <div>
-                            <Label htmlFor="amount">Montant (MAD)</Label>
-                            <Input 
-                                id="amount" 
-                                type="number" 
-                                step="0.01" 
-                                value={formData.amount?.toString() || ''} 
-                                onChange={handleChange} 
-                                required 
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="paymentMethod">Mode de paiement</Label>
-                            <Select value={formData.paymentMethod || ''} onValueChange={(value) => handleSelectChange('paymentMethod', value)}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="CASH">Cash</SelectItem>
-                                    <SelectItem value="VIREMENT">Virement</SelectItem>
-                                    <SelectItem value="CARTE">Carte</SelectItem>
-                                    <SelectItem value="CHEQUE">Chèque</SelectItem>
-                                    <SelectItem value="MOBILE">Mobile</SelectItem>
-                                    <SelectItem value="AUTRE">Autre</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label htmlFor="category">Catégorie</Label>
-                            <Select value={formData.category || ''} onValueChange={(value) => handleSelectChange('category', value)}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {Object.keys(expenseStructure).map(cat => (
-                                        <SelectItem key={cat} value={cat}>
-                                            {cat.replace(/_/g, ' ')}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label htmlFor="subCategory">Sous-Catégorie</Label>
-                            <Select value={formData.subCategory || ''} onValueChange={(value) => handleSelectChange('subCategory', value)} required>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Choisir..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {formData.category && expenseStructure[formData.category as keyof typeof expenseStructure]?.map(subCat => (
-                                        <SelectItem key={subCat} value={subCat}>
-                                            {subCat}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label htmlFor="vendor">Fournisseur / Payé à</Label>
-                            <Input 
-                                id="vendor" 
-                                value={formData.vendor || ''} 
-                                onChange={handleChange} 
-                            />
-                        </div>
-                        <div className="lg:col-span-3">
-                            <Label htmlFor="description">Description / Notes</Label>
-                            <Textarea 
-                                id="description" 
-                                value={formData.description || ''} 
-                                onChange={handleChange} 
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="missionId">Lier à une mission (optionnel)</Label>
-                            <Select value={formData.missionId || 'none'} onValueChange={(value) => handleSelectChange('missionId', value)}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Sélectionner..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">Aucune</SelectItem>
-                                    {missions.map(m => (
-                                        <SelectItem key={m.id} value={m.id}>
-                                            {m.missionNumber}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label htmlFor="leadId">Lier à un lead (optionnel)</Label>
-                            <Select value={formData.leadId || 'none'} onValueChange={(value) => handleSelectChange('leadId', value)}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Sélectionner..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">Aucun</SelectItem>
-                                    {leads.map(l => (
-                                        <SelectItem key={l.id} value={l.id}>
-                                            {l.firstName} {l.lastName}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {isRental && (
-                            <>
-                                <div>
-                                    <Label htmlFor="rentalStartDate">Début location</Label>
-                                    <Input 
-                                        id="rentalStartDate" 
-                                        type="date" 
-                                        value={formData.rentalStartDate?.toString() || ''} 
-                                        onChange={handleChange}
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="rentalEndDate">Fin location</Label>
-                                    <Input 
-                                        id="rentalEndDate" 
-                                        type="date" 
-                                        value={formData.rentalEndDate?.toString() || ''} 
-                                        onChange={handleChange}
-                                    />
-                                </div>
-                            </>
-                        )}
                     </CardContent>
                 </Card>
-                <div className="flex justify-end mt-6">
-                    <Button type="submit" className="bg-enarva-gradient rounded-lg px-8" disabled={isSaving}>
-                        <Save className="w-4 h-4 mr-2" />
-                        {isSaving ? 'Sauvegarde...' : 'Sauvegarder les modifications'}
+
+                {/* Rental dates for LOCATIONS category */}
+                {isRental && (
+                    <Card className="thread-card">
+                        <CardHeader>
+                            <CardTitle>Dates de Location</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <Label htmlFor="rentalStartDate">Date de début</Label>
+                                    <Input
+                                        id="rentalStartDate"
+                                        type="date"
+                                        value={typeof formData.rentalStartDate === 'string' ? formData.rentalStartDate : ''}
+                                        onChange={handleChange}
+                                    />
+                                </div>
+                                <div>
+                                    <Label htmlFor="rentalEndDate">Date de fin</Label>
+                                    <Input
+                                        id="rentalEndDate"
+                                        type="date"
+                                        value={typeof formData.rentalEndDate === 'string' ? formData.rentalEndDate : ''}
+                                        onChange={handleChange}
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Mission and Lead associations */}
+                <Card className="thread-card">
+                    <CardHeader>
+                        <CardTitle>Mission Associée</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 gap-4">
+                            {/* Mission */}
+                            <div>
+                                <Label>Mission associée</Label>
+                                <Select 
+                                    value={formData.missionId || 'none'} 
+                                    onValueChange={(value) => handleSelectChange('missionId', value)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Aucune mission" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Aucune mission</SelectItem>
+                                        {missions.map(mission => (
+                                            <SelectItem key={mission.id} value={mission.id}>
+                                                {mission.missionNumber} - {new Date(mission.scheduledDate).toLocaleDateString('fr-FR')}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    La mission contient déjà les informations du client associé
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Action buttons */}
+                <div className="flex items-center justify-end gap-4">
+                    <Link href="/expenses">
+                        <Button type="button" variant="outline">
+                            Annuler
+                        </Button>
+                    </Link>
+                    <Button type="submit" disabled={isSaving} className="gap-2">
+                        {isSaving ? (
+                            <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Mise à jour...
+                            </>
+                        ) : (
+                            <>
+                                <Save className="w-4 h-4" />
+                                Mettre à jour
+                            </>
+                        )}
                     </Button>
                 </div>
             </form>
