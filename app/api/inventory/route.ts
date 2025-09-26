@@ -63,23 +63,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get total count for pagination
-    const totalCount = await prisma.inventory.count({ where });
-
     console.log(`✅ Fetched ${filteredItems.length} inventory items`);
     
-    return NextResponse.json({
-      items: filteredItems,
-      totalCount,
-      currentPage: Math.floor(offset / limit) + 1,
-      totalPages: Math.ceil(totalCount / limit),
-      limit,
-      hasNextPage: offset + limit < totalCount,
-      hasPreviousPage: offset > 0,
-      lowStockCount: inventoryItems.filter(item => 
-        Number(item.currentStock) <= Number(item.minimumStock)
-      ).length
-    });
+    // Return direct array for backward compatibility with existing frontend
+    return NextResponse.json(filteredItems);
 
   } catch (error) {
     console.error('❌ Failed to fetch inventory:', error);
