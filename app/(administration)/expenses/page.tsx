@@ -33,8 +33,7 @@ import { TableSkeleton } from '@/components/skeletons/TableSkeleton';
 import { toast } from 'sonner';
 
 type ExpenseWithDetails = Expense & { 
-  mission?: { missionNumber: string; address: string };
-  lead?: { firstName: string; lastName: string };
+  mission?: { missionNumber: string; address: string; lead?: { firstName: string; lastName: string } };
   user: { name: string | null; image?: string | null };
 };
 
@@ -90,8 +89,11 @@ export default function ExpensesPage() {
       const response = await fetch('/api/expenses');
       if (!response.ok) throw new Error('Impossible de charger les dépenses.');
       const data = await response.json();
-      setExpenses(data);
-      setFilteredExpenses(data);
+      
+      // Handle both old and new API response formats
+      const expensesArray = data.expenses || data;
+      setExpenses(expensesArray);
+      setFilteredExpenses(expensesArray);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -107,10 +109,14 @@ export default function ExpensesPage() {
   useEffect(() => {
     let filtered = expenses.filter(expense => {
       const matchesSearch = searchTerm === '' || 
-        expense.subCategory.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        expense.subCategory?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         expense.vendor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        expense.user.name?.toLowerCase().includes(searchTerm.toLowerCase());
+        expense.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        expense.mission?.missionNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        expense.mission?.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        expense.mission?.lead?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        expense.mission?.lead?.lastName?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesCategory = selectedCategory === 'ALL' || expense.category === selectedCategory;
       const matchesPaymentMethod = selectedPaymentMethod === 'ALL' || expense.paymentMethod === selectedPaymentMethod;
@@ -150,7 +156,10 @@ export default function ExpensesPage() {
     }
   };
 
-  const totalAmount = filteredExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
+  const totalAmount = filteredExpenses.reduce((sum, expense) => {
+    const amount = expense.amount ? Number(expense.amount) : 0;
+    return sum + amount;
+  }, 0);
 
   if (isLoading) {
     return <TableSkeleton title="Gestion des Dépenses" />;
@@ -287,7 +296,7 @@ export default function ExpensesPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredExpenses.map((expense) => {
-            const IconComponent = categoryIcons[expense.category];
+            const IconComponent = expense.category ? categoryIcons[expense.category] : Receipt;
             return (
               <Card key={expense.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50/30">
                 <CardHeader className="pb-3">
@@ -297,20 +306,20 @@ export default function ExpensesPage() {
                         <IconComponent className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-foreground line-clamp-1">{expense.subCategory}</h3>
+                        <h3 className="font-semibold text-foreground line-clamp-1">{expense.subCategory || 'Catégorie non définie'}</h3>
                         <div className="flex items-center gap-2 mt-1">
-                          <Badge className={`text-xs font-medium border ${categoryColors[expense.category]}`}>
-                            {expense.category.replace(/_/g, ' ')}
+                          <Badge className={`text-xs font-medium border ${categoryColors[expense.category] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+                            {expense.category ? expense.category.replace(/_/g, ' ') : 'Non défini'}
                           </Badge>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-xl font-bold text-red-600 mb-1">
-                        {formatCurrency(Number(expense.amount))}
+                        {formatCurrency(expense.amount ? Number(expense.amount) : 0)}
                       </div>
-                      <Badge className={`text-xs font-medium border ${paymentMethodColors[expense.paymentMethod]}`}>
-                        {expense.paymentMethod}
+                      <Badge className={`text-xs font-medium border ${paymentMethodColors[expense.paymentMethod] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+                        {expense.paymentMethod || 'N/A'}
                       </Badge>
                     </div>
                   </div>
@@ -321,16 +330,16 @@ export default function ExpensesPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="w-4 h-4" />
-                      <span>{formatDate(expense.date)}</span>
+                      <span>{expense.date ? formatDate(expense.date) : 'Date non définie'}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Avatar className="w-5 h-5">
                         <AvatarImage src={expense.user.image || undefined} />
                         <AvatarFallback className="text-xs">
-                          {expense.user.name?.charAt(0) || 'U'}
+                          {expense.user?.name?.charAt(0) || 'U'}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="truncate">{expense.user.name}</span>
+                      <span className="truncate">{expense.user?.name || 'Utilisateur inconnu'}</span>
                     </div>
                   </div>
 
@@ -342,24 +351,24 @@ export default function ExpensesPage() {
                     </div>
                   )}
 
-                  {/* Mission or Lead */}
-                  {(expense.mission || expense.lead) && (
+                  {/* Mission information (includes lead data) */}
+                  {expense.mission && (
                     <div className="flex items-center gap-2 text-sm">
                       <MapPin className="w-4 h-4 text-muted-foreground" />
                       <div>
-                        {expense.mission ? (
-                          <div>
-                            <span className="font-medium">Mission #{expense.mission.missionNumber}</span>
-                            <br />
-                            <span className="text-muted-foreground text-xs">{expense.mission.address}</span>
-                          </div>
-                        ) : expense.lead ? (
-                          <span className="font-medium">
-                            {expense.lead.firstName} {expense.lead.lastName}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">Général</span>
-                        )}
+                        <div>
+                          <span className="font-medium">Mission #{expense.mission.missionNumber}</span>
+                          <br />
+                          <span className="text-muted-foreground text-xs">{expense.mission.address}</span>
+                          {expense.mission.lead && (
+                            <>
+                              <br />
+                              <span className="text-xs text-blue-600">
+                                Client: {expense.mission.lead.firstName} {expense.mission.lead.lastName}
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
