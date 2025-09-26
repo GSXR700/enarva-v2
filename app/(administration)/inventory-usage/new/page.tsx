@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Save, AlertTriangle } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ArrowLeft, Save, AlertTriangle, Package, Calendar } from 'lucide-react'
 import { Inventory, Mission, Lead } from '@prisma/client'
 import { toast } from 'sonner'
 
@@ -21,7 +22,10 @@ export default function NewInventoryUsagePage() {
   const [inventoryItems, setInventoryItems] = useState<Inventory[]>([])
   const [missions, setMissions] = useState<MissionWithLead[]>([])
   const [selectedInventory, setSelectedInventory] = useState<Inventory | null>(null)
+  const [selectedMission, setSelectedMission] = useState<MissionWithLead | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isDataLoading, setIsDataLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     inventoryId: '',
@@ -33,29 +37,95 @@ export default function NewInventoryUsagePage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [inventoryRes, missionsRes] = await Promise.all([
-          fetch('/api/inventory'),
-          fetch('/api/missions?status=IN_PROGRESS,SCHEDULED')
-        ])
+        setIsDataLoading(true)
+        setError(null)
 
-        if (!inventoryRes.ok || !missionsRes.ok) {
-          throw new Error('Failed to fetch data')
-        }
+        // Fetch inventory and missions separately with better error handling
+        const inventoryPromise = fetch('/api/inventory').then(async (res) => {
+          if (!res.ok) {
+            throw new Error(`Failed to fetch inventory: ${res.status}`)
+          }
+          return res.json()
+        })
+
+        // Try different approaches to get missions
+        const missionsPromise = fetchMissions()
 
         const [inventoryData, missionsData] = await Promise.all([
-          inventoryRes.json(),
-          missionsRes.json()
+          inventoryPromise,
+          missionsPromise
         ])
 
-        setInventoryItems(inventoryData.filter((item: Inventory) => Number(item.currentStock) > 0))
-        setMissions(missionsData)
-      } catch (error) {
+        console.log('Inventory data:', inventoryData)
+        console.log('Missions data:', missionsData)
+
+        // Handle inventory data (could be direct array or object with items)
+        let inventoryItems: Inventory[] = []
+        if (Array.isArray(inventoryData)) {
+          inventoryItems = inventoryData
+        } else if (inventoryData.items && Array.isArray(inventoryData.items)) {
+          inventoryItems = inventoryData.items
+        }
+
+        // Filter items with stock > 0
+        const availableItems = inventoryItems.filter((item: Inventory) => {
+          const stock = Number(item.currentStock) || 0
+          return stock > 0
+        })
+
+        console.log('Available inventory items:', availableItems)
+
+        setInventoryItems(availableItems)
+        setMissions(missionsData || [])
+      } catch (error: any) {
+        console.error('Error fetching data:', error)
+        setError(error.message || 'Impossible de charger les données')
         toast.error('Impossible de charger les données')
+      } finally {
+        setIsDataLoading(false)
       }
     }
 
     fetchData()
   }, [])
+
+  const fetchMissions = async (): Promise<MissionWithLead[]> => {
+    try {
+      // Try to get all missions first
+      console.log('Fetching missions...')
+      const response = await fetch('/api/missions')
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch missions: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('Missions API response:', data)
+      
+      // Handle different response formats
+      let allMissions: MissionWithLead[] = []
+      if (Array.isArray(data)) {
+        allMissions = data
+      } else if (data.missions && Array.isArray(data.missions)) {
+        allMissions = data.missions
+      } else if (data.data && Array.isArray(data.data)) {
+        allMissions = data.data
+      }
+
+      // Filter for active missions (IN_PROGRESS, SCHEDULED, or any status that makes sense)
+      const activeMissions = allMissions.filter((mission: Mission) => {
+        const validStatuses = ['SCHEDULED', 'IN_PROGRESS', 'PENDING', 'CONFIRMED', 'READY']
+        return validStatuses.includes(mission.status)
+      })
+
+      console.log('Filtered active missions:', activeMissions)
+      return activeMissions
+    } catch (error) {
+      console.error('Error fetching missions:', error)
+      // Return empty array instead of throwing to prevent complete failure
+      return []
+    }
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target
@@ -69,60 +139,109 @@ export default function NewInventoryUsagePage() {
       const selected = inventoryItems.find(item => item.id === value)
       setSelectedInventory(selected || null)
     }
+
+    if (id === 'missionId') {
+      const selected = missions.find(mission => mission.id === value)
+      setSelectedMission(selected || null)
+    }
   }
 
   const isStockSufficient = () => {
     if (!selectedInventory || !formData.quantity) return true
-    return Number(formData.quantity) <= Number(selectedInventory.currentStock)
-  }
-
-  const willStockBeLow = () => {
-    if (!selectedInventory || !formData.quantity) return false
-    const remaining = Number(selectedInventory.currentStock) - Number(formData.quantity)
-    return remaining <= Number(selectedInventory.minimumStock)
+    const requestedQuantity = parseFloat(formData.quantity)
+    const availableStock = Number(selectedInventory.currentStock)
+    return requestedQuantity <= availableStock
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validation
     if (!formData.inventoryId || !formData.missionId || !formData.quantity) {
       toast.error('Veuillez remplir tous les champs obligatoires')
       return
     }
 
     if (!isStockSufficient()) {
-      toast.error('Quantité insuffisante en stock')
+      toast.error('Stock insuffisant pour cette quantité')
+      return
+    }
+
+    const quantity = parseFloat(formData.quantity)
+    if (isNaN(quantity) || quantity <= 0) {
+      toast.error('La quantité doit être un nombre positif')
       return
     }
 
     setIsLoading(true)
 
     try {
-      const usageData = {
-        inventoryId: formData.inventoryId,
-        missionId: formData.missionId,
-        quantity: parseFloat(formData.quantity),
-        notes: formData.notes || null
-      }
-
       const response = await fetch('/api/inventory-usage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(usageData)
+        body: JSON.stringify({
+          inventoryId: formData.inventoryId,
+          missionId: formData.missionId,
+          quantity: quantity,
+          notes: formData.notes.trim() || null
+        }),
       })
 
-      if (!response.ok) throw new Error('Failed to create inventory usage')
+      if (!response.ok) {
+        const errorData = await response.text()
+        throw new Error(errorData || 'Échec de l\'enregistrement de l\'utilisation')
+      }
 
-      toast.success('Utilisation d\'inventaire enregistrée avec succès!')
+      toast.success('Utilisation d\'inventaire enregistrée avec succès !')
       router.push('/inventory-usage')
-    } catch (error) {
-      toast.error('Erreur lors de l\'enregistrement')
+      router.refresh()
+    } catch (err: any) {
+      console.error('Error creating inventory usage:', err)
+      toast.error(err.message || 'Une erreur est survenue')
     } finally {
       setIsLoading(false)
     }
   }
 
+  // Loading state
+  if (isDataLoading) {
+    return (
+      <div className="main-content">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground mt-2">Chargement des données...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="main-content">
+        <Alert className="max-w-md mx-auto">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {error}
+            <Button 
+              onClick={() => window.location.reload()} 
+              variant="outline" 
+              size="sm" 
+              className="ml-4"
+            >
+              Réessayer
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
   return (
     <div className="main-content space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/inventory-usage">
           <Button variant="outline" size="icon">
@@ -139,118 +258,138 @@ export default function NewInventoryUsagePage() {
         </div>
       </div>
 
+      {/* Data Status Alerts */}
+      {inventoryItems.length === 0 && (
+        <Alert>
+          <Package className="h-4 w-4" />
+          <AlertDescription>
+            Aucun article d'inventaire disponible. 
+            <Link href="/inventory" className="ml-2 underline text-blue-600">
+              Ajouter des articles à l'inventaire
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {missions.length === 0 && (
+        <Alert>
+          <Calendar className="h-4 w-4" />
+          <AlertDescription>
+            Aucune mission active disponible. 
+            <Link href="/missions" className="ml-2 underline text-blue-600">
+              Créer ou vérifier les missions
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Selection */}
+        {/* Selections */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle>Sélections</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Inventory Item */}
             <div>
-              <Label htmlFor="inventory">Article d'inventaire *</Label>
-              <Select onValueChange={(value) => handleSelectChange('inventoryId', value)} required>
+              <Label htmlFor="inventoryId">Article d'inventaire *</Label>
+              <Select 
+                value={formData.inventoryId} 
+                onValueChange={(value) => handleSelectChange('inventoryId', value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un article..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {inventoryItems.map((item) => (
+                  {inventoryItems.map(item => (
                     <SelectItem key={item.id} value={item.id}>
-                      {item.name} - Stock: {Number(item.currentStock)} {item.unit}
+                      <div className="flex items-center justify-between w-full">
+                        <span>{item.name}</span>
+                        <span className="text-muted-foreground text-sm ml-2">
+                          Stock: {Number(item.currentStock)} {item.unit}
+                        </span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {selectedInventory && (
+                <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                  <p><strong>Catégorie:</strong> {selectedInventory.category}</p>
+                  <p><strong>Stock disponible:</strong> {Number(selectedInventory.currentStock)} {selectedInventory.unit}</p>
+                  {selectedInventory.supplier && (
+                    <p><strong>Fournisseur:</strong> {selectedInventory.supplier}</p>
+                  )}
+                </div>
+              )}
             </div>
 
+            {/* Mission */}
             <div>
-              <Label htmlFor="mission">Mission *</Label>
-              <Select onValueChange={(value) => handleSelectChange('missionId', value)} required>
+              <Label htmlFor="missionId">Mission *</Label>
+              <Select 
+                value={formData.missionId} 
+                onValueChange={(value) => handleSelectChange('missionId', value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner une mission..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {missions.map((mission) => (
+                  {missions.map(mission => (
                     <SelectItem key={mission.id} value={mission.id}>
-                      {mission.missionNumber} - {mission.lead.firstName} {mission.lead.lastName}
+                      <div className="flex flex-col">
+                        <span>{mission.missionNumber}</span>
+                        {mission.lead && (
+                          <span className="text-muted-foreground text-sm">
+                            {mission.lead.firstName} {mission.lead.lastName} - {mission.address}
+                          </span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {selectedMission && (
+                <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                  <p><strong>Client:</strong> {selectedMission.lead?.firstName} {selectedMission.lead?.lastName}</p>
+                  <p><strong>Adresse:</strong> {selectedMission.address}</p>
+                  <p><strong>Date prévue:</strong> {new Date(selectedMission.scheduledDate).toLocaleDateString('fr-FR')}</p>
+                  <p><strong>Statut:</strong> {selectedMission.status}</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Quantity and Details */}
+        {/* Usage Details */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle>Détails de l'utilisation</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <div>
-              <Label htmlFor="quantity">
-                Quantité utilisée *
-                {selectedInventory && (
-                  <span className="text-sm text-muted-foreground ml-2">
-                    (en {selectedInventory.unit})
-                  </span>
-                )}
-              </Label>
+              <Label htmlFor="quantity">Quantité utilisée *</Label>
               <Input
                 id="quantity"
                 type="number"
                 step="0.01"
                 min="0.01"
-                max={selectedInventory ? Number(selectedInventory.currentStock) : undefined}
                 value={formData.quantity}
                 onChange={handleChange}
+                placeholder="0.00"
                 required
               />
-              
-              {/* Stock Information */}
-              {selectedInventory && (
-                <div className="mt-2 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Stock actuel:</span>
-                    <span className="font-medium">
-                      {Number(selectedInventory.currentStock)} {selectedInventory.unit}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Stock minimum:</span>
-                    <span className="font-medium">
-                      {Number(selectedInventory.minimumStock)} {selectedInventory.unit}
-                    </span>
-                  </div>
-                  
-                  {formData.quantity && (
-                    <div className="flex justify-between text-sm">
-                      <span>Stock restant:</span>
-                      <span className={`font-medium ${
-                        Number(selectedInventory.currentStock) - Number(formData.quantity) <= Number(selectedInventory.minimumStock)
-                          ? 'text-orange-600'
-                          : 'text-green-600'
-                      }`}>
-                        {Number(selectedInventory.currentStock) - Number(formData.quantity)} {selectedInventory.unit}
-                      </span>
-                    </div>
+              {selectedInventory && formData.quantity && (
+                <div className="mt-1">
+                  {isStockSufficient() ? (
+                    <p className="text-green-600 text-sm">
+                      ✓ Stock suffisant ({Number(selectedInventory.currentStock)} {selectedInventory.unit} disponibles)
+                    </p>
+                  ) : (
+                    <p className="text-red-600 text-sm">
+                      ⚠️ Stock insuffisant (seulement {Number(selectedInventory.currentStock)} {selectedInventory.unit} disponibles)
+                    </p>
                   )}
-                </div>
-              )}
-              
-              {/* Warnings */}
-              {!isStockSufficient() && (
-                <div className="flex items-center gap-2 mt-2 p-2 bg-red-50 border border-red-200 rounded">
-                  <AlertTriangle className="w-4 h-4 text-red-600" />
-                  <span className="text-sm text-red-600">Stock insuffisant</span>
-                </div>
-              )}
-              
-              {isStockSufficient() && willStockBeLow() && (
-                <div className="flex items-center gap-2 mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
-                  <AlertTriangle className="w-4 h-4 text-orange-600" />
-                  <span className="text-sm text-orange-600">
-                    Attention: Le stock sera en dessous du minimum après cette utilisation
-                  </span>
                 </div>
               )}
             </div>
@@ -261,53 +400,36 @@ export default function NewInventoryUsagePage() {
                 id="notes"
                 value={formData.notes}
                 onChange={handleChange}
+                placeholder="Notes sur l'utilisation de cet article..."
                 rows={3}
-                placeholder="Notes sur cette utilisation d'inventaire..."
               />
             </div>
           </CardContent>
         </Card>
 
-        {/* Summary */}
-        {selectedInventory && formData.quantity && (
-          <Card className="thread-card">
-            <CardHeader>
-              <CardTitle>Résumé</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-muted p-4 rounded-lg space-y-2">
-                <div className="flex justify-between">
-                  <span>Article:</span>
-                  <span className="font-medium">{selectedInventory.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Quantité utilisée:</span>
-                  <span className="font-medium">{formData.quantity} {selectedInventory.unit}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Coût unitaire:</span>
-                  <span className="font-medium">{Number(selectedInventory.unitPrice)} MAD</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t">
-                  <span>Coût total:</span>
-                  <span className="font-bold text-lg">
-                    {(Number(formData.quantity) * Number(selectedInventory.unitPrice)).toFixed(2)} MAD
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Submit Button */}
-        <div className="flex justify-end">
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end gap-4">
+          <Link href="/inventory-usage">
+            <Button type="button" variant="outline">
+              Annuler
+            </Button>
+          </Link>
           <Button 
             type="submit" 
-            disabled={isLoading || !isStockSufficient()}
-            className="bg-enarva-gradient rounded-lg px-8"
+            disabled={isLoading || !isStockSufficient() || inventoryItems.length === 0 || missions.length === 0}
+            className="gap-2"
           >
-            <Save className="w-4 h-4 mr-2" />
-            {isLoading ? 'Enregistrement...' : 'Enregistrer l\'Utilisation'}
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Enregistrement...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Enregistrer l'utilisation
+              </>
+            )}
           </Button>
         </div>
       </form>
