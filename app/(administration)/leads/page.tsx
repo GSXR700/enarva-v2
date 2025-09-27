@@ -416,7 +416,7 @@ export default function LeadsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Leads</h1>
+          <h1 className="text-3xl font-bold text-foreground">Leads</h1>
           <p className="text-gray-600">Gérez vos prospects et opportunités commerciales</p>
         </div>
         
@@ -489,7 +489,7 @@ export default function LeadsPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Leads</p>
+                <p className="text-sm font-medium text-foreground">Total Leads</p>
                 <p className="text-2xl font-bold">{totalLeads}</p>
               </div>
               <Users className="w-8 h-8 text-blue-600" />
