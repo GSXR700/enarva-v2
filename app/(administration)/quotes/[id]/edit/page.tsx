@@ -119,7 +119,6 @@ export default function EditQuotePage() {
       setStatus(data.status);
       setType(data.type || 'STANDARD');
       
-    
 
       // Initialize lead updates with current lead data
       setLeadUpdates({
@@ -363,9 +362,9 @@ export default function EditQuotePage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Devis introuvable</h3>
-              <p className="text-gray-600 mb-4">Le devis demandé n'existe pas ou a été supprimé.</p>
+              <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">Devis introuvable</h3>
+              <p className="text-muted-foreground mb-4">Le devis demandé n'existe pas ou a été supprimé.</p>
               <Link href="/quotes">
                 <Button>Retour aux devis</Button>
               </Link>
@@ -377,10 +376,10 @@ export default function EditQuotePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background transition-colors duration-300">
       <form onSubmit={handleSubmit}>
         {/* Mobile Header */}
-        <div className="lg:hidden bg-white border-b sticky top-0 z-10">
+        <div className="lg:hidden bg-card border-b border-border sticky top-0 z-10 transition-colors duration-300">
           <div className="flex items-center justify-between p-4 mx-2">
             <Link href={`/quotes/${quoteId}`}>
               <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-full">
@@ -389,15 +388,15 @@ export default function EditQuotePage() {
             </Link>
             
             <div className="flex-1 mx-4 text-center">
-              <h1 className="text-lg font-bold text-gray-900 truncate">Modifier le devis</h1>
-              <p className="text-sm text-gray-600 truncate">{quote.quoteNumber}</p>
+              <h1 className="text-lg font-bold text-foreground truncate">Modifier le devis</h1>
+              <p className="text-sm text-muted-foreground truncate">{quote.quoteNumber}</p>
             </div>
             
             <Button 
               type="submit" 
               disabled={isSaving}
               size="sm"
-              className="h-10 w-10 p-0 rounded-full bg-blue-600 hover:bg-blue-700"
+              className="h-10 w-10 p-0 rounded-full bg-primary hover:bg-primary/90"
             >
               <Save className="h-4 w-4" />
             </Button>
@@ -416,15 +415,15 @@ export default function EditQuotePage() {
                   </Button>
                 </Link>
                 <div>
-                  <h1 className="text-2xl font-bold">Modifier le devis</h1>
-                  <p className="text-gray-600">{quote.quoteNumber}</p>
+                  <h1 className="text-2xl font-bold text-foreground">Modifier le devis</h1>
+                  <p className="text-muted-foreground">{quote.quoteNumber}</p>
                 </div>
               </div>
               
               <Button 
                 type="submit" 
                 disabled={isSaving}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-primary hover:bg-primary/90"
               >
                 <Save className="h-4 w-4 mr-2" />
                 {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
@@ -437,13 +436,13 @@ export default function EditQuotePage() {
         <div className="container mx-auto p-4 lg:p-6 max-w-4xl space-y-6">
           {/* Validation Errors */}
           {validationErrors.length > 0 && (
-            <Card className="border-red-200 bg-red-50">
+            <Card className="border-destructive/50 bg-destructive/10 dark:bg-destructive/20">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                  <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
                   <div>
-                    <h3 className="font-semibold text-red-800">Erreurs de validation</h3>
-                    <ul className="mt-2 text-sm text-red-700 space-y-1">
+                    <h3 className="font-semibold text-destructive">Erreurs de validation</h3>
+                    <ul className="mt-2 text-sm text-destructive/80 space-y-1">
                       {validationErrors.map((error, index) => (
                         <li key={index}>• {error}</li>
                       ))}
@@ -455,7 +454,7 @@ export default function EditQuotePage() {
           )}
 
           {/* Quote Settings */}
-          <Card>
+          <Card className="transition-colors duration-300">
             <CardHeader>
               <CardTitle>Paramètres du devis</CardTitle>
             </CardHeader>
@@ -498,13 +497,14 @@ export default function EditQuotePage() {
                   value={expiresAt}
                   onChange={(e) => setExpiresAt(e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
+                  className="bg-background border-input"
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Lead Information (modifiable) */}
-          <Card>
+          <Card className="transition-colors duration-300">
             <CardHeader>
               <CardTitle>Informations Lead (modifiables depuis le devis)</CardTitle>
               <CardDescription>
@@ -521,6 +521,7 @@ export default function EditQuotePage() {
                   onChange={(e) => handleLeadChange('estimatedSurface', e.target.value)}
                   min="1"
                   placeholder="Surface en m²"
+                  className="bg-background border-input"
                 />
               </div>
 
@@ -572,6 +573,7 @@ export default function EditQuotePage() {
                   value={leadUpdates.budgetRange}
                   onChange={(e) => handleLeadChange('budgetRange', e.target.value)}
                   placeholder="1000-5000 MAD"
+                  className="bg-background border-input"
                 />
               </div>
 
@@ -582,22 +584,23 @@ export default function EditQuotePage() {
                   value={leadUpdates.address}
                   onChange={(e) => handleLeadChange('address', e.target.value)}
                   placeholder="Adresse complète"
+                  className="bg-background border-input"
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Client Information (read-only) */}
-          <Card>
+          <Card className="transition-colors duration-300">
             <CardHeader>
               <CardTitle>Informations client</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <h3 className="font-semibold">{quote.lead.firstName} {quote.lead.lastName}</h3>
-                  <p className="text-gray-600">{quote.lead.phone}</p>
-                  {quote.lead.email && <p className="text-gray-600">{quote.lead.email}</p>}
+                  <h3 className="font-semibold text-foreground">{quote.lead.firstName} {quote.lead.lastName}</h3>
+                  <p className="text-muted-foreground">{quote.lead.phone}</p>
+                  {quote.lead.email && <p className="text-muted-foreground">{quote.lead.email}</p>}
                 </div>
                 <div>
                   {quote.lead.company && <p><strong>Société:</strong> {quote.lead.company}</p>}
@@ -608,7 +611,7 @@ export default function EditQuotePage() {
           </Card>
 
           {/* Services Management */}
-          <Card>
+          <Card className="transition-colors duration-300">
             <CardHeader>
               <CardTitle>Services du devis</CardTitle>
               <CardDescription>
@@ -630,7 +633,7 @@ export default function EditQuotePage() {
                       }}
                       onFocus={() => setShowServiceDropdown(true)}
                       placeholder="Rechercher ou taper un nouveau service..."
-                      className="flex-1"
+                      className="flex-1 bg-background border-input"
                     />
                     <Button
                       type="button"
@@ -645,18 +648,18 @@ export default function EditQuotePage() {
                   
                   {/* Service Dropdown */}
                   {showServiceDropdown && serviceSearch && (
-                    <div className="absolute top-full left-0 right-0 z-10 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
+                    <div className="absolute top-full left-0 right-0 z-10 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto mt-1 transition-colors duration-300">
                       {filteredServices.map((service, index) => (
                         <button
                           key={index}
                           type="button"
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                          className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors"
                           onClick={() => {
                             setServiceSearch(service);
                             setShowServiceDropdown(false);
                           }}
                         >
-                          <Search className="h-4 w-4 text-gray-400" />
+                          <Search className="h-4 w-4 text-muted-foreground" />
                           {service}
                         </button>
                       ))}
@@ -665,7 +668,7 @@ export default function EditQuotePage() {
                       {!PREDEFINED_SERVICES.includes(serviceSearch) && (
                         <button
                           type="button"
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2 border-t border-gray-200 text-blue-600"
+                          className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground flex items-center gap-2 border-t border-border text-primary transition-colors"
                           onClick={addNewService}
                         >
                           <Plus className="h-4 w-4" />
@@ -681,7 +684,7 @@ export default function EditQuotePage() {
               <div className="space-y-4">
                 {editableLineItems.length > 0 ? (
                   editableLineItems.map((item) => (
-                    <div key={item.id} className="border rounded-lg p-4 bg-gray-50">
+                    <div key={item.id} className="border border-border rounded-lg p-4 bg-muted/30 dark:bg-muted/20 transition-colors duration-300">
                       <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 items-start">
                         {/* Service Type - Searchable */}
                         <div className="lg:col-span-2">
@@ -691,7 +694,7 @@ export default function EditQuotePage() {
                               value={item.serviceType || item.description}
                               onChange={(e) => handleLineItemChange(item.id, 'serviceType', e.target.value)}
                               placeholder="Type de service..."
-                              className="w-full"
+                              className="w-full bg-background border-input"
                               list={`services-${item.id}`}
                             />
                             <datalist id={`services-${item.id}`}>
@@ -714,7 +717,7 @@ export default function EditQuotePage() {
                             onChange={(e) => handleLineItemChange(item.id, 'quantity', parseFloat(e.target.value))}
                             min="1"
                             step="1"
-                            className="w-full"
+                            className="w-full bg-background border-input"
                             disabled={isSaving}
                           />
                         </div>
@@ -728,10 +731,10 @@ export default function EditQuotePage() {
                             onChange={(e) => handleLineItemChange(item.id, 'unitPrice', parseFloat(e.target.value))}
                             min="0"
                             step="0.01"
-                            className="w-full"
+                            className="w-full bg-background border-input"
                             disabled={isSaving}
                           />
-                          <p className="text-xs text-gray-500 mt-1">MAD</p>
+                          <p className="text-xs text-muted-foreground mt-1">MAD</p>
                         </div>
 
                         {/* Total Price */}
@@ -743,10 +746,10 @@ export default function EditQuotePage() {
                             onChange={(e) => handleLineItemChange(item.id, 'amount', parseFloat(e.target.value))}
                             min="0"
                             step="0.01"
-                            className="w-full font-semibold"
+                            className="w-full font-semibold bg-background border-input"
                             disabled={isSaving}
                           />
-                          <p className="text-xs text-gray-500 mt-1">MAD</p>
+                          <p className="text-xs text-muted-foreground mt-1">MAD</p>
                         </div>
 
                         {/* Quick Actions */}
@@ -784,7 +787,7 @@ export default function EditQuotePage() {
                             variant="outline"
                             size="sm"
                             onClick={() => removeLineItem(item.id)}
-                            className="text-red-600 hover:bg-red-50"
+                            className="text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20"
                             disabled={isSaving || editableLineItems.length === 1}
                           >
                             Supprimer
@@ -794,8 +797,8 @@ export default function EditQuotePage() {
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <FileText className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
                     <p>Aucun service dans ce devis</p>
                     <p className="text-sm">Utilisez la recherche ci-dessus pour ajouter des services</p>
                   </div>
@@ -803,50 +806,51 @@ export default function EditQuotePage() {
               </div>
             </CardContent>
           </Card>
+          
           {/* Totals */}
-          <Card>
+          <Card className="transition-colors duration-300">
             <CardHeader>
               <CardTitle>Récapitulatif</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Sous-total HT</span>
-                  <span className="font-medium">{formatCurrency(finalQuote.subTotalHT)} MAD</span>
+                  <span className="text-muted-foreground">Sous-total HT</span>
+                  <span className="font-medium text-foreground">{formatCurrency(finalQuote.subTotalHT)} MAD</span>
                 </div>
                 
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">TVA (20%)</span>
-                  <span className="font-medium">{formatCurrency(finalQuote.vatAmount)} MAD</span>
+                  <span className="text-muted-foreground">TVA (20%)</span>
+                  <span className="font-medium text-foreground">{formatCurrency(finalQuote.vatAmount)} MAD</span>
                 </div>
                 
-                <hr />
+                <hr className="border-border" />
                 
                 <div className="flex justify-between items-center text-lg">
-                  <span className="font-semibold">Total TTC</span>
-                  <span className="font-bold text-blue-600">
+                  <span className="font-semibold text-foreground">Total TTC</span>
+                  <span className="font-bold text-primary">
                     {formatCurrency(finalQuote.totalTTC)} MAD
                   </span>
                 </div>
                 
                 {finalQuote.finalPrice !== finalQuote.totalTTC && (
-                  <div className="flex justify-between items-center text-sm text-gray-600">
+                  <div className="flex justify-between items-center text-sm text-muted-foreground">
                     <span>Prix final (arrondi)</span>
-                    <span className="font-semibold">{formatCurrency(finalQuote.finalPrice)} MAD</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(finalQuote.finalPrice)} MAD</span>
                   </div>
                 )}
 
                 {/* Surface and Type Info */}
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Informations du devis</h4>
+                <div className="mt-4 p-3 bg-primary/10 dark:bg-primary/20 rounded-lg border border-primary/20 transition-colors duration-300">
+                  <h4 className="font-medium text-primary mb-2">Informations du devis</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-blue-700">Type:</span>
-                      <span className="ml-2 font-medium">{type}</span>
+                      <span className="text-primary/80">Type:</span>
+                      <span className="ml-2 font-medium text-foreground">{type}</span>
                     </div>
                     <div>
-                      <span className="text-blue-700">Surface:</span>
-                      <span className="ml-2 font-medium">
+                      <span className="text-primary/80">Surface:</span>
+                      <span className="ml-2 font-medium text-foreground">
                         {quote?.surface || leadUpdates.estimatedSurface || 'Non définie'} m²
                       </span>
                     </div>
