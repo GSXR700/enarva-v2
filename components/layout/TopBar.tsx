@@ -20,7 +20,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Activity } from '@prisma/client'
 import { getRelativeTime } from '@/lib/utils'
-import InstallPWAButton from '@/components/InstallPWAButton';
+import InstallPWAButton from '@/components/InstallPWAButton'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -134,12 +135,18 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                             Paramètres
                         </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {/* Theme Toggle Integration */}
+                    <div className="p-1">
+                        <ThemeToggle />
+                    </div>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleEnableNotifications} className="flex items-center gap-2">
                         <BellRing className="w-4 h-4" />
                         Activer les notifications
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => signOut()} className="flex items-center gap-2 text-red-600">
+                    <DropdownMenuItem onClick={() => signOut()} className="flex items-center gap-2 text-red-600 dark:text-red-400">
                         <LogOut className="w-4 h-4" />
                         Se déconnecter
                     </DropdownMenuItem>

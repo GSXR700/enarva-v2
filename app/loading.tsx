@@ -5,7 +5,7 @@ import Image from 'next/image';
 
 export default function Loading() {
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-white">
+    <div className="flex h-screen w-screen items-center justify-center bg-background transition-colors duration-300">
       <div className="relative w-48 h-16 animate-pulse">
         <Image
           src="/images/light-logo.png"
@@ -15,9 +15,9 @@ export default function Loading() {
           priority
           className="object-contain"
         />
-        {/* Water flooding effect */}
+        {/* Water flooding effect with theme support */}
         <div
-          className="absolute bottom-0 left-0 right-0 h-full bg-blue-600/30 mix-blend-screen animate-flood"
+          className="absolute bottom-0 left-0 right-0 h-full bg-primary/30 mix-blend-screen animate-flood dark:mix-blend-plus-lighter"
         />
       </div>
       <style jsx>{`

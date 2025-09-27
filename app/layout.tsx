@@ -1,4 +1,4 @@
-// app/layout.tsx - AUTHENTIFICATION CORRIGÉE
+// app/layout.tsx - ENHANCED WITH THEME SUPPORT
 import './globals.css'
 import { Poppins } from 'next/font/google'
 import { Providers } from '@/components/providers/Providers'
@@ -18,7 +18,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   userScalable: true,
-  themeColor: '#0066FF',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#0066FF' },
+    { media: '(prefers-color-scheme: dark)', color: '#000000' }
+  ],
 }
 
 export const metadata: Metadata = {
@@ -62,9 +65,24 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="theme-color" content="#0066FF" />
+        <meta name="theme-color" content="#0066FF" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+        
+        {/* Prevent flash of unstyled content */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const theme = localStorage.getItem('enarva-theme') || 'light';
+                const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                const effectiveTheme = theme === 'system' ? systemTheme : theme;
+                document.documentElement.classList.add(effectiveTheme);
+              } catch (e) {}
+            `,
+          }}
+        />
       </head>
-      <body className="antialiased bg-background font-poppins" suppressHydrationWarning>
+      <body className="antialiased bg-background font-poppins transition-colors duration-300" suppressHydrationWarning>
         <SplashScreen />
         <Providers>
           {children}

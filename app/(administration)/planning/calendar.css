@@ -17,13 +17,16 @@
     border: none;
     padding: 0.75rem 0;
     font-weight: 500;
-    color: #6b7280; /* text-gray-500 */
+    color: hsl(var(--muted-foreground));
+    background-color: hsl(var(--background));
 }
 
 /* Day Cells */
 .fc .fc-daygrid-day {
     border: 1px solid hsl(var(--border));
     padding: 4px;
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
 }
 .fc .fc-daygrid-day:first-child {
     border-left: none;
@@ -32,13 +35,19 @@
     border-right: none;
 }
 
+/* Day Numbers */
+.fc .fc-daygrid-day-number {
+    color: hsl(var(--foreground));
+    padding: 4px;
+}
+
 /* Today's Date */
 .fc .fc-daygrid-day.fc-day-today {
     background-color: transparent !important;
 }
 .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
     background-color: hsl(var(--primary));
-    color: white;
+    color: hsl(var(--primary-foreground));
     border-radius: 9999px;
     width: 28px;
     height: 28px;
@@ -51,7 +60,7 @@
 .fc-event {
     background-color: hsl(var(--primary)) !important;
     border: 1px solid hsl(var(--primary)) !important;
-    color: white !important;
+    color: hsl(var(--primary-foreground)) !important;
     border-radius: 4px;
     padding: 2px 4px;
     font-size: 0.75rem;
@@ -61,20 +70,78 @@
 
 .fc-event:hover {
     background-color: hsl(217, 91%, 50%) !important; /* Darker blue for hover */
-    color: white !important;
+    color: hsl(var(--primary-foreground)) !important;
 }
 
 .fc-event .fc-event-title {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    color: hsl(var(--primary-foreground)) !important;
 }
 
 /* List View */
 .fc-list-event-title a {
-    color: hsl(var(--foreground));
+    color: hsl(var(--foreground)) !important;
     text-decoration: none;
 }
 .fc-list-event-dot {
     border-color: hsl(var(--primary)) !important;
+}
+
+/* Dark Mode Specific Styles */
+.dark .fc .fc-scrollgrid-section > * {
+    border-color: hsl(var(--border)) !important;
+}
+
+.dark .fc .fc-scrollgrid {
+    border-color: hsl(var(--border)) !important;
+}
+
+.dark .fc .fc-daygrid-day-events {
+    margin-bottom: 0;
+}
+
+.dark .fc-popover {
+    background-color: hsl(var(--card)) !important;
+    border-color: hsl(var(--border)) !important;
+    color: hsl(var(--card-foreground)) !important;
+}
+
+.dark .fc-popover-header {
+    background-color: hsl(var(--muted)) !important;
+    color: hsl(var(--muted-foreground)) !important;
+    border-bottom-color: hsl(var(--border)) !important;
+}
+
+/* Other Day (previous/next month) */
+.fc .fc-daygrid-day.fc-day-other {
+    background-color: hsl(var(--muted)) !important;
+    opacity: 0.5;
+}
+
+.dark .fc .fc-daygrid-day.fc-day-other {
+    background-color: hsl(var(--muted)) !important;
+}
+
+/* Button styling */
+.fc .fc-button-primary {
+    background-color: hsl(var(--primary)) !important;
+    border-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+}
+
+.fc .fc-button-primary:hover {
+    background-color: hsl(217, 91%, 50%) !important;
+    border-color: hsl(217, 91%, 50%) !important;
+}
+
+/* Grid lines and borders */
+.dark .fc-theme-standard td, 
+.dark .fc-theme-standard th {
+    border-color: hsl(var(--border)) !important;
+}
+
+.dark .fc-scrollgrid-sync-table {
+    border-color: hsl(var(--border)) !important;
 }

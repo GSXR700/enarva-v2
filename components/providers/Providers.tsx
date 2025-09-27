@@ -5,7 +5,7 @@ import { createContext, useEffect, useState } from 'react'
 import { SessionProvider } from 'next-auth/react'
 import { EdgeStoreProvider } from '@/lib/edgestore'
 
-// --- ThemeProvider Logic (from your file) ---
+// --- ThemeProvider Logic ---
 type Theme = 'dark' | 'light' | 'system'
 
 type ThemeProviderProps = {
@@ -24,7 +24,7 @@ const initialState: ThemeProviderState = {
   setTheme: () => null,
 }
 
-const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
+export const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
 
 export function ThemeProvider({
   children,
@@ -33,8 +33,10 @@ export function ThemeProvider({
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(defaultTheme);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const storedTheme = localStorage.getItem(storageKey) as Theme | null;
     if (storedTheme) {
       setTheme(storedTheme);
@@ -42,6 +44,8 @@ export function ThemeProvider({
   }, [storageKey]);
 
   useEffect(() => {
+    if (!mounted) return;
+    
     const root = window.document.documentElement
     root.classList.remove('light', 'dark')
 
@@ -52,11 +56,13 @@ export function ThemeProvider({
 
     root.classList.add(effectiveTheme);
     localStorage.setItem(storageKey, theme);
-  }, [theme, storageKey])
+  }, [theme, storageKey, mounted])
 
   const value = {
     theme,
-    setTheme,
+    setTheme: (theme: Theme) => {
+      setTheme(theme);
+    },
   }
 
   return (
@@ -66,19 +72,15 @@ export function ThemeProvider({
   )
 }
 
-// --- Main Providers Component (Updated) ---
-
+// --- Main Providers Component ---
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    // Wrap the entire app in SessionProvider for authentication
     <SessionProvider>
-        {/* Wrap in EdgeStoreProvider for file uploads */}
-        <EdgeStoreProvider>
-            {/* Your existing ThemeProvider */}
-            <ThemeProvider defaultTheme="light" storageKey="enarva-theme">
-                {children}
-            </ThemeProvider>
-        </EdgeStoreProvider>
+      <EdgeStoreProvider>
+        <ThemeProvider defaultTheme="light" storageKey="enarva-theme">
+          {children}
+        </ThemeProvider>
+      </EdgeStoreProvider>
     </SessionProvider>
   )
 }
