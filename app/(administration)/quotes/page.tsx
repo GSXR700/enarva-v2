@@ -62,7 +62,7 @@ interface Quote {
   }
 }
 
-// Status configurations
+// Status configurations with dark mode support
 const getStatusConfig = (status: QuoteStatus) => {
   const configs: Record<QuoteStatus, {
     color: string;
@@ -71,43 +71,43 @@ const getStatusConfig = (status: QuoteStatus) => {
     priority: number;
   }> = {
     DRAFT: { 
-      color: 'bg-gray-100 text-gray-800 border-gray-200', 
+      color: 'bg-muted text-muted-foreground border-border', 
       icon: FileText, 
       label: 'Brouillon',
       priority: 1
     },
     SENT: { 
-      color: 'bg-blue-100 text-blue-800 border-blue-200', 
+      color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-300 dark:border-blue-600', 
       icon: Clock, 
       label: 'Envoyé',
       priority: 2
     },
     ACCEPTED: { 
-      color: 'bg-green-100 text-green-800 border-green-200', 
+      color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-300 dark:border-green-600', 
       icon: CheckCircle, 
       label: 'Accepté',
       priority: 4
     },
     REJECTED: { 
-      color: 'bg-red-100 text-red-800 border-red-200', 
+      color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-300 dark:border-red-600', 
       icon: XCircle, 
       label: 'Refusé',
       priority: 3
     },
     EXPIRED: { 
-      color: 'bg-orange-100 text-orange-800 border-orange-200', 
+      color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-300 dark:border-orange-600', 
       icon: AlertCircle, 
       label: 'Expiré',
       priority: 5
     },
     VIEWED: { 
-      color: 'bg-blue-100 text-blue-800 border-blue-200', 
+      color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-300 dark:border-blue-600', 
       icon: Eye, 
       label: 'Consulté',
       priority: 2
     },
     CANCELLED: { 
-      color: 'bg-gray-100 text-gray-800 border-gray-200', 
+      color: 'bg-muted text-muted-foreground border-border', 
       icon: XCircle, 
       label: 'Annulé',
       priority: 6
@@ -227,14 +227,14 @@ export default function QuotesPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
+      <div className="min-h-screen bg-background p-4">
         <div className="max-w-6xl mx-auto">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-            <div className="h-12 bg-gray-200 rounded"></div>
+            <div className="h-8 bg-muted rounded w-1/3"></div>
+            <div className="h-12 bg-muted rounded"></div>
             <div className="space-y-3">
               {[1, 2, 3].map(i => (
-                <div key={i} className="h-24 bg-gray-200 rounded"></div>
+                <div key={i} className="h-24 bg-muted rounded"></div>
               ))}
             </div>
           </div>
@@ -244,16 +244,16 @@ export default function QuotesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Mobile Header */}
-      <div className="lg:hidden bg-white border-b sticky top-0 z-10 px-4 py-3">
+      <div className="lg:hidden bg-card border-b border-border sticky top-0 z-10 px-4 py-3">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Devis</h1>
-            <p className="text-sm text-gray-600">{filteredQuotes.length} devis</p>
+            <h1 className="text-xl font-bold text-foreground">Devis</h1>
+            <p className="text-sm text-muted-foreground">{filteredQuotes.length} devis</p>
           </div>
           <Link href="/quotes/new">
-            <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+            <Button size="sm" className="bg-primary hover:bg-primary/90">
               <Plus className="h-4 w-4 mr-1" />
               Nouveau
             </Button>
@@ -263,7 +263,7 @@ export default function QuotesPage() {
         {/* Mobile Search & Filter */}
         <div className="flex gap-2">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Rechercher un devis..."
               value={searchTerm}
@@ -302,15 +302,15 @@ export default function QuotesPage() {
       </div>
 
       {/* Desktop Header */}
-      <div className="hidden lg:block bg-white border-b">
+      <div className="hidden lg:block bg-card border-b border-border">
         <div className="max-w-6xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Devis</h1>
-              <p className="text-gray-600 mt-1">Gérez vos devis et propositions commerciales</p>
+              <h1 className="text-3xl font-bold text-foreground">Devis</h1>
+              <p className="text-muted-foreground mt-1">Gérez vos devis et propositions commerciales</p>
             </div>
             <Link href="/quotes/new">
-              <Button className="bg-blue-600 hover:bg-blue-700">
+              <Button className="bg-primary hover:bg-primary/90">
                 <Plus className="mr-2 h-4 w-4" />
                 Nouveau Devis
               </Button>
@@ -320,7 +320,7 @@ export default function QuotesPage() {
           {/* Desktop Search & Filter */}
           <div className="flex gap-4">
             <div className="flex-1 max-w-md relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Rechercher par numéro, client, téléphone..."
                 value={searchTerm}
@@ -366,11 +366,11 @@ export default function QuotesPage() {
           <Card>
             <CardContent className="py-12">
               <div className="text-center">
-                <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">
                   {searchTerm || statusFilter !== 'ALL' ? 'Aucun devis trouvé' : 'Aucun devis'}
                 </h3>
-                <p className="text-gray-600 mb-6">
+                <p className="text-muted-foreground mb-6">
                   {searchTerm || statusFilter !== 'ALL' 
                     ? 'Essayez de modifier vos critères de recherche' 
                     : 'Commencez par créer votre premier devis'
@@ -396,14 +396,14 @@ export default function QuotesPage() {
                 const StatusIcon = statusConfig.icon
                 
                 return (
-                  <Card key={quote.id} className="bg-white">
+                  <Card key={quote.id}>
                     <CardContent className="p-4">
                       {/* Quote Header */}
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
                           <Link 
                             href={`/quotes/${quote.id}`}
-                            className="font-semibold text-blue-600 hover:text-blue-800 text-sm"
+                            className="font-semibold text-primary hover:text-primary/80 text-sm"
                           >
                             {quote.quoteNumber}
                           </Link>
@@ -449,7 +449,7 @@ export default function QuotesPage() {
                                 <AlertDialogTrigger asChild>
                                   <DropdownMenuItem 
                                     onSelect={(e) => e.preventDefault()}
-                                    className="text-red-600"
+                                    className="text-destructive focus:text-destructive"
                                   >
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Supprimer
@@ -467,7 +467,7 @@ export default function QuotesPage() {
                                     <AlertDialogCancel>Annuler</AlertDialogCancel>
                                     <AlertDialogAction
                                       onClick={() => handleDelete(quote.id, quote.quoteNumber)}
-                                      className="bg-red-600 hover:bg-red-700"
+                                      className="bg-destructive hover:bg-destructive/90"
                                     >
                                       Supprimer
                                     </AlertDialogAction>
@@ -482,37 +482,37 @@ export default function QuotesPage() {
                       {/* Client Info */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-gray-400" />
-                          <span className="font-medium text-sm">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium text-sm text-foreground">
                             {quote.lead.firstName} {quote.lead.lastName}
                           </span>
                         </div>
                         
                         {quote.lead.company && (
-                          <div className="text-xs text-gray-600 ml-6">
+                          <div className="text-xs text-muted-foreground ml-6">
                             {quote.lead.company}
                           </div>
                         )}
                         
-                        <div className="text-xs text-gray-600 ml-6">
+                        <div className="text-xs text-muted-foreground ml-6">
                           {quote.lead.phone}
                         </div>
 
                         {/* Amount and Date */}
-                        <div className="flex items-center justify-between mt-3 pt-2 border-t">
+                        <div className="flex items-center justify-between mt-3 pt-2 border-t border-border">
                           <div>
-                            <div className="text-lg font-bold text-green-600">
+                            <div className="text-lg font-bold text-primary">
                               {formatCurrency(quote.finalPrice)}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-muted-foreground">
                               Expire le {formatDate(quote.expiresAt)}
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-muted-foreground">
                               Créé le
                             </div>
-                            <div className="text-xs font-medium">
+                            <div className="text-xs font-medium text-foreground">
                               {formatDate(quote.createdAt)}
                             </div>
                           </div>
@@ -537,13 +537,13 @@ export default function QuotesPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-3 px-4 font-medium text-gray-900">Devis</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900">Client</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900">Type</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900">Montant</th>
-                          <th className="text-left py-3 px-4 font-medium text-gray-900">Statut</th>
-                          <th className="text-right py-3 px-4 font-medium text-gray-900">Actions</th>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-3 px-4 font-medium text-foreground">Devis</th>
+                          <th className="text-left py-3 px-4 font-medium text-foreground">Client</th>
+                          <th className="text-left py-3 px-4 font-medium text-foreground">Type</th>
+                          <th className="text-left py-3 px-4 font-medium text-foreground">Montant</th>
+                          <th className="text-left py-3 px-4 font-medium text-foreground">Statut</th>
+                          <th className="text-right py-3 px-4 font-medium text-foreground">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -552,28 +552,28 @@ export default function QuotesPage() {
                           const StatusIcon = statusConfig.icon
                           
                           return (
-                            <tr key={quote.id} className="border-b hover:bg-gray-50">
+                            <tr key={quote.id} className="border-b border-border hover:bg-muted/50 transition-colors">
                               <td className="py-4 px-4">
                                 <Link 
                                   href={`/quotes/${quote.id}`}
-                                  className="font-medium text-blue-600 hover:text-blue-800"
+                                  className="font-medium text-primary hover:text-primary/80"
                                 >
                                   {quote.quoteNumber}
                                 </Link>
-                                <div className="text-sm text-gray-500 mt-1">
+                                <div className="text-sm text-muted-foreground mt-1">
                                   {formatDate(quote.createdAt)}
                                 </div>
                               </td>
                               <td className="py-4 px-4">
-                                <div className="font-medium">
+                                <div className="font-medium text-foreground">
                                   {quote.lead.firstName} {quote.lead.lastName}
                                 </div>
                                 {quote.lead.company && (
-                                  <div className="text-sm text-gray-500">
+                                  <div className="text-sm text-muted-foreground">
                                     {quote.lead.company}
                                   </div>
                                 )}
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-muted-foreground">
                                   {quote.lead.phone}
                                 </div>
                                 <Badge variant="outline" className="text-xs mt-1">
@@ -586,10 +586,10 @@ export default function QuotesPage() {
                                 </Badge>
                               </td>
                               <td className="py-4 px-4">
-                                <div className="font-semibold text-green-600">
+                                <div className="font-semibold text-primary">
                                   {formatCurrency(quote.finalPrice)}
                                 </div>
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-muted-foreground">
                                   Expire le {formatDate(quote.expiresAt)}
                                 </div>
                               </td>
@@ -626,7 +626,7 @@ export default function QuotesPage() {
                                           variant="ghost"
                                           size="sm"
                                           title="Supprimer le devis"
-                                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                         >
                                           <Trash2 className="h-4 w-4" />
                                         </Button>
@@ -641,7 +641,7 @@ export default function QuotesPage() {
                                             <br />
                                             Montant: {formatCurrency(quote.finalPrice)}
                                             <br /><br />
-                                            <span className="text-red-600 font-medium">
+                                            <span className="text-destructive font-medium">
                                               Cette action est irréversible.
                                             </span>
                                           </AlertDialogDescription>
@@ -650,7 +650,7 @@ export default function QuotesPage() {
                                           <AlertDialogCancel>Annuler</AlertDialogCancel>
                                           <AlertDialogAction
                                             onClick={() => handleDelete(quote.id, quote.quoteNumber)}
-                                            className="bg-red-600 hover:bg-red-700"
+                                            className="bg-destructive hover:bg-destructive/90"
                                             disabled={deletingQuoteId === quote.id}
                                           >
                                             {deletingQuoteId === quote.id ? 'Suppression...' : 'Supprimer'}

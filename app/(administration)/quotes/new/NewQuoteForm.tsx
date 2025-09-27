@@ -592,15 +592,15 @@ const NewQuoteForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Header */}
-        <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
+        <div className="bg-card border-b border-border sticky top-0 z-10 shadow-sm">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold">Nouveau Devis</h1>
-                <p className="text-gray-600">Créer un devis pour un client</p>
+                <h1 className="text-2xl font-bold text-foreground">Nouveau Devis</h1>
+                <p className="text-muted-foreground">Créer un devis pour un client</p>
               </div>
               <div className="flex gap-2">
                 <Button
@@ -613,7 +613,7 @@ const NewQuoteForm = () => {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   {isLoading ? (
                     <>
@@ -634,7 +634,7 @@ const NewQuoteForm = () => {
 
         <div className="container mx-auto px-4 max-w-4xl pb-8">
           <div className="space-y-6">
-            {/* Business Type Selection - REDESIGNED */}
+            {/* Business Type Selection - REDESIGNED with dark mode support */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -647,27 +647,27 @@ const NewQuoteForm = () => {
                   <div
                     className={`relative cursor-pointer rounded-xl border-2 p-6 transition-all duration-200 ${
                       businessType === 'SERVICE'
-                        ? 'border-blue-500 bg-blue-50 shadow-lg'
-                        : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
+                        ? 'border-primary bg-primary/5 shadow-lg'
+                        : 'border-border bg-card hover:border-primary/50 hover:shadow-md'
                     }`}
                     onClick={() => setBusinessType('SERVICE')}
                   >
                     <div className="flex flex-col items-center text-center space-y-3">
                       <div className={`p-3 rounded-full ${
-                        businessType === 'SERVICE' ? 'bg-blue-100' : 'bg-gray-100'
+                        businessType === 'SERVICE' ? 'bg-primary/10' : 'bg-muted'
                       }`}>
                         <Wrench className={`h-8 w-8 ${
-                          businessType === 'SERVICE' ? 'text-blue-600' : 'text-gray-600'
+                          businessType === 'SERVICE' ? 'text-primary' : 'text-muted-foreground'
                         }`} />
                       </div>
                       <div>
                         <h3 className={`text-lg font-semibold ${
-                          businessType === 'SERVICE' ? 'text-blue-900' : 'text-gray-900'
+                          businessType === 'SERVICE' ? 'text-primary' : 'text-foreground'
                         }`}>
                           Devis de Service
                         </h3>
                         <p className={`text-sm ${
-                          businessType === 'SERVICE' ? 'text-blue-700' : 'text-gray-600'
+                          businessType === 'SERVICE' ? 'text-primary/80' : 'text-muted-foreground'
                         }`}>
                           Nettoyage, maintenance, intervention
                         </p>
@@ -675,7 +675,7 @@ const NewQuoteForm = () => {
                     </div>
                     {businessType === 'SERVICE' && (
                       <div className="absolute top-2 right-2">
-                        <div className="bg-blue-600 text-white rounded-full p-1">
+                        <div className="bg-primary text-primary-foreground rounded-full p-1">
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
@@ -687,27 +687,27 @@ const NewQuoteForm = () => {
                   <div
                     className={`relative cursor-pointer rounded-xl border-2 p-6 transition-all duration-200 ${
                       businessType === 'PRODUCT'
-                        ? 'border-green-500 bg-green-50 shadow-lg'
-                        : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
+                        ? 'border-primary bg-primary/5 shadow-lg'
+                        : 'border-border bg-card hover:border-primary/50 hover:shadow-md'
                     }`}
                     onClick={() => setBusinessType('PRODUCT')}
                   >
                     <div className="flex flex-col items-center text-center space-y-3">
                       <div className={`p-3 rounded-full ${
-                        businessType === 'PRODUCT' ? 'bg-green-100' : 'bg-gray-100'
+                        businessType === 'PRODUCT' ? 'bg-primary/10' : 'bg-muted'
                       }`}>
                         <Package className={`h-8 w-8 ${
-                          businessType === 'PRODUCT' ? 'text-green-600' : 'text-gray-600'
+                          businessType === 'PRODUCT' ? 'text-primary' : 'text-muted-foreground'
                         }`} />
                       </div>
                       <div>
                         <h3 className={`text-lg font-semibold ${
-                          businessType === 'PRODUCT' ? 'text-green-900' : 'text-gray-900'
+                          businessType === 'PRODUCT' ? 'text-primary' : 'text-foreground'
                         }`}>
                           Devis de Produit
                         </h3>
                         <p className={`text-sm ${
-                          businessType === 'PRODUCT' ? 'text-green-700' : 'text-gray-600'
+                          businessType === 'PRODUCT' ? 'text-primary/80' : 'text-muted-foreground'
                         }`}>
                           Vente de produits, équipements
                         </p>
@@ -715,7 +715,7 @@ const NewQuoteForm = () => {
                     </div>
                     {businessType === 'PRODUCT' && (
                       <div className="absolute top-2 right-2">
-                        <div className="bg-green-600 text-white rounded-full p-1">
+                        <div className="bg-primary text-primary-foreground rounded-full p-1">
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
@@ -738,10 +738,10 @@ const NewQuoteForm = () => {
             <CardContent className="space-y-4">
               {/* Selected Lead Display */}
               {selectedLead ? (
-                <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-lg">
                   <div>
-                    <h3 className="font-medium">{selectedLead.displayName}</h3>
-                    <p className="text-sm text-gray-600">{selectedLead.phone}</p>
+                    <h3 className="font-medium text-foreground">{selectedLead.displayName}</h3>
+                    <p className="text-sm text-muted-foreground">{selectedLead.phone}</p>
                     <Badge variant="outline" className="mt-1 text-xs">
                       {selectedLead.typeLabel}
                     </Badge>
@@ -760,7 +760,7 @@ const NewQuoteForm = () => {
                   {/* Search Field */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Search className="h-4 w-4 text-gray-400" />
+                      <Search className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <Input
                       placeholder="Rechercher un client existant..."
@@ -772,22 +772,22 @@ const NewQuoteForm = () => {
 
                   {/* Search Results */}
                   {showSearchResults && (
-                    <div className="border rounded-lg bg-white shadow-sm max-h-64 overflow-y-auto">
+                    <div className="border border-border rounded-lg bg-card shadow-sm max-h-64 overflow-y-auto">
                       {isSearching ? (
-                        <div className="p-4 text-center text-gray-500">
+                        <div className="p-4 text-center text-muted-foreground">
                           Recherche en cours...
                         </div>
                       ) : searchResults.length > 0 ? (
                         searchResults.map((lead) => (
                           <div
                             key={lead.id}
-                            className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                            className="p-3 hover:bg-muted/50 cursor-pointer border-b border-border last:border-b-0"
                             onClick={() => selectLead(lead)}
                           >
                             <div className="flex justify-between items-start">
                               <div>
-                                <h4 className="font-medium text-sm">{lead.displayName}</h4>
-                                <p className="text-xs text-gray-600">{lead.phone}</p>
+                                <h4 className="font-medium text-sm text-foreground">{lead.displayName}</h4>
+                                <p className="text-xs text-muted-foreground">{lead.phone}</p>
                               </div>
                               <Badge variant="outline" className="text-xs">
                                 {lead.typeLabel}
@@ -796,7 +796,7 @@ const NewQuoteForm = () => {
                           </div>
                         ))
                       ) : (
-                        <div className="p-4 text-center text-gray-500">
+                        <div className="p-4 text-center text-muted-foreground">
                           Aucun client trouvé
                         </div>
                       )}
@@ -804,8 +804,8 @@ const NewQuoteForm = () => {
                   )}
 
                   {/* New Client Form */}
-                  <div className="border-t pt-4">
-                    <h3 className="font-medium mb-3">Ou créer un nouveau client</h3>
+                  <div className="border-t border-border pt-4">
+                    <h3 className="font-medium mb-3 text-foreground">Ou créer un nouveau client</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="clientName">Nom complet *</Label>
@@ -814,9 +814,9 @@ const NewQuoteForm = () => {
                           value={newClientData.name}
                           onChange={(e) => updateNewClientData('name', e.target.value)}
                           placeholder="Nom et prénom du client"
-                          className={errors.client ? 'border-red-500' : ''}
+                          className={errors.client ? 'border-destructive' : ''}
                         />
-                        {errors.client && <p className="text-red-500 text-xs mt-1">{errors.client}</p>}
+                        {errors.client && <p className="text-destructive text-xs mt-1">{errors.client}</p>}
                       </div>
                       <div>
                         <Label htmlFor="clientPhone">Téléphone *</Label>
@@ -825,9 +825,9 @@ const NewQuoteForm = () => {
                           value={newClientData.phone}
                           onChange={(e) => updateNewClientData('phone', e.target.value)}
                           placeholder="+212 6XX XXX XXX"
-                          className={errors.phone ? 'border-red-500' : ''}
+                          className={errors.phone ? 'border-destructive' : ''}
                         />
-                        {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+                        {errors.phone && <p className="text-destructive text-xs mt-1">{errors.phone}</p>}
                       </div>
                       <div>
                         <Label htmlFor="clientEmail">Email</Label>
@@ -880,9 +880,9 @@ const NewQuoteForm = () => {
                 {/* Services List */}
                 <div className="space-y-3">
                   {services.map((service, index) => (
-                    <div key={service.id} className="p-4 border rounded-lg bg-gray-50">
+                    <div key={service.id} className="p-4 border border-border rounded-lg bg-muted/30">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium">Service {index + 1}</h4>
+                        <h4 className="font-medium text-foreground">Service {index + 1}</h4>
                         {services.length > 1 && (
                           <Button
                             type="button"
@@ -1014,7 +1014,7 @@ const NewQuoteForm = () => {
                 </div>
 
                 {errors.services && (
-                  <p className="text-red-500 text-sm">{errors.services}</p>
+                  <p className="text-destructive text-sm">{errors.services}</p>
                 )}
               </CardContent>
             </Card>
@@ -1047,9 +1047,9 @@ const NewQuoteForm = () => {
                 {/* Products List */}
                 <div className="space-y-3">
                   {productItems.map((product, index) => (
-                    <div key={product.id} className="p-4 border rounded-lg bg-gray-50">
+                    <div key={product.id} className="p-4 border border-border rounded-lg bg-muted/30">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium">Produit {index + 1}</h4>
+                        <h4 className="font-medium text-foreground">Produit {index + 1}</h4>
                         {productItems.length > 1 && (
                           <Button
                             type="button"
@@ -1118,7 +1118,7 @@ const NewQuoteForm = () => {
                             <Input
                               value={`${(product.qty * product.unitPrice).toFixed(2)} MAD`}
                               disabled
-                              className="bg-gray-100"
+                              className="bg-muted"
                             />
                           </div>
                         </div>
@@ -1138,8 +1138,8 @@ const NewQuoteForm = () => {
                 </div>
 
                 {/* Delivery Information */}
-                <div className="border-t pt-4 space-y-3">
-                  <h3 className="font-medium">Informations de Livraison</h3>
+                <div className="border-t border-border pt-4 space-y-3">
+                  <h3 className="font-medium text-foreground">Informations de Livraison</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
@@ -1178,7 +1178,7 @@ const NewQuoteForm = () => {
                 </div>
 
                 {errors.products && (
-                  <p className="text-red-500 text-sm">{errors.products}</p>
+                  <p className="text-destructive text-sm">{errors.products}</p>
                 )}
               </CardContent>
             </Card>
@@ -1188,15 +1188,15 @@ const NewQuoteForm = () => {
           <Card>
             <CardHeader>
               <CardTitle>Éléments Personnalisés</CardTitle>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 Ajoutez des services ou produits personnalisés au devis
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
               {editableLineItems.map((item) => (
-                <div key={item.id} className="p-4 border rounded-lg bg-gray-50">
+                <div key={item.id} className="p-4 border border-border rounded-lg bg-muted/30">
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium">Élément personnalisé</h4>
+                    <h4 className="font-medium text-foreground">Élément personnalisé</h4>
                     <Button
                       type="button"
                       variant="ghost"
@@ -1244,7 +1244,7 @@ const NewQuoteForm = () => {
                       <Input
                         value={`${item.totalPrice.toFixed(2)} MAD`}
                         disabled
-                        className="bg-gray-100"
+                        className="bg-muted"
                       />
                     </div>
                   </div>
@@ -1282,35 +1282,35 @@ const NewQuoteForm = () => {
               <div className="space-y-4">
                 {/* Line Items Preview */}
                 <div className="space-y-2">
-                  <h4 className="font-medium">Éléments du devis :</h4>
+                  <h4 className="font-medium text-foreground">Éléments du devis :</h4>
                   {finalQuote.lineItems.map((item) => (
-                    <div key={item.id} className="flex justify-between text-sm py-1 border-b">
+                    <div key={item.id} className="flex justify-between text-sm py-1 border-b border-border">
                       <div className="flex-1">
-                        <span className="font-medium">{item.description}</span>
-                        {item.detail && <span className="text-gray-600 ml-2">({item.detail})</span>}
+                        <span className="font-medium text-foreground">{item.description}</span>
+                        {item.detail && <span className="text-muted-foreground ml-2">({item.detail})</span>}
                       </div>
-                      <span className="font-medium">{item.totalPrice.toFixed(2)} MAD</span>
+                      <span className="font-medium text-foreground">{item.totalPrice.toFixed(2)} MAD</span>
                     </div>
                   ))}
                 </div>
 
                 {/* Financial Summary */}
-                <div className="border-t pt-4 space-y-2">
-                  <div className="flex justify-between">
+                <div className="border-t border-border pt-4 space-y-2">
+                  <div className="flex justify-between text-foreground">
                     <span>Sous-total HT :</span>
                     <span>{finalQuote.subTotalHT.toFixed(2)} MAD</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between text-foreground">
                     <span>TVA (20%) :</span>
                     <span>{finalQuote.vatAmount.toFixed(2)} MAD</span>
                   </div>
-                  <div className="flex justify-between font-medium">
+                  <div className="flex justify-between font-medium text-foreground">
                     <span>Total TTC :</span>
                     <span>{finalQuote.totalTTC.toFixed(2)} MAD</span>
                   </div>
                   
                   {/* Price Override Section */}
-                  <div className="border-t pt-3 space-y-3">
+                  <div className="border-t border-border pt-3 space-y-3">
                     <div className="flex items-center space-x-2">
                       <Switch
                         id="price-override"
@@ -1334,19 +1334,19 @@ const NewQuoteForm = () => {
                           min="0"
                           step="0.01"
                         />
-                        <p className="text-xs text-gray-600">
+                        <p className="text-xs text-muted-foreground">
                           Prix calculé automatiquement : {finalQuote.calculatedPrice.toFixed(2)} MAD
                         </p>
                       </div>
                     ) : (
-                      <div className="flex justify-between text-lg font-bold text-blue-600">
+                      <div className="flex justify-between text-lg font-bold text-primary">
                         <span>Prix final :</span>
                         <span>{finalQuote.finalPrice.toFixed(2)} MAD</span>
                       </div>
                     )}
 
                     {enablePriceOverride && (
-                      <div className="flex justify-between text-lg font-bold text-blue-600">
+                      <div className="flex justify-between text-lg font-bold text-primary">
                         <span>Prix final :</span>
                         <span>{finalQuote.finalPrice.toFixed(2)} MAD</span>
                       </div>
@@ -1355,7 +1355,7 @@ const NewQuoteForm = () => {
                 </div>
 
                 {/* Expiration Date */}
-                <div className="border-t pt-3">
+                <div className="border-t border-border pt-3">
                   <Label htmlFor="expiresAt">Date d'expiration du devis</Label>
                   <Input
                     id="expiresAt"
@@ -1363,10 +1363,10 @@ const NewQuoteForm = () => {
                     value={expiresAt}
                     onChange={(e) => setExpiresAt(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
-                    className={errors.expiresAt ? 'border-red-500' : ''}
+                    className={errors.expiresAt ? 'border-destructive' : ''}
                   />
                   {errors.expiresAt && (
-                    <p className="text-red-500 text-xs mt-1">{errors.expiresAt}</p>
+                    <p className="text-destructive text-xs mt-1">{errors.expiresAt}</p>
                   )}
                 </div>
               </div>
@@ -1381,7 +1381,7 @@ const NewQuoteForm = () => {
                   type="submit"
                   disabled={isLoading}
                   size="lg"
-                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+                  className="w-full sm:w-auto bg-primary hover:bg-primary/90"
                 >
                   {isLoading ? (
                     <>
@@ -1397,7 +1397,7 @@ const NewQuoteForm = () => {
                 </Button>
 
                 {/* Help Text */}
-                <div className="text-xs text-gray-500 space-y-1 text-center sm:text-right">
+                <div className="text-xs text-muted-foreground space-y-1 text-center sm:text-right">
                   <p>• Le devis sera automatiquement sauvegardé</p>
                   <p>• Le statut du lead sera mis à jour vers "Devis envoyé"</p>
                   <p>• Une notification sera envoyée à l'équipe</p>
@@ -1406,9 +1406,9 @@ const NewQuoteForm = () => {
 
               {/* Error Display */}
               {Object.keys(errors).length > 0 && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <h4 className="text-red-800 font-medium mb-2">Erreurs à corriger :</h4>
-                  <ul className="text-red-700 text-sm space-y-1">
+                <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <h4 className="text-destructive font-medium mb-2">Erreurs à corriger :</h4>
+                  <ul className="text-destructive/80 text-sm space-y-1">
                     {Object.entries(errors).map(([field, message]) => (
                       <li key={field}>• {message}</li>
                     ))}

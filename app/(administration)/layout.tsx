@@ -44,7 +44,7 @@ export default function AdministrationLayout({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex h-screen bg-background">
+      <div className="flex h-screen bg-background transition-colors duration-300">
         <Sidebar isOpen={isSidebarOpen} setOpen={setSidebarOpen} />
 
         <div className="flex-1 flex flex-col overflow-hidden">

@@ -86,7 +86,7 @@ interface Quote {
   }
 }
 
-// Status configurations
+// Status configurations with dark mode support
 const getStatusConfig = (status: QuoteStatus) => {
   const configs: Record<QuoteStatus, {
     color: string;
@@ -94,37 +94,37 @@ const getStatusConfig = (status: QuoteStatus) => {
     label: string;
   }> = {
     DRAFT: { 
-      color: 'bg-gray-100 text-gray-800 border-gray-200', 
+      color: 'bg-muted text-muted-foreground border-border', 
       icon: FileText, 
       label: 'Brouillon'
     },
     SENT: { 
-      color: 'bg-blue-100 text-blue-800 border-blue-200', 
+      color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-300 dark:border-blue-600', 
       icon: Clock, 
       label: 'Envoyé'
     },
     ACCEPTED: { 
-      color: 'bg-green-100 text-green-800 border-green-200', 
+      color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-300 dark:border-green-600', 
       icon: CheckCircle, 
       label: 'Accepté'
     },
     REJECTED: { 
-      color: 'bg-red-100 text-red-800 border-red-200', 
+      color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-300 dark:border-red-600', 
       icon: XCircle, 
       label: 'Refusé'
     },
     EXPIRED: { 
-      color: 'bg-orange-100 text-orange-800 border-orange-200', 
+      color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-300 dark:border-orange-600', 
       icon: AlertCircle, 
       label: 'Expiré'
     },
     VIEWED: { 
-      color: 'bg-blue-100 text-blue-800 border-blue-200', 
+      color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-300 dark:border-blue-600', 
       icon: Clock, 
       label: 'Consulté'
     },
     CANCELLED: { 
-      color: 'bg-gray-100 text-gray-800 border-gray-200', 
+      color: 'bg-muted text-muted-foreground border-border', 
       icon: XCircle, 
       label: 'Annulé'
     }
@@ -221,12 +221,12 @@ export default function QuoteDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
+      <div className="min-h-screen bg-background p-4">
         <div className="max-w-4xl mx-auto">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-            <div className="h-64 bg-gray-200 rounded"></div>
-            <div className="h-48 bg-gray-200 rounded"></div>
+            <div className="h-8 bg-muted rounded w-1/4"></div>
+            <div className="h-64 bg-muted rounded"></div>
+            <div className="h-48 bg-muted rounded"></div>
           </div>
         </div>
       </div>
@@ -235,12 +235,12 @@ export default function QuoteDetailPage() {
 
   if (!quote) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Card>
           <CardContent className="p-8 text-center">
-            <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Devis introuvable</h3>
-            <p className="text-gray-600 mb-6">Le devis demandé n'existe pas ou a été supprimé.</p>
+            <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">Devis introuvable</h3>
+            <p className="text-muted-foreground mb-6">Le devis demandé n'existe pas ou a été supprimé.</p>
             <Button onClick={() => router.push('/quotes')}>
               Retour aux devis
             </Button>
@@ -254,9 +254,9 @@ export default function QuoteDetailPage() {
   const StatusIcon = statusConfig.icon
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Mobile Header */}
-      <div className="lg:hidden bg-white border-b sticky top-0 z-10">
+      <div className="lg:hidden bg-card border-b border-border sticky top-0 z-10">
         <div className="flex items-center justify-between p-4">
           <Button
             variant="ghost"
@@ -268,14 +268,14 @@ export default function QuoteDetailPage() {
           </Button>
           
           <div className="flex-1 mx-4 text-center">
-            <h1 className="text-lg font-bold text-gray-900">{quote.quoteNumber}</h1>
+            <h1 className="text-lg font-bold text-foreground">{quote.quoteNumber}</h1>
             <div className="flex items-center justify-center gap-2 mt-1">
               <Badge className={`${statusConfig.color} text-xs border`}>
                 <StatusIcon className="w-3 h-3 mr-1" />
                 {statusConfig.label}
               </Badge>
             </div>
-            <p className="text-sm text-gray-500 mt-1">Créé le {formatDate(quote.createdAt)}</p>
+            <p className="text-sm text-muted-foreground mt-1">Créé le {formatDate(quote.createdAt)}</p>
           </div>
 
           {/* Mobile Actions */}
@@ -305,7 +305,7 @@ export default function QuoteDetailPage() {
                   <AlertDialogTrigger asChild>
                     <DropdownMenuItem 
                       onSelect={(e) => e.preventDefault()}
-                      className="text-red-600"
+                      className="text-destructive focus:text-destructive"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Supprimer
@@ -323,7 +323,7 @@ export default function QuoteDetailPage() {
                       <AlertDialogCancel>Annuler</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={handleDelete}
-                        className="bg-red-600 hover:bg-red-700"
+                        className="bg-destructive hover:bg-destructive/90"
                         disabled={isDeleting}
                       >
                         {isDeleting ? 'Suppression...' : 'Supprimer'}
@@ -338,22 +338,22 @@ export default function QuoteDetailPage() {
       </div>
 
       {/* Desktop Header */}
-      <div className="hidden lg:block bg-white border-b">
+      <div className="hidden lg:block bg-card border-b border-border">
         <div className="max-w-4xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <Button
                 variant="ghost"
                 onClick={() => router.back()}
-                className="h-10 w-10 p-0 rounded-full hover:bg-gray-100"
+                className="h-10 w-10 p-0 rounded-full hover:bg-muted"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">{quote.quoteNumber}</h1>
+                <h1 className="text-3xl font-bold text-foreground">{quote.quoteNumber}</h1>
                 <div className="flex items-center gap-3 mt-2">
-                  <p className="text-gray-600">Créé le {formatDate(quote.createdAt)}</p>
+                  <p className="text-muted-foreground">Créé le {formatDate(quote.createdAt)}</p>
                   <Badge className={`${statusConfig.color} border`}>
                     <StatusIcon className="w-4 h-4 mr-1" />
                     {statusConfig.label}
@@ -366,7 +366,7 @@ export default function QuoteDetailPage() {
               <Button
                 variant="outline"
                 onClick={handleDownload}
-                className="h-10 w-10 p-0 rounded-full border-gray-300 hover:bg-gray-50"
+                className="h-10 w-10 p-0 rounded-full border-border hover:bg-muted"
                 title="Télécharger PDF"
               >
                 <Download className="h-5 w-5" />
@@ -375,7 +375,7 @@ export default function QuoteDetailPage() {
               <Link href={`/quotes/${quoteId}/edit`}>
                 <Button
                   variant="outline"
-                  className="h-10 w-10 p-0 rounded-full border-gray-300 hover:bg-gray-50"
+                  className="h-10 w-10 p-0 rounded-full border-border hover:bg-muted"
                   title="Modifier le devis"
                 >
                   <Edit className="h-5 w-5" />
@@ -384,7 +384,7 @@ export default function QuoteDetailPage() {
 
               <Button
                 variant="outline"
-                className="h-10 w-10 p-0 rounded-full border-gray-300 hover:bg-gray-50"
+                className="h-10 w-10 p-0 rounded-full border-border hover:bg-muted"
                 title="Partager"
               >
                 <Share2 className="h-5 w-5" />
@@ -395,7 +395,7 @@ export default function QuoteDetailPage() {
                   <AlertDialogTrigger asChild>
                     <Button
                       variant="outline"
-                      className="h-10 w-10 p-0 rounded-full border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                      className="h-10 w-10 p-0 rounded-full border-destructive/50 text-destructive hover:bg-destructive/10 hover:border-destructive"
                       title="Supprimer le devis"
                     >
                       <Trash2 className="h-5 w-5" />
@@ -411,7 +411,7 @@ export default function QuoteDetailPage() {
                         <br />
                         Montant: {formatCurrency(quote.finalPrice)}
                         <br /><br />
-                        <span className="text-red-600 font-medium">
+                        <span className="text-destructive font-medium">
                           Cette action est irréversible.
                         </span>
                       </AlertDialogDescription>
@@ -420,7 +420,7 @@ export default function QuoteDetailPage() {
                       <AlertDialogCancel>Annuler</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={handleDelete}
-                        className="bg-red-600 hover:bg-red-700"
+                        className="bg-destructive hover:bg-destructive/90"
                         disabled={isDeleting}
                       >
                         {isDeleting ? 'Suppression...' : 'Supprimer'}
@@ -449,27 +449,27 @@ export default function QuoteDetailPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <div className="text-sm text-gray-500 mb-1">Nom complet</div>
-                  <div className="font-medium">
+                  <div className="text-sm text-muted-foreground mb-1">Nom complet</div>
+                  <div className="font-medium text-foreground">
                     {quote.lead.firstName} {quote.lead.lastName}
                   </div>
                 </div>
                 
                 {quote.lead.company && (
                   <div>
-                    <div className="text-sm text-gray-500 mb-1">Entreprise</div>
-                    <div className="font-medium flex items-center gap-2">
-                      <Building className="h-4 w-4 text-gray-400" />
+                    <div className="text-sm text-muted-foreground mb-1">Entreprise</div>
+                    <div className="font-medium flex items-center gap-2 text-foreground">
+                      <Building className="h-4 w-4 text-muted-foreground" />
                       {quote.lead.company}
                     </div>
                   </div>
                 )}
                 
                 <div>
-                  <div className="text-sm text-gray-500 mb-1">Téléphone</div>
+                  <div className="text-sm text-muted-foreground mb-1">Téléphone</div>
                   <div className="font-medium flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-gray-400" />
-                    <a href={`tel:${quote.lead.phone}`} className="text-blue-600 hover:text-blue-800">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <a href={`tel:${quote.lead.phone}`} className="text-primary hover:text-primary/80">
                       {quote.lead.phone}
                     </a>
                   </div>
@@ -477,10 +477,10 @@ export default function QuoteDetailPage() {
                 
                 {quote.lead.email && (
                   <div>
-                    <div className="text-sm text-gray-500 mb-1">Email</div>
+                    <div className="text-sm text-muted-foreground mb-1">Email</div>
                     <div className="font-medium flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-gray-400" />
-                      <a href={`mailto:${quote.lead.email}`} className="text-blue-600 hover:text-blue-800">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <a href={`mailto:${quote.lead.email}`} className="text-primary hover:text-primary/80">
                         {quote.lead.email}
                       </a>
                     </div>
@@ -489,9 +489,9 @@ export default function QuoteDetailPage() {
                 
                 {quote.lead.address && (
                   <div className="sm:col-span-2">
-                    <div className="text-sm text-gray-500 mb-1">Adresse</div>
-                    <div className="font-medium flex items-start gap-2">
-                      <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                    <div className="text-sm text-muted-foreground mb-1">Adresse</div>
+                    <div className="font-medium flex items-start gap-2 text-foreground">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                       {quote.lead.address}
                     </div>
                   </div>
@@ -523,8 +523,8 @@ export default function QuoteDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <div className="text-sm text-gray-500 mb-1">Montant Total</div>
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-sm text-muted-foreground mb-1">Montant Total</div>
+                <div className="text-2xl font-bold text-primary">
                   {formatCurrency(quote.finalPrice)}
                 </div>
               </div>
@@ -533,16 +533,16 @@ export default function QuoteDetailPage() {
               
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Sous-total HT</span>
-                  <span>{formatCurrency(quote.subTotalHT)}</span>
+                  <span className="text-muted-foreground">Sous-total HT</span>
+                  <span className="text-foreground">{formatCurrency(quote.subTotalHT)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">TVA (20%)</span>
-                  <span>{formatCurrency(quote.vatAmount)}</span>
+                  <span className="text-muted-foreground">TVA (20%)</span>
+                  <span className="text-foreground">{formatCurrency(quote.vatAmount)}</span>
                 </div>
                 <div className="flex justify-between font-medium">
-                  <span>Total TTC</span>
-                  <span>{formatCurrency(quote.totalTTC)}</span>
+                  <span className="text-foreground">Total TTC</span>
+                  <span className="text-foreground">{formatCurrency(quote.totalTTC)}</span>
                 </div>
               </div>
               
@@ -550,10 +550,10 @@ export default function QuoteDetailPage() {
               
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-600">Expire le</span>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Expire le</span>
                 </div>
-                <div className="font-medium">
+                <div className="font-medium text-foreground">
                   {formatDate(quote.expiresAt)}
                 </div>
               </div>
@@ -564,14 +564,14 @@ export default function QuoteDetailPage() {
                   <div className="space-y-2 text-sm">
                     {quote.surface && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Surface</span>
-                        <span>{quote.surface} m²</span>
+                        <span className="text-muted-foreground">Surface</span>
+                        <span className="text-foreground">{quote.surface} m²</span>
                       </div>
                     )}
                     {quote.levels && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Niveaux</span>
-                        <span>{quote.levels}</span>
+                        <span className="text-muted-foreground">Niveaux</span>
+                        <span className="text-foreground">{quote.levels}</span>
                       </div>
                     )}
                   </div>
@@ -592,23 +592,23 @@ export default function QuoteDetailPage() {
                 {/* Mobile: Card Layout */}
                 <div className="lg:hidden space-y-3">
                   {quote.lineItems.map((item, index) => (
-                    <div key={item.id || index} className="border rounded-lg p-4 bg-gray-50">
-                      <div className="font-medium mb-2">{item.description}</div>
+                    <div key={item.id || index} className="border border-border rounded-lg p-4 bg-muted/30">
+                      <div className="font-medium mb-2 text-foreground">{item.description}</div>
                       {item.detail && (
-                        <div className="text-sm text-gray-600 mb-3">{item.detail}</div>
+                        <div className="text-sm text-muted-foreground mb-3">{item.detail}</div>
                       )}
                       <div className="grid grid-cols-3 gap-2 text-sm">
                         <div>
-                          <span className="text-gray-500">Qté:</span>
-                          <div className="font-medium">{item.quantity}</div>
+                          <span className="text-muted-foreground">Qté:</span>
+                          <div className="font-medium text-foreground">{item.quantity}</div>
                         </div>
                         <div>
-                          <span className="text-gray-500">Prix unit.:</span>
-                          <div className="font-medium">{formatCurrency(item.unitPrice)}</div>
+                          <span className="text-muted-foreground">Prix unit.:</span>
+                          <div className="font-medium text-foreground">{formatCurrency(item.unitPrice)}</div>
                         </div>
                         <div>
-                          <span className="text-gray-500">Total:</span>
-                          <div className="font-bold text-green-600">{formatCurrency(item.totalPrice)}</div>
+                          <span className="text-muted-foreground">Total:</span>
+                          <div className="font-bold text-primary">{formatCurrency(item.totalPrice)}</div>
                         </div>
                       </div>
                     </div>
@@ -619,25 +619,25 @@ export default function QuoteDetailPage() {
                 <div className="hidden lg:block overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 font-medium text-gray-900">Description</th>
-                        <th className="text-center py-3 font-medium text-gray-900">Quantité</th>
-                        <th className="text-right py-3 font-medium text-gray-900">Prix Unitaire</th>
-                        <th className="text-right py-3 font-medium text-gray-900">Total</th>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 font-medium text-foreground">Description</th>
+                        <th className="text-center py-3 font-medium text-foreground">Quantité</th>
+                        <th className="text-right py-3 font-medium text-foreground">Prix Unitaire</th>
+                        <th className="text-right py-3 font-medium text-foreground">Total</th>
                       </tr>
                     </thead>
                     <tbody>
                       {quote.lineItems.map((item, index) => (
-                        <tr key={item.id || index} className="border-b">
+                        <tr key={item.id || index} className="border-b border-border">
                           <td className="py-4">
-                            <div className="font-medium">{item.description}</div>
+                            <div className="font-medium text-foreground">{item.description}</div>
                             {item.detail && (
-                              <div className="text-sm text-gray-600 mt-1">{item.detail}</div>
+                              <div className="text-sm text-muted-foreground mt-1">{item.detail}</div>
                             )}
                           </td>
-                          <td className="py-4 text-center">{item.quantity}</td>
-                          <td className="py-4 text-right">{formatCurrency(item.unitPrice)}</td>
-                          <td className="py-4 text-right font-medium">{formatCurrency(item.totalPrice)}</td>
+                          <td className="py-4 text-center text-foreground">{item.quantity}</td>
+                          <td className="py-4 text-right text-foreground">{formatCurrency(item.unitPrice)}</td>
+                          <td className="py-4 text-right font-medium text-foreground">{formatCurrency(item.totalPrice)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -645,8 +645,8 @@ export default function QuoteDetailPage() {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                <FileText className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                 <p>Aucun détail disponible pour ce devis</p>
               </div>
             )}
@@ -655,7 +655,7 @@ export default function QuoteDetailPage() {
 
         {/* Quick Actions - Mobile */}
         <div className="lg:hidden grid grid-cols-1 gap-3">
-          <Button onClick={handleDownload} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={handleDownload} className="bg-primary hover:bg-primary/90">
             <Download className="h-4 w-4 mr-2" />
             Télécharger le PDF
           </Button>
