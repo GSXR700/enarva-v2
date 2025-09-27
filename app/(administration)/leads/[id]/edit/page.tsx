@@ -456,27 +456,28 @@ export default function EditLeadPage() {
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="propertyType">Type de Propriété</Label>
-                <Select
-                  value={formData.propertyType || ''}
-                  onValueChange={(value) => handleInputChange('propertyType', value || null)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="APARTMENT_SMALL">Appartement Petit</SelectItem>
-                    <SelectItem value="APARTMENT_MEDIUM">Appartement Moyen</SelectItem>
-                    <SelectItem value="APARTMENT_LARGE">Appartement Grand</SelectItem>
-                    <SelectItem value="VILLA_SMALL">Villa Petite</SelectItem>
-                    <SelectItem value="VILLA_MEDIUM">Villa Moyenne</SelectItem>
-                    <SelectItem value="VILLA_LARGE">Villa Grande</SelectItem>
-                    <SelectItem value="COMMERCIAL">Commercial</SelectItem>
-                    <SelectItem value="OFFICE">Bureau</SelectItem>
-                    <SelectItem value="OTHER">Autre</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                  <Label htmlFor="propertyType">Type de Propriété</Label>
+                  <Select
+                    value={formData.propertyType || 'NONE'}
+                    onValueChange={(value) => handleInputChange('propertyType', value === 'NONE' ? null : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NONE">Aucun</SelectItem>
+                      <SelectItem value="APARTMENT_SMALL">Appartement Petit</SelectItem>
+                      <SelectItem value="APARTMENT_MEDIUM">Appartement Moyen</SelectItem>
+                      <SelectItem value="APARTMENT_LARGE">Appartement Grand</SelectItem>
+                      <SelectItem value="VILLA_SMALL">Villa Petite</SelectItem>
+                      <SelectItem value="VILLA_MEDIUM">Villa Moyenne</SelectItem>
+                      <SelectItem value="VILLA_LARGE">Villa Grande</SelectItem>
+                      <SelectItem value="COMMERCIAL">Commercial</SelectItem>
+                      <SelectItem value="OFFICE">Bureau</SelectItem>
+                      <SelectItem value="OTHER">Autre</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               <div>
                 <Label htmlFor="estimatedSurface">Surface Estimée (m²)</Label>
                 <Input
@@ -506,7 +507,7 @@ export default function EditLeadPage() {
                 <Label htmlFor="urgencyLevel">Niveau d'Urgence</Label>
                 <Select
                   value={formData.urgencyLevel || 'NORMAL'}
-                  onValueChange={(value) => handleInputChange('urgencyLevel', value || null)}
+                  onValueChange={(value) => handleInputChange('urgencyLevel', value === 'NORMAL' ? 'NORMAL' : value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -532,7 +533,7 @@ export default function EditLeadPage() {
                 <Label htmlFor="frequency">Fréquence</Label>
                 <Select
                   value={formData.frequency || 'PONCTUEL'}
-                  onValueChange={(value) => handleInputChange('frequency', value || null)}
+                  onValueChange={(value) => handleInputChange('frequency', value === 'PONCTUEL' ? 'PONCTUEL' : value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -678,14 +679,14 @@ export default function EditLeadPage() {
             <div>
               <Label htmlFor="assignedToId">Assigné à</Label>
               <Select
-                value={formData.assignedToId || ''}
-                onValueChange={(value) => handleInputChange('assignedToId', value || null)}
+                value={formData.assignedToId || 'UNASSIGNED'}
+                onValueChange={(value) => handleInputChange('assignedToId', value === 'UNASSIGNED' ? null : value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un utilisateur..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Non assigné</SelectItem>
+                  <SelectItem value="UNASSIGNED">Non assigné</SelectItem>
                   {Array.isArray(assignableUsers) && assignableUsers.map(user => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name} ({user.role})
