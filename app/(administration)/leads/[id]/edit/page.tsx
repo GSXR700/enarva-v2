@@ -1,3 +1,4 @@
+// app/(administration)/leads/[id]/edit/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react';
@@ -10,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ArrowLeft, Save, User, Briefcase, Search, Package, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, User, Briefcase, Search, Package, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Lead, User as PrismaUser } from '@prisma/client';
 import { toast } from 'sonner';
 
@@ -46,6 +47,7 @@ export default function EditLeadPage() {
   const [requestType, setRequestType] = useState<'SERVICE' | 'PRODUCTS'>('SERVICE');
   const [productRequests, setProductRequests] = useState<ProductRequest[]>([{ name: '', category: '', quantity: 1, unit: '' }]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [assignableUsers, setAssignableUsers] = useState<PrismaUser[]>([]);
   
   useEffect(() => {
@@ -58,44 +60,66 @@ export default function EditLeadPage() {
                 fetch('/api/users')
             ]);
 
-            if (!leadResponse.ok) throw new Error("Lead non trouvé.");
-            if (!usersResponse.ok) throw new Error("Impossible de charger les utilisateurs.");
-
-            const [leadData, usersData] = await Promise.all([
-                leadResponse.json(),
-                usersResponse.json()
-            ]);
-
-            // Handle both response formats: {users: [...]} and [...]
-            const userList = usersData.users || usersData;
-            if (Array.isArray(userList)) {
-                setAssignableUsers(userList);
-            } else {
-                console.error('Users data is not an array:', usersData);
+            if (!leadResponse.ok) {
+                const errorText = await leadResponse.text();
+                console.error('Lead fetch error:', errorText);
+                throw new Error("Lead non trouvé.");
+            }
+            
+            if (!usersResponse.ok) {
+                console.warn('Users fetch failed, proceeding without user list');
                 setAssignableUsers([]);
+            } else {
+                const usersData = await usersResponse.json();
+                const usersList = usersData.users || usersData || [];
+                setAssignableUsers(Array.isArray(usersList) ? usersList : []);
             }
 
-            // Map lead data to form structure
-            setFormData({
-                ...leadData,
-                score: leadData.score || 0,
-                estimatedSurface: leadData.estimatedSurface || '',
-                materials: leadData.materials || null,
-            });
+            const leadData = await leadResponse.json();
+            console.log('Fetched lead data:', leadData);
 
-            // Set request type based on lead data
-            if (leadData.needsProducts && !leadData.propertyType) {
+            // Properly parse and set form data with better error handling
+            const parsedFormData: FormDataType = {
+                ...leadData,
+                estimatedSurface: leadData.estimatedSurface?.toString() || '',
+                score: leadData.score || 0,
+                materials: leadData.materials || null,
+                // Ensure all enum fields are properly handled with fallbacks
+                propertyType: leadData.propertyType || null,
+                accessibility: leadData.accessibility || 'EASY',
+                urgencyLevel: leadData.urgencyLevel || 'NORMAL',
+                frequency: leadData.frequency || 'PONCTUEL',
+                contractType: leadData.contractType || 'INTERVENTION_UNIQUE',
+                providedBy: leadData.providedBy || 'ENARVA',
+                enarvaRole: leadData.enarvaRole || 'PRESTATAIRE_PRINCIPAL',
+                assignedToId: leadData.assignedToId || '',
+                // Handle string fields that might be empty or null
+                email: leadData.email || '',
+                address: leadData.address || '',
+                gpsLocation: leadData.gpsLocation || '',
+                company: leadData.company || '',
+                iceNumber: leadData.iceNumber || '',
+                activitySector: leadData.activitySector || '',
+                contactPosition: leadData.contactPosition || '',
+                department: leadData.department || '',
+                budgetRange: leadData.budgetRange || '',
+                source: leadData.source || '',
+                referrerContact: leadData.referrerContact || '',
+            };
+
+            setFormData(parsedFormData);
+
+            // Set request type and product requests if materials exist
+            if (leadData.materials && Array.isArray(leadData.materials) && leadData.materials.length > 0) {
                 setRequestType('PRODUCTS');
-                if (leadData.materials && Array.isArray(leadData.materials)) {
-                    setProductRequests(leadData.materials);
-                }
+                setProductRequests(leadData.materials);
             } else {
                 setRequestType('SERVICE');
             }
 
         } catch (error: any) {
-            console.error("Error fetching data:", error);
-            toast.error(error.message);
+            console.error('Error fetching data:', error);
+            toast.error(error.message || "Erreur lors du chargement des données.");
             router.push('/leads');
         } finally {
             setIsLoading(false);
@@ -106,25 +130,16 @@ export default function EditLeadPage() {
     }
   }, [leadId, router]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value
-    }));
+  const handleInputChange = (field: keyof FormDataType, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSelectChange = (name: keyof FormDataType, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [name]: value === 'null' || value === '' ? null : value
-    }));
-  };
-
-  const handleProductRequestChange = (index: number, field: keyof ProductRequest, value: string | number) => {
-    setProductRequests(prev => prev.map((req, i) => 
-      i === index ? { ...req, [field]: value } : req
-    ));
+  const handleProductRequestChange = (index: number, field: keyof ProductRequest, value: any) => {
+    setProductRequests(prev => 
+      prev.map((req, i) => 
+        i === index ? { ...req, [field]: value } : req
+      )
+    );
   };
 
   const addProductRequest = () => {
@@ -137,18 +152,39 @@ export default function EditLeadPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
 
-    const submissionData = {
+    try {
+      // Prepare submission data with proper type conversion and null handling
+      const submissionData = {
         ...formData,
         materials: requestType === 'PRODUCTS' ? productRequests : null,
+        estimatedSurface: formData.estimatedSurface ? parseInt(formData.estimatedSurface.toString()) : null,
+        score: formData.score ? parseInt(formData.score.toString()) : 0,
+        
+        // Handle null values for optional enum fields
         propertyType: formData.propertyType || null,
         urgencyLevel: formData.urgencyLevel || null,
         frequency: formData.frequency || null,
         contractType: formData.contractType || null,
         assignedToId: formData.assignedToId || null,
-    };
+        
+        // Clean empty string values to null for better database consistency
+        email: formData.email || null,
+        address: formData.address || null,
+        gpsLocation: formData.gpsLocation || null,
+        company: formData.company || null,
+        iceNumber: formData.iceNumber || null,
+        activitySector: formData.activitySector || null,
+        contactPosition: formData.contactPosition || null,
+        department: formData.department || null,
+        budgetRange: formData.budgetRange || null,
+        source: formData.source || null,
+        referrerContact: formData.referrerContact || null,
+      };
 
-    try {
+      console.log('Submitting lead update:', submissionData);
+
       const response = await fetch(`/api/leads/${leadId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -156,24 +192,47 @@ export default function EditLeadPage() {
       });
 
       if (!response.ok) {
-        const errorBody = await response.text();
-        console.error("API Error:", errorBody);
-        throw new Error('La mise à jour a échoué.');
+        const errorText = await response.text();
+        console.error("API Error Response:", errorText);
+        
+        let errorMessage = 'La mise à jour a échoué.';
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.details && Array.isArray(errorData.details)) {
+            errorMessage = errorData.details.join(', ');
+          } else {
+            errorMessage = errorData.error || errorData.message || errorMessage;
+          }
+        } catch {
+          // If not JSON, use the text as error message
+          errorMessage = errorText || errorMessage;
+        }
+        
+        throw new Error(errorMessage);
       }
+      
+      const updatedLead = await response.json();
+      console.log('Lead updated successfully:', updatedLead);
       
       toast.success("Lead mis à jour avec succès !");
       router.push('/leads');
+      
     } catch (error: any) {
-      toast.error(error.message || "Une erreur est survenue.");
+      console.error('Submit error:', error);
+      toast.error(error.message || "Une erreur est survenue lors de la mise à jour.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-96 bg-gray-200 rounded"></div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader2 className="animate-spin h-8 w-8 mx-auto mb-4" />
+            <p className="text-gray-600">Chargement du lead...</p>
+          </div>
         </div>
       </div>
     );
@@ -181,16 +240,19 @@ export default function EditLeadPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
+      {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Link href="/leads">
-          <Button variant="ghost" size="sm">
+          <Button variant="outline" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Retour aux leads
           </Button>
         </Link>
         <div>
           <h1 className="text-2xl font-bold">Modifier le lead</h1>
-          <p className="text-gray-600">ID: {leadId}</p>
+          <p className="text-gray-600">
+            {formData.firstName} {formData.lastName}
+          </p>
         </div>
       </div>
 
@@ -208,9 +270,8 @@ export default function EditLeadPage() {
               <Label htmlFor="firstName">Prénom *</Label>
               <Input
                 id="firstName"
-                name="firstName"
                 value={formData.firstName || ''}
-                onChange={handleInputChange}
+                onChange={(e) => handleInputChange('firstName', e.target.value)}
                 required
               />
             </div>
@@ -218,9 +279,8 @@ export default function EditLeadPage() {
               <Label htmlFor="lastName">Nom *</Label>
               <Input
                 id="lastName"
-                name="lastName"
                 value={formData.lastName || ''}
-                onChange={handleInputChange}
+                onChange={(e) => handleInputChange('lastName', e.target.value)}
                 required
               />
             </div>
@@ -228,9 +288,8 @@ export default function EditLeadPage() {
               <Label htmlFor="phone">Téléphone *</Label>
               <Input
                 id="phone"
-                name="phone"
                 value={formData.phone || ''}
-                onChange={handleInputChange}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
                 required
               />
             </div>
@@ -238,28 +297,25 @@ export default function EditLeadPage() {
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
-                name="email"
                 type="email"
                 value={formData.email || ''}
-                onChange={handleInputChange}
+                onChange={(e) => handleInputChange('email', e.target.value)}
               />
             </div>
             <div className="md:col-span-2">
               <Label htmlFor="address">Adresse</Label>
               <Input
                 id="address"
-                name="address"
                 value={formData.address || ''}
-                onChange={handleInputChange}
+                onChange={(e) => handleInputChange('address', e.target.value)}
               />
             </div>
             <div>
               <Label htmlFor="gpsLocation">Localisation GPS</Label>
               <Input
                 id="gpsLocation"
-                name="gpsLocation"
                 value={formData.gpsLocation || ''}
-                onChange={handleInputChange}
+                onChange={(e) => handleInputChange('gpsLocation', e.target.value)}
                 placeholder="33.5731, -7.5898"
               />
             </div>
@@ -267,7 +323,7 @@ export default function EditLeadPage() {
               <Label htmlFor="status">Statut</Label>
               <Select
                 value={formData.status || 'NEW'}
-                onValueChange={(value) => handleSelectChange('status', value)}
+                onValueChange={(value) => handleInputChange('status', value)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -275,9 +331,10 @@ export default function EditLeadPage() {
                 <SelectContent>
                   <SelectItem value="NEW">Nouveau</SelectItem>
                   <SelectItem value="QUALIFIED">Qualifié</SelectItem>
-                  <SelectItem value="IN_PROGRESS">En cours</SelectItem>
+                  <SelectItem value="QUOTE_SENT">Devis envoyé</SelectItem>
+                  <SelectItem value="QUOTE_ACCEPTED">Devis accepté</SelectItem>
                   <SelectItem value="COMPLETED">Terminé</SelectItem>
-                  <SelectItem value="LOST">Perdu</SelectItem>
+                  <SelectItem value="CANCELLED">Annulé</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -292,72 +349,72 @@ export default function EditLeadPage() {
               Détails Professionnels
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="leadType">Type de Lead *</Label>
-              <Select
+              <Label>Type de Lead *</Label>
+              <RadioGroup
                 value={formData.leadType || 'PARTICULIER'}
-                onValueChange={(value) => handleSelectChange('leadType', value)}
+                onValueChange={(value) => handleInputChange('leadType', value)}
+                className="flex gap-4 mt-2"
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PARTICULIER">Particulier</SelectItem>
-                  <SelectItem value="PROFESSIONNEL">Professionnel</SelectItem>
-                  <SelectItem value="SYNDIC">Syndic</SelectItem>
-                </SelectContent>
-              </Select>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="PARTICULIER" id="particulier" />
+                  <Label htmlFor="particulier">Particulier</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="PROFESSIONNEL" id="professionnel" />
+                  <Label htmlFor="professionnel">Professionnel</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="SYNDIC" id="syndic" />
+                  <Label htmlFor="syndic">Syndic</Label>
+                </div>
+              </RadioGroup>
             </div>
 
             {(formData.leadType === 'PROFESSIONNEL' || formData.leadType === 'SYNDIC') && (
-              <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="company">Société</Label>
                   <Input
                     id="company"
-                    name="company"
                     value={formData.company || ''}
-                    onChange={handleInputChange}
+                    onChange={(e) => handleInputChange('company', e.target.value)}
                   />
                 </div>
                 <div>
                   <Label htmlFor="iceNumber">N° ICE</Label>
                   <Input
                     id="iceNumber"
-                    name="iceNumber"
                     value={formData.iceNumber || ''}
-                    onChange={handleInputChange}
+                    onChange={(e) => handleInputChange('iceNumber', e.target.value)}
                   />
                 </div>
                 <div>
                   <Label htmlFor="activitySector">Secteur d'Activité</Label>
                   <Input
                     id="activitySector"
-                    name="activitySector"
                     value={formData.activitySector || ''}
-                    onChange={handleInputChange}
+                    onChange={(e) => handleInputChange('activitySector', e.target.value)}
                   />
                 </div>
                 <div>
                   <Label htmlFor="contactPosition">Poste du Contact</Label>
                   <Input
                     id="contactPosition"
-                    name="contactPosition"
                     value={formData.contactPosition || ''}
-                    onChange={handleInputChange}
+                    onChange={(e) => handleInputChange('contactPosition', e.target.value)}
                   />
                 </div>
                 <div>
                   <Label htmlFor="department">Département</Label>
                   <Input
                     id="department"
-                    name="department"
                     value={formData.department || ''}
-                    onChange={handleInputChange}
+                    onChange={(e) => handleInputChange('department', e.target.value)}
                   />
                 </div>
-              </>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -402,7 +459,7 @@ export default function EditLeadPage() {
                 <Label htmlFor="propertyType">Type de Propriété</Label>
                 <Select
                   value={formData.propertyType || ''}
-                  onValueChange={(value) => handleSelectChange('propertyType', value)}
+                  onValueChange={(value) => handleInputChange('propertyType', value || null)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner..." />
@@ -424,17 +481,16 @@ export default function EditLeadPage() {
                 <Label htmlFor="estimatedSurface">Surface Estimée (m²)</Label>
                 <Input
                   id="estimatedSurface"
-                  name="estimatedSurface"
                   type="number"
                   value={formData.estimatedSurface || ''}
-                  onChange={handleInputChange}
+                  onChange={(e) => handleInputChange('estimatedSurface', e.target.value)}
                 />
               </div>
               <div>
                 <Label htmlFor="accessibility">Accessibilité</Label>
                 <Select
                   value={formData.accessibility || 'EASY'}
-                  onValueChange={(value) => handleSelectChange('accessibility', value)}
+                  onValueChange={(value) => handleInputChange('accessibility', value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -450,7 +506,7 @@ export default function EditLeadPage() {
                 <Label htmlFor="urgencyLevel">Niveau d'Urgence</Label>
                 <Select
                   value={formData.urgencyLevel || 'NORMAL'}
-                  onValueChange={(value) => handleSelectChange('urgencyLevel', value)}
+                  onValueChange={(value) => handleInputChange('urgencyLevel', value || null)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -467,9 +523,8 @@ export default function EditLeadPage() {
                 <Label htmlFor="budgetRange">Budget</Label>
                 <Input
                   id="budgetRange"
-                  name="budgetRange"
                   value={formData.budgetRange || ''}
-                  onChange={handleInputChange}
+                  onChange={(e) => handleInputChange('budgetRange', e.target.value)}
                   placeholder="1000-5000 DH"
                 />
               </div>
@@ -477,7 +532,7 @@ export default function EditLeadPage() {
                 <Label htmlFor="frequency">Fréquence</Label>
                 <Select
                   value={formData.frequency || 'PONCTUEL'}
-                  onValueChange={(value) => handleSelectChange('frequency', value)}
+                  onValueChange={(value) => handleInputChange('frequency', value || null)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -576,7 +631,7 @@ export default function EditLeadPage() {
               <Label htmlFor="channel">Canal d'Acquisition *</Label>
               <Select
                 value={formData.channel || 'MANUEL'}
-                onValueChange={(value) => handleSelectChange('channel', value)}
+                onValueChange={(value) => handleInputChange('channel', value)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -595,9 +650,8 @@ export default function EditLeadPage() {
               <Label htmlFor="source">Source Détaillée</Label>
               <Input
                 id="source"
-                name="source"
                 value={formData.source || ''}
-                onChange={handleInputChange}
+                onChange={(e) => handleInputChange('source', e.target.value)}
                 placeholder="Ex: Google Ads, Page Facebook"
               />
             </div>
@@ -614,9 +668,8 @@ export default function EditLeadPage() {
               <Label htmlFor="originalMessage">Message Original *</Label>
               <Textarea
                 id="originalMessage"
-                name="originalMessage"
                 value={formData.originalMessage || ''}
-                onChange={handleInputChange}
+                onChange={(e) => handleInputChange('originalMessage', e.target.value)}
                 rows={4}
                 placeholder="Description de la demande du client..."
                 required
@@ -625,14 +678,14 @@ export default function EditLeadPage() {
             <div>
               <Label htmlFor="assignedToId">Assigné à</Label>
               <Select
-                value={formData.assignedToId || 'null'}
-                onValueChange={(value) => handleSelectChange('assignedToId', value)}
+                value={formData.assignedToId || ''}
+                onValueChange={(value) => handleInputChange('assignedToId', value || null)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un utilisateur..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="null">Non assigné</SelectItem>
+                  <SelectItem value="">Non assigné</SelectItem>
                   {Array.isArray(assignableUsers) && assignableUsers.map(user => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name} ({user.role})
@@ -641,19 +694,39 @@ export default function EditLeadPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label htmlFor="score">Score (0-100)</Label>
+              <Input
+                id="score"
+                type="number"
+                min="0"
+                max="100"
+                value={formData.score || 0}
+                onChange={(e) => handleInputChange('score', parseInt(e.target.value) || 0)}
+              />
+            </div>
           </CardContent>
         </Card>
 
         {/* Bouton de Soumission */}
         <div className="flex justify-end gap-4">
           <Link href="/leads">
-            <Button type="button" variant="outline">
+            <Button type="button" variant="outline" disabled={isSaving}>
               Annuler
             </Button>
           </Link>
-          <Button type="submit" disabled={isLoading}>
-            <Save className="h-4 w-4 mr-2" />
-            Sauvegarder les modifications
+          <Button type="submit" disabled={isSaving}>
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Mise à jour...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Sauvegarder les modifications
+              </>
+            )}
           </Button>
         </div>
       </form>

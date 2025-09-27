@@ -1,5 +1,4 @@
-'use client';
-
+// app/(administration)/leads/page.tsx
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -22,12 +21,12 @@ import { toast } from 'sonner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CardGridSkeleton } from '@/components/skeletons/CardGridSkeleton';
 
-
 type LeadWithRelations = Lead & { assignedTo?: User | null };
 
 interface LeadsResponse {
   leads: LeadWithRelations[];
   total: number;
+  totalPages?: number;
 }
 
 export default function LeadsPage() {
@@ -67,7 +66,7 @@ export default function LeadsPage() {
     fetchUsers();
   }, []);
 
-  // Real-time updates with Pusher
+  // Real-time updates with Pusher - Enhanced with all lead events
   usePusherChannel('leads-channel', {
     'new-lead': (newLead: any) => {
       console.log('Leads page: New lead received via Pusher:', newLead);
@@ -86,7 +85,98 @@ export default function LeadsPage() {
         };
       });
 
-      // If we're on a different page or filter, also invalidate to refresh counts
+      // Invalidate to refresh counts
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+
+    'lead-updated': (updatedLead: any) => {
+      console.log('Leads page: Lead updated via Pusher:', updatedLead);
+      
+      toast.success(`Lead ${updatedLead.firstName} ${updatedLead.lastName} mis à jour!`);
+      
+      // Update the specific lead in all relevant query caches
+      queryClient.setQueryData(['leads', page, limit, statusFilter, searchTerm], (oldData: LeadsResponse | undefined) => {
+        if (!oldData) return oldData;
+        
+        return {
+          ...oldData,
+          leads: oldData.leads.map(lead =>
+            lead.id === updatedLead.id 
+              ? { ...lead, ...updatedLead }
+              : lead
+          )
+        };
+      });
+
+      // Also invalidate to ensure consistency across filters/pages
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+
+    'lead-status-changed': (data: any) => {
+      console.log('Leads page: Lead status changed via Pusher:', data);
+      
+      toast.info(`Statut du lead ${data.firstName} ${data.lastName} changé vers ${translate(data.newStatus)}`);
+      
+      // Update query cache for status changes
+      queryClient.setQueryData(['leads', page, limit, statusFilter, searchTerm], (oldData: LeadsResponse | undefined) => {
+        if (!oldData) return oldData;
+        
+        return {
+          ...oldData,
+          leads: oldData.leads.map(lead =>
+            lead.id === data.id 
+              ? { ...lead, status: data.newStatus }
+              : lead
+          )
+        };
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+
+    'lead-assigned': (data: any) => {
+      console.log('Leads page: Lead assigned via Pusher:', data);
+      
+      const message = data.newAssignedToId 
+        ? `Lead ${data.firstName} ${data.lastName} assigné à un agent`
+        : `Assignation du lead ${data.firstName} ${data.lastName} supprimée`;
+      
+      toast.info(message);
+      
+      // Update query cache for assignment changes
+      queryClient.setQueryData(['leads', page, limit, statusFilter, searchTerm], (oldData: LeadsResponse | undefined) => {
+        if (!oldData) return oldData;
+        
+        return {
+          ...oldData,
+          leads: oldData.leads.map(lead =>
+            lead.id === data.id 
+              ? { ...lead, assignedToId: data.newAssignedToId }
+              : lead
+          )
+        };
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+
+    'lead-deleted': (data: any) => {
+      console.log('Leads page: Lead deleted via Pusher:', data);
+      
+      toast.error(`Lead ${data.firstName} ${data.lastName} supprimé`);
+      
+      // Remove the lead from query cache
+      queryClient.setQueryData(['leads', page, limit, statusFilter, searchTerm], (oldData: LeadsResponse | undefined) => {
+        if (!oldData) return oldData;
+        
+        return {
+          ...oldData,
+          leads: oldData.leads.filter(lead => lead.id !== data.id),
+          total: Math.max(0, oldData.total - 1),
+          totalPages: Math.ceil(Math.max(0, oldData.total - 1) / limit)
+        };
+      });
+
       queryClient.invalidateQueries({ queryKey: ['leads'] });
     }
   });
@@ -139,9 +229,6 @@ export default function LeadsPage() {
     errorMessage: 'Erreur lors de la mise à jour du statut'
   });
 
-  // Optimistic mutation for lead assignment
-  
-
   // Optimistic mutation for lead deletion
   const deleteMutation = useOptimisticMutation<void, string>({
     queryKey: ['leads', page, limit, statusFilter, searchTerm],
@@ -180,8 +267,6 @@ export default function LeadsPage() {
   const handleStatusUpdate = (leadId: string, newStatus: LeadStatus) => {
     statusUpdateMutation.mutate({ id: leadId, status: newStatus });
   };
-
-  
 
   const handleDelete = (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce lead?')) return;

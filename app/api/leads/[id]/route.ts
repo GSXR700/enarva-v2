@@ -1,10 +1,11 @@
-// app/api/leads/[id]/route.ts - DIAGNOSTIC VERSION WITH DETAILED LOGGING
+// app/api/leads/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { leadService } from '@/services/lead.service';
 import { validateCompleteLeadInput, cleanLeadData } from '@/lib/validations';
 import { errorHandler } from '@/lib/error-handler';
+import { pusherServer } from '@/lib/pusher';
 import { ExtendedUser } from '@/types/next-auth';
 
 export async function GET(
@@ -121,7 +122,7 @@ export async function PATCH(
     const body = await request.json();
     console.log('✅ Request body parsed, keys:', Object.keys(body));
 
-    // Step 6: Clean data - ADD DETAILED LOGGING HERE
+    // Step 6: Clean data
     console.log('🔍 Step 6: Cleaning data');
     try {
       const cleanedData = cleanLeadData(body);
@@ -171,7 +172,7 @@ export async function PATCH(
         console.log('✅ Score calculated:', updateData.score);
       }
 
-      // Step 10: Store previous values for logging
+      // Step 10: Store previous values for logging and Pusher
       const previousStatus = existingLead.status;
       const previousAssignedToId = existingLead.assignedToId;
 
@@ -180,8 +181,55 @@ export async function PATCH(
       const updatedLead = await leadService.updateLead(leadId, updateData);
       console.log('✅ Lead updated successfully');
 
-      // Step 12: Log activities (if needed)
-      console.log('🔍 Step 12: Logging activities');
+      // Step 12: Send Pusher notifications for real-time updates
+      console.log('🔍 Step 12: Sending Pusher notifications');
+      if (process.env.PUSHER_APP_ID) {
+        try {
+          // Send general lead update notification
+          await pusherServer.trigger('leads-channel', 'lead-updated', {
+            id: updatedLead.id,
+            firstName: updatedLead.firstName,
+            lastName: updatedLead.lastName,
+            status: updatedLead.status,
+            score: updatedLead.score,
+            assignedToId: updatedLead.assignedToId,
+            updatedAt: updatedLead.updatedAt,
+            changes: Object.keys(updateData),
+            updatedBy: user.name || user.email
+          });
+
+          // Send specific notifications for important changes
+          if (body.status && body.status !== previousStatus) {
+            await pusherServer.trigger('leads-channel', 'lead-status-changed', {
+              id: updatedLead.id,
+              firstName: updatedLead.firstName,
+              lastName: updatedLead.lastName,
+              oldStatus: previousStatus,
+              newStatus: body.status,
+              updatedBy: user.name || user.email
+            });
+          }
+
+          if (body.assignedToId !== undefined && body.assignedToId !== previousAssignedToId) {
+            await pusherServer.trigger('leads-channel', 'lead-assigned', {
+              id: updatedLead.id,
+              firstName: updatedLead.firstName,
+              lastName: updatedLead.lastName,
+              oldAssignedToId: previousAssignedToId,
+              newAssignedToId: body.assignedToId,
+              assignedBy: user.name || user.email
+            });
+          }
+
+          console.log('✅ Pusher notifications sent successfully');
+        } catch (pusherError) {
+          console.warn('⚠️ Pusher notification failed:', pusherError);
+          // Don't fail the request if Pusher fails
+        }
+      }
+
+      // Step 13: Log activities (if needed)
+      console.log('🔍 Step 13: Logging activities');
       
       // Log status changes
       if (body.status && body.status !== previousStatus) {
@@ -263,6 +311,20 @@ export async function DELETE(
     }
 
     await leadService.deleteLead(leadId);
+
+    // Send Pusher notification for lead deletion
+    if (process.env.PUSHER_APP_ID) {
+      try {
+        await pusherServer.trigger('leads-channel', 'lead-deleted', {
+          id: leadId,
+          firstName: existingLead.firstName,
+          lastName: existingLead.lastName,
+          deletedBy: user.name || user.email
+        });
+      } catch (pusherError) {
+        console.warn('Pusher notification failed:', pusherError);
+      }
+    }
 
     try {
       await leadService.logActivity({
