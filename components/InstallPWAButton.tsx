@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Check } from 'lucide-react';
+import { Download, TabletSmartphone  } from 'lucide-react';
 
 export default function InstallPWAButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -67,9 +67,7 @@ export default function InstallPWAButton() {
   if (isInstalled) {
     return (
       <Button variant="outline" disabled className="gap-2">
-        <Check className="w-4 h-4" />
-        App installée
-      </Button>
+        <TabletSmartphone className="w-4 h-4" /></Button>
     );
   }
 
