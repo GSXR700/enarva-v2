@@ -184,9 +184,9 @@ export default function MissionDetailPage() {
     return (
       <div className="main-content">
         <div className="flex items-center gap-4 mb-6">
-          <Link href="/missions" className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
+          <Link href="/administration/missions" className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-4 h-4" />
-            Retour aux missions
+              Retour aux missions
           </Link>
         </div>
         <Card>
