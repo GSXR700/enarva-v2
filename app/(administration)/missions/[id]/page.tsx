@@ -494,35 +494,37 @@ export default function MissionDetailPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {mission.teamLeader && (
-                <div className="flex items-center gap-3">
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src={mission.teamLeader.image || undefined} />
-                    <AvatarFallback>
-                      {mission.teamLeader.name?.split(' ').map(n => n[0]).join('') || 'TL'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-medium">{mission.teamLeader.name}</p>
-                    <p className="text-xs text-muted-foreground">Chef d'équipe</p>
-                  </div>
-                </div>
-              )}
-              {mission.team?.members.map((member) => (
-                <div key={member.user.id} className="flex items-center gap-3">
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src={member.user.image || undefined} />
-                    <AvatarFallback>
-                      {member.user.name?.split(' ').map(n => n[0]).join('') || 'M'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-medium">{member.user.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {translate(member.user.role)}
-                    </p>
-                  </div>
-                </div>
-              ))}
+  <div className="flex items-center gap-3">
+    <Avatar className="w-8 h-8">
+      <AvatarImage src={mission.teamLeader.image || undefined} />
+      <AvatarFallback>
+        {mission.teamLeader.name?.split(' ').map(n => n[0]).join('') || 'TL'}
+      </AvatarFallback>
+    </Avatar>
+    <div>
+      <p className="text-sm font-medium">{mission.teamLeader.name}</p>
+      <p className="text-xs text-muted-foreground">Chef d'équipe</p>
+    </div>
+  </div>
+)}
+              {mission.team?.members
+  .filter((member) => member.user.id !== mission.teamLeader?.id)
+  .map((member) => (
+    <div key={member.user.id} className="flex items-center gap-3">
+      <Avatar className="w-8 h-8">
+        <AvatarImage src={member.user.image || undefined} />
+        <AvatarFallback>
+          {member.user.name?.split(' ').map(n => n[0]).join('') || 'M'}
+        </AvatarFallback>
+      </Avatar>
+      <div>
+        <p className="text-sm font-medium">{member.user.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {translate(member.user.role)}
+        </p>
+      </div>
+    </div>
+  ))}
             </CardContent>
           </Card>
 
