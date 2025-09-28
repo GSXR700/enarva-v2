@@ -552,7 +552,7 @@ export default function EditMissionClient() {
               <p className="text-muted-foreground mb-6">
                 La mission demandée n'existe pas ou vous n'avez pas les permissions pour y accéder.
               </p>
-              <Button onClick={() => router.push('/administration/missions')}>
+              <Button onClick={() => router.push('/missions')}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Retour aux missions
               </Button>
