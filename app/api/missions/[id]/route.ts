@@ -19,6 +19,8 @@ export async function GET(
     }
     const { id } = await params;
 
+    console.log('🔍 Fetching mission with ID:', id);
+
     const mission = await prisma.mission.findUnique({
       where: { id },
       include: {
@@ -206,12 +208,16 @@ export async function GET(
     });
 
     if (!mission) {
+      console.log('❌ Mission not found:', id);
       return new NextResponse('Mission not found', { status: 404 });
     }
 
+    console.log('✅ Mission found with', mission.tasks.length, 'tasks');
+    console.log('📋 Task details:', mission.tasks.map(t => ({ id: t.id, title: t.title, status: t.status })));
+
     return NextResponse.json(mission);
   } catch (error) {
-    console.error('Failed to fetch mission:', error);
+    console.error('❌ Failed to fetch mission:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   } finally {
     await prisma.$disconnect();
@@ -267,7 +273,81 @@ async function handleMissionUpdate(
       const updatedMission = await missionService.updateMission(id, body);
       
       console.log('✅ Mission updated successfully via service:', updatedMission.id);
-      return NextResponse.json(updatedMission);
+      
+      // FIXED: Fetch complete mission with tasks after service update
+      const completeUpdatedMission = await prisma.mission.findUnique({
+        where: { id: updatedMission.id },
+        include: {
+          lead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              email: true,
+              address: true,
+              company: true
+            }
+          },
+          quote: {
+            select: {
+              id: true,
+              quoteNumber: true,
+              finalPrice: true,
+              status: true
+            }
+          },
+          teamLeader: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+              role: true
+            }
+          },
+          team: { 
+            include: { 
+              members: { 
+                where: { isActive: true },
+                include: { 
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                      image: true,
+                      role: true
+                    }
+                  } 
+                } 
+              } 
+            } 
+          },
+          tasks: {
+            include: {
+              assignedTo: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                      image: true
+                    }
+                  }
+                }
+              }
+            },
+            orderBy: {
+              createdAt: 'asc'
+            }
+          }
+        }
+      });
+
+      console.log('✅ Complete mission fetched with', completeUpdatedMission?.tasks?.length || 0, 'tasks');
+      return NextResponse.json(completeUpdatedMission);
       
     } catch (serviceError: any) {
       console.error('🚨 Mission service error:', serviceError);
@@ -382,9 +462,9 @@ async function fallbackManualUpdate(id: string, body: any, user: ExtendedUser) {
       }
     });
 
-    // Handle tasks - accept any structure
+    // CRITICAL FIX: Handle tasks properly with better error handling
     if (body.tasks !== undefined && Array.isArray(body.tasks)) {
-      console.log('Updating tasks:', body.tasks.length, 'tasks provided');
+      console.log('🔧 Updating tasks:', body.tasks.length, 'tasks provided');
       
       // Delete existing tasks
       await tx.task.deleteMany({
@@ -413,10 +493,10 @@ async function fallbackManualUpdate(id: string, body: any, user: ExtendedUser) {
             await tx.task.createMany({
               data: tasksToCreate
             });
-            console.log('Successfully created', tasksToCreate.length, 'tasks');
+            console.log('✅ Successfully created', tasksToCreate.length, 'tasks');
           } catch (taskError) {
-            console.error('Failed to create tasks:', taskError);
-            // Don't fail the entire update if task creation fails
+            console.error('❌ Failed to create tasks:', taskError);
+            throw taskError; // Don't silently fail - this is critical
           }
         }
       }
@@ -517,6 +597,7 @@ async function fallbackManualUpdate(id: string, body: any, user: ExtendedUser) {
       }
     }
 
+    console.log('✅ Fallback update completed with', updated.tasks.length, 'tasks');
     return updated;
   });
 

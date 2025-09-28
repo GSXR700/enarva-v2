@@ -264,6 +264,7 @@ export default function EditMissionClient() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        console.log('🔄 Loading mission data for ID:', missionId)
         const [missionRes, teamLeadersRes, teamsRes, templatesRes] = await Promise.all([
           fetch(`/api/missions/${missionId}`),
           fetch('/api/users?role=TEAM_LEADER'),
@@ -283,6 +284,9 @@ export default function EditMissionClient() {
           templatesRes.json()
         ])
 
+        console.log('✅ Mission loaded with', missionData.tasks?.length || 0, 'tasks')
+        console.log('📋 Tasks data:', missionData.tasks?.map((t: any) => ({ id: t.id, title: t.title })))
+
         const processedMission = {
           ...missionData,
           scheduledDate: new Date(missionData.scheduledDate).toISOString().slice(0, 16),
@@ -296,7 +300,7 @@ export default function EditMissionClient() {
         setTeams(teamsData.teams || teamsData)
         setTaskTemplates(templatesData.templates || templatesData)
       } catch (error) {
-        console.error('Failed to load data:', error)
+        console.error('❌ Failed to load data:', error)
         toast.error('Erreur lors du chargement des données')
       } finally {
         setIsLoadingData(false)
@@ -312,9 +316,10 @@ export default function EditMissionClient() {
 
     setIsLoading(true)
     try {
+      console.log('🔧 Submitting mission update with', mission.tasks.length, 'tasks')
+      
       const payload = {
         ...mission,
-        estimatedDuration: mission.estimatedDuration / 60,
         tasks: mission.tasks.map(task => ({
           id: task.id || undefined,
           title: task.title || 'Nouvelle tâche',
@@ -329,6 +334,8 @@ export default function EditMissionClient() {
         }))
       }
 
+      console.log('📦 Payload tasks:', payload.tasks.map(t => ({ title: t.title, category: t.category })))
+
       const response = await fetch(`/api/missions/${missionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -340,10 +347,13 @@ export default function EditMissionClient() {
         throw new Error(errorData.error || 'Failed to update mission')
       }
 
+      const updatedMission = await response.json()
+      console.log('✅ Mission updated successfully with', updatedMission.tasks?.length || 0, 'tasks')
+      
       toast.success('Mission mise à jour avec succès!')
       router.push('/administration/missions')
     } catch (error: any) {
-      console.error('Failed to update mission:', error)
+      console.error('❌ Failed to update mission:', error)
       toast.error(error.message || 'Erreur lors de la mise à jour')
     } finally {
       setIsLoading(false)
@@ -397,34 +407,90 @@ export default function EditMissionClient() {
     if (!templateId || !mission) return
 
     try {
+      console.log('🔧 Loading tasks from template:', templateId)
+      
       const template = taskTemplates.find(t => t.id === templateId)
-      if (!template) return
-
-      let templateTasks = []
-      if (Array.isArray(template.tasks)) {
-        templateTasks = template.tasks
-      } else if (typeof template.tasks === 'object' && template.tasks !== null) {
-        templateTasks = Object.values(template.tasks)
+      if (!template) {
+        console.warn('❌ Template not found:', templateId)
+        toast.error('Modèle de tâches introuvable')
+        return
       }
 
-      const newTasks: Task[] = templateTasks.map((task: any) => ({
-        id: undefined,
-        title: task.title || task.name || 'Tâche',
-        description: task.description || null,
-        category: task.category || 'GENERAL',
-        type: task.type || 'EXECUTION',
-        status: 'ASSIGNED',
-        estimatedTime: task.estimatedTime || 60,
-        actualTime: null,
-        assignedToId: null,
-        assignedTo: null,
-        notes: null
-      }))
+      console.log('📋 Template found:', template.name, 'with tasks:', template.tasks)
+
+      let templateTasks: any[] = []
+
+      // ROBUST: Handle different task template structures
+      if (!template.tasks) {
+        console.warn('❌ No tasks found in template')
+        toast.error('Aucune tâche trouvée dans le modèle')
+        return
+      }
+
+      if (Array.isArray(template.tasks)) {
+        // Direct array structure
+        templateTasks = template.tasks
+      } else if (typeof template.tasks === 'object' && template.tasks !== null) {
+        // Handle nested structures from database
+        const tasksObj = template.tasks as any
+        
+        console.log('🔍 Analyzing nested task structure:', Object.keys(tasksObj))
+        
+        if (tasksObj.items?.create && Array.isArray(tasksObj.items.create)) {
+          // Structure: { items: { create: [...] } }
+          templateTasks = tasksObj.items.create
+        } else if (tasksObj.items && Array.isArray(tasksObj.items)) {
+          // Structure: { items: [...] }
+          templateTasks = tasksObj.items
+        } else if (tasksObj.create && Array.isArray(tasksObj.create)) {
+          // Structure: { create: [...] }
+          templateTasks = tasksObj.create
+        } else if (Array.isArray(Object.values(tasksObj))) {
+          // Try to extract array values
+          const values = Object.values(tasksObj)
+          if (values.length > 0 && Array.isArray(values[0])) {
+            templateTasks = values[0] as any[]
+          } else {
+            templateTasks = values.filter(v => v && typeof v === 'object' && 'title' in (v as any)) as any[]
+          }
+        } else {
+          console.warn('❌ Unknown task template structure:', tasksObj)
+          toast.error('Structure de modèle non reconnue')
+          return
+        }
+      }
+
+      console.log('✅ Extracted', templateTasks.length, 'tasks from template')
+
+      if (templateTasks.length === 0) {
+        toast.warning('Le modèle sélectionné ne contient aucune tâche')
+        return
+      }
+
+      const newTasks: Task[] = templateTasks.map((task: any, index: number) => {
+        console.log('🔧 Processing task', index + 1, ':', task)
+        
+        return {
+          id: undefined,
+          title: task.title || task.name || `Tâche ${index + 1}`,
+          description: task.description || null,
+          category: (task.category as TaskCategory) || 'GENERAL',
+          type: (task.type as TaskType) || 'EXECUTION',
+          status: 'ASSIGNED',
+          estimatedTime: task.estimatedTime || 60,
+          actualTime: null,
+          assignedToId: null,
+          assignedTo: null,
+          notes: null
+        }
+      })
+
+      console.log('🔧 Created tasks:', newTasks.map(t => ({ title: t.title, category: t.category })))
 
       setMission({ ...mission, tasks: newTasks })
-      toast.success(`${newTasks.length} tâches chargées depuis le modèle`)
+      toast.success(`${newTasks.length} tâches chargées depuis le modèle "${template.name}"`)
     } catch (error) {
-      console.error('Failed to load template tasks:', error)
+      console.error('❌ Failed to load template tasks:', error)
       toast.error('Erreur lors du chargement du modèle')
     }
   }
