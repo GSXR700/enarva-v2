@@ -190,4 +190,171 @@
   .dark *:focus-visible {
     outline-color: hsl(217 91% 60%);
   }
+
+  /* Additional CSS fixes for sidebar mobile dark mode issues */
+/* Add these styles to your app/globals.css file */
+
+@layer components {
+  /* Mobile sidebar specific optimizations */
+  .sidebar-mobile-fix {
+    /* Prevent blur on mobile transforms */
+    -webkit-transform-style: preserve-3d;
+    transform-style: preserve-3d;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    
+    /* Optimize rendering for mobile */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    
+    /* Force hardware acceleration without blur */
+    will-change: transform;
+    transform: translateZ(0);
+    
+    /* Ensure proper pixel alignment */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+
+  /* Dark mode specific sidebar fixes */
+  .dark .sidebar-mobile-fix {
+    /* Prevent text rendering issues in dark mode */
+    color-rendering: optimizeQuality;
+    text-rendering: optimizeLegibility;
+    
+    /* Better contrast for dark mode */
+    -webkit-font-smoothing: subpixel-antialiased;
+    
+    /* Ensure proper layering */
+    isolation: isolate;
+  }
+
+  /* Mobile-specific link fixes */
+  @media (max-width: 768px) {
+    .sidebar-mobile-fix .sidebar-link {
+      /* Ensure proper touch targets */
+      min-height: 44px;
+      touch-action: manipulation;
+      
+      /* Prevent text blur on transform */
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+      
+      /* Better mobile rendering */
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
+    
+    .sidebar-mobile-fix .sidebar-link:active {
+      /* Better mobile feedback */
+      transform: scale(0.98);
+      transition: transform 0.1s ease;
+    }
+  }
+
+  /* Icon and text rendering fixes */
+  .sidebar-icon-fix {
+    /* Prevent icon distortion */
+    flex-shrink: 0;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    
+    /* Better icon rendering */
+    shape-rendering: geometricPrecision;
+  }
+
+  /* Text rendering fixes */
+  .sidebar-text-fix {
+    /* Prevent text blur */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    
+    /* Better text rendering */
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Dark mode icon fixes */
+  .dark .sidebar-icon-fix {
+    /* Better dark mode icon visibility */
+    filter: brightness(1.1);
+  }
+
+  /* Overlay improvements for better interaction */
+  .sidebar-overlay-fix {
+    /* Better backdrop for mobile */
+    backdrop-filter: blur(8px) saturate(180%);
+    -webkit-backdrop-filter: blur(8px) saturate(180%);
+    
+    /* Ensure proper interaction */
+    touch-action: none;
+    pointer-events: auto;
+    
+    /* Smoother animation */
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Logo rendering fixes */
+  .sidebar-logo-fix {
+    /* Prevent logo blur */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    
+    /* Ensure proper scaling */
+    object-fit: contain;
+    object-position: center;
+  }
+
+  /* Scrollbar improvements for dark mode */
+  .dark .custom-scrollbar {
+    /* Better dark mode scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    border: none;
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Performance optimizations for mobile sidebar */
+@media (max-width: 768px) {
+  /* Optimize sidebar container for mobile */
+  .sidebar-container {
+    /* Better performance on mobile */
+    contain: layout style paint;
+    
+    /* Reduce repaints */
+    will-change: transform;
+    
+    /* Better layering */
+    transform: translateZ(0);
+  }
+
+  /* Reduce motion for better performance if needed */
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar-container {
+      transition: none !important;
+    }
+  }
+}
+
 }
