@@ -37,6 +37,7 @@ model User {
   expenses         Expense[]
   fieldReports     FieldReport[]
   readMessages     Message[]       @relation("MessageReadBy")
+  qualityChecksPerformed QualityCheck[] @relation("QualityCheckPerformedBy")
 
   // --- Timestamps ---
   createdAt        DateTime        @default(now())
@@ -369,19 +370,30 @@ model TaskTemplate {
 
 // EXPLANATION: A quality control check performed on a Mission.
 model QualityCheck {
-  id          String           @id @default(cuid())
-  missionId   String
-  mission     Mission          @relation(fields: [missionId], references: [id])
-  type        QualityCheckType
-  status      QualityStatus    @default(PENDING)
-  checkedBy   String?
-  checkedAt   DateTime?
-  notes       String?
-  photos      String[]
-  issues      Json?
-  validatedAt DateTime?
+  id                String           @id @default(cuid())
+  missionId         String
+  mission           Mission          @relation(fields: [missionId], references: [id])
+  type              QualityCheckType
+  status            QualityStatus    @default(PENDING)
+  score             Int?
+  checkedBy         String?
+  checkedByUser     User?            @relation("QualityCheckPerformedBy", fields: [checkedBy], references: [id])
+  checkedAt         DateTime?
+  validatedAt       DateTime?
+  notes             String?          @db.Text
+  photos            String[]
+  issues            Json?
+  corrections       Json?
+  followUpRequired  Boolean          @default(false)
+  followUpDate      DateTime?
+  clientNotified    Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   @@map("quality_checks")
+  @@index([missionId, status])
+  @@index([type, status])
+  @@index([checkedAt])
 }
 
 // EXPLANATION: Represents a physical inventory item (product, equipment).
