@@ -49,12 +49,11 @@
     --input: 0 0% 10%; /* Dark input background */
     --ring: 217 91% 60%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground font-poppins;
     transition: background-color 0.3s ease, color 0.3s ease;
@@ -63,6 +62,35 @@
   /* Ensure smooth transitions for theme changes */
   html {
     transition: background-color 0.3s ease;
+  }
+
+  /* Additional dark mode optimizations */
+  .dark ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .dark ::-webkit-scrollbar-track {
+    background: hsl(0 0% 5%);
+  }
+  
+  .dark ::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 20%);
+    border-radius: 4px;
+  }
+  
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: hsl(0 0% 30%);
+  }
+  
+  /* Selection colors for dark mode */
+  .dark ::selection {
+    background-color: hsl(217 91% 60% / 0.3);
+    color: hsl(0 0% 98%);
+  }
+  
+  /* Focus outline improvements for dark mode */
+  .dark *:focus-visible {
+    outline-color: hsl(217 91% 60%);
   }
 }
 
@@ -120,6 +148,7 @@
     position: relative;
     overflow: hidden;
   }
+
   .animate-shine::after {
     content: '';
     position: absolute;
@@ -153,24 +182,6 @@
     }
   }
   
-  /* Additional dark mode optimizations */
-  .dark ::-webkit-scrollbar {
-    width: 8px;
-  }
-  
-  .dark ::-webkit-scrollbar-track {
-    background: hsl(0 0% 5%);
-  }
-  
-  .dark ::-webkit-scrollbar-thumb {
-    background: hsl(0 0% 20%);
-    border-radius: 4px;
-  }
-  
-  .dark ::-webkit-scrollbar-thumb:hover {
-    background: hsl(0 0% 30%);
-  }
-  
   /* Loading skeleton animations with theme support */
   .skeleton {
     @apply animate-pulse bg-muted rounded;
@@ -179,22 +190,7 @@
   .dark .skeleton {
     background-color: hsl(0 0% 15%);
   }
-  
-  /* Selection colors for dark mode */
-  .dark ::selection {
-    background-color: hsl(217 91% 60% / 0.3);
-    color: hsl(0 0% 98%);
-  }
-  
-  /* Focus outline improvements for dark mode */
-  .dark *:focus-visible {
-    outline-color: hsl(217 91% 60%);
-  }
 
-  /* Additional CSS fixes for sidebar mobile dark mode issues */
-/* Add these styles to your app/globals.css file */
-
-@layer components {
   /* Mobile sidebar specific optimizations */
   .sidebar-mobile-fix {
     /* Prevent blur on mobile transforms */
@@ -227,30 +223,6 @@
     
     /* Ensure proper layering */
     isolation: isolate;
-  }
-
-  /* Mobile-specific link fixes */
-  @media (max-width: 768px) {
-    .sidebar-mobile-fix .sidebar-link {
-      /* Ensure proper touch targets */
-      min-height: 44px;
-      touch-action: manipulation;
-      
-      /* Prevent text blur on transform */
-      -webkit-backface-visibility: hidden;
-      backface-visibility: hidden;
-      
-      /* Better mobile rendering */
-      -webkit-tap-highlight-color: transparent;
-      -webkit-touch-callout: none;
-      user-select: none;
-    }
-    
-    .sidebar-mobile-fix .sidebar-link:active {
-      /* Better mobile feedback */
-      transform: scale(0.98);
-      transition: transform 0.1s ease;
-    }
   }
 
   /* Icon and text rendering fixes */
@@ -309,7 +281,7 @@
     object-position: center;
   }
 
-  /* Scrollbar improvements for dark mode */
+  /* Better dark mode custom scrollbar */
   .dark .custom-scrollbar {
     /* Better dark mode scrollbar */
     scrollbar-width: thin;
@@ -337,6 +309,28 @@
 
 /* Performance optimizations for mobile sidebar */
 @media (max-width: 768px) {
+  /* Mobile-specific link fixes */
+  .sidebar-mobile-fix .sidebar-link {
+    /* Ensure proper touch targets */
+    min-height: 44px;
+    touch-action: manipulation;
+    
+    /* Prevent text blur on transform */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    
+    /* Better mobile rendering */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+  
+  .sidebar-mobile-fix .sidebar-link:active {
+    /* Better mobile feedback */
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+
   /* Optimize sidebar container for mobile */
   .sidebar-container {
     /* Better performance on mobile */
@@ -355,6 +349,4 @@
       transition: none !important;
     }
   }
-}
-
 }
