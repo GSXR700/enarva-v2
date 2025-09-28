@@ -1,3 +1,4 @@
+// components/layout/Sidebar.tsx - UPDATED WITH QUALITY CHECKS
 'use client'
 
 import Link from 'next/link'
@@ -21,7 +22,8 @@ import {
   Activity,
   AlertTriangle,
   FileBarChart,
-  CalendarDays
+  CalendarDays,
+  UserCheck
 } from 'lucide-react'
 import { Dispatch, SetStateAction } from 'react'
 
@@ -57,6 +59,16 @@ const navigation = [
     icon: Users,
   },
   {
+    name: 'Contrôles Qualité',
+    href: '/quality-checks',
+    icon: ClipboardCheck,
+  },
+  {
+    name: 'Validation Missions',
+    href: '/missions/validation',
+    icon: UserCheck,
+  },
+  {
     name: 'Facturation',
     href: '/billing',
     icon: DollarSign,
@@ -85,11 +97,6 @@ const navigation = [
     name: 'Rapports Terrain',
     href: '/field-reports',
     icon: FileBarChart,
-  },
-  {
-    name: 'Contrôles Qualité',
-    href: '/quality-checks',
-    icon: ClipboardCheck,
   },
   {
     name: 'Messages',
@@ -196,7 +203,7 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
           <div className="space-y-1">
             {navigation.map((item) => {
-              const isActive = pathname === item.href
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               
               return (
                 <Link
