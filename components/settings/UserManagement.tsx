@@ -1,4 +1,3 @@
-// components/settings/UserManagement.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -8,11 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Plus, Edit, Trash2, Users, Loader2, Save, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
-import { UserRole } from '@prisma/client'
-import { toast } from 'sonner'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Plus, Edit, Trash2, Users, Loader2, Save, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { UserRole, TeamSpecialty, ExperienceLevel, TeamAvailability } from '@prisma/client'
+import { toast } from 'sonner'
 import { useDebounce } from '@/hooks/use-debounce'
 
 type User = {
@@ -24,6 +24,11 @@ type User = {
   createdAt: string
   lastSeen: string | null
   onlineStatus: string
+  specialties: TeamSpecialty[]
+  experience: ExperienceLevel
+  availability: TeamAvailability
+  hourlyRate: number | null
+  currentTeam: { id: string; name: string } | null
 }
 
 const roleLabels: { [key in UserRole]: string } = {
@@ -35,11 +40,43 @@ const roleLabels: { [key in UserRole]: string } = {
 }
 
 const roleColors: { [key in UserRole]: string } = {
-  ADMIN: 'bg-red-100 text-red-800',
-  MANAGER: 'bg-purple-100 text-purple-800',
-  AGENT: 'bg-blue-100 text-blue-800',
-  TEAM_LEADER: 'bg-orange-100 text-orange-800',
-  TECHNICIAN: 'bg-green-100 text-green-800'
+  ADMIN: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  MANAGER: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+  AGENT: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  TEAM_LEADER: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  TECHNICIAN: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+}
+
+const specialtyLabels: { [key in TeamSpecialty]: string } = {
+  GENERAL_CLEANING: 'Nettoyage général',
+  WINDOW_SPECIALIST: 'Spécialiste vitres',
+  FLOOR_SPECIALIST: 'Spécialiste sols',
+  LUXURY_SURFACES: 'Surfaces de luxe',
+  EQUIPMENT_HANDLING: 'Manipulation équipement',
+  TEAM_MANAGEMENT: 'Gestion équipe',
+  QUALITY_CONTROL: 'Contrôle qualité',
+  DETAIL_FINISHING: 'Finitions détaillées'
+}
+
+const experienceLabels: { [key in ExperienceLevel]: string } = {
+  JUNIOR: 'Junior',
+  INTERMEDIATE: 'Intermédiaire',
+  SENIOR: 'Senior',
+  EXPERT: 'Expert'
+}
+
+const experienceColors: { [key in ExperienceLevel]: string } = {
+  JUNIOR: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+  INTERMEDIATE: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  SENIOR: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  EXPERT: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
+}
+
+const availabilityLabels: { [key in TeamAvailability]: string } = {
+  AVAILABLE: 'Disponible',
+  BUSY: 'Occupé',
+  OFF_DUTY: 'En repos',
+  VACATION: 'En congé'
 }
 
 const initialFormState = {
@@ -47,7 +84,11 @@ const initialFormState = {
   name: '',
   email: '',
   password: '',
-  role: 'TECHNICIAN' as UserRole
+  role: 'TECHNICIAN' as UserRole,
+  specialties: [] as TeamSpecialty[],
+  experience: 'JUNIOR' as ExperienceLevel,
+  availability: 'AVAILABLE' as TeamAvailability,
+  hourlyRate: null as number | null
 }
 
 export function UserManagement() {
@@ -58,7 +99,7 @@ export function UserManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [page, setPage] = useState(1)
-  const [limit] = useState(10) // Fixed: Remove setLimit since it's not used
+  const [limit] = useState(10)
   const [totalPages, setTotalPages] = useState(1)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 500)
@@ -74,26 +115,12 @@ export function UserManagement() {
       if (!response.ok) throw new Error('Impossible de charger les utilisateurs')
       
       const data = await response.json()
-      console.log('API Response:', data) // Debug log
-      
-      // FIX: Handle both response formats
-      // API returns users directly as array, not wrapped in {users: []}
-      const usersList = Array.isArray(data) ? data : (data.users || [])
-      
-      setUsers(usersList)
-      
-      // Handle pagination headers
-      const totalPagesHeader = response.headers.get('X-Total-Pages')
-      if (totalPagesHeader) {
-        setTotalPages(parseInt(totalPagesHeader))
-      } else if (data.totalPages) {
-        setTotalPages(data.totalPages)
-      }
-      
+      setUsers(data.users || [])
+      setTotalPages(data.totalPages || 1)
     } catch (error: any) {
       console.error('Failed to fetch users:', error)
       toast.error(error.message)
-      setUsers([]) // Ensure users is an array on error
+      setUsers([])
     } finally {
       setIsLoading(false)
     }
@@ -110,7 +137,11 @@ export function UserManagement() {
       const body: any = {
         name: formState.name,
         email: formState.email,
-        role: formState.role
+        role: formState.role,
+        specialties: formState.specialties,
+        experience: formState.experience,
+        availability: formState.availability,
+        hourlyRate: formState.hourlyRate
       }
 
       if (!isEditing && formState.password) {
@@ -125,7 +156,7 @@ export function UserManagement() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || `Impossible de ${isEditing ? 'mettre à jour' : 'créer'} l'utilisateur`)
+        throw new Error(errorData.error || `Impossible de ${isEditing ? 'mettre à jour' : 'créer'} l'utilisateur`)
       }
 
       toast.success(`Utilisateur ${isEditing ? 'mis à jour' : 'créé'} avec succès !`)
@@ -145,7 +176,11 @@ export function UserManagement() {
       name: user.name || '',
       email: user.email || '',
       password: '',
-      role: user.role
+      role: user.role,
+      specialties: user.specialties || [],
+      experience: user.experience || 'JUNIOR',
+      availability: user.availability || 'AVAILABLE',
+      hourlyRate: user.hourlyRate
     })
     setIsEditing(true)
     setIsDialogOpen(true)
@@ -159,7 +194,7 @@ export function UserManagement() {
       const response = await fetch(`/api/users/${userId}`, { method: 'DELETE' })
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Impossible de supprimer l\'utilisateur');
+        throw new Error(errorData.error || 'Impossible de supprimer l\'utilisateur');
       }
       toast.success('Utilisateur supprimé avec succès !')
       await fetchUsers()
@@ -173,52 +208,48 @@ export function UserManagement() {
     setIsEditing(false)
   }
 
-  const openCreateDialog = () => {
-    resetForm()
-    setIsDialogOpen(true)
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ONLINE': return 'bg-green-100 text-green-800'
-      case 'AWAY': return 'bg-yellow-100 text-yellow-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
+  const handleSpecialtyChange = (specialty: TeamSpecialty, checked: boolean) => {
+    setFormState(prev => ({
+      ...prev,
+      specialties: checked 
+        ? [...prev.specialties, specialty]
+        : prev.specialties.filter(s => s !== specialty)
+    }))
   }
 
   return (
-    <div className="space-y-6">
-      <Card className="thread-card">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-enarva-start" />
-                Gestion des Utilisateurs
-              </CardTitle>
-              <CardDescription>
-                Gérez les comptes utilisateurs et leurs permissions dans l'organisation.
-              </CardDescription>
-            </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={openCreateDialog} className="bg-enarva-gradient">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Ajouter un utilisateur
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle>
-                    {isEditing ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'}
-                  </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Gestion des utilisateurs
+            </CardTitle>
+            <CardDescription>
+              Gérez les utilisateurs, leurs rôles, spécialités et expérience
+            </CardDescription>
+          </div>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm} className="bg-enarva-gradient">
+                <Plus className="w-4 h-4 mr-2" />
+                Nouvel utilisateur
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>
+                  {isEditing ? 'Modifier l\'utilisateur' : 'Créer un nouvel utilisateur'}
+                </DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="user-name">Nom complet</Label>
+                    <Label htmlFor="user-name">Nom complet *</Label>
                     <Input
                       id="user-name"
-                      placeholder="Ex: Jean Dupont"
+                      placeholder="Jean Dupont"
                       value={formState.name}
                       onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))}
                       required
@@ -226,33 +257,35 @@ export function UserManagement() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="user-email">Email</Label>
+                    <Label htmlFor="user-email">Email *</Label>
                     <Input
                       id="user-email"
                       type="email"
-                      placeholder="jean.dupont@enarva.com"
+                      placeholder="jean.dupont@example.com"
                       value={formState.email}
                       onChange={(e) => setFormState(prev => ({ ...prev, email: e.target.value }))}
                       required
                     />
                   </div>
+                </div>
 
-                  {!isEditing && (
-                    <div className="space-y-2">
-                      <Label htmlFor="user-password">Mot de passe temporaire</Label>
-                      <Input
-                        id="user-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={formState.password}
-                        onChange={(e) => setFormState(prev => ({ ...prev, password: e.target.value }))}
-                        required={!isEditing}
-                      />
-                    </div>
-                  )}
-
+                {!isEditing && (
                   <div className="space-y-2">
-                    <Label htmlFor="user-role">Rôle</Label>
+                    <Label htmlFor="user-password">Mot de passe temporaire *</Label>
+                    <Input
+                      id="user-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={formState.password}
+                      onChange={(e) => setFormState(prev => ({ ...prev, password: e.target.value }))}
+                      required={!isEditing}
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="user-role">Rôle *</Label>
                     <Select
                       value={formState.role}
                       onValueChange={(value) => setFormState(prev => ({ ...prev, role: value as UserRole }))}
@@ -263,151 +296,261 @@ export function UserManagement() {
                       <SelectContent>
                         {Object.entries(roleLabels).map(([key, label]) => (
                           <SelectItem key={key} value={key}>
-                            <div className={`inline-block w-3 h-3 mr-2 rounded-full ${roleColors[key as UserRole]}`}></div>
                             {label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex justify-end space-x-2 pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsDialogOpen(false)}
-                      disabled={isSaving}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="user-experience">Expérience</Label>
+                    <Select
+                      value={formState.experience}
+                      onValueChange={(value) => setFormState(prev => ({ ...prev, experience: value as ExperienceLevel }))}
                     >
-                      Annuler
-                    </Button>
-                    <Button type="submit" className="bg-enarva-gradient" disabled={isSaving}>
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Sauvegarde...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4 mr-2" />
-                          {isEditing ? 'Mettre à jour' : 'Créer'}
-                        </>
-                      )}
-                    </Button>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(experienceLabels).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </form>
-              </DialogContent>
-            </Dialog>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="user-availability">Disponibilité</Label>
+                    <Select
+                      value={formState.availability}
+                      onValueChange={(value) => setFormState(prev => ({ ...prev, availability: value as TeamAvailability }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(availabilityLabels).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="user-hourly-rate">Taux horaire (€)</Label>
+                  <Input
+                    id="user-hourly-rate"
+                    type="number"
+                    placeholder="25"
+                    value={formState.hourlyRate || ''}
+                    onChange={(e) => setFormState(prev => ({ 
+                      ...prev, 
+                      hourlyRate: e.target.value ? parseFloat(e.target.value) : null 
+                    }))}
+                    min="0"
+                    max="1000"
+                    step="0.01"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Spécialités</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {Object.entries(specialtyLabels).map(([key, label]) => (
+                      <div key={key} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`specialty-${key}`}
+                          checked={formState.specialties.includes(key as TeamSpecialty)}
+                          onCheckedChange={(checked) => 
+                            handleSpecialtyChange(key as TeamSpecialty, checked as boolean)
+                          }
+                        />
+                        <Label htmlFor={`specialty-${key}`} className="text-sm font-normal">
+                          {label}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsDialogOpen(false)}
+                    disabled={isSaving}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit" className="bg-enarva-gradient" disabled={isSaving}>
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Sauvegarde...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        {isEditing ? 'Mettre à jour' : 'Créer'}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+
+      <CardContent>
+        <div className="flex items-center space-x-2 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Rechercher par nom ou email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex items-center space-x-2">
-            <div className="relative flex-grow">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Rechercher par nom ou email..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
           </div>
-          {isLoading ? (
-            <div className="flex justify-center py-10">
-              <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
-            </div>
-          ) : users.length === 0 ? (
-            <p className="text-center text-gray-500">Aucun utilisateur trouvé.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full table-auto border-collapse">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-2 text-left">Utilisateur</th>
-                    <th className="px-4 py-2 text-left">Rôle</th>
-                    <th className="px-4 py-2 text-left">Statut</th>
-                    <th className="px-4 py-2 text-left">Dernière connexion</th>
-                    <th className="px-4 py-2 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map(user => (
-                    <tr key={user.id} className="border-t hover:bg-gray-50">
-                      <td className="px-4 py-3 flex items-center space-x-3">
-                        <Avatar className="w-10 h-10">
-                          {user.image ? (
-                            <AvatarImage src={user.image} alt={user.name || 'Avatar'} />
-                          ) : (
-                            <AvatarFallback>{user.name ? user.name.charAt(0) : user.email?.charAt(0)}</AvatarFallback>
-                          )}
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{user.name || 'N/A'}</p>
-                          <p className="text-sm text-gray-500">{user.email || 'N/A'}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge className={`px-2 py-1 ${roleColors[user.role]}`}>
-                          {roleLabels[user.role]}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge className={`px-2 py-1 ${getStatusBadge(user.onlineStatus)}`}>
-                          {user.onlineStatus === 'ONLINE' ? 'En ligne' : user.onlineStatus === 'AWAY' ? 'Absent' : 'Hors ligne'}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        {user.lastSeen ? new Date(user.lastSeen).toLocaleString() : 'Jamais connecté'}
-                      </td>
-                      <td className="px-4 py-3 text-right space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(user)}
-                          title="Modifier l'utilisateur"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(user.id)}
-                          title="Supprimer l'utilisateur"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </td>
+        ) : (
+          <>
+            <div className="rounded-md border">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-4 font-medium">Utilisateur</th>
+                      <th className="text-left p-4 font-medium">Rôle</th>
+                      <th className="text-left p-4 font-medium">Expérience</th>
+                      <th className="text-left p-4 font-medium">Spécialités</th>
+                      <th className="text-left p-4 font-medium">Équipe</th>
+                      <th className="text-left p-4 font-medium">Taux/h</th>
+                      <th className="text-right p-4 font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="mt-4 flex items-center justify-between">
-                <p className="text-sm text-gray-600">
+                  </thead>
+                  <tbody>
+                    {users.map((user) => (
+                      <tr key={user.id} className="border-b hover:bg-muted/50">
+                        <td className="p-4">
+                          <div className="flex items-center space-x-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={user.image || ''} alt={user.name || ''} />
+                              <AvatarFallback>
+                                {user.name?.slice(0, 2).toUpperCase() || 'U'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium">{user.name}</div>
+                              <div className="text-sm text-muted-foreground">{user.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <Badge className={roleColors[user.role]}>
+                            {roleLabels[user.role]}
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          <Badge className={experienceColors[user.experience]}>
+                            {experienceLabels[user.experience]}
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex flex-wrap gap-1">
+                            {user.specialties?.slice(0, 2).map((specialty) => (
+                              <Badge key={specialty} variant="outline" className="text-xs">
+                                {specialtyLabels[specialty]}
+                              </Badge>
+                            ))}
+                            {user.specialties?.length > 2 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{user.specialties.length - 2}
+                              </Badge>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          {user.currentTeam ? (
+                            <span className="text-sm">{user.currentTeam.name}</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Aucune équipe</span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          {user.hourlyRate ? (
+                            <span className="text-sm font-medium">{user.hourlyRate}€</span>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex justify-end space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(user)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(user.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-2 py-4">
+                <div className="text-sm text-muted-foreground">
                   Page {page} sur {totalPages}
-                </p>
-                <div className="space-x-2">
+                </div>
+                <div className="flex items-center space-x-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setPage(1)}
                     disabled={page === 1}
                   >
-                    <ChevronsLeft className="w-4 h-4" />
+                    <ChevronsLeft className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                    onClick={() => setPage(page - 1)}
                     disabled={page === 1}
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                    onClick={() => setPage(page + 1)}
                     disabled={page === totalPages}
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="outline"
@@ -415,14 +558,14 @@ export function UserManagement() {
                     onClick={() => setPage(totalPages)}
                     disabled={page === totalPages}
                   >
-                    <ChevronsRight className="w-4 h-4" />
+                    <ChevronsRight className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }

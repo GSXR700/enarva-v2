@@ -1,121 +1,134 @@
-// app/api/users/route.ts - VERSION CORRIGÉE
-import { NextResponse } from 'next/server'
-import { PrismaClient, UserRole, Prisma } from '@prisma/client'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { ExtendedUser } from '@/types/next-auth'
+import { z } from 'zod'
+import { UserRole, TeamSpecialty, ExperienceLevel, TeamAvailability } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
+import { Decimal } from '@prisma/client/runtime/library'
 
-const prisma = new PrismaClient()
+// Enhanced user schema with experience and speciality fields
+const userCreateSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional(),
+  role: z.nativeEnum(UserRole),
+  specialties: z.array(z.nativeEnum(TeamSpecialty)).default([]),
+  experience: z.nativeEnum(ExperienceLevel).default(ExperienceLevel.JUNIOR),
+  availability: z.nativeEnum(TeamAvailability).default(TeamAvailability.AVAILABLE),
+  hourlyRate: z.number().min(0).max(1000).optional().nullable().transform(val => val ?? null),
+})
 
-// GET /api/users - Get all users with pagination and search
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user as ExtendedUser).role !== 'ADMIN') {
+    if (!session?.user) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1', 10)
-    const limit = parseInt(searchParams.get('limit') || '20', 10)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 50)
     const search = searchParams.get('search') || ''
-    const role = searchParams.get('role') // Filter by specific role
+    const role = searchParams.get('role') as UserRole | null
+    const skip = (page - 1) * limit
 
-    // Build where clause for filtering
-    const where: Prisma.UserWhereInput = {}
+    const whereClause: any = {}
 
-    // Add search condition
     if (search) {
-      where.OR = [
+      whereClause.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } }
       ]
     }
 
-    // Add role filter
-    if (role && role !== 'all') {
-      if (role === 'TEAM_LEADER') {
-        where.role = 'TEAM_LEADER'
-      } else if (Object.values(UserRole).includes(role as UserRole)) {
-        where.role = role as UserRole
-      }
+    if (role) {
+      whereClause.role = role
     }
 
-    // Get total count for pagination
-    const totalCount = await prisma.user.count({ where })
-
-    // Get users with pagination
-    const users = await prisma.user.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        image: true,
-        onlineStatus: true,
-        lastSeen: true,
-        createdAt: true,
-        teamMemberships: {
-          include: {
-            team: true
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          image: true,
+          onlineStatus: true,
+          lastSeen: true,
+          createdAt: true,
+          teamMemberships: {
+            where: { isActive: true },
+            select: {
+              specialties: true,
+              experience: true,
+              availability: true,
+              hourlyRate: true,
+              team: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
           }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      skip: (page - 1) * limit,
-      take: limit
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.user.count({ where: whereClause })
+    ])
+
+    const enhancedUsers = users.map((user: any) => ({
+      ...user,
+      specialties: user.teamMemberships[0]?.specialties || [],
+      experience: user.teamMemberships[0]?.experience || 'JUNIOR',
+      availability: user.teamMemberships[0]?.availability || 'AVAILABLE',
+      hourlyRate: user.teamMemberships[0]?.hourlyRate || null,
+      currentTeam: user.teamMemberships[0]?.team || null
+    }))
+
+    return NextResponse.json({
+      users: enhancedUsers,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
     })
-
-    console.log(`Fetched ${users.length} users for role filter: ${role}`)
-
-    // Always return users as array, not wrapped in data object
-    return NextResponse.json(users, {
-      headers: {
-        'X-Total-Count': totalCount.toString(),
-        'X-Page': page.toString(),
-        'X-Per-Page': limit.toString(),
-        'X-Total-Pages': Math.ceil(totalCount / limit).toString()
-      }
-    })
-
   } catch (error) {
     console.error('Failed to fetch users:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return new NextResponse('Internal Server Error', { status: 500 })
   }
 }
 
-// POST /api/users - Create a new user
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || (session.user as ExtendedUser).role !== 'ADMIN') {
+    if (!session?.user) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
 
+    const user = session.user as any
+    if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+      return new NextResponse('Forbidden', { status: 403 })
+    }
+
     const body = await request.json()
-    const { name, email, password, role, teamId } = body
-
-    // Validate required fields
-    if (!name || !email || !password || !role) {
+    const validationResult = userCreateSchema.safeParse(body)
+    
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: 'Missing required fields: name, email, password, role' },
+        { error: 'Validation failed', details: validationResult.error.errors },
         { status: 400 }
       )
     }
 
-    // Validate role
-    if (!Object.values(UserRole).includes(role)) {
-      return NextResponse.json(
-        { error: 'Invalid role provided' },
-        { status: 400 }
-      )
-    }
+    const { name, email, password, role, specialties, experience, availability, hourlyRate } = validationResult.data
 
-    // Check if user already exists
+    // Check if user with email already exists
     const existingUser = await prisma.user.findUnique({
       where: { email }
     })
@@ -127,17 +140,20 @@ export async function POST(request: Request) {
       )
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12)
+    // Hash password if provided
+    let hashedPassword = null
+    if (password) {
+      hashedPassword = await bcrypt.hash(password, 12)
+    }
 
-    // Create user and optionally assign to a team within a transaction
-    const newUser = await prisma.$transaction(async (tx) => {
+    // Create user with transaction to handle team membership
+    const newUser = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const createdUser = await tx.user.create({
         data: {
           name,
           email,
           hashedPassword,
-          role: role as UserRole,
+          role,
           onlineStatus: 'OFFLINE'
         },
         select: {
@@ -149,26 +165,49 @@ export async function POST(request: Request) {
           onlineStatus: true,
           createdAt: true
         }
-      });
+      })
 
-      if (teamId) {
+      // If user has specialties or experience, try to find or create a default team
+      if (specialties.length > 0 || experience !== 'JUNIOR' || hourlyRate) {
+        const defaultTeam = await tx.team.findFirst({
+          where: { name: 'Default Team' }
+        })
+
+        let teamId = defaultTeam?.id
+
+        if (!teamId) {
+          const createdTeam = await tx.team.create({
+            data: {
+              name: 'Default Team',
+              description: 'Default team for users with specialties'
+            }
+          })
+          teamId = createdTeam.id
+        }
+
+        // Create proper team member data with correct typing
+        const teamMemberData: Prisma.TeamMemberUncheckedCreateInput = {
+          userId: createdUser.id,
+          teamId,
+          specialties,
+          experience,
+          availability,
+          hourlyRate: hourlyRate ? new Decimal(hourlyRate) : null,
+          isActive: true,
+          joinedAt: new Date()
+        }
+
         await tx.teamMember.create({
-          data: {
-            userId: createdUser.id,
-            teamId: teamId
-          }
-        });
+          data: teamMemberData
+        })
       }
 
-      return createdUser;
-    });
-
-    console.log(`Created new user: ${newUser.email} with role: ${newUser.role}`)
+      return createdUser
+    })
 
     return NextResponse.json(newUser, { status: 201 })
-
   } catch (error) {
     console.error('Failed to create user:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return new NextResponse('Internal Server Error', { status: 500 })
   }
 }

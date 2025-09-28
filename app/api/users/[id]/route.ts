@@ -1,60 +1,35 @@
-// app/api/users/[id]/route.ts
-import { NextResponse } from 'next/server'
-import { PrismaClient, UserRole } from '@prisma/client'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { ExtendedUser } from '@/types/next-auth';
+import { prisma } from '@/lib/prisma'
+import { z } from 'zod'
+import { UserRole, TeamSpecialty, ExperienceLevel, TeamAvailability } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 
-const prisma = new PrismaClient()
+const userUpdateSchema = z.object({
+  name: z.string().min(1, 'Name is required').optional(),
+  email: z.string().email('Invalid email format').optional(),
+  role: z.nativeEnum(UserRole).optional(),
+  specialties: z.array(z.nativeEnum(TeamSpecialty)).optional(),
+  experience: z.nativeEnum(ExperienceLevel).optional(),
+  availability: z.nativeEnum(TeamAvailability).optional(),
+  hourlyRate: z.number().min(0).max(1000).optional().nullable(),
+})
 
-// PUT /api/users/[id] - Update a user
-export async function PUT(
-  request: Request,
+export async function GET(
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    const loggedInUser = session?.user as ExtendedUser;
-    
-    if (!loggedInUser || loggedInUser.role !== 'ADMIN') {
-      return new NextResponse('Unauthorized', { status: 401 });
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     const { id } = await params
-    const body = await request.json()
-    const { name, email, role } = body
 
-    if (!name || !email || !role) {
-      return NextResponse.json(
-        { message: 'Nom, email et rôle sont requis' }, 
-        { status: 400 }
-      )
-    }
-
-    // Check if email is already taken by another user
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        email,
-        NOT: { id }
-      }
-    })
-
-    if (existingUser) {
-      return NextResponse.json(
-        { message: 'Cet email est déjà utilisé par un autre utilisateur' }, 
-        { status: 400 }
-      )
-    }
-
-    // Update user
-    const updatedUser = await prisma.user.update({
+    const user = await prisma.user.findUnique({
       where: { id },
-      data: {
-        name,
-        email,
-        role: role as UserRole,
-        updatedAt: new Date()
-      },
       select: {
         id: true,
         name: true,
@@ -64,98 +39,224 @@ export async function PUT(
         onlineStatus: true,
         lastSeen: true,
         createdAt: true,
-        updatedAt: true
+        teamMemberships: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            specialties: true,
+            experience: true,
+            availability: true,
+            hourlyRate: true,
+            joinedAt: true,
+            team: {
+              select: {
+                id: true,
+                name: true,
+                description: true
+              }
+            }
+          }
+        }
       }
     })
 
-    return NextResponse.json(updatedUser)
-  } catch (error: any) {
-    console.error('Failed to update user:', error)
-    
-    if (error?.code === 'P2025') {
-      return NextResponse.json(
-        { message: 'Utilisateur non trouvé' }, 
-        { status: 404 }
-      )
+    if (!user) {
+      return new NextResponse('User not found', { status: 404 })
     }
 
+    const enhancedUser = {
+      ...user,
+      specialties: user.teamMemberships[0]?.specialties || [],
+      experience: user.teamMemberships[0]?.experience || 'JUNIOR',
+      availability: user.teamMemberships[0]?.availability || 'AVAILABLE',
+      hourlyRate: user.teamMemberships[0]?.hourlyRate || null,
+      currentTeam: user.teamMemberships[0]?.team || null,
+      teamMembershipId: user.teamMemberships[0]?.id || null
+    }
+
+    return NextResponse.json(enhancedUser)
+  } catch (error) {
+    console.error('Failed to fetch user:', error)
     return new NextResponse('Internal Server Error', { status: 500 })
   }
 }
 
-// DELETE /api/users/[id] - Delete a user
-export async function DELETE(
-  _request: Request,
+export async function PUT(
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    const loggedInUser = session?.user as ExtendedUser;
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 })
+    }
+
+    const user = session.user as any
+    if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+      return new NextResponse('Forbidden', { status: 403 })
+    }
+
+    const { id } = await params
+    const body = await request.json()
     
-    if (!loggedInUser || loggedInUser.role !== 'ADMIN') {
-      return new NextResponse('Unauthorized', { status: 401 });
+    const validationResult = userUpdateSchema.safeParse(body)
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validationResult.error.errors },
+        { status: 400 }
+      )
+    }
+
+    const { name, email, role, specialties, experience, availability, hourlyRate } = validationResult.data
+
+    // Check if user exists
+    const existingUser = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        teamMemberships: {
+          where: { isActive: true }
+        }
+      }
+    })
+
+    if (!existingUser) {
+      return new NextResponse('User not found', { status: 404 })
+    }
+
+    // Check if email is taken by another user
+    if (email && email !== existingUser.email) {
+      const emailTaken = await prisma.user.findUnique({
+        where: { email }
+      })
+      if (emailTaken) {
+        return NextResponse.json(
+          { error: 'Email already taken by another user' },
+          { status: 409 }
+        )
+      }
+    }
+
+    const updatedUser = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Update user basic info
+      const userUpdate: any = {}
+      if (name !== undefined) userUpdate.name = name
+      if (email !== undefined) userUpdate.email = email
+      if (role !== undefined) userUpdate.role = role
+
+      const updated = await tx.user.update({
+        where: { id },
+        data: userUpdate,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          image: true,
+          onlineStatus: true,
+          createdAt: true
+        }
+      })
+
+      // Update team membership if specialties/experience provided
+      if (specialties !== undefined || experience !== undefined || availability !== undefined || hourlyRate !== undefined) {
+        const currentMembership = existingUser.teamMemberships[0]
+
+        if (currentMembership) {
+          // Update existing membership
+          const membershipUpdate: any = {}
+          if (specialties !== undefined) membershipUpdate.specialties = specialties
+          if (experience !== undefined) membershipUpdate.experience = experience
+          if (availability !== undefined) membershipUpdate.availability = availability
+          if (hourlyRate !== undefined) membershipUpdate.hourlyRate = hourlyRate
+
+          await tx.teamMember.update({
+            where: { id: currentMembership.id },
+            data: membershipUpdate
+          })
+        } else if (specialties && specialties.length > 0) {
+          // Create new membership if user has specialties but no team
+          const defaultTeam = await tx.team.findFirst({
+            where: { name: 'Default Team' }
+          })
+
+          let teamId = defaultTeam?.id
+
+          if (!teamId) {
+            const createdTeam = await tx.team.create({
+              data: {
+                name: 'Default Team',
+                description: 'Default team for users with specialties'
+              }
+            })
+            teamId = createdTeam.id
+          }
+
+          await tx.teamMember.create({
+            data: {
+              userId: id,
+              teamId,
+              specialties: specialties || [],
+              experience: experience || 'JUNIOR',
+              availability: availability || 'AVAILABLE',
+              hourlyRate: hourlyRate || null,
+              isActive: true,
+              joinedAt: new Date()
+            }
+          })
+        }
+      }
+
+      return updated
+    })
+
+    return NextResponse.json(updatedUser)
+  } catch (error) {
+    console.error('Failed to update user:', error)
+    return new NextResponse('Internal Server Error', { status: 500 })
+  }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 })
+    }
+
+    const user = session.user as any
+    if (user.role !== 'ADMIN') {
+      return new NextResponse('Forbidden', { status: 403 })
     }
 
     const { id } = await params
 
-    // Prevent admin from deleting themselves
-    if (loggedInUser.id === id) {
-      return NextResponse.json(
-        { message: 'Vous ne pouvez pas supprimer votre propre compte' }, 
-        { status: 400 }
-      )
-    }
-
-    // Check if user exists and get their details
-    const userToDelete = await prisma.user.findUnique({
-      where: { id },
-      include: {
-        leadsAssigned: true,
-        missionsLed: true,
-        activities: true,
-        expenses: true
-      }
+    // Check if user exists
+    const existingUser = await prisma.user.findUnique({
+      where: { id }
     })
 
-    if (!userToDelete) {
-      return NextResponse.json(
-        { message: 'Utilisateur non trouvé' }, 
-        { status: 404 }
-      )
+    if (!existingUser) {
+      return new NextResponse('User not found', { status: 404 })
     }
 
-    // Check if user has associated data that would prevent deletion
-    const hasAssociatedData = 
-      userToDelete.leadsAssigned.length > 0 || 
-      userToDelete.missionsLed.length > 0 || 
-      userToDelete.activities.length > 0 || 
-      userToDelete.expenses.length > 0
-
-    if (hasAssociatedData) {
+    // Prevent self-deletion
+    if (id === user.id) {
       return NextResponse.json(
-        { 
-          message: 'Impossible de supprimer cet utilisateur car il a des données associées (leads, missions, activités ou dépenses)' 
-        }, 
+        { error: 'Cannot delete your own account' },
         { status: 400 }
       )
     }
 
-    // Delete the user
     await prisma.user.delete({
       where: { id }
     })
 
     return new NextResponse(null, { status: 204 })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Failed to delete user:', error)
-    
-    if (error?.code === 'P2025') {
-      return NextResponse.json(
-        { message: 'Utilisateur non trouvé' }, 
-        { status: 404 }
-      )
-    }
-
     return new NextResponse('Internal Server Error', { status: 500 })
   }
 }
