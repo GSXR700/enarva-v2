@@ -697,14 +697,14 @@ export default function EditMissionClient() {
                       <div>
                         <Label htmlFor="teamLeaderId">Chef d'équipe</Label>
                         <Select
-                          value={mission.teamLeaderId || ''}
-                          onValueChange={(value) => setMission({ ...mission, teamLeaderId: value || null })}
+                          value={mission.teamLeaderId || "none"}
+                          onValueChange={(value) => setMission({ ...mission, teamLeaderId: value === "none" ? null : value })}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Sélectionner un chef d'équipe" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Aucun chef d'équipe</SelectItem>
+                            <SelectItem value="none">Aucun chef d'équipe</SelectItem>
                             {teamLeaders.map((leader) => (
                               <SelectItem key={leader.id} value={leader.id}>
                                 {leader.name}
@@ -717,14 +717,14 @@ export default function EditMissionClient() {
                       <div>
                         <Label htmlFor="teamId">Équipe assignée</Label>
                         <Select
-                          value={mission.teamId || ''}
-                          onValueChange={(value) => setMission({ ...mission, teamId: value || null })}
+                          value={mission.teamId || "none"}
+                          onValueChange={(value) => setMission({ ...mission, teamId: value === "none" ? null : value })}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Sélectionner une équipe" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Aucune équipe</SelectItem>
+                            <SelectItem value="none">Aucune équipe</SelectItem>
                             {teams.map((team) => (
                               <SelectItem key={team.id} value={team.id}>
                                 {team.name} ({team.members.length} membres)
@@ -782,8 +782,7 @@ export default function EditMissionClient() {
                         value={mission.accessNotes || ''}
                         onChange={(e) => setMission({ ...mission, accessNotes: e.target.value || null })}
                         placeholder="Instructions spéciales pour accéder au site..."
-                        rows={3}
-                      />
+                        rows={3}/>
                     </div>
 
                     <div>
