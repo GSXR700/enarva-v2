@@ -137,19 +137,15 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
 
       <div
         className={cn(
-          // Base styles with explicit flex display for all screen sizes
+          // Base styles for mobile - always fixed positioned
           'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border',
-          // Desktop: always visible and positioned relative
-          'md:relative md:flex md:translate-x-0',
-          // Mobile: transform based on isOpen state
-          'transition-transform duration-300 ease-in-out',
-          'flex flex-col', // Always flex
-          // Mobile transform with hardware acceleration and subpixel fix
-          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-          // Dark mode specific fixes
-          'dark:bg-card dark:border-border',
-          // Apply our custom CSS fixes
-          'sidebar-mobile-fix sidebar-container'
+          'flex flex-col transition-transform duration-300 ease-in-out',
+          // Desktop styles - relative positioning, always visible
+          'md:relative md:z-auto md:translate-x-0',
+          // Mobile transform logic - ONLY applies on mobile (below md breakpoint)
+          isOpen ? 'translate-x-0' : '-translate-x-full',
+          // Dark mode and performance fixes
+          'dark:bg-card dark:border-border sidebar-mobile-fix sidebar-container'
         )}
       >
         <div className="flex h-full flex-col">
@@ -165,7 +161,7 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
                 priority
               />
             </div>
-            {/* Close button for mobile */}
+            {/* Close button for mobile only */}
             <button 
               onClick={() => setOpen(false)} 
               className={cn(
@@ -184,13 +180,12 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
               <Link
                 key={item.name}
                 href={item.href}
-                onClick={() => setOpen(false)}
+                onClick={() => setOpen(false)} // Close sidebar on mobile when link is clicked
                 className={cn(
                   pathname === item.href
                     ? 'bg-primary/10 text-primary border-r-2 border-primary'
                     : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                   'group flex items-center px-3 py-2.5 text-sm font-medium rounded-l-md transition-all duration-200 relative',
-                  // Apply sidebar link fixes
                   'sidebar-link cursor-pointer'
                 )}
               >

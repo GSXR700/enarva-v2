@@ -37,6 +37,7 @@ export default function AdministrationLayout({
 }: {
   children: React.ReactNode
 }) {
+  // IMPORTANT: Default to false so sidebar is closed on mobile by default
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   // Initialize push notification logic
