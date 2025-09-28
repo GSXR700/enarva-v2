@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { TopBar } from '@/components/layout/TopBar'
@@ -37,26 +37,44 @@ export default function AdministrationLayout({
 }: {
   children: React.ReactNode
 }) {
-  // IMPORTANT: Default to false so sidebar is closed on mobile by default
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  // Start with sidebar closed
+  const [isSidebarOpen, setSidebarOpen] = useState(false)
 
   // Initialize push notification logic
-  usePushNotifications();
+  usePushNotifications()
+
+  // Handle escape key to close sidebar
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isSidebarOpen) {
+        setSidebarOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isSidebarOpen])
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex h-screen bg-background transition-colors duration-300">
-        <Sidebar isOpen={isSidebarOpen} setOpen={setSidebarOpen} />
+      <div className="flex h-screen bg-background">
+        <Sidebar 
+          isOpen={isSidebarOpen} 
+          setOpen={setSidebarOpen} 
+        />
 
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar onMenuClick={() => setSidebarOpen(true)} />
-
-          <main className="flex-1 overflow-y-auto custom-scrollbar bg-background">
-            {children}
+          
+          <main className="flex-1 overflow-y-auto">
+            <div className="h-full">
+              {children}
+            </div>
           </main>
         </div>
+        
         <Toaster position="bottom-right" />
       </div>
     </QueryClientProvider>
-  );
+  )
 }
