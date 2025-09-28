@@ -130,37 +130,27 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
       {/* Mobile overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-black/50 sidebar-overlay-fix z-40 md:hidden"
           onClick={() => setOpen(false)}
         />
       )}
 
       <div
         className={cn(
-          // Base styles with explicit flex display
-          'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border md:relative md:translate-x-0',
-          // Transition improvements for smooth animation without blur
+          // Base styles with explicit flex display for all screen sizes
+          'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border',
+          // Desktop: always visible and positioned relative
+          'md:relative md:flex md:translate-x-0',
+          // Mobile: transform based on isOpen state
           'transition-transform duration-300 ease-in-out',
-          // Explicit flex display to prevent layout issues
-          'flex flex-col',
+          'flex flex-col', // Always flex
           // Mobile transform with hardware acceleration and subpixel fix
-          isOpen ? 'transform translate-x-0' : 'transform -translate-x-full',
+          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
           // Dark mode specific fixes
           'dark:bg-card dark:border-border',
-          // Anti-aliasing and rendering optimizations
-          'antialiased will-change-transform',
-          // Ensure proper stacking and no blur
-          'backface-visibility-hidden'
+          // Apply our custom CSS fixes
+          'sidebar-mobile-fix sidebar-container'
         )}
-        style={{
-          // Force hardware acceleration without causing blur
-          transform: isOpen ? 'translate3d(0, 0, 0)' : 'translate3d(-100%, 0, 0)',
-          // Prevent subpixel rendering issues
-          backfaceVisibility: 'hidden',
-          perspective: '1000px',
-          // Ensure crisp rendering
-          imageRendering: 'crisp-edges'
-        }}
       >
         <div className="flex h-full flex-col">
           {/* Header with Logo */}
@@ -171,13 +161,8 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
                 alt="Enarva OS"
                 width={120}
                 height={40}
-                className="object-contain transition-opacity duration-300"
+                className="object-contain transition-opacity duration-300 sidebar-logo-fix"
                 priority
-                style={{
-                  // Prevent image blur
-                  imageRendering: 'crisp-edges',
-                  backfaceVisibility: 'hidden'
-                }}
               />
             </div>
             {/* Close button for mobile */}
@@ -186,15 +171,10 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
               className={cn(
                 "md:hidden p-2 rounded-md hover:bg-accent transition-colors z-10",
                 "flex items-center justify-center",
-                "touch-manipulation" // Better touch response
+                "touch-manipulation cursor-pointer"
               )}
-              style={{ 
-                // Ensure button is clickable
-                position: 'relative',
-                zIndex: 10
-              }}
             >
-              <X className="w-5 h-5 text-muted-foreground" />
+              <X className="w-5 h-5 text-muted-foreground sidebar-icon-fix" />
             </button>
           </div>
 
@@ -210,33 +190,20 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
                     ? 'bg-primary/10 text-primary border-r-2 border-primary'
                     : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                   'group flex items-center px-3 py-2.5 text-sm font-medium rounded-l-md transition-all duration-200 relative',
-                  // Ensure links are clickable
-                  'cursor-pointer touch-manipulation',
-                  // Prevent text blur
-                  'antialiased'
+                  // Apply sidebar link fixes
+                  'sidebar-link cursor-pointer'
                 )}
-                style={{
-                  // Ensure proper z-index for clickability
-                  position: 'relative',
-                  zIndex: 5,
-                  // Prevent text rendering issues
-                  backfaceVisibility: 'hidden'
-                }}
               >
                 <item.icon
                   className={cn(
                     pathname === item.href
                       ? 'text-primary'
                       : 'text-muted-foreground group-hover:text-foreground',
-                    'mr-3 flex-shrink-0 h-5 w-5 transition-colors duration-200'
+                    'mr-3 flex-shrink-0 h-5 w-5 transition-colors duration-200 sidebar-icon-fix'
                   )}
                   aria-hidden="true"
-                  style={{
-                    // Prevent icon blur
-                    backfaceVisibility: 'hidden'
-                  }}
                 />
-                <span style={{ backfaceVisibility: 'hidden' }}>
+                <span className="sidebar-text-fix">
                   {item.name}
                 </span>
               </Link>
