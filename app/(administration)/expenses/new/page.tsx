@@ -244,7 +244,7 @@ export default function NewExpensePage() {
     <div className="main-content space-y-6">
       {/* Header with navigation */}
       <div className="flex items-center gap-4">
-        <Link href="/(administration)/expenses">
+        <Link href="/expenses">
           <Button variant="outline" size="icon">
             <ArrowLeft className="w-4 h-4" />
           </Button>

@@ -1,4 +1,4 @@
-// app/(administration)/teams/page.tsx - PAGE TEAMS FIXED WITH PROPER AVATARS
+// app/(administration)/teams/page.tsx - PAGE TEAMS FIXED WITH PROPER AVATARS AND DARK MODE
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -244,21 +244,21 @@ export default function TeamsPage() {
   // Helper functions
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case 'TEAM_LEADER': return <Shield className="w-4 h-4 text-purple-600" />;
-      case 'TECHNICIAN': return <Users className="w-4 h-4 text-blue-600" />;
-      case 'ADMIN': return <Settings className="w-4 h-4 text-red-600" />;
-      default: return <UserIcon className="w-4 h-4 text-gray-600" />;
+      case 'TEAM_LEADER': return <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />;
+      case 'TECHNICIAN': return <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
+      case 'ADMIN': return <Settings className="w-4 h-4 text-red-600 dark:text-red-400" />;
+      default: return <UserIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />;
     }
   };
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'TEAM_LEADER': return 'bg-purple-100 text-purple-800';
-      case 'TECHNICIAN': return 'bg-blue-100 text-blue-800';
-      case 'ADMIN': return 'bg-red-100 text-red-800';
-      case 'MANAGER': return 'bg-orange-100 text-orange-800';
-      case 'AGENT': return 'bg-cyan-100 text-cyan-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'TEAM_LEADER': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
+      case 'TECHNICIAN': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+      case 'ADMIN': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+      case 'MANAGER': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
+      case 'AGENT': return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
   };
 
@@ -271,9 +271,9 @@ export default function TeamsPage() {
       <div className="main-content">
         <Card className="thread-card">
           <CardContent className="pt-6 text-center">
-            <AlertCircle className="mx-auto w-12 h-12 text-red-500 mb-4" />
-            <h3 className="text-lg font-medium text-red-900 mb-2">Erreur de chargement</h3>
-            <p className="text-red-600 mb-4">{error}</p>
+            <AlertCircle className="mx-auto w-12 h-12 text-red-500 dark:text-red-400 mb-4" />
+            <h3 className="text-lg font-medium text-red-900 dark:text-red-100 mb-2">Erreur de chargement</h3>
+            <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
             <Button onClick={() => fetchTeams()}>
               Réessayer
             </Button>
@@ -390,7 +390,7 @@ export default function TeamsPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={() => handleDeleteTeam(team.id, team.name)}
-                          className="flex items-center gap-2 text-red-600"
+                          className="flex items-center gap-2 text-red-600 dark:text-red-400"
                         >
                           <Trash2 className="w-4 h-4" />
                           Supprimer
@@ -400,22 +400,22 @@ export default function TeamsPage() {
                   </CardHeader>
 
                   <CardContent className="space-y-4">
-                    {/* Team Leader FIXED */}
+                    {/* Team Leader FIXED with Dark Mode */}
                     {team.teamLeader && (
-                      <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
+                      <div className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800">
                         <Avatar className="w-8 h-8">
                           <AvatarImage 
                             src={team.teamLeader.image} 
                             alt={team.teamLeader.name}
                           />
-                          <AvatarFallback className="bg-purple-200 text-purple-800">
+                          <AvatarFallback className="bg-purple-200 text-purple-800 dark:bg-purple-800 dark:text-purple-200">
                             {team.teamLeader.name?.charAt(0) || 'L'}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <Shield className="w-4 h-4 text-purple-600" />
-                            <span className="font-medium text-sm">{team.teamLeader.name}</span>
+                            <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                            <span className="font-medium text-sm text-foreground">{team.teamLeader.name}</span>
                           </div>
                           <p className="text-xs text-muted-foreground">Chef d'équipe</p>
                         </div>
@@ -429,8 +429,8 @@ export default function TeamsPage() {
                     <div className="grid grid-cols-3 gap-4 text-center">
                       <div>
                         <div className="flex items-center justify-center mb-1">
-                          <Users className="w-4 h-4 text-blue-600 mr-1" />
-                          <span className="text-lg font-bold text-blue-600">
+                          <Users className="w-4 h-4 text-blue-600 dark:text-blue-400 mr-1" />
+                          <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
                             {team.stats.totalMembers}
                           </span>
                         </div>
@@ -438,8 +438,8 @@ export default function TeamsPage() {
                       </div>
                       <div>
                         <div className="flex items-center justify-center mb-1">
-                          <CheckCircle className="w-4 h-4 text-green-600 mr-1" />
-                          <span className="text-lg font-bold text-green-600">
+                          <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 mr-1" />
+                          <span className="text-lg font-bold text-green-600 dark:text-green-400">
                             {team.stats.availableMembers}
                           </span>
                         </div>
@@ -447,8 +447,8 @@ export default function TeamsPage() {
                       </div>
                       <div>
                         <div className="flex items-center justify-center mb-1">
-                          <Calendar className="w-4 h-4 text-orange-600 mr-1" />
-                          <span className="text-lg font-bold text-orange-600">
+                          <Calendar className="w-4 h-4 text-orange-600 dark:text-orange-400 mr-1" />
+                          <span className="text-lg font-bold text-orange-600 dark:text-orange-400">
                             {team.stats.completedMissions}
                           </span>
                         </div>
@@ -456,7 +456,7 @@ export default function TeamsPage() {
                       </div>
                     </div>
 
-                    {/* FIXED Team Members Avatars */}
+                    {/* FIXED Team Members Avatars with Dark Mode */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Membres</span>
@@ -468,7 +468,7 @@ export default function TeamsPage() {
                       </div>
                       <div className="flex -space-x-2">
                         {team.membersSummary.slice(0, 4).map((member) => (
-                          <Avatar key={member.id} className="w-8 h-8 border-2 border-white">
+                          <Avatar key={member.id} className="w-8 h-8 border-2 border-white dark:border-gray-800">
                             <AvatarImage 
                               src={member.image} 
                               alt={member.name}
@@ -479,8 +479,8 @@ export default function TeamsPage() {
                           </Avatar>
                         ))}
                         {team.membersSummary.length > 4 && (
-                          <div className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center">
-                            <span className="text-xs text-gray-600">+{team.membersSummary.length - 4}</span>
+                          <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 border-2 border-white dark:border-gray-800 flex items-center justify-center">
+                            <span className="text-xs text-gray-600 dark:text-gray-400">+{team.membersSummary.length - 4}</span>
                           </div>
                         )}
                       </div>
@@ -563,7 +563,7 @@ export default function TeamsPage() {
                         <p className="text-sm text-muted-foreground">
                           {member.user?.email}
                         </p>
-                        <p className="text-xs text-blue-600">
+                        <p className="text-xs text-blue-600 dark:text-blue-400">
                           Équipe: {member.team?.name}
                         </p>
                       </div>
@@ -583,7 +583,7 @@ export default function TeamsPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={() => handleDeleteMember(member.id, member.user.name)}
-                          className="flex items-center gap-2 text-red-600"
+                          className="flex items-center gap-2 text-red-600 dark:text-red-400"
                         >
                           <Trash2 className="w-4 h-4" />
                           Supprimer
@@ -605,7 +605,7 @@ export default function TeamsPage() {
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-gray-500" />
+                        <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                         <span className="text-sm">
                           Disponibilité: 
                           <Badge 
@@ -619,7 +619,7 @@ export default function TeamsPage() {
 
                       {member.specialties.length > 0 && (
                         <div className="flex items-center gap-2">
-                          <Award className="w-4 h-4 text-gray-500" />
+                          <Award className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                           <span className="text-sm">Spécialités:</span>
                         </div>
                       )}

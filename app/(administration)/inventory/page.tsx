@@ -295,9 +295,9 @@ export default function EnhancedInventoryManagement() {
   if (error) {
     return (
       <div className="main-content">
-        <Alert className="max-w-md mx-auto">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
+        <Alert className="max-w-md mx-auto border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
+          <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+          <AlertDescription className="text-red-800 dark:text-red-200">
             {error}
             <Button 
               onClick={fetchInventory} 
@@ -315,7 +315,7 @@ export default function EnhancedInventoryManagement() {
 
   return (
     <div className="main-content space-y-6">
-      {/* Header */}
+      {/* Header - Responsive buttons */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
@@ -326,79 +326,80 @@ export default function EnhancedInventoryManagement() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Mobile: Icon only, Desktop: Icon + Text */}
           <Button variant="outline" onClick={exportInventory}>
-            <Download className="w-4 h-4 mr-2" />
-            Exporter
+            <Download className="w-4 h-4 md:mr-2" />
+            <span className="hidden md:inline">Exporter</span>
           </Button>
           <Button onClick={() => fetchInventory()}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Actualiser
+            <RefreshCw className="w-4 h-4 md:mr-2" />
+            <span className="hidden md:inline">Actualiser</span>
           </Button>
           <Link href="/inventory/new">
             <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Nouvel Article
+              <Plus className="w-4 h-4 md:mr-2" />
+              <span className="hidden md:inline">Nouvel Article</span>
             </Button>
           </Link>
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards - Dark Mode Support */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
+        <Card className="border-0 shadow-lg dark:bg-gray-800/50">
           <CardContent className="pt-6">
             <div className="flex items-center">
-              <Package className="w-8 h-8 text-blue-600" />
+              <Package className="w-8 h-8 text-blue-600 dark:text-blue-400" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Total Articles</p>
-                <p className="text-2xl font-bold">{inventory.length}</p>
+                <p className="text-2xl font-bold text-foreground">{inventory.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-lg dark:bg-gray-800/50">
           <CardContent className="pt-6">
             <div className="flex items-center">
-              <TrendingDown className="w-8 h-8 text-yellow-600" />
+              <TrendingDown className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Stock Faible</p>
-                <p className="text-2xl font-bold text-yellow-600">{lowStockCount}</p>
+                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{lowStockCount}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-lg dark:bg-gray-800/50">
           <CardContent className="pt-6">
             <div className="flex items-center">
-              <AlertTriangle className="w-8 h-8 text-red-600" />
+              <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Rupture</p>
-                <p className="text-2xl font-bold text-red-600">{outOfStockCount}</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{outOfStockCount}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-lg dark:bg-gray-800/50">
           <CardContent className="pt-6">
             <div className="flex items-center">
-              <Package className="w-8 h-8 text-green-600" />
+              <Package className="w-8 h-8 text-green-600 dark:text-green-400" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Valeur Totale</p>
-                <p className="text-2xl font-bold text-green-600">{formatCurrency(totalInventoryValue)}</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalInventoryValue)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Stock Alerts */}
+      {/* Stock Alerts - Dark Mode Support */}
       {showAlerts && stockAlerts.length > 0 && (
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
+        <Alert className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
+          <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+          <AlertDescription className="flex items-center justify-between text-yellow-800 dark:text-yellow-200">
             <div>
               <strong>{stockAlerts.length} article(s) nécessite(nt) votre attention</strong>
               <div className="mt-1">
@@ -424,8 +425,8 @@ export default function EnhancedInventoryManagement() {
         </Alert>
       )}
 
-      {/* Filters and Search */}
-      <Card>
+      {/* Filters and Search - Dark Mode Support */}
+      <Card className="border-0 shadow-lg dark:bg-gray-800/50">
         <CardHeader>
           <CardTitle>Filtres</CardTitle>
         </CardHeader>
@@ -444,7 +445,7 @@ export default function EnhancedInventoryManagement() {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="border rounded-md px-3 py-2"
+              className="border rounded-md px-3 py-2 bg-background text-foreground border-input focus:border-ring focus:ring-2 focus:ring-ring"
             >
               <option value="all">Toutes les catégories</option>
               {categories.map(category => (
@@ -457,7 +458,7 @@ export default function EnhancedInventoryManagement() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="border rounded-md px-3 py-2"
+              className="border rounded-md px-3 py-2 bg-background text-foreground border-input focus:border-ring focus:ring-2 focus:ring-ring"
             >
               <option value="all">Tous les statuts</option>
               <option value="IN_STOCK">En stock</option>
@@ -470,15 +471,15 @@ export default function EnhancedInventoryManagement() {
 
       {/* Inventory Items */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">
+        <h2 className="text-xl font-semibold text-foreground">
           Articles d'Inventaire ({filteredInventory.length})
         </h2>
         
         {filteredInventory.length === 0 ? (
-          <Card>
+          <Card className="border-0 shadow-lg dark:bg-gray-800/50">
             <CardContent className="py-16 text-center">
               <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-medium mb-2">
+              <h3 className="text-lg font-medium text-foreground mb-2">
                 {inventory.length === 0 ? 'Aucun article dans l\'inventaire' : 'Aucun article trouvé'}
               </h3>
               <p className="text-muted-foreground mb-4">
@@ -500,13 +501,13 @@ export default function EnhancedInventoryManagement() {
         ) : (
           <div className="grid gap-4">
             {filteredInventory.map((item) => (
-              <Card key={item.id} className="hover:shadow-md transition-shadow">
+              <Card key={item.id} className="hover:shadow-md transition-shadow border-0 shadow-lg dark:bg-gray-800/50">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-4">
                         <div>
-                          <h3 className="text-lg font-semibold">{item.name}</h3>
+                          <h3 className="text-lg font-semibold text-foreground">{item.name}</h3>
                           <p className="text-sm text-muted-foreground">
                             {categoryTranslations[item.category] || item.category}
                             {item.supplier && ` • ${item.supplier}`}
@@ -517,21 +518,21 @@ export default function EnhancedInventoryManagement() {
                       <div className="flex items-center gap-6 mt-4">
                         <div>
                           <p className="text-sm text-muted-foreground">Stock actuel</p>
-                          <p className="text-lg font-semibold">
+                          <p className="text-lg font-semibold text-foreground">
                             {Number(item.currentStock)} {item.unit}
                           </p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Stock minimum</p>
-                          <p className="text-lg">{Number(item.minimumStock)} {item.unit}</p>
+                          <p className="text-lg text-foreground">{Number(item.minimumStock)} {item.unit}</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Prix unitaire</p>
-                          <p className="text-lg">{formatCurrency(Number(item.unitPrice))}</p>
+                          <p className="text-lg text-foreground">{formatCurrency(Number(item.unitPrice))}</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Valeur totale</p>
-                          <p className="text-lg font-semibold">{formatCurrency(item.totalValue)}</p>
+                          <p className="text-lg font-semibold text-foreground">{formatCurrency(item.totalValue)}</p>
                         </div>
                       </div>
                     </div>
@@ -564,7 +565,7 @@ export default function EnhancedInventoryManagement() {
                           <Button 
                             size="sm" 
                             onClick={() => handleRestock(item.id)}
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700"
                           >
                             Réapprovisionner
                           </Button>

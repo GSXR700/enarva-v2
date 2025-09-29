@@ -1,4 +1,4 @@
-//app/(administration)/expenses/page.tsx
+// app/(administration)/expenses/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react';
@@ -50,24 +50,24 @@ const categoryIcons: Record<ExpenseCategory, React.ElementType> = {
 };
 
 const paymentMethodColors: Record<PaymentMethod, string> = {
-  CASH: 'bg-green-100 text-green-800 border-green-200',
-  VIREMENT: 'bg-blue-100 text-blue-800 border-blue-200',
-  CARTE: 'bg-purple-100 text-purple-800 border-purple-200',
-  CHEQUE: 'bg-orange-100 text-orange-800 border-orange-200',
-  MOBILE: 'bg-pink-100 text-pink-800 border-pink-200',
-  AUTRE: 'bg-gray-100 text-gray-800 border-gray-200',
+  CASH: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800',
+  VIREMENT: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
+  CARTE: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800',
+  CHEQUE: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800',
+  MOBILE: 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-800',
+  AUTRE: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700',
 };
 
 const categoryColors: Record<ExpenseCategory, string> = {
-  OPERATIONS: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  REVENTE_NEGOCE: 'bg-blue-100 text-blue-800 border-blue-200',
-  RESSOURCES_HUMAINES: 'bg-purple-100 text-purple-800 border-purple-200',
-  ADMINISTRATIF_FINANCIER: 'bg-orange-100 text-orange-800 border-orange-200',
-  MARKETING_COMMERCIAL: 'bg-pink-100 text-pink-800 border-pink-200',
-  LOGISTIQUE_MOBILITE: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-  INFRASTRUCTURES_LOCAUX: 'bg-amber-100 text-amber-800 border-amber-200',
-  LOCATIONS: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  EXCEPTIONNELLES_DIVERSES: 'bg-gray-100 text-gray-800 border-gray-200',
+  OPERATIONS: 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
+  REVENTE_NEGOCE: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
+  RESSOURCES_HUMAINES: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800',
+  ADMINISTRATIF_FINANCIER: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800',
+  MARKETING_COMMERCIAL: 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-800',
+  LOGISTIQUE_MOBILITE: 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-800',
+  INFRASTRUCTURES_LOCAUX: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
+  LOCATIONS: 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800',
+  EXCEPTIONNELLES_DIVERSES: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700',
 };
 
 export default function ExpensesPage() {
@@ -166,7 +166,7 @@ export default function ExpensesPage() {
   }
 
   if (error) {
-    return <div className="main-content text-center p-10 text-red-500">{error}</div>;
+    return <div className="main-content text-center p-10 text-red-500 dark:text-red-400">{error}</div>;
   }
 
   return (
@@ -177,7 +177,7 @@ export default function ExpensesPage() {
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Gestion des Dépenses</h1>
           <div className="flex items-center gap-4 mt-2">
             <p className="text-muted-foreground">{filteredExpenses.length} dépenses trouvées</p>
-            <Badge variant="outline" className="font-semibold text-red-600 border-red-200 bg-red-50">
+            <Badge variant="outline" className="font-semibold text-red-600 border-red-200 bg-red-50 dark:text-red-400 dark:border-red-800 dark:bg-red-900/30">
               Total: {formatCurrency(totalAmount)}
             </Badge>
           </div>
@@ -191,7 +191,7 @@ export default function ExpensesPage() {
       </div>
 
       {/* Filters Section */}
-      <Card className="border-0 shadow-lg bg-gradient-to-r from-white to-gray-50/50">
+      <Card className="border-0 shadow-lg bg-gradient-to-r from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Filter className="w-5 h-5" />
@@ -202,7 +202,7 @@ export default function ExpensesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
               <Input
                 placeholder="Rechercher..."
                 value={searchTerm}
@@ -275,8 +275,8 @@ export default function ExpensesPage() {
       {filteredExpenses.length === 0 ? (
         <Card className="border-0 shadow-lg">
           <CardContent className="text-center py-16">
-            <div className="w-20 h-20 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-              <Receipt className="w-10 h-10 text-gray-400" />
+            <div className="w-20 h-20 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+              <Receipt className="w-10 h-10 text-gray-400 dark:text-gray-500" />
             </div>
             <h3 className="text-lg font-medium text-foreground mb-2">Aucune dépense trouvée</h3>
             <p className="text-muted-foreground mb-6">
@@ -298,27 +298,27 @@ export default function ExpensesPage() {
           {filteredExpenses.map((expense) => {
             const IconComponent = expense.category ? categoryIcons[expense.category] : Receipt;
             return (
-              <Card key={expense.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50/30">
+              <Card key={expense.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50/30 dark:from-gray-900 dark:to-gray-800/30">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 flex items-center justify-center shadow-lg">
                         <IconComponent className="w-5 h-5 text-white" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-foreground line-clamp-1">{expense.subCategory || 'Catégorie non définie'}</h3>
                         <div className="flex items-center gap-2 mt-1">
-                          <Badge className={`text-xs font-medium border ${categoryColors[expense.category] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+                          <Badge className={`text-xs font-medium border ${categoryColors[expense.category] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'}`}>
                             {expense.category ? expense.category.replace(/_/g, ' ') : 'Non défini'}
                           </Badge>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-bold text-red-600 mb-1">
+                      <div className="text-xl font-bold text-red-600 dark:text-red-400 mb-1">
                         {formatCurrency(expense.amount ? Number(expense.amount) : 0)}
                       </div>
-                      <Badge className={`text-xs font-medium border ${paymentMethodColors[expense.paymentMethod] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+                      <Badge className={`text-xs font-medium border ${paymentMethodColors[expense.paymentMethod] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'}`}>
                         {expense.paymentMethod || 'N/A'}
                       </Badge>
                     </div>
@@ -363,7 +363,7 @@ export default function ExpensesPage() {
                           {expense.mission.lead && (
                             <>
                               <br />
-                              <span className="text-xs text-blue-600">
+                              <span className="text-xs text-blue-600 dark:text-blue-400">
                                 Client: {expense.mission.lead.firstName} {expense.mission.lead.lastName}
                               </span>
                             </>
@@ -375,12 +375,12 @@ export default function ExpensesPage() {
 
                   {/* Rental Period */}
                   {expense.rentalStartDate && expense.rentalEndDate && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <div className="flex items-center gap-2 text-sm font-medium text-blue-800 mb-1">
+                    <div className="bg-blue-50 border border-blue-200 dark:bg-blue-900/30 dark:border-blue-800 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-blue-800 dark:text-blue-300 mb-1">
                         <Clock className="w-4 h-4" />
                         Période de location
                       </div>
-                      <div className="text-xs text-blue-600">
+                      <div className="text-xs text-blue-600 dark:text-blue-400">
                         {formatDate(expense.rentalStartDate)} → {formatDate(expense.rentalEndDate)}
                       </div>
                     </div>
@@ -388,29 +388,29 @@ export default function ExpensesPage() {
 
                   {/* Description */}
                   {expense.description && (
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         <FileText className="w-4 h-4" />
                         Description
                       </div>
-                      <p className="text-sm text-gray-600 line-clamp-2">{expense.description}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{expense.description}</p>
                     </div>
                   )}
 
                   {/* Proof Document */}
                   {expense.proofUrl && (
-                    <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
-                      <div className="flex items-center gap-2 text-sm font-medium text-green-800">
+                    <div className="flex items-center justify-between bg-green-50 border border-green-200 dark:bg-green-900/30 dark:border-green-800 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-sm font-medium text-green-800 dark:text-green-300">
                         <Eye className="w-4 h-4" />
                         Justificatif disponible
                       </div>
                       <div className="flex gap-1">
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600 hover:text-green-800 hover:bg-green-100">
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600 hover:text-green-800 hover:bg-green-100 dark:text-green-400 dark:hover:text-green-300 dark:hover:bg-green-900/50">
                           <a href={expense.proofUrl} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600 hover:text-green-800 hover:bg-green-100">
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600 hover:text-green-800 hover:bg-green-100 dark:text-green-400 dark:hover:text-green-300 dark:hover:bg-green-900/50">
                           <Download className="w-3 h-3" />
                         </Button>
                       </div>
@@ -418,9 +418,9 @@ export default function ExpensesPage() {
                   )}
 
                   {/* Actions */}
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
                     <Link href={`/expenses/${expense.id}/edit`}>
-                      <Button variant="ghost" size="sm" className="h-8 gap-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50">
+                      <Button variant="ghost" size="sm" className="h-8 gap-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-900/30">
                         <Edit className="w-3 h-3" />
                         Modifier
                       </Button>
@@ -429,7 +429,7 @@ export default function ExpensesPage() {
                       variant="ghost" 
                       size="sm" 
                       onClick={() => handleDelete(expense.id)}
-                      className="h-8 gap-1 text-red-600 hover:text-red-800 hover:bg-red-50"
+                      className="h-8 gap-1 text-red-600 hover:text-red-800 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/30"
                     >
                       <Trash2 className="w-3 h-3" />
                       Supprimer
