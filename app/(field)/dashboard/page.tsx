@@ -1,7 +1,9 @@
+// app/(field)/dashboard/page.tsx - UPDATED & ENHANCED VERSION
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,40 +25,44 @@ import {
   Settings,
   Navigation,
   Timer,
-  Target
+  Target,
+  Play,
+  Eye,
+  User
 } from 'lucide-react'
-import { formatDate, formatTime } from '@/lib/utils'
-import { Mission, Task } from '@prisma/client'
+import { formatDate, formatTime, translate } from '@/lib/utils'
+import { Mission, Task, User as UserType } from '@prisma/client'
 import { toast } from 'sonner'
+
+// Enhanced type definitions
+interface TaskWithAssignment extends Task {
+  assignedTo?: {
+    id: string
+    user: UserType
+  } | null
+}
 
 type FieldMission = Mission & {
   lead: {
+    id: string
     firstName: string
     lastName: string
     phone: string | null
     email: string | null
     address: string
+    company: string | null
   }
-  tasks: (Task & {
-    assignedTo?: {
-      user: {
-        name: string
-        image: string | null
-      }
-    } | null
-  })[]
-  teamLeader: {
-    name: string | null
-    phone: string | null
-  } | null
+  tasks: TaskWithAssignment[]
+  teamLeader: UserType | null
   team: {
+    id: string
     name: string
     members: {
-      user: {
-        name: string | null
-        image: string | null
-        role: string
-      }
+      id: string
+      user: UserType
+      specialties: string[]
+      experience: string
+      availability: string
     }[]
   } | null
 }
@@ -104,6 +110,9 @@ export default function FieldDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedMission, setSelectedMission] = useState<FieldMission | null>(null)
 
+  const currentUser = session?.user as any
+  const isTeamLeader = currentUser?.role === 'TEAM_LEADER'
+
   useEffect(() => {
     fetchFieldData()
     const interval = setInterval(fetchFieldData, 30000) // Refresh every 30 seconds
@@ -112,22 +121,45 @@ export default function FieldDashboard() {
 
   const fetchFieldData = async () => {
     try {
-      const [missionsRes, statsRes] = await Promise.all([
-        fetch('/api/field/missions'),
-        fetch('/api/field/stats')
-      ])
+      // Use the new field missions API
+      const missionsRes = await fetch('/api/missions/field')
 
       if (missionsRes.ok) {
         const missionsData = await missionsRes.json()
         setMissions(missionsData)
+        
+        // Calculate stats from missions data
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        
+        const activeMissions = missionsData.filter((m: FieldMission) => 
+          ['SCHEDULED', 'IN_PROGRESS'].includes(m.status)
+        ).length
+        
+        const completedToday = missionsData.filter((m: FieldMission) => 
+          m.status === 'COMPLETED' && new Date(m.actualEndTime || '').toDateString() === today.toDateString()
+        ).length
+        
+        const pendingTasks = missionsData.reduce((acc: number, m: FieldMission) => 
+          acc + m.tasks.filter(t => ['ASSIGNED', 'IN_PROGRESS'].includes(t.status)).length, 0
+        )
+        
+        const totalTasks = missionsData.reduce((acc: number, m: FieldMission) => acc + m.tasks.length, 0)
+        const completedTasks = missionsData.reduce((acc: number, m: FieldMission) => 
+          acc + m.tasks.filter(t => ['COMPLETED', 'VALIDATED'].includes(t.status)).length, 0
+        )
+        const teamEfficiency = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+        
+        setStats({
+          activeMissions,
+          completedToday,
+          pendingTasks,
+          teamEfficiency
+        })
+        
         if (missionsData.length > 0 && !selectedMission) {
           setSelectedMission(missionsData[0])
         }
-      }
-
-      if (statsRes.ok) {
-        const statsData = await statsRes.json()
-        setStats(statsData)
       }
     } catch (error) {
       console.error('Failed to fetch field data:', error)
@@ -156,8 +188,13 @@ export default function FieldDashboard() {
 
   const startMission = async (missionId: string) => {
     try {
-      const response = await fetch(`/api/missions/${missionId}/start`, {
-        method: 'PATCH'
+      const response = await fetch(`/api/missions/${missionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          status: 'IN_PROGRESS',
+          actualStartTime: new Date().toISOString()
+        })
       })
 
       if (!response.ok) throw new Error('Failed to start mission')
@@ -167,6 +204,16 @@ export default function FieldDashboard() {
     } catch (error) {
       toast.error('Erreur lors du démarrage')
     }
+  }
+
+  const getMissionProgress = (mission: FieldMission) => {
+    if (!mission.tasks.length) return 0
+    const completed = mission.tasks.filter(t => ['COMPLETED', 'VALIDATED'].includes(t.status)).length
+    return Math.round((completed / mission.tasks.length) * 100)
+  }
+
+  const getMyTasks = (mission: FieldMission) => {
+    return mission.tasks.filter(task => task.assignedTo?.user.id === currentUser?.id)
   }
 
   if (isLoading) {
@@ -196,8 +243,14 @@ export default function FieldDashboard() {
           <div>
             <h1 className="text-3xl font-bold text-foreground">Tableau de bord terrain</h1>
             <p className="text-muted-foreground">
-              Bonjour {session?.user?.name}, voici vos missions du jour
+              Bonjour {currentUser?.name?.split(' ')[0] || 'Équipe'}, voici vos missions du jour
             </p>
+            {isTeamLeader && (
+              <Badge variant="outline" className="mt-2">
+                <User className="w-3 h-3 mr-1" />
+                Chef d'équipe
+              </Badge>
+            )}
           </div>
           <div className="flex items-center space-x-2">
             <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
@@ -270,56 +323,63 @@ export default function FieldDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="space-y-2 p-4">
+                <div className="space-y-2 p-4 max-h-[600px] overflow-y-auto">
                   {missions.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
                       <p>Aucune mission aujourd'hui</p>
                     </div>
                   ) : (
-                    missions.map((mission) => (
-                      <div
-                        key={mission.id}
-                        className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
-                          selectedMission?.id === mission.id 
-                            ? 'bg-primary/10 border-primary' 
-                            : 'bg-card hover:bg-muted/50'
-                        }`}
-                        onClick={() => setSelectedMission(mission)}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-sm">{mission.missionNumber}</span>
-                          <Badge className={statusColors[mission.status as keyof typeof statusColors]}>
-                            {mission.status}
-                          </Badge>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="font-medium">{mission.lead.firstName} {mission.lead.lastName}</p>
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            <span className="truncate">{mission.address}</span>
+                    missions.map((mission) => {
+                      const progress = getMissionProgress(mission)
+                      const myTasks = getMyTasks(mission)
+                      
+                      return (
+                        <div
+                          key={mission.id}
+                          className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
+                            selectedMission?.id === mission.id 
+                              ? 'bg-primary/10 border-primary' 
+                              : 'bg-card hover:bg-muted/50'
+                          }`}
+                          onClick={() => setSelectedMission(mission)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium text-sm">{mission.missionNumber}</span>
+                            <Badge className={statusColors[mission.status as keyof typeof statusColors] + ' text-xs'}>
+                              {translate(mission.status)}
+                            </Badge>
                           </div>
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <Clock className="h-3 w-3 mr-1" />
-                            <span>{formatTime(new Date(mission.scheduledDate))}</span>
-                          </div>
-                        </div>
-                        {mission.tasks.length > 0 && (
-                          <div className="mt-2">
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>Progression</span>
-                              <span>
-                                {mission.tasks.filter(t => t.status === 'COMPLETED').length}/{mission.tasks.length}
-                              </span>
+                          <div className="space-y-1">
+                            <p className="font-medium">{mission.lead.firstName} {mission.lead.lastName}</p>
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                              <span className="truncate">{mission.address}</span>
                             </div>
-                            <Progress 
-                              value={(mission.tasks.filter(t => t.status === 'COMPLETED').length / mission.tasks.length) * 100}
-                              className="h-2 mt-1"
-                            />
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <Clock className="h-3 w-3 mr-1 flex-shrink-0" />
+                              <span>{formatTime(new Date(mission.scheduledDate))}</span>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    ))
+                          {myTasks.length > 0 && (
+                            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                              <p className="text-xs text-blue-700 dark:text-blue-400">
+                                Mes tâches: {myTasks.filter(t => ['COMPLETED', 'VALIDATED'].includes(t.status)).length}/{myTasks.length}
+                              </p>
+                            </div>
+                          )}
+                          {mission.tasks.length > 0 && (
+                            <div className="mt-2">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>Progression</span>
+                                <span>{progress}%</span>
+                              </div>
+                              <Progress value={progress} className="h-2 mt-1" />
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })
                   )}
                 </div>
               </CardContent>
@@ -339,14 +399,15 @@ export default function FieldDashboard() {
                       </CardTitle>
                       <p className="text-muted-foreground">
                         {selectedMission.lead.firstName} {selectedMission.lead.lastName}
+                        {selectedMission.lead.company && ` - ${selectedMission.lead.company}`}
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Badge className={priorityColors[selectedMission.priority as keyof typeof priorityColors]}>
-                        {selectedMission.priority}
+                        {translate(selectedMission.priority)}
                       </Badge>
                       <Badge className={statusColors[selectedMission.status as keyof typeof statusColors]}>
-                        {selectedMission.status}
+                        {translate(selectedMission.status)}
                       </Badge>
                     </div>
                   </div>
@@ -366,21 +427,21 @@ export default function FieldDashboard() {
                           <div>
                             <label className="text-sm font-medium text-muted-foreground">Adresse</label>
                             <div className="flex items-center mt-1">
-                              <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                              <MapPin className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                               <span>{selectedMission.address}</span>
                             </div>
                           </div>
                           <div>
                             <label className="text-sm font-medium text-muted-foreground">Heure prévue</label>
                             <div className="flex items-center mt-1">
-                              <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                              <Clock className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                               <span>{formatDate(new Date(selectedMission.scheduledDate))} à {formatTime(new Date(selectedMission.scheduledDate))}</span>
                             </div>
                           </div>
                           <div>
                             <label className="text-sm font-medium text-muted-foreground">Durée estimée</label>
                             <div className="flex items-center mt-1">
-                              <Timer className="h-4 w-4 mr-2 text-muted-foreground" />
+                              <Timer className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                               <span>{Math.round(selectedMission.estimatedDuration / 60)} heures</span>
                             </div>
                           </div>
@@ -391,14 +452,18 @@ export default function FieldDashboard() {
                             <div className="space-y-1 mt-1">
                               {selectedMission.lead.phone && (
                                 <div className="flex items-center">
-                                  <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                                  <span>{selectedMission.lead.phone}</span>
+                                  <Phone className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
+                                  <a href={`tel:${selectedMission.lead.phone}`} className="text-blue-600 hover:underline">
+                                    {selectedMission.lead.phone}
+                                  </a>
                                 </div>
                               )}
                               {selectedMission.lead.email && (
                                 <div className="flex items-center">
-                                  <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                                  <span>{selectedMission.lead.email}</span>
+                                  <Mail className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
+                                  <a href={`mailto:${selectedMission.lead.email}`} className="text-blue-600 hover:underline truncate">
+                                    {selectedMission.lead.email}
+                                  </a>
                                 </div>
                               )}
                             </div>
@@ -428,13 +493,13 @@ export default function FieldDashboard() {
                               <div className="flex items-center justify-between mb-2">
                                 <h4 className="font-medium">{task.title}</h4>
                                 <Badge className={taskStatusColors[task.status as keyof typeof taskStatusColors]}>
-                                  {task.status}
+                                  {translate(task.status)}
                                 </Badge>
                               </div>
                               {task.description && (
                                 <p className="text-sm text-muted-foreground mb-3">{task.description}</p>
                               )}
-                              <div className="flex items-center justify-between">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                                   {task.estimatedTime && (
                                     <div className="flex items-center">
@@ -446,7 +511,9 @@ export default function FieldDashboard() {
                                     <div className="flex items-center">
                                       <Avatar className="h-5 w-5 mr-2">
                                         <AvatarImage src={task.assignedTo.user.image || ''} />
-                                        <AvatarFallback>{task.assignedTo.user.name?.slice(0, 2)}</AvatarFallback>
+                                        <AvatarFallback className="text-xs">
+                                          {task.assignedTo.user.name?.slice(0, 2)}
+                                        </AvatarFallback>
                                       </Avatar>
                                       <span>{task.assignedTo.user.name}</span>
                                     </div>
@@ -459,6 +526,7 @@ export default function FieldDashboard() {
                                       onClick={() => updateTaskStatus(task.id, 'IN_PROGRESS')}
                                       className="bg-blue-500 hover:bg-blue-600"
                                     >
+                                      <Play className="w-3 h-3 mr-1" />
                                       Commencer
                                     </Button>
                                   )}
@@ -468,6 +536,7 @@ export default function FieldDashboard() {
                                       onClick={() => updateTaskStatus(task.id, 'COMPLETED')}
                                       className="bg-green-500 hover:bg-green-600"
                                     >
+                                      <CheckCircle2 className="w-3 h-3 mr-1" />
                                       Terminer
                                     </Button>
                                   )}
@@ -487,30 +556,30 @@ export default function FieldDashboard() {
                             <div className="p-3 border rounded-lg bg-card">
                               <div className="flex items-center space-x-3">
                                 <Avatar>
+                                  <AvatarImage src={selectedMission.teamLeader.image || ''} />
                                   <AvatarFallback>
                                     {selectedMission.teamLeader.name?.slice(0, 2).toUpperCase()}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
                                   <p className="font-medium">{selectedMission.teamLeader.name}</p>
-                                  {selectedMission.teamLeader.phone && (
-                                    <div className="flex items-center text-sm text-muted-foreground">
-                                      <Phone className="h-3 w-3 mr-1" />
-                                      <span>{selectedMission.teamLeader.phone}</span>
-                                    </div>
-                                  )}
+                                  <Badge variant="outline" className="text-xs mt-1">
+                                    {translate(selectedMission.teamLeader.role)}
+                                  </Badge>
                                 </div>
                               </div>
                             </div>
                           </div>
                         )}
 
-                        {selectedMission.team && (
+                        {selectedMission.team && selectedMission.team.members.length > 0 && (
                           <div>
-                            <h4 className="font-medium mb-3">Équipe ({selectedMission.team.members.length} membres)</h4>
+                            <h4 className="font-medium mb-3">
+                              Équipe {selectedMission.team.name} ({selectedMission.team.members.length} membres)
+                            </h4>
                             <div className="space-y-2">
-                              {selectedMission.team.members.map((member, index) => (
-                                <div key={index} className="p-3 border rounded-lg bg-card">
+                              {selectedMission.team.members.map((member) => (
+                                <div key={member.id} className="p-3 border rounded-lg bg-card">
                                   <div className="flex items-center space-x-3">
                                     <Avatar>
                                       <AvatarImage src={member.user.image || ''} />
@@ -520,9 +589,14 @@ export default function FieldDashboard() {
                                     </Avatar>
                                     <div className="flex-1">
                                       <p className="font-medium">{member.user.name}</p>
-                                      <Badge variant="outline" className="text-xs">
-                                        {member.user.role}
-                                      </Badge>
+                                      <div className="flex gap-1 mt-1">
+                                        <Badge variant="outline" className="text-xs">
+                                          {translate(member.user.role)}
+                                        </Badge>
+                                        <Badge variant="outline" className="text-xs">
+                                          {member.experience}
+                                        </Badge>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
@@ -548,14 +622,31 @@ export default function FieldDashboard() {
                             </Button>
                           )}
 
-                          <Button variant="outline" className="w-full">
-                            <Navigation className="w-4 h-4 mr-2" />
-                            Itinéraire GPS
-                          </Button>
+                          <Link href={`/field/missions/${selectedMission.id}/execute`} className="block">
+                            <Button variant="default" className="w-full">
+                              <Eye className="w-4 h-4 mr-2" />
+                              Vue complète mission
+                            </Button>
+                          </Link>
 
-                          <Button variant="outline" className="w-full">
-                            <Phone className="w-4 h-4 mr-2" />
-                            Appeler le client
+                          {selectedMission.lead.phone && (
+                            <Button variant="outline" className="w-full" asChild>
+                              <a href={`tel:${selectedMission.lead.phone}`}>
+                                <Phone className="w-4 h-4 mr-2" />
+                                Appeler le client
+                              </a>
+                            </Button>
+                          )}
+
+                          <Button variant="outline" className="w-full" asChild>
+                            <a 
+                              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedMission.address)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Navigation className="w-4 h-4 mr-2" />
+                              Itinéraire GPS
+                            </a>
                           </Button>
 
                           <Button variant="outline" className="w-full">
@@ -567,25 +658,36 @@ export default function FieldDashboard() {
                         <div className="space-y-3">
                           <h4 className="font-medium">Documentation</h4>
                           
+                          <Link href={`/field/missions/${selectedMission.id}/report`} className="block">
+                            <Button variant="outline" className="w-full">
+                              <FileText className="w-4 h-4 mr-2" />
+                              Rapport de terrain
+                            </Button>
+                          </Link>
+
                           <Button variant="outline" className="w-full">
                             <Camera className="w-4 h-4 mr-2" />
                             Photos avant/après
                           </Button>
 
                           <Button variant="outline" className="w-full">
-                            <FileText className="w-4 h-4 mr-2" />
-                            Rapport de terrain
-                          </Button>
-
-                          <Button variant="outline" className="w-full">
                             <Settings className="w-4 h-4 mr-2" />
                             Matériaux utilisés
                           </Button>
+
+                          {isTeamLeader && (
+                            <Link href={`/administration/missions/${selectedMission.id}/edit`} className="block">
+                              <Button variant="outline" className="w-full border-purple-200 text-purple-600 hover:bg-purple-50">
+                                <User className="w-4 h-4 mr-2" />
+                                Gestion avancée
+                              </Button>
+                            </Link>
+                          )}
                         </div>
                       </div>
                     </TabsContent>
                   </Tabs>
-                  </CardContent>
+                </CardContent>
               </Card>
             ) : (
               <Card>

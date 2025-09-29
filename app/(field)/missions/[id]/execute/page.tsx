@@ -1,9 +1,9 @@
-// app/(field)/missions/[id]/execute/page.tsx - FINAL FIX
+// app/(field)/missions/[id]/execute/page.tsx - ENHANCED & CORRECTED VERSION
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { useCurrentUser } from '@/hooks/use-current-user' // <-- IMPORT THE CORRECT HOOK
+import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { 
   ArrowLeft, 
   CheckCircle, 
@@ -21,26 +23,49 @@ import {
   ThumbsUp,
   ThumbsDown,
   MapPin,
-  Calendar
+  Calendar,
+  Users,
+  Settings,
+  Timer,
+  User,
+  Phone,
+  Star
 } from 'lucide-react'
-import { Mission, Lead, Task, TaskStatus } from '@prisma/client'
+import { Mission, Lead, Task, TaskStatus, User as UserType } from '@prisma/client'
 import { formatDate, formatTime, translate } from '@/lib/utils'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { useEdgeStore } from '@/lib/edgestore'
 
-type TaskWithDetails = Task & {
-  beforePhotos?: string[];
-  afterPhotos?: string[];
-  clientApproved?: boolean;
-  teamLeaderValidated?: boolean;
-};
+// Enhanced type definitions
+interface TaskWithAssignment extends Task {
+  beforePhotos?: string[]
+  afterPhotos?: string[]
+  clientApproved?: boolean
+  teamLeaderValidated?: boolean
+  assignedTo?: {
+    id: string
+    user: UserType
+  } | null
+}
+
+interface TeamMember {
+  id: string
+  user: UserType
+  specialties: string[]
+  experience: string
+  availability: string
+}
 
 type MissionWithDetails = Mission & { 
-  lead: Lead; 
-  tasks: TaskWithDetails[];
-};
+  lead: Lead
+  teamLeader: UserType | null
+  team: {
+    members: TeamMember[]
+  } | null
+  tasks: TaskWithAssignment[]
+}
 
+// Status color and icon helpers
 const getTaskStatusColor = (status: TaskStatus) => {
   switch (status) {
     case 'ASSIGNED': return 'bg-gray-100 text-gray-800'
@@ -63,17 +88,41 @@ const getTaskStatusIcon = (status: TaskStatus) => {
   }
 }
 
+const getMissionStatusIcon = (status: string) => {
+  switch (status) {
+    case 'IN_PROGRESS': return <Clock className="w-4 h-4" />
+    case 'COMPLETED': return <CheckCircle className="w-4 h-4" />
+    default: return <Calendar className="w-4 h-4" />
+  }
+}
+
+const getMissionStatusText = (status: string) => {
+  switch (status) {
+    case 'IN_PROGRESS': return 'En Cours'
+    case 'COMPLETED': return 'Terminée'
+    case 'SCHEDULED': return 'Planifiée'
+    case 'QUALITY_CHECK': return 'Contrôle Qualité'
+    default: return translate(status)
+  }
+}
+
 export default function MissionExecutePage() {
   const params = useParams()
   const router = useRouter()
-  const currentUser = useCurrentUser() // <-- USE THE TYPE-SAFE HOOK
-  const { edgestore } = useEdgeStore()
+  const { data: session } = useSession()
   const missionId = params.id as string
 
+  const currentUser = session?.user as any
+
+  // State management
   const [mission, setMission] = useState<MissionWithDetails | null>(null)
-  const [selectedTask, setSelectedTask] = useState<TaskWithDetails | null>(null)
+  const [selectedTask, setSelectedTask] = useState<TaskWithAssignment | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
+  
+  // Task assignment states
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false)
+  const [taskToAssign, setTaskToAssign] = useState<TaskWithAssignment | null>(null)
   
   // Task execution states
   const [taskNotes, setTaskNotes] = useState('')
@@ -87,6 +136,13 @@ export default function MissionExecutePage() {
   const [finalClientFeedback, setFinalClientFeedback] = useState('')
   const [isCompletingMission, setIsCompletingMission] = useState(false)
 
+  // Team leader time management
+  const [isTimeDialogOpen, setIsTimeDialogOpen] = useState(false)
+  const [selectedTaskForTime, setSelectedTaskForTime] = useState<TaskWithAssignment | null>(null)
+  const [newEstimatedTime, setNewEstimatedTime] = useState(60)
+
+  const isTeamLeader = currentUser?.role === 'TEAM_LEADER' || currentUser?.id === mission?.teamLeaderId
+
   const fetchMission = useCallback(async () => {
     try {
       const response = await fetch(`/api/missions/${missionId}`)
@@ -95,7 +151,7 @@ export default function MissionExecutePage() {
       setMission(data)
     } catch (error) {
       toast.error('Impossible de charger la mission')
-      router.push('/dashboard')
+      router.push('/field/dashboard')
     } finally {
       setIsLoading(false)
     }
@@ -131,13 +187,10 @@ export default function MissionExecutePage() {
   const startTask = async (taskId: string) => {
     setIsUpdating(true)
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const response = await fetch(`/api/tasks/${taskId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          status: 'IN_PROGRESS',
-          //startedAt: new Date().toISOString()
-        })
+        body: JSON.stringify({ status: 'IN_PROGRESS' })
       })
       if (!response.ok) throw new Error('Failed to start task')
       
@@ -155,35 +208,34 @@ export default function MissionExecutePage() {
     setIsUpdating(true)
     
     try {
-      // Upload photos if any
-      let beforePhotoUrls: string[] = []
-      let afterPhotoUrls: string[] = []
+      // Convert photos to base64 strings
+      const beforePhotoBase64 = await Promise.all(
+        beforePhotos.map(async (file) => {
+          const reader = new FileReader()
+          return new Promise((resolve) => {
+            reader.onload = () => resolve(reader.result)
+            reader.readAsDataURL(file)
+          })
+        })
+      )
+      
+      const afterPhotoBase64 = await Promise.all(
+        afterPhotos.map(async (file) => {
+          const reader = new FileReader()
+          return new Promise((resolve) => {
+            reader.onload = () => resolve(reader.result)
+            reader.readAsDataURL(file)
+          })
+        })
+      )
 
-      if (beforePhotos.length > 0) {
-        const beforeUploads = await Promise.all(
-          beforePhotos.map(file => edgestore.publicFiles.upload({ file }))
-        )
-        beforePhotoUrls = beforeUploads.map(upload => upload.url)
-      }
-
-      if (afterPhotos.length > 0) {
-        const afterUploads = await Promise.all(
-          afterPhotos.map(file => edgestore.publicFiles.upload({ file }))
-        )
-        afterPhotoUrls = afterUploads.map(upload => upload.url)
-      }
-
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const response = await fetch(`/api/tasks/${taskId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           status: 'COMPLETED',
-          completedAt: new Date().toISOString(),
-          notes: taskNotes,
-          beforePhotos: beforePhotoUrls,
-          afterPhotos: afterPhotoUrls,
-          clientApproved: clientApproval,
-          clientFeedback
+          beforePhotos: beforePhotoBase64,
+          afterPhotos: afterPhotoBase64
         })
       })
       if (!response.ok) throw new Error('Failed to complete task')
@@ -208,13 +260,11 @@ export default function MissionExecutePage() {
   const validateTask = async (taskId: string, approved: boolean) => {
     setIsUpdating(true)
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const response = await fetch(`/api/tasks/${taskId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          status: approved ? 'VALIDATED' : 'REJECTED',
-          validatedBy: currentUser?.id, // <-- FIX: Use currentUser
-          validatedAt: new Date().toISOString()
+          status: approved ? 'VALIDATED' : 'REJECTED'
         })
       })
       if (!response.ok) throw new Error('Failed to validate task')
@@ -228,12 +278,56 @@ export default function MissionExecutePage() {
     }
   }
 
+  const handleTaskAssignment = async (taskId: string, memberId: string | null) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignedToId: memberId })
+      })
+
+      if (!response.ok) throw new Error('Failed to assign task')
+
+      await fetchMission()
+      toast.success(memberId ? 'Tâche assignée avec succès' : 'Assignation supprimée')
+    } catch (error) {
+      toast.error('Erreur lors de l\'assignation')
+    }
+  }
+
+  const updateTaskTime = async (taskId: string, estimatedTime: number) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/time`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estimatedTime })
+      })
+
+      if (!response.ok) throw new Error('Failed to update time')
+
+      await fetchMission()
+      toast.success('Temps mis à jour')
+    } catch (error) {
+      toast.error('Erreur de mise à jour du temps')
+    }
+  }
+
+  const openAssignmentDialog = (task: TaskWithAssignment) => {
+    setTaskToAssign(task)
+    setIsAssignmentDialogOpen(true)
+  }
+
+  const openTimeDialog = (task: TaskWithAssignment) => {
+    setSelectedTaskForTime(task)
+    setNewEstimatedTime(task.estimatedTime || 60)
+    setIsTimeDialogOpen(true)
+  }
+
   const completeMission = async () => {
     if (!mission) return
     setIsCompletingMission(true)
     
     try {
-      // Check if all tasks are validated
       const incompleteJobs = mission.tasks.filter(task => 
         task.status !== 'VALIDATED'
       )
@@ -257,7 +351,7 @@ export default function MissionExecutePage() {
       if (!response.ok) throw new Error('Failed to complete mission')
       
       toast.success('Mission terminée! En attente de validation administrative.')
-      router.push('/dashboard')
+      router.push('/field/dashboard')
     } catch (error) {
       toast.error('Impossible de terminer la mission')
     } finally {
@@ -272,234 +366,323 @@ export default function MissionExecutePage() {
   }
 
   if (isLoading || !mission) {
-    return <div className="main-content p-6">Chargement...</div>
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    )
   }
 
   const progress = getProgress()
   const canComplete = progress === 100 && mission.status === 'IN_PROGRESS'
 
   return (
-    <div className="main-content space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="w-4 h-4" />
-          Retour au tableau de bord
-        </Link>
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Header - ENHANCED LAYOUT */}
+      <div className="bg-white border-b sticky top-0 z-10">
+        <div className="flex items-center justify-between p-4">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/field/dashboard">
+              <ArrowLeft className="w-4 h-4" />
+            </Link>
+          </Button>
+          <div className="flex-1 text-center">
+            <div className="space-y-1">
+              <h1 className="text-lg font-semibold">{mission.missionNumber}</h1>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <span className="text-sm text-gray-600">{mission.lead.firstName} {mission.lead.lastName}</span>
+                <Badge variant="outline" className="text-xs px-2 py-1">
+                  {translate(mission.priority)}
+                </Badge>
+                <div className="flex items-center gap-1">
+                  {getMissionStatusIcon(mission.status)}
+                  <span className="text-xs text-gray-600">{getMissionStatusText(mission.status)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="w-10"></div>
+        </div>
       </div>
 
-      {/* Mission Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5" />
-                Mission {mission.missionNumber}
-              </CardTitle>
-              <p className="text-muted-foreground mt-1">
-                {mission.lead.firstName} {mission.lead.lastName}
+      <div className="p-4 space-y-4">
+        {/* Mission Overview Card */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="w-4 h-4 text-gray-500" />
+              <span className="truncate">{mission.address}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Calendar className="w-4 h-4 text-gray-500" />
+              <span>{formatDate(mission.scheduledDate)} à {formatTime(mission.scheduledDate)}</span>
+            </div>
+            
+            {/* Progress Bar */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Progression</span>
+                <span className="text-sm font-medium">{progress}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+              <p className="text-xs text-gray-500">
+                {mission.tasks.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length} sur {mission.tasks.length} tâches terminées
               </p>
             </div>
-            <Badge className={`px-3 py-1 ${
-              mission.status === 'SCHEDULED' ? 'bg-blue-100 text-blue-800' :
-              mission.status === 'IN_PROGRESS' ? 'bg-orange-100 text-orange-800' :
-              mission.status === 'QUALITY_CHECK' ? 'bg-purple-100 text-purple-800' :
-              'bg-green-100 text-green-800'
-            }`}>
-              {translate(mission.status)}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">{mission.address}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">{formatDate(mission.scheduledDate)} à {formatTime(mission.scheduledDate)}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">Durée: {mission.estimatedDuration}h</span>
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Progression</span>
-              <span className="text-sm font-medium">{progress}%</span>
+            {/* Mission Control Buttons */}
+            <div className="flex gap-2">
+              {mission.status === 'SCHEDULED' && (
+                <Button 
+                  onClick={startMission} 
+                  disabled={isUpdating}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Démarrer la Mission
+                </Button>
+              )}
+              
+              {canComplete && (
+                <Button 
+                  onClick={() => setIsCompletingMission(true)}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Terminer la Mission
+                </Button>
+              )}
+
+              {/* Contact Buttons */}
+              {mission.lead.phone && (
+                <Button variant="outline" size="sm" asChild>
+                  <a href={`tel:${mission.lead.phone}`}>
+                    <Phone className="w-4 h-4" />
+                  </a>
+                </Button>
+              )}
             </div>
-            <Progress value={progress} className="h-2" />
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Mission Control Buttons */}
-          <div className="flex gap-2 mt-4">
-            {mission.status === 'SCHEDULED' && (
-              <Button 
-                onClick={startMission} 
-                disabled={isUpdating}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <Play className="w-4 h-4 mr-2" />
-                Démarrer la Mission
-              </Button>
-            )}
-            
-            {canComplete && (
-              <Button 
-                onClick={() => setIsCompletingMission(true)}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Terminer la Mission
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tasks List */}
-      <div className="grid grid-cols-1 gap-4">
-        {mission.tasks.map((task, index) => (
-          <Card key={task.id} className={`border-l-4 ${
-            task.status === 'VALIDATED' ? 'border-l-green-500' :
-            task.status === 'COMPLETED' ? 'border-l-blue-500' :
-            task.status === 'IN_PROGRESS' ? 'border-l-orange-500' :
-            task.status === 'REJECTED' ? 'border-l-red-500' :
-            'border-l-gray-300'
-          }`}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h3 className="font-medium">
-                    {index + 1}. {task.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {translate(task.category)}
-                  </p>
-                  {task.notes && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Notes: {task.notes}
-                    </p>
-                  )}
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Badge className={`${getTaskStatusColor(task.status)} flex items-center gap-1`}>
-                    {getTaskStatusIcon(task.status)}
-                    {translate(task.status)}
-                  </Badge>
-                  
-                  {/* Task Action Buttons */}
-                  {mission.status === 'IN_PROGRESS' && (
-                    <div className="flex gap-1">
-                      {task.status === 'ASSIGNED' && (
-                        <Button 
-                          size="sm" 
-                          onClick={() => startTask(task.id)}
-                          disabled={isUpdating}
-                        >
-                          <Play className="w-3 h-3" />
-                        </Button>
-                      )}
-                      
-                      {task.status === 'IN_PROGRESS' && (
-                        <Button 
-                          size="sm" 
-                          onClick={() => setSelectedTask(task)}
-                          variant="outline"
-                        >
-                          <CheckCircle className="w-3 h-3" />
-                        </Button>
-                      )}
-                      
-                      {task.status === 'COMPLETED' && currentUser?.role === 'TEAM_LEADER' && (
-                        <div className="flex gap-1">
-                          <Button 
-                            size="sm" 
-                            onClick={() => validateTask(task.id, true)}
-                            disabled={isUpdating}
-                            variant="outline"
-                            className="text-green-600 hover:text-green-700"
-                          >
-                            <ThumbsUp className="w-3 h-3" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            onClick={() => validateTask(task.id, false)}
-                            disabled={isUpdating}
-                            variant="outline"
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <ThumbsDown className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      )}
-                      
-                      {(task.beforePhotos?.length || task.afterPhotos?.length) && (
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => setSelectedTask(task)}
-                        >
-                          <Eye className="w-3 h-3" />
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
+        {/* Team Leader Controls */}
+        {isTeamLeader && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                Contrôles Chef d'Équipe
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" size="sm" className="text-xs">
+                  <Users className="w-3 h-3 mr-1" />
+                  Gérer Équipe
+                </Button>
+                <Button variant="outline" size="sm" className="text-xs">
+                  <Timer className="w-3 h-3 mr-1" />
+                  Ajuster Temps
+                </Button>
               </div>
             </CardContent>
           </Card>
-        ))}
+        )}
+
+        {/* Tasks List */}
+        <div className="space-y-3">
+          {mission.tasks.map((task, index) => (
+            <Card key={task.id} className={`border-l-4 ${
+              task.status === 'VALIDATED' ? 'border-l-green-500' :
+              task.status === 'COMPLETED' ? 'border-l-blue-500' :
+              task.status === 'IN_PROGRESS' ? 'border-l-orange-500' :
+              task.status === 'REJECTED' ? 'border-l-red-500' :
+              'border-l-gray-300'
+            }`}>
+              <CardContent className="p-3">
+                <div className="space-y-3">
+                  {/* Task Header */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 pr-2">
+                      <h3 className="font-medium text-sm leading-tight">
+                        {index + 1}. {task.title}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {translate(task.category)}
+                      </p>
+                      {task.notes && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Notes: {task.notes}
+                        </p>
+                      )}
+                    </div>
+                    <Badge className={`${getTaskStatusColor(task.status)} text-xs flex items-center gap-1 shrink-0`}>
+                      {getTaskStatusIcon(task.status)}
+                      <span className="hidden sm:inline">{translate(task.status)}</span>
+                    </Badge>
+                  </div>
+
+                  {/* Assignment Info */}
+                  {task.assignedTo && (
+                    <div className="flex items-center gap-2">
+                      <Avatar className="w-6 h-6">
+                        <AvatarImage src={task.assignedTo.user.image || undefined} />
+                        <AvatarFallback className="text-xs">
+                          {task.assignedTo.user.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs text-gray-600">{task.assignedTo.user.name}</span>
+                    </div>
+                  )}
+
+                  {/* Estimated Time */}
+                  <div className="flex items-center gap-2">
+                    <Timer className="w-3 h-3 text-gray-400" />
+                    <span className="text-xs text-gray-600">
+                      {task.estimatedTime ? `${task.estimatedTime} min` : 'Temps non défini'}
+                    </span>
+                    {isTeamLeader && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openTimeDialog(task)}
+                        className="text-xs h-auto p-1"
+                      >
+                        <Settings className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 flex-wrap">
+                    {/* Start Task Button */}
+                    {task.status === 'ASSIGNED' && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => startTask(task.id)}
+                        disabled={isUpdating}
+                        className="flex-1 text-xs min-w-0"
+                      >
+                        <Play className="w-3 h-3 mr-1" />
+                        Commencer
+                      </Button>
+                    )}
+                    
+                    {/* Complete Task Button */}
+                    {task.status === 'IN_PROGRESS' && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => setSelectedTask(task)}
+                        disabled={isUpdating}
+                        className="flex-1 text-xs bg-green-600 hover:bg-green-700 min-w-0"
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Terminer
+                      </Button>
+                    )}
+
+                    {/* Team Leader Controls */}
+                    {isTeamLeader && (
+                      <>
+                        {/* Assignment Button */}
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => openAssignmentDialog(task)}
+                          className="text-xs"
+                        >
+                          <User className="w-3 h-3 mr-1" />
+                          {task.assignedTo ? 'Réassigner' : 'Assigner'}
+                        </Button>
+
+                        {/* Validate Button for completed tasks */}
+                        {task.status === 'COMPLETED' && (
+                          <>
+                            <Button 
+                              size="sm" 
+                              onClick={() => validateTask(task.id, true)}
+                              disabled={isUpdating}
+                              className="text-xs bg-purple-600 hover:bg-purple-700"
+                            >
+                              <ThumbsUp className="w-3 h-3 mr-1" />
+                              Valider
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              onClick={() => validateTask(task.id, false)}
+                              disabled={isUpdating}
+                              variant="outline"
+                              className="text-xs text-red-600"
+                            >
+                              <ThumbsDown className="w-3 h-3 mr-1" />
+                              Rejeter
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    )}
+
+                    {/* View Photos Button */}
+                    {(task.beforePhotos?.length || task.afterPhotos?.length) && (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setSelectedTask(task)}
+                        className="text-xs"
+                      >
+                        <Eye className="w-3 h-3 mr-1" />
+                        Photos
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       {/* Task Completion Dialog */}
       {selectedTask && (
-        <Card className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">
-                Terminer la tâche: {selectedTask.title}
-              </h3>
-              <Button 
-                variant="ghost" 
-                onClick={() => setSelectedTask(null)}
-              >
-                ✕
-              </Button>
-            </div>
+        <Dialog open={!!selectedTask} onOpenChange={() => setSelectedTask(null)}>
+          <DialogContent className="max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-base">
+                Terminer: {selectedTask.title}
+              </DialogTitle>
+            </DialogHeader>
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="task-notes">Notes de la tâche</Label>
+                <Label htmlFor="task-notes" className="text-sm">Notes de la tâche</Label>
                 <Textarea
                   id="task-notes"
                   value={taskNotes}
                   onChange={(e) => setTaskNotes(e.target.value)}
                   placeholder="Décrivez le travail effectué..."
+                  rows={3}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Photos avant</Label>
+                  <Label className="text-sm">Photos avant</Label>
                   <Input
                     type="file"
                     multiple
                     accept="image/*"
                     onChange={(e) => setBeforePhotos(Array.from(e.target.files || []))}
+                    className="text-xs"
                   />
                 </div>
                 <div>
-                  <Label>Photos après</Label>
+                  <Label className="text-sm">Photos après</Label>
                   <Input
                     type="file"
                     multiple
                     accept="image/*"
                     onChange={(e) => setAfterPhotos(Array.from(e.target.files || []))}
+                    className="text-xs"
                   />
                 </div>
               </div>
@@ -510,90 +693,253 @@ export default function MissionExecutePage() {
                   checked={clientApproval}
                   onCheckedChange={(checked) => setClientApproval(!!checked)}
                 />
-                <Label htmlFor="client-approval">
+                <Label htmlFor="client-approval" className="text-sm">
                   Client approuve cette tâche
                 </Label>
               </div>
 
               {clientApproval && (
                 <div>
-                  <Label htmlFor="client-feedback">Feedback du client</Label>
+                  <Label htmlFor="client-feedback" className="text-sm">Feedback du client</Label>
                   <Textarea
                     id="client-feedback"
                     value={clientFeedback}
                     onChange={(e) => setClientFeedback(e.target.value)}
                     placeholder="Commentaires du client..."
+                    rows={3}
                   />
                 </div>
               )}
 
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 pt-4">
                 <Button 
                   variant="outline" 
                   onClick={() => setSelectedTask(null)}
+                  size="sm"
                 >
                   Annuler
                 </Button>
                 <Button 
                   onClick={() => completeTask(selectedTask.id)}
                   disabled={isUpdating}
+                  size="sm"
                 >
-                  {isUpdating ? 'Enregistrement...' : 'Terminer la tâche'}
+                  {isUpdating ? 'Enregistrement...' : 'Terminer'}
                 </Button>
               </div>
             </div>
-          </div>
-        </Card>
+          </DialogContent>
+        </Dialog>
       )}
 
-      {/* Mission Completion Dialog */}
-      {isCompletingMission && (
-        <Card className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">
-              Terminer la mission
-            </h3>
+      {/* Time Management Dialog */}
+      {isTimeDialogOpen && selectedTaskForTime && (
+        <Dialog open={isTimeDialogOpen} onOpenChange={setIsTimeDialogOpen}>
+          <DialogContent className="max-w-sm mx-4">
+            <DialogHeader>
+              <DialogTitle className="text-base">
+                Ajuster le temps: {selectedTaskForTime.title}
+              </DialogTitle>
+            </DialogHeader>
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="final-rating">Note globale du client (1-5)</Label>
+                <Label htmlFor="estimated-time" className="text-sm">
+                  Temps Estimé (minutes)
+                </Label>
                 <Input
-                  id="final-rating"
+                  id="estimated-time"
                   type="number"
                   min="1"
-                  max="5"
-                  value={finalClientRating}
-                  onChange={(e) => setFinalClientRating(Number(e.target.value))}
+                  max="1440"
+                  value={newEstimatedTime}
+                  onChange={(e) => setNewEstimatedTime(Number(e.target.value))}
                 />
               </div>
 
               <div>
-                <Label htmlFor="final-feedback">Feedback final du client</Label>
+                <Label className="text-sm mb-2 block">Temps Prédéfinis</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[30, 60, 90, 120, 180, 240].map((time) => (
+                    <Button
+                      key={time}
+                      variant={newEstimatedTime === time ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setNewEstimatedTime(time)}
+                      className="text-xs"
+                    >
+                      {time}min
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={() => {
+                    updateTaskTime(selectedTaskForTime.id, newEstimatedTime)
+                    setIsTimeDialogOpen(false)
+                  }}
+                  className="flex-1"
+                  size="sm"
+                >
+                  Mettre à Jour
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsTimeDialogOpen(false)}
+                  size="sm"
+                >
+                  Annuler
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Task Assignment Dialog */}
+      {isAssignmentDialogOpen && taskToAssign && (
+        <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+          <DialogContent className="max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-base">
+                Assigner: {taskToAssign.title}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {mission.team?.members.map((member) => (
+                <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="w-8 h-8">
+                      <AvatarImage src={member.user.image || undefined} />
+                      <AvatarFallback className="text-xs">
+                        {member.user.name?.split(' ').map(n => n[0]).join('') || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h4 className="font-medium text-sm">{member.user.name}</h4>
+                      <div className="flex gap-1 mt-1">
+                        <Badge variant="outline" className="text-xs">
+                          {member.experience}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {member.availability === 'AVAILABLE' ? 'Disponible' : 'Occupé'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      handleTaskAssignment(taskToAssign.id, member.id)
+                      setIsAssignmentDialogOpen(false)
+                    }}
+                    disabled={member.availability !== 'AVAILABLE'}
+                    size="sm"
+                    className="text-xs"
+                  >
+                    {member.availability === 'AVAILABLE' ? 'Assigner' : 'Indispo'}
+                  </Button>
+                </div>
+              )) || (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  Aucun membre d'équipe disponible
+                </p>
+              )}
+
+              {/* Remove assignment option */}
+              {taskToAssign.assignedTo && (
+                <div className="p-3 border rounded-lg bg-red-50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-red-600">Supprimer l'assignation</span>
+                    <Button
+                      onClick={() => {
+                        handleTaskAssignment(taskToAssign.id, null)
+                        setIsAssignmentDialogOpen(false)
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs text-red-600"
+                    >
+                      Supprimer
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsAssignmentDialogOpen(false)}
+                size="sm"
+              >
+                Fermer
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Mission Completion Dialog */}
+      {isCompletingMission && (
+        <Dialog open={isCompletingMission} onOpenChange={setIsCompletingMission}>
+          <DialogContent className="max-w-md mx-4">
+            <DialogHeader>
+              <DialogTitle className="text-base">
+                Terminer la mission
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="final-rating" className="text-sm">Note globale du client (1-5)</Label>
+                <div className="flex gap-1 mt-2">
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <Button
+                      key={rating}
+                      variant={finalClientRating === rating ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setFinalClientRating(rating)}
+                      className="w-10 h-10 p-0"
+                    >
+                      <Star className={`w-4 h-4 ${rating <= finalClientRating ? 'fill-current' : ''}`} />
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="final-feedback" className="text-sm">Feedback final du client</Label>
                 <Textarea
                   id="final-feedback"
                   value={finalClientFeedback}
                   onChange={(e) => setFinalClientFeedback(e.target.value)}
                   placeholder="Satisfaction générale du client..."
+                  rows={3}
                 />
               </div>
 
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 pt-2">
                 <Button 
                   variant="outline" 
                   onClick={() => setIsCompletingMission(false)}
+                  size="sm"
                 >
                   Annuler
                 </Button>
                 <Button 
                   onClick={completeMission}
                   disabled={isCompletingMission}
+                  size="sm"
                 >
-                  {isCompletingMission ? 'Finalisation...' : 'Terminer la mission'}
+                  {isCompletingMission ? 'Finalisation...' : 'Terminer'}
                 </Button>
               </div>
             </div>
-          </div>
-        </Card>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )
