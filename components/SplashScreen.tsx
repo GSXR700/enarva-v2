@@ -17,13 +17,30 @@ export default function SplashScreen() {
   const [isVisible, setIsVisible] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [showLogo, setShowLogo] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const hasShownRef = useRef(false);
   const { theme } = useTheme();
 
-  // Determine if we're in dark mode
-  const isDarkMode = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  // Determine dark mode on client side only
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const checkDarkMode = () => {
+      if (theme === 'dark') {
+        return true;
+      } else if (theme === 'system') {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+      return false;
+    };
+
+    setIsDarkMode(checkDarkMode());
+  }, [theme]);
 
   useEffect(() => {
+    // Ensure we're on the client
+    if (typeof window === 'undefined') return;
+
     // Check if this is a PWA launch
     const isPWA = checkIfPWA();
     
@@ -79,6 +96,9 @@ export default function SplashScreen() {
   }, []);
 
   const checkIfPWA = (): boolean => {
+    // Client-side check only
+    if (typeof window === 'undefined') return false;
+    
     // Check if app was launched from home screen
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     const isIOSStandalone = (window.navigator as any).standalone === true;
@@ -102,7 +122,7 @@ export default function SplashScreen() {
             clipPath: { duration: 1, ease: [0.76, 0, 0.24, 1] }
           }
         }}
-        className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center ${
+        className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-colors duration-300 ${
           isDarkMode ? 'bg-black' : 'bg-white'
         }`}
       >
@@ -169,14 +189,14 @@ export default function SplashScreen() {
               className="w-64 md:w-80"
             >
               {/* Progress Bar Container */}
-              <div className={`w-full h-1 rounded-full overflow-hidden ${
+              <div className={`w-full h-1 rounded-full overflow-hidden transition-colors duration-300 ${
                 isDarkMode ? 'bg-white/10' : 'bg-gray-200'
               }`}>
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${loadingProgress}%` }}
                   transition={{ duration: 0.3, ease: "easeOut" }}
-                  className={`h-full rounded-full ${
+                  className={`h-full rounded-full transition-colors duration-300 ${
                     isDarkMode 
                       ? 'bg-white' 
                       : 'bg-gradient-to-r from-blue-500 to-blue-600'
