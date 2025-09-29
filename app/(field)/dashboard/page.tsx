@@ -313,51 +313,62 @@ export default function FieldDashboard() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="space-y-2 p-4 max-h-[600px] overflow-y-auto">
-                  {missions.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Aucune mission aujourd'hui</p>
-                    </div>
-                  ) : (
-                    missions.map((mission) => {
-                      const progress = getMissionProgress(mission)
-                      const myTasks = getMyTasks(mission)
-                      return (
-                        <div key={mission.id} className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${selectedMission?.id === mission.id ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-muted/50'}`} onClick={() => setSelectedMission(mission)}>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium text-sm">{mission.missionNumber}</span>
-                            <Badge className={statusColors[mission.status as keyof typeof statusColors] + ' text-xs'}>{translate(mission.status)}</Badge>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="font-medium">{mission.lead.firstName} {mission.lead.lastName}</p>
-                            <div className="flex items-center text-sm text-muted-foreground">
-                              <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                              <span className="truncate">{mission.address}</span>
-                            </div>
-                            <div className="flex items-center text-sm text-muted-foreground">
-                              <Clock className="h-3 w-3 mr-1 flex-shrink-0" />
-                              <span>{formatTime(new Date(mission.scheduledDate))}</span>
-                            </div>
-                          </div>
-                          {myTasks.length > 0 && (
-                            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                              <p className="text-xs text-blue-700 dark:text-blue-400">Mes tâches: {myTasks.filter(t => ['COMPLETED', 'VALIDATED'].includes(t.status)).length}/{myTasks.length}</p>
-                            </div>
-                          )}
-                          {mission.tasks.length > 0 && (
-                            <div className="mt-2">
-                              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                                <span>Progression</span>
-                                <span>{progress}%</span>
-                              </div>
-                              <Progress value={progress} className="h-2" />
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
+  {missions.length === 0 ? (
+    <div className="text-center py-8 text-muted-foreground">
+      <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+      <p>Aucune mission aujourd'hui</p>
+    </div>
+  ) : (
+    missions.map((mission) => {
+      const progress = getMissionProgress(mission)
+      const myTasks = getMyTasks(mission)
+      const completedMyTasks = myTasks.filter(t => ['COMPLETED', 'VALIDATED'].includes(t.status)).length
+      
+      return (
+        <div 
+          key={mission.id} 
+          className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${selectedMission?.id === mission.id ? 'bg-primary/10 border-primary' : 'bg-card hover:bg-muted/50'}`} 
+          onClick={() => setSelectedMission(mission)}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-medium text-sm">{mission.missionNumber}</span>
+            <Badge className={statusColors[mission.status as keyof typeof statusColors] + ' text-xs'}>
+              {translate(mission.status)}
+            </Badge>
+          </div>
+          
+          <div className="space-y-1">
+            <p className="font-medium">{mission.lead.firstName} {mission.lead.lastName}</p>
+            <div className="flex items-center text-sm text-muted-foreground">
+              <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+              <span className="truncate">{mission.address}</span>
+            </div>
+            <div className="flex items-center text-sm text-muted-foreground">
+              <Clock className="h-3 w-3 mr-1 flex-shrink-0" />
+              <span>{formatTime(new Date(mission.scheduledDate))}</span>
+            </div>
+          </div>
+          
+          {myTasks.length > 0 && (
+            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+              <p className="text-xs text-blue-700 dark:text-blue-400">
+                Mes tâches: {completedMyTasks}/{myTasks.length}
+              </p>
+            </div>
+          )}
+          
+          <div className="mt-3 space-y-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Progression</span>
+              <span className="font-medium">{progress}%</span>
+            </div>
+            <Progress value={progress} className="h-2" />
+          </div>
+        </div>
+      )
+    })
+  )}
+</div>
               </CardContent>
             </Card>
           </div>
