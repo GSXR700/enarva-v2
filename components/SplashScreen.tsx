@@ -122,10 +122,63 @@ export default function SplashScreen() {
             clipPath: { duration: 1, ease: [0.76, 0, 0.24, 1] }
           }
         }}
-        className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-colors duration-300 ${
-          isDarkMode ? 'bg-black' : 'bg-white'
-        }`}
+        className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden"
+        style={{
+          background: isDarkMode 
+            ? '#000000'
+            : 'linear-gradient(to right, #267df4, #2155c9)'
+        }}
       >
+        {/* Animated Background Blobs - Only in Light Mode */}
+        {!isDarkMode && (
+          <>
+            <motion.div
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.3, 0.5, 0.3],
+                x: [0, 50, 0],
+                y: [0, -30, 0],
+              }}
+              transition={{
+                duration: 8,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              className="absolute -top-1/4 -left-1/4 h-96 w-96 rounded-full bg-white/20 blur-3xl"
+            />
+            <motion.div
+              animate={{
+                scale: [1, 1.3, 1],
+                opacity: [0.3, 0.6, 0.3],
+                x: [0, -40, 0],
+                y: [0, 40, 0],
+              }}
+              transition={{
+                duration: 10,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 1
+              }}
+              className="absolute -bottom-1/4 -right-1/4 h-96 w-96 rounded-full bg-blue-200/30 blur-3xl"
+            />
+            <motion.div
+              animate={{
+                scale: [1, 1.15, 1],
+                opacity: [0.2, 0.4, 0.2],
+                x: [0, 30, 0],
+                y: [0, 20, 0],
+              }}
+              transition={{
+                duration: 7,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 2
+              }}
+              className="absolute top-1/3 right-1/4 h-72 w-72 rounded-full bg-sky-300/25 blur-3xl"
+            />
+          </>
+        )}
+
         {/* Logo Container */}
         <AnimatePresence>
           {showLogo && (
@@ -141,9 +194,9 @@ export default function SplashScreen() {
                 duration: 0.6,
                 ease: [0.43, 0.13, 0.23, 0.96]
               }}
-              className="relative mb-12"
+              className="relative mb-12 z-10"
             >
-              {/* Logo with shine effect */}
+              {/* Logo without shine effect */}
               <div className="relative w-80 h-24 md:w-96 md:h-28">
                 <Image
                   src="/images/dark-logo.png"
@@ -153,27 +206,6 @@ export default function SplashScreen() {
                   className="object-contain"
                   quality={100}
                 />
-                
-                {/* Shine effect overlay - sweeps from E to A */}
-                <motion.div
-                  initial={{ x: '-100%' }}
-                  animate={{ x: '100%' }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    repeatDelay: 1,
-                    ease: "linear"
-                  }}
-                  className="absolute inset-0 overflow-hidden"
-                >
-                  <div 
-                    className="absolute inset-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent"
-                    style={{
-                      filter: 'blur(10px)',
-                      transform: 'skewX(-20deg)'
-                    }}
-                  />
-                </motion.div>
               </div>
             </motion.div>
           )}
@@ -186,39 +218,26 @@ export default function SplashScreen() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.5 }}
-              className="w-64 md:w-80"
+              className="w-64 md:w-80 z-10"
             >
               {/* Progress Bar Container */}
               <div className={`w-full h-1 rounded-full overflow-hidden transition-colors duration-300 ${
-                isDarkMode ? 'bg-white/10' : 'bg-gray-200'
+                isDarkMode ? 'bg-white/10' : 'bg-white/20'
               }`}>
+                {/* Progress Bar - animates from left to right (0% to 100% width) */}
                 <motion.div
-                  initial={{ width: 0 }}
+                  initial={{ width: '0%' }}
                   animate={{ width: `${loadingProgress}%` }}
                   transition={{ duration: 0.3, ease: "easeOut" }}
-                  className={`h-full rounded-full transition-colors duration-300 ${
-                    isDarkMode 
-                      ? 'bg-white' 
-                      : 'bg-gradient-to-r from-blue-500 to-blue-600'
-                  }`}
+                  className="h-full rounded-full transition-colors duration-300 bg-white"
                   style={{
-                    boxShadow: isDarkMode 
-                      ? '0 0 10px rgba(255, 255, 255, 0.5)' 
-                      : '0 0 10px rgba(59, 130, 246, 0.5)'
+                    boxShadow: '0 0 10px rgba(255, 255, 255, 0.5)'
                   }}
                 />
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Custom styles for shine animation */}
-        <style jsx>{`
-          @keyframes shine {
-            0% { transform: translateX(-100%) skewX(-20deg); }
-            100% { transform: translateX(100%) skewX(-20deg); }
-          }
-        `}</style>
       </motion.div>
     </AnimatePresence>
   );
