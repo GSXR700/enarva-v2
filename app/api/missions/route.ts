@@ -1,8 +1,8 @@
-// app/api/missions/route.ts - FIXED VERSION WITH PROPER TYPING
+// app/api/missions/route.ts - FIXED VERSION
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';  // Use singleton
+import { prisma } from '@/lib/prisma';
 import { ExtendedUser } from '@/types/next-auth';
 import { MissionStatus, Prisma } from '@prisma/client';
 
@@ -34,13 +34,13 @@ export async function GET(request: NextRequest) {
     // Build where clause
     const where: Prisma.MissionWhereInput = {};
 
-    // FIXED: Proper TypeScript handling for status
+    // Handle comma-separated status values
     if (statusParam) {
       const statusValues = statusParam.split(',').map(s => s.trim()) as MissionStatus[];
       if (statusValues.length === 1) {
-        where.status = statusValues[0] as MissionStatus;  // FIXED: explicit cast
+        where.status = statusValues[0] as MissionStatus;
       } else if (statusValues.length > 1) {
-        where.status = { in: statusValues };  // FIXED: this is correct for arrays
+        where.status = { in: statusValues };
       }
     }
 
@@ -155,13 +155,21 @@ export async function GET(request: NextRequest) {
 
     console.log(`✅ Successfully fetched ${missions.length} missions (total: ${total})`);
 
-    return NextResponse.json({
-      missions,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
-    });
+    // FIXED: Return array directly if no pagination params, otherwise return object with metadata
+    const includePagination = searchParams.has('page') || searchParams.has('limit');
+    
+    if (includePagination) {
+      return NextResponse.json({
+        missions,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      });
+    } else {
+      // Return array directly for backward compatibility
+      return NextResponse.json(missions);
+    }
 
   } catch (error) {
     console.error('❌ Failed to fetch missions:', error);
