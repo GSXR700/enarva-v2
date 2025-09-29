@@ -1,7 +1,7 @@
-// app/(field)/dashboard/page.tsx - COMPLETE VERSION WITH ALL FEATURES
+// app/(field)/dashboard/page.tsx - UPDATED & ENHANCED VERSION
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,31 +27,12 @@ import {
   Timer,
   Target,
   Play,
-  Square,
   Eye,
-  User,
-  ChevronDown
+  User
 } from 'lucide-react'
 import { formatDate, formatTime, translate } from '@/lib/utils'
 import { Mission, Task, User as UserType } from '@prisma/client'
 import { toast } from 'sonner'
-import { usePusherChannel } from '@/hooks/usePusherClient'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 
 // Enhanced type definitions
 interface TaskWithAssignment extends Task {
@@ -129,62 +110,42 @@ export default function FieldDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedMission, setSelectedMission] = useState<FieldMission | null>(null)
 
-  // Task management states
-  const [isTimeDialogOpen, setIsTimeDialogOpen] = useState(false)
-  const [selectedTask, setSelectedTask] = useState<TaskWithAssignment | null>(null)
-  const [newEstimatedTime, setNewEstimatedTime] = useState(60)
-  const [isUpdating, setIsUpdating] = useState(false)
-
   const currentUser = session?.user as any
   const isTeamLeader = currentUser?.role === 'TEAM_LEADER'
-  const isTechnician = currentUser?.role === 'TECHNICIAN'
 
-  const fetchFieldData = useCallback(async () => {
+  useEffect(() => {
+    fetchFieldData()
+    const interval = setInterval(fetchFieldData, 30000) // Refresh every 30 seconds
+    return () => clearInterval(interval)
+  }, [])
+
+  const fetchFieldData = async () => {
     try {
+      // Use the new field missions API
       const missionsRes = await fetch('/api/missions/field')
 
       if (missionsRes.ok) {
         const missionsData = await missionsRes.json()
-        
-        // Filter missions based on user role
-        let filteredMissions = missionsData
-        
-        if (isTechnician && !isTeamLeader) {
-          filteredMissions = missionsData.filter((m: FieldMission) =>
-            m.tasks.some(t => t.assignedTo?.user.id === currentUser?.id)
-          )
-        }
-        
-        setMissions(filteredMissions)
+        setMissions(missionsData)
         
         // Calculate stats from missions data
         const today = new Date()
         today.setHours(0, 0, 0, 0)
         
-        const activeMissions = filteredMissions.filter((m: FieldMission) => 
+        const activeMissions = missionsData.filter((m: FieldMission) => 
           ['SCHEDULED', 'IN_PROGRESS'].includes(m.status)
         ).length
         
-        const completedToday = filteredMissions.filter((m: FieldMission) => 
+        const completedToday = missionsData.filter((m: FieldMission) => 
           m.status === 'COMPLETED' && new Date(m.actualEndTime || '').toDateString() === today.toDateString()
         ).length
         
-        let pendingTasks = 0
-        if (isTechnician && !isTeamLeader) {
-          pendingTasks = filteredMissions.reduce((acc: number, m: FieldMission) => 
-            acc + m.tasks.filter(t => 
-              t.assignedTo?.user.id === currentUser?.id && 
-              ['ASSIGNED', 'IN_PROGRESS'].includes(t.status)
-            ).length, 0
-          )
-        } else {
-          pendingTasks = filteredMissions.reduce((acc: number, m: FieldMission) => 
-            acc + m.tasks.filter(t => ['ASSIGNED', 'IN_PROGRESS'].includes(t.status)).length, 0
-          )
-        }
+        const pendingTasks = missionsData.reduce((acc: number, m: FieldMission) => 
+          acc + m.tasks.filter(t => ['ASSIGNED', 'IN_PROGRESS'].includes(t.status)).length, 0
+        )
         
-        const totalTasks = filteredMissions.reduce((acc: number, m: FieldMission) => acc + m.tasks.length, 0)
-        const completedTasks = filteredMissions.reduce((acc: number, m: FieldMission) => 
+        const totalTasks = missionsData.reduce((acc: number, m: FieldMission) => acc + m.tasks.length, 0)
+        const completedTasks = missionsData.reduce((acc: number, m: FieldMission) => 
           acc + m.tasks.filter(t => ['COMPLETED', 'VALIDATED'].includes(t.status)).length, 0
         )
         const teamEfficiency = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
@@ -196,8 +157,8 @@ export default function FieldDashboard() {
           teamEfficiency
         })
         
-        if (filteredMissions.length > 0 && !selectedMission) {
-          setSelectedMission(filteredMissions[0])
+        if (missionsData.length > 0 && !selectedMission) {
+          setSelectedMission(missionsData[0])
         }
       }
     } catch (error) {
@@ -206,104 +167,24 @@ export default function FieldDashboard() {
     } finally {
       setIsLoading(false)
     }
-  }, [currentUser?.id, isTechnician, isTeamLeader, selectedMission])
+  }
 
-  useEffect(() => {
-    fetchFieldData()
-  }, [fetchFieldData])
+  const updateTaskStatus = async (taskId: string, status: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      })
 
-  // Real-time updates with Pusher
-  usePusherChannel('missions-channel', {
-    'task-updated': (data: any) => {
-      console.log('Task updated via Pusher:', data)
+      if (!response.ok) throw new Error('Failed to update task')
+
+      toast.success('Statut de la tâche mis à jour')
       fetchFieldData()
-      toast.success('Tâche mise à jour en temps réel')
-    },
-    'mission-updated': (data: any) => {
-      console.log('Mission updated via Pusher:', data)
-      fetchFieldData()
-    }
-  })
-
-  // Task assignment handler
-  const handleAssignTask = async (taskId: string, memberId: string | null) => {
-    setIsUpdating(true)
-    try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignedToId: memberId })
-      })
-
-      if (!response.ok) throw new Error('Failed to assign task')
-
-      await fetchFieldData()
-      toast.success(memberId ? 'Tâche assignée avec succès' : 'Assignation supprimée')
     } catch (error) {
-      console.error('Assignment error:', error)
-      toast.error('Erreur lors de l\'assignation')
-    } finally {
-      setIsUpdating(false)
+      toast.error('Erreur lors de la mise à jour')
     }
   }
-
-  // Task time update handler
-  const handleUpdateTaskTime = async () => {
-    if (!selectedTask) return
-    
-    setIsUpdating(true)
-    try {
-      const response = await fetch(`/api/tasks/${selectedTask.id}/time`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estimatedTime: newEstimatedTime })
-      })
-
-      if (!response.ok) throw new Error('Failed to update time')
-
-      await fetchFieldData()
-      toast.success('Durée mise à jour')
-      setIsTimeDialogOpen(false)
-    } catch (error) {
-      console.error('Time update error:', error)
-      toast.error('Erreur de mise à jour')
-    } finally {
-      setIsUpdating(false)
-    }
-  }
-
-  // Task status toggle (start/stop)
-  const handleToggleTaskStatus = async (task: TaskWithAssignment) => {
-    const newStatus = task.status === 'ASSIGNED' ? 'IN_PROGRESS' : 
-                     task.status === 'IN_PROGRESS' ? 'COMPLETED' : task.status
-    
-    setIsUpdating(true)
-    try {
-      const response = await fetch(`/api/tasks/${task.id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      })
-
-      if (!response.ok) throw new Error('Failed to update status')
-
-      await fetchFieldData()
-      toast.success(`Tâche ${newStatus === 'IN_PROGRESS' ? 'démarrée' : 'terminée'}`)
-    } catch (error) {
-      console.error('Status update error:', error)
-      toast.error('Erreur lors de la mise à jour du statut')
-    } finally {
-      setIsUpdating(false)
-    }
-  }
-
-  // Open time dialog
-  const openTimeDialog = (task: TaskWithAssignment) => {
-    setSelectedTask(task)
-    setNewEstimatedTime(task.estimatedTime || 60)
-    setIsTimeDialogOpen(true)
-  }
-
 
   const startMission = async (missionId: string) => {
     try {
@@ -532,7 +413,7 @@ export default function FieldDashboard() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue="tasks" className="w-full">
+                  <Tabs defaultValue="details" className="w-full">
                     <TabsList className="grid w-full grid-cols-4">
                       <TabsTrigger value="details">Détails</TabsTrigger>
                       <TabsTrigger value="tasks">Tâches</TabsTrigger>
@@ -620,81 +501,10 @@ export default function FieldDashboard() {
                               )}
                               <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                                  {/* Assignment Dropdown - Team Leader Only */}
-                                  {isTeamLeader && selectedMission.team && (
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="h-8 text-xs flex items-center gap-1.5 px-2"
-                                          disabled={isUpdating}
-                                        >
-                                          {task.assignedTo ? (
-                                            <>
-                                              <Avatar className="h-5 w-5">
-                                                <AvatarImage src={task.assignedTo.user.image || ''} />
-                                                <AvatarFallback className="text-[10px]">
-                                                  {task.assignedTo.user.name?.charAt(0) || '?'}
-                                                </AvatarFallback>
-                                              </Avatar>
-                                              <span className="max-w-[80px] truncate">
-                                                {task.assignedTo.user.name?.split(' ')[0] || 'Assigné'}
-                                              </span>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <User className="h-3.5 w-3.5" />
-                                              <span>Assigner</span>
-                                            </>
-                                          )}
-                                          <ChevronDown className="h-3 w-3 opacity-50" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="start" className="w-48">
-                                        {selectedMission.team.members.map((member) => (
-                                          <DropdownMenuItem
-                                            key={member.id}
-                                            onClick={() => handleAssignTask(task.id, member.id)}
-                                            className="flex items-center gap-2 cursor-pointer"
-                                          >
-                                            <Avatar className="h-6 w-6">
-                                              <AvatarImage src={member.user.image || ''} />
-                                              <AvatarFallback className="text-xs">
-                                                {member.user.name?.charAt(0) || '?'}
-                                              </AvatarFallback>
-                                            </Avatar>
-                                            <span className="text-sm truncate">
-                                              {member.user.name?.split(' ')[0] || 'Sans nom'}
-                                            </span>
-                                          </DropdownMenuItem>
-                                        ))}
-                                        {task.assignedTo && (
-                                          <DropdownMenuItem
-                                            className="border-t"
-                                            onClick={() => handleAssignTask(task.id, null)}
-                                          >
-                                            <span className="text-sm text-red-600">Retirer l'assignation</span>
-                                          </DropdownMenuItem>
-                                        )}
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  )}
-
                                   {task.estimatedTime && (
                                     <div className="flex items-center">
                                       <Clock className="h-3 w-3 mr-1" />
                                       <span>{task.estimatedTime} min</span>
-                                      {isTeamLeader && (
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => openTimeDialog(task)}
-                                          className="text-xs h-auto p-1 ml-1"
-                                        >
-                                          <Settings className="w-3 h-3" />
-                                        </Button>
-                                      )}
                                     </div>
                                   )}
                                   {task.assignedTo && (
@@ -710,30 +520,25 @@ export default function FieldDashboard() {
                                   )}
                                 </div>
                                 <div className="flex space-x-2">
-                                  {/* Play/Stop Button - Circular */}
-                                  {(task.assignedTo?.user.id === currentUser?.id || isTeamLeader) && (
-                                    <>
-                                      {task.status === 'ASSIGNED' && (
-                                        <Button
-                                          onClick={() => handleToggleTaskStatus(task)}
-                                          disabled={isUpdating}
-                                          className="h-9 w-9 rounded-full p-0 bg-blue-500 hover:bg-blue-600"
-                                          size="sm"
-                                        >
-                                          <Play className="h-4 w-4 text-white fill-white" />
-                                        </Button>
-                                      )}
-                                      {task.status === 'IN_PROGRESS' && (
-                                        <Button
-                                          onClick={() => handleToggleTaskStatus(task)}
-                                          disabled={isUpdating}
-                                          className="h-9 w-9 rounded-full p-0 bg-red-500 hover:bg-red-600"
-                                          size="sm"
-                                        >
-                                          <Square className="h-4 w-4 text-white fill-white" />
-                                        </Button>
-                                      )}
-                                    </>
+                                  {task.status === 'ASSIGNED' && (
+                                    <Button 
+                                      size="sm" 
+                                      onClick={() => updateTaskStatus(task.id, 'IN_PROGRESS')}
+                                      className="bg-blue-500 hover:bg-blue-600"
+                                    >
+                                      <Play className="w-3 h-3 mr-1" />
+                                      Commencer
+                                    </Button>
+                                  )}
+                                  {task.status === 'IN_PROGRESS' && (
+                                    <Button 
+                                      size="sm" 
+                                      onClick={() => updateTaskStatus(task.id, 'COMPLETED')}
+                                      className="bg-green-500 hover:bg-green-600"
+                                    >
+                                      <CheckCircle2 className="w-3 h-3 mr-1" />
+                                      Terminer
+                                    </Button>
                                   )}
                                 </div>
                               </div>
@@ -817,7 +622,7 @@ export default function FieldDashboard() {
                             </Button>
                           )}
 
-                          <Link href={`/missions/${selectedMission.id}/execute`} className="block">
+                          <Link href={`/field/missions/${selectedMission.id}/execute`} className="block">
                             <Button variant="default" className="w-full">
                               <Eye className="w-4 h-4 mr-2" />
                               Vue complète mission
@@ -853,7 +658,7 @@ export default function FieldDashboard() {
                         <div className="space-y-3">
                           <h4 className="font-medium">Documentation</h4>
                           
-                          <Link href={`/missions/${selectedMission.id}/report`} className="block">
+                          <Link href={`/field/missions/${selectedMission.id}/report`} className="block">
                             <Button variant="outline" className="w-full">
                               <FileText className="w-4 h-4 mr-2" />
                               Rapport de terrain
@@ -898,45 +703,6 @@ export default function FieldDashboard() {
           </div>
         </div>
       </div>
-
-      {/* Time Update Dialog */}
-      <Dialog open={isTimeDialogOpen} onOpenChange={setIsTimeDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Modifier la durée</DialogTitle>
-            <DialogDescription>
-              Ajustez le temps estimé pour cette tâche
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="time">Durée (minutes)</Label>
-              <Input
-                id="time"
-                type="number"
-                min="1"
-                max="480"
-                value={newEstimatedTime}
-                onChange={(e) => setNewEstimatedTime(parseInt(e.target.value) || 60)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsTimeDialogOpen(false)}
-            >
-              Annuler
-            </Button>
-            <Button
-              onClick={handleUpdateTaskTime}
-              disabled={isUpdating}
-            >
-              {isUpdating ? 'Mise à jour...' : 'Confirmer'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
-}
+} 
