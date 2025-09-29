@@ -349,62 +349,66 @@ export default function MissionDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {mission.tasks.length === 0 ? (
-                <div className="text-center py-8">
-                  <CheckCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">Aucune tâche assignée</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {mission.tasks.map((task, index) => (
-                    <div
-                      key={task.id}
-                      className={`border-l-4 p-4 rounded-lg ${
-                        task.status === 'VALIDATED' ? 'border-l-green-500 bg-green-50/50' :
-                        task.status === 'COMPLETED' ? 'border-l-blue-500 bg-blue-50/50' :
-                        task.status === 'IN_PROGRESS' ? 'border-l-orange-500 bg-orange-50/50' :
-                        task.status === 'REJECTED' ? 'border-l-red-500 bg-red-50/50' :
-                        'border-l-gray-300 bg-gray-50/50'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium">
-                            {index + 1}. {task.title}
-                          </h4>
-                          {task.description && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {task.description}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-4 mt-2">
-                            <Badge className={`text-xs ${getTaskStatusColor(task.status)}`}>
-                              {translate(task.status)}
-                            </Badge>
-                            {task.assignedTo && (
-                              <div className="flex items-center gap-1">
-                                <User className="w-3 h-3 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">
-                                  {task.assignedTo.user.name}
-                                </span>
-                              </div>
-                            )}
-                            {task.estimatedTime && (
-                              <div className="flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">
-                                  {task.estimatedTime}min
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+  {mission.tasks.length === 0 ? (
+    <div className="text-center py-8">
+      <CheckCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+      <p className="text-muted-foreground">Aucune tâche assignée</p>
+    </div>
+  ) : (
+    <div className="space-y-3">
+      {mission.tasks.map((task, index) => (
+        <div
+          key={task.id}
+          className={`border-l-4 p-4 rounded-lg ${
+            task.status === 'VALIDATED' 
+              ? 'border-l-green-500 bg-green-50/50 dark:bg-green-950/20 dark:border-l-green-400' 
+              : task.status === 'COMPLETED' 
+              ? 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20 dark:border-l-blue-400' 
+              : task.status === 'IN_PROGRESS' 
+              ? 'border-l-orange-500 bg-orange-50/50 dark:bg-orange-950/20 dark:border-l-orange-400' 
+              : task.status === 'REJECTED' 
+              ? 'border-l-red-500 bg-red-50/50 dark:bg-red-950/20 dark:border-l-red-400' 
+              : 'border-l-gray-300 dark:border-l-gray-600 bg-gray-50/50 dark:bg-gray-800/50'
+          }`}
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h4 className="font-medium">
+                {index + 1}. {task.title}
+              </h4>
+              {task.description && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {task.description}
+                </p>
               )}
-            </CardContent>
+              <div className="flex items-center gap-4 mt-2">
+                <Badge className={`text-xs ${getTaskStatusColor(task.status)}`}>
+                  {translate(task.status)}
+                </Badge>
+                {task.assignedTo && (
+                  <div className="flex items-center gap-1">
+                    <User className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">
+                      {task.assignedTo.user.name}
+                    </span>
+                  </div>
+                )}
+                {task.estimatedTime && (
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">
+                      {task.estimatedTime}min
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</CardContent>
           </Card>
 
           {/* Financial Information */}
