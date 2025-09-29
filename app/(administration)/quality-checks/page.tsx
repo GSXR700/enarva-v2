@@ -1,4 +1,4 @@
-// app/(administration)/quality-checks/page.tsx
+// app/(administration)/quality-checks/page.tsx - FIXED VERSION
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -31,10 +31,27 @@ export default function QualityChecksPage() {
       const response = await fetch('/api/quality-checks')
       if (!response.ok) throw new Error('Failed to fetch quality checks')
       const data = await response.json()
-      setChecks(data)
-      setFilteredChecks(data)
+      
+      // ✅ FIX: Handle both response formats (direct array or wrapped in qualityChecks property)
+      const checksData = Array.isArray(data) ? data : (data.qualityChecks || [])
+      
+      // ✅ FIX: Ensure checksData is always an array before setting state
+      if (!Array.isArray(checksData)) {
+        console.error('Invalid data format received:', data)
+        toast.error('Format de données invalide')
+        setChecks([])
+        setFilteredChecks([])
+        return
+      }
+      
+      setChecks(checksData)
+      setFilteredChecks(checksData)
     } catch (error) {
+      console.error('Error fetching quality checks:', error)
       toast.error('Impossible de charger les contrôles qualité')
+      // ✅ FIX: Set empty arrays on error to prevent crashes
+      setChecks([])
+      setFilteredChecks([])
     } finally {
       setIsLoading(false)
     }
@@ -45,6 +62,12 @@ export default function QualityChecksPage() {
   }, [])
 
   useEffect(() => {
+    // ✅ FIX: Ensure checks is an array before filtering
+    if (!Array.isArray(checks)) {
+      setFilteredChecks([])
+      return
+    }
+    
     let filtered = [...checks]
     
     if (statusFilter !== 'all') {
@@ -57,9 +80,9 @@ export default function QualityChecksPage() {
     
     if (searchQuery) {
       filtered = filtered.filter(check =>
-        check.mission.lead.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        check.mission.lead.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        check.mission.missionNumber.toLowerCase().includes(searchQuery.toLowerCase())
+        check.mission?.lead?.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        check.mission?.lead?.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        check.mission?.missionNumber?.toLowerCase().includes(searchQuery.toLowerCase())
       )
     }
     
@@ -131,19 +154,19 @@ export default function QualityChecksPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-background text-foreground focus:ring-2 focus:ring-enarva-blue focus:border-transparent"
             >
               <option value="all">Tous les statuts</option>
               <option value="PENDING">En attente</option>
-              <option value="PASSED">Validé</option>
-              <option value="FAILED">Échec</option>
-              <option value="NEEDS_CORRECTION">Correction requise</option>
+              <option value="PASSED">Approuvé</option>
+              <option value="FAILED">Échoué</option>
+              <option value="NEEDS_CORRECTION">Corrections requises</option>
             </select>
-            
+
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+              className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-background text-foreground focus:ring-2 focus:ring-enarva-blue focus:border-transparent"
             >
               <option value="all">Tous les types</option>
               <option value="TEAM_LEADER_CHECK">Contrôle Chef d'équipe</option>
@@ -154,129 +177,108 @@ export default function QualityChecksPage() {
         </CardContent>
       </Card>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {['PENDING', 'PASSED', 'FAILED', 'NEEDS_CORRECTION'].map((status) => (
-          <Card key={status} className="thread-card">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {status === 'PENDING' ? 'En attente' : 
-                     status === 'PASSED' ? 'Validés' :
-                     status === 'FAILED' ? 'Échecs' : 'Corrections'}
-                  </p>
-                  <p className="text-2xl font-bold">
-                    {checks.filter(check => check.status === status).length}
-                  </p>
-                </div>
-                <div className="p-2">
-                  {getStatusIcon(status as QualityStatus)}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Quality Checks List */}
-      <div className="grid gap-4">
-        {filteredChecks.length === 0 ? (
-          <Card className="thread-card">
-            <CardContent className="pt-6 text-center">
-              <CheckCircle className="mx-auto w-12 h-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                {searchQuery || statusFilter !== 'all' || typeFilter !== 'all' 
-                  ? 'Aucun contrôle trouvé' 
-                  : 'Aucun contrôle qualité disponible'}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredChecks.map((check) => (
-            <Card key={check.id} className="thread-card">
-              <CardContent className="pt-6">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold">
-                        Mission {check.mission.missionNumber}
-                      </h3>
-                      <Badge variant="outline">
-                        {check.mission.lead.firstName} {check.mission.lead.lastName}
-                      </Badge>
-                      <Badge variant={getStatusVariant(check.status)}>
-                        <div className="flex items-center gap-1">
-                          {getStatusIcon(check.status)}
-                          {check.status === 'PENDING' ? 'En attente' :
-                           check.status === 'PASSED' ? 'Validé' :
-                           check.status === 'FAILED' ? 'Échec' : 'Correction requise'}
+      {/* Quality Checks Table */}
+      {filteredChecks.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Aucun contrôle qualité</h3>
+            <p className="text-muted-foreground">
+              {checks.length === 0 
+                ? 'Aucun contrôle qualité enregistré.' 
+                : 'Aucun contrôle ne correspond à votre recherche.'}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-muted/50 border-b">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Mission
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Client
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Statut
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Score
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-background divide-y divide-border">
+                  {filteredChecks.map((check) => (
+                    <tr key={check.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-foreground">
+                          {check.mission?.missionNumber || 'N/A'}
                         </div>
-                      </Badge>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-muted-foreground">
-                      <div>
-                        <span className="font-medium">Type:</span> {getTypeLabel(check.type)}
-                      </div>
-                      <div>
-                        <span className="font-medium">Date:</span> {formatDate(check.checkedAt)}
-                      </div>
-                      <div>
-                        <span className="font-medium">Score:</span> 
-                        {check.score ? (
-                          <span className={`ml-1 font-semibold ${
-                            check.score >= 4 ? 'text-green-600' :
-                            check.score >= 3 ? 'text-orange-600' : 'text-red-600'
-                          }`}>
-                            {check.score}/5
-                          </span>
-                        ) : 'N/A'}
-                      </div>
-                      <div>
-                        <span className="font-medium">Validé:</span> 
-                        {check.validatedAt ? formatDate(check.validatedAt) : 'Non validé'}
-                      </div>
-                    </div>
-
-                    {check.notes && (
-                      <div className="mt-3">
-                        <p className="text-sm">
-                          <span className="font-medium">Notes:</span>{' '}
-                          {check.notes.substring(0, 100)}
-                          {check.notes.length > 100 && '...'}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Issues Preview */}
-                    {check.issues && typeof check.issues === 'object' && Object.keys(check.issues).length > 0 && (
-                      <div className="mt-2">
-                        <Badge variant="destructive" className="text-xs">
-                          {Object.keys(check.issues).length} problème(s) détecté(s)
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-foreground">
+                          {check.mission?.lead ? 
+                            `${check.mission.lead.firstName} ${check.mission.lead.lastName}` : 
+                            'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-muted-foreground">
+                          {getTypeLabel(check.type)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge variant={getStatusVariant(check.status)} className="flex items-center gap-1 w-fit">
+                          {getStatusIcon(check.status)}
+                          {check.status === 'PASSED' ? 'Approuvé' :
+                           check.status === 'FAILED' ? 'Échoué' :
+                           check.status === 'NEEDS_CORRECTION' ? 'Corrections' :
+                           'En attente'}
                         </Badge>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2 ml-4">
-                    <Link href={`/quality-checks/${check.id}`}>
-                      <Button variant="outline" size="sm">
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                    <Link href={`/quality-checks/${check.id}/edit`}>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-foreground">
+                          {check.score ? `${check.score}/5` : '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                        {formatDate(check.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end gap-2">
+                          <Link href={`/quality-checks/${check.id}`}>
+                            <Button variant="ghost" size="sm">
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </Link>
+                          <Link href={`/quality-checks/${check.id}/edit`}>
+                            <Button variant="ghost" size="sm">
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
