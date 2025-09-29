@@ -255,6 +255,7 @@ model Task {
   estimatedTime Int?
   actualTime    Int?
   notes         String?
+  startedAt     DateTime?
   completedAt   DateTime?
   validatedAt   DateTime?
   createdAt     DateTime     @default(now())
