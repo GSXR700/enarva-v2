@@ -10,23 +10,28 @@ interface ProgressProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
-  ({ className, value = 0, max = 100, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        "relative h-2 w-full overflow-hidden rounded-full bg-secondary",
-        className
-      )}
-      {...props}
-    >
+  ({ className, value = 0, max = 100, ...props }, ref) => {
+    const percentage = Math.min(Math.max((value / max) * 100, 0), 100)
+    
+    return (
       <div
-        className="h-full bg-primary transition-all duration-300 ease-in-out"
-        style={{
-          width: `${Math.min(Math.max((value / max) * 100, 0), 100)}%`,
-        }}
-      />
-    </div>
-  )
+        ref={ref}
+        className={cn(
+          "relative h-2 w-full overflow-hidden rounded-full bg-secondary",
+          className
+        )}
+        {...props}
+      >
+        <div
+          className="h-full bg-primary transition-all duration-300 ease-in-out"
+          style={{
+            width: `${percentage}%`,
+            transform: 'translateX(0)',
+          }}
+        />
+      </div>
+    )
+  }
 )
 Progress.displayName = "Progress"
 
