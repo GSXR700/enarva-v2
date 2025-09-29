@@ -1,11 +1,11 @@
-// app/api/system-logs/cleanup/route.ts
+// app/api/system-logs/cleanup/route.ts - FIXED VERSION
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'  // CHANGED: Use singleton instead of new PrismaClient()
 
 export async function DELETE() {
   try {
+    console.log('🔵 Starting cleanup of old system logs...')
+    
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
@@ -17,12 +17,14 @@ export async function DELETE() {
       }
     })
 
+    console.log(`✅ Cleanup complete: ${result.count} logs deleted`)
+    
     return NextResponse.json({ 
       success: true, 
       deletedCount: result.count 
     })
   } catch (error) {
-    console.error('Failed to cleanup system logs:', error)
+    console.error('❌ Failed to cleanup system logs:', error)
     return new NextResponse('Internal Server Error', { status: 500 })
   }
 }
