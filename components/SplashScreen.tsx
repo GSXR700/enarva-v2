@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from '@/hooks/useTheme';
 
 // Type extension for iOS Safari
 declare global {
@@ -17,6 +18,10 @@ export default function SplashScreen() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [showLogo, setShowLogo] = useState(false);
   const hasShownRef = useRef(false);
+  const { theme } = useTheme();
+
+  // Determine if we're in dark mode
+  const isDarkMode = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   useEffect(() => {
     // Check if this is a PWA launch
@@ -45,34 +50,31 @@ export default function SplashScreen() {
       setShowLogo(true);
     }, 100);
 
-    // Simulate app loading with realistic progress
-    const steps = [
-      { progress: 20, delay: 300 },
-      { progress: 40, delay: 600 },
-      { progress: 60, delay: 900 },
-      { progress: 80, delay: 1200 },
-      { progress: 100, delay: 1500 }
-    ];
+    // Simulate app loading with smooth progress
+    const duration = 2000; // 2 seconds loading
+    const steps = 50;
+    const interval = duration / steps;
 
-    const timers: NodeJS.Timeout[] = [];
-
-    steps.forEach(({ progress, delay }) => {
-      const timer = setTimeout(() => {
-        setLoadingProgress(progress);
-      }, delay);
-      timers.push(timer);
-    });
+    const progressInterval = setInterval(() => {
+      setLoadingProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          return 100;
+        }
+        return prev + (100 / steps);
+      });
+    }, interval);
 
     // Hide splash screen after loading
     const hideTimer = setTimeout(() => {
       setIsVisible(false);
-    }, 2000);
+    }, duration + 500);
 
     // Cleanup
     return () => {
       clearTimeout(logoTimer);
       clearTimeout(hideTimer);
-      timers.forEach(timer => clearTimeout(timer));
+      clearInterval(progressInterval);
     };
   }, []);
 
@@ -91,174 +93,113 @@ export default function SplashScreen() {
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="fixed inset-0 z-[9999] bg-gradient-to-br from-blue-50 via-white to-blue-50 flex flex-col items-center justify-center"
-        style={{
-          background: `
-            linear-gradient(135deg, 
-              #f8fafc 0%, 
-              #ffffff 50%, 
-              #f1f5f9 100%
-            )
-          `
+        exit={{ 
+          opacity: 0,
+          clipPath: 'polygon(0 0, 100% 0, 100% 0, 0 0)',
+          transition: { 
+            duration: 0.8, 
+            ease: [0.76, 0, 0.24, 1],
+            clipPath: { duration: 1, ease: [0.76, 0, 0.24, 1] }
+          }
         }}
+        className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center ${
+          isDarkMode ? 'bg-black' : 'bg-white'
+        }`}
       >
         {/* Logo Container */}
-        <div className="relative flex flex-col items-center">
-          {/* Main Logo */}
-          <AnimatePresence>
-            {showLogo && (
-              <motion.div
-                initial={{ scale: 0.5, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                transition={{ 
-                  duration: 0.8,
-                  ease: [0.43, 0.13, 0.23, 0.96]
-                }}
-                className="relative mb-8"
-              >
-                {/* Logo with glow effect */}
-                <div className="relative w-32 h-32 md:w-40 md:h-40">
-                  <div className="absolute inset-0 rounded-full bg-blue-500/10 animate-pulse"></div>
-                  <div className="relative w-full h-full rounded-full overflow-hidden shadow-2xl">
-                    <Image
-                      src="/images/enarva-logo.png"
-                      alt="Enarva"
-                      fill
-                      priority
-                      className="object-contain p-4"
-                      quality={100}
-                    />
-                  </div>
-                  
-                  {/* Animated rings */}
-                  <div className="absolute inset-0 rounded-full border-2 border-blue-200 animate-ping"></div>
+        <AnimatePresence>
+          {showLogo && (
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ 
+                scale: 0.9,
+                opacity: 0,
+                transition: { duration: 0.5 }
+              }}
+              transition={{ 
+                duration: 0.6,
+                ease: [0.43, 0.13, 0.23, 0.96]
+              }}
+              className="relative mb-12"
+            >
+              {/* Logo with shine effect */}
+              <div className="relative w-80 h-24 md:w-96 md:h-28">
+                <Image
+                  src="/images/dark-logo.png"
+                  alt="Enarva"
+                  fill
+                  priority
+                  className="object-contain"
+                  quality={100}
+                />
+                
+                {/* Shine effect overlay - sweeps from E to A */}
+                <motion.div
+                  initial={{ x: '-100%' }}
+                  animate={{ x: '100%' }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    repeatDelay: 1,
+                    ease: "linear"
+                  }}
+                  className="absolute inset-0 overflow-hidden"
+                >
                   <div 
-                    className="absolute inset-0 rounded-full border border-blue-300"
+                    className="absolute inset-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent"
                     style={{
-                      animation: 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
-                      animationDelay: '0.5s'
+                      filter: 'blur(10px)',
+                      transform: 'skewX(-20deg)'
                     }}
-                  ></div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  />
+                </motion.div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          {/* App Name */}
-          <AnimatePresence>
-            {showLogo && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4, duration: 0.6 }}
-                className="text-center mb-8"
-              >
-                <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-                  Enarva OS
-                </h1>
-                <p className="text-gray-500 text-sm md:text-base">
-                  Système de Gestion Professionnel
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+        {/* Apple-style Progress Bar */}
+        <AnimatePresence>
+          {showLogo && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="w-64 md:w-80"
+            >
+              {/* Progress Bar Container */}
+              <div className={`w-full h-1 rounded-full overflow-hidden ${
+                isDarkMode ? 'bg-white/10' : 'bg-gray-200'
+              }`}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${loadingProgress}%` }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className={`h-full rounded-full ${
+                    isDarkMode 
+                      ? 'bg-white' 
+                      : 'bg-gradient-to-r from-blue-500 to-blue-600'
+                  }`}
+                  style={{
+                    boxShadow: isDarkMode 
+                      ? '0 0 10px rgba(255, 255, 255, 0.5)' 
+                      : '0 0 10px rgba(59, 130, 246, 0.5)'
+                  }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          {/* Loading Progress */}
-          <AnimatePresence>
-            {showLogo && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6, duration: 0.6 }}
-                className="w-64 md:w-80"
-              >
-                {/* Progress Bar */}
-                <div className="mb-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-gray-500">Chargement</span>
-                    <span className="text-sm text-blue-600 font-medium">
-                      {loadingProgress}%
-                    </span>
-                  </div>
-                  
-                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${loadingProgress}%` }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
-                      className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full relative"
-                    >
-                      {/* Shimmer effect */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
-                    </motion.div>
-                  </div>
-                </div>
-
-                {/* Loading Text */}
-                <div className="text-center">
-                  <motion.p
-                    key={loadingProgress}
-                    initial={{ opacity: 0.5 }}
-                    animate={{ opacity: 1 }}
-                    className="text-xs text-gray-400"
-                  >
-                    {getLoadingText(loadingProgress)}
-                  </motion.p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Floating Elements */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            {[...Array(6)].map((_, i) => (
-              <motion.div
-                key={i}
-                initial={{ 
-                  opacity: 0,
-                  x: Math.random() * 400 - 200,
-                  y: Math.random() * 400 - 200,
-                }}
-                animate={{ 
-                  opacity: [0, 0.3, 0],
-                  x: Math.random() * 400 - 200,
-                  y: Math.random() * 400 - 200,
-                  scale: [0.5, 1, 0.5]
-                }}
-                transition={{
-                  duration: 3 + Math.random() * 2,
-                  repeat: Infinity,
-                  repeatType: "reverse",
-                  delay: Math.random() * 2
-                }}
-                className="absolute w-2 h-2 bg-blue-300/30 rounded-full"
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Custom styles for animations */}
+        {/* Custom styles for shine animation */}
         <style jsx>{`
-          @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-          }
-          
-          .animate-shimmer {
-            animation: shimmer 1.5s infinite;
+          @keyframes shine {
+            0% { transform: translateX(-100%) skewX(-20deg); }
+            100% { transform: translateX(100%) skewX(-20deg); }
           }
         `}</style>
       </motion.div>
     </AnimatePresence>
   );
-}
-
-function getLoadingText(progress: number): string {
-  if (progress <= 20) return "Initialisation...";
-  if (progress <= 40) return "Chargement des ressources...";
-  if (progress <= 60) return "Configuration de l'interface...";
-  if (progress <= 80) return "Finalisation...";
-  return "Prêt !";
 }
