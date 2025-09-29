@@ -1,5 +1,6 @@
 // lib/pdf-generator.ts
 import jsPDF from 'jspdf';
+import { poppinsNormal, poppinsBold } from './fonts';
 
 // Type definitions for the PDF data structure
 export type QuotePDFData = {
@@ -48,6 +49,16 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     format: 'a4', // 595.28 × 841.89 pt
   });
 
+  // Load Poppins fonts
+  try {
+    doc.addFileToVFS('Poppins-Regular.ttf', poppinsNormal);
+    doc.addFont('Poppins-Regular.ttf', 'Poppins', 'normal');
+    doc.addFileToVFS('Poppins-Bold.ttf', poppinsBold);
+    doc.addFont('Poppins-Bold.ttf', 'Poppins', 'bold');
+  } catch(e) { 
+    console.warn("Erreur lors du chargement des polices Poppins, utilisation de Helvetica:", e);
+  }
+
   const PAGE_WIDTH = 595.28;
   const PAGE_HEIGHT = 841.89;
   const MARGIN_LEFT = 40;
@@ -55,12 +66,11 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
   
   // Color definitions
-  const BLUE_PRIMARY = [33, 85, 201]; // #2155C9
-  const BLUE_DARK = [28, 63, 145]; // Darker blue for header
+  const BLUE_PRIMARY = [30, 58, 138]; // Bleu marine Enarva
+  const BLUE_DARK = [28, 63, 145];
   const TEXT_DARK = [33, 33, 33];
-  // Removed unused TEXT_GRAY constant
 
-  // Helper function to set colors - Fixed: Add proper type guards for array access
+  // Helper function to set colors
   const setColor = (color: number[]) => {
     if (color.length >= 3 && typeof color[0] === 'number' && typeof color[1] === 'number' && typeof color[2] === 'number') {
       doc.setTextColor(color[0], color[1], color[2]);
@@ -78,19 +88,19 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   doc.rect(0, 0, PAGE_WIDTH, 100, 'F');
   
   // DEVIS title (left side)
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('Poppins', 'bold');
   doc.setFontSize(48);
   doc.setTextColor(255, 255, 255);
   doc.text(data.docType, MARGIN_LEFT, 60);
   
   // Date and Number below DEVIS
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.text(`Date: ${data.date}`, MARGIN_LEFT, 80);
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(10);
+  doc.text(`Date:${data.date}`, MARGIN_LEFT, 80);
   doc.text(`N° ${data.number}`, MARGIN_LEFT + 120, 80);
   
   // Enarva logo/text (right side)
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('Poppins', 'bold');
   doc.setFontSize(36);
   doc.text('enarva', PAGE_WIDTH - MARGIN_RIGHT - 120, 60);
 
@@ -98,14 +108,14 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   let yPos = 130;
   
   // Left side - Company info
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(11);
   setColor(TEXT_DARK);
   doc.text(data.company.name, MARGIN_LEFT, yPos);
   
   yPos += 20;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
   data.company.address.forEach(line => {
     doc.text(line, MARGIN_LEFT, yPos);
     yPos += 14;
@@ -113,148 +123,141 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   
   // Right side - Recipient
   yPos = 130;
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('Poppins', 'bold');
   doc.setFontSize(11);
   doc.text(`À l'attention de ${data.recipient.attention}`, PAGE_WIDTH - 250, yPos);
   
   yPos += 20;
-  doc.setFontSize(10);
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
   data.recipient.addressLines.forEach(line => {
     doc.text(line, PAGE_WIDTH - 250, yPos);
     yPos += 14;
   });
 
-  // 3. OBJET SECTION WITH BLUE BACKGROUND
+  // 3. OBJET SECTION WITH BLUE ROUNDED BACKGROUND
   yPos = 220;
   setFillColor(BLUE_PRIMARY);
   doc.roundedRect(MARGIN_LEFT, yPos, CONTENT_WIDTH, 40, 8, 8, 'F');
   
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(11);
   doc.setTextColor(255, 255, 255);
-  doc.text(`OBJET: ${data.project.objet}`, MARGIN_LEFT + 20, yPos + 25);
+  doc.text(data.project.objet, MARGIN_LEFT + 20, yPos + 25);
 
   // 4. DÉTAILS DE LA PRESTATION
   yPos = 280;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(11);
   setColor(BLUE_PRIMARY);
-  doc.text('DÉTAILS DE LA PRESTATION:', MARGIN_LEFT, yPos);
+  doc.text('I. PRESTATIONS INCLUSES', MARGIN_LEFT, yPos);
   
   // Personnel mobilisé
-  yPos += 30;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  yPos += 25;
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(10);
   setColor(BLUE_PRIMARY);
   doc.text('Personnel mobilisé:', MARGIN_LEFT, yPos);
   
-  yPos += 18;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
+  yPos += 16;
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
   setColor(TEXT_DARK);
   data.prestation.personnelMobilise.forEach(item => {
     doc.text(`• ${item}`, MARGIN_LEFT + 10, yPos);
-    yPos += 14;
+    yPos += 13;
   });
 
   // Équipements et produits utilisés
-  yPos += 10;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  setColor(BLUE_PRIMARY);
-  doc.text('Équipements et produits utilisés:', MARGIN_LEFT, yPos);
-  
-  yPos += 18;
-  doc.setFont('helvetica', 'normal');
+  yPos += 8;
+  doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
+  setColor(BLUE_PRIMARY);
+  doc.text('Équipements&Produits Utilisés', MARGIN_LEFT, yPos);
+  
+  yPos += 16;
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
   setColor(TEXT_DARK);
   data.prestation.equipementsUtilises.forEach(item => {
-    // Handle long text with word wrap
     const lines = doc.splitTextToSize(item, CONTENT_WIDTH - 20);
     lines.forEach((line: string) => {
       doc.text(line.startsWith('•') ? line : `• ${line}`, MARGIN_LEFT + 10, yPos);
-      yPos += 14;
+      yPos += 13;
     });
   });
 
   // Prestations incluses
-  yPos += 10;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  yPos += 8;
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(10);
   setColor(BLUE_PRIMARY);
   doc.text('Prestations incluses:', MARGIN_LEFT, yPos);
   
-  yPos += 18;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
+  yPos += 16;
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
   setColor(TEXT_DARK);
   data.prestation.prestationsIncluses.forEach(item => {
     const lines = doc.splitTextToSize(item, CONTENT_WIDTH - 20);
     lines.forEach((line: string) => {
       doc.text(line.startsWith('•') ? line : `• ${line}`, MARGIN_LEFT + 10, yPos);
-      yPos += 14;
+      yPos += 13;
     });
   });
 
   // Délai prévu
-  yPos += 10;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  yPos += 8;
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(10);
   setColor(BLUE_PRIMARY);
   doc.text('Délai prévu de la prestation:', MARGIN_LEFT, yPos);
   
-  yPos += 18;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
+  yPos += 16;
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
   setColor(TEXT_DARK);
   doc.text(`• ${data.prestation.delaiPrevu}`, MARGIN_LEFT + 10, yPos);
 
   // 5. AMOUNT BOX
-  yPos += 40;
+  yPos += 35;
   
-  // Draw border box for amount
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(1);
-  doc.rect(MARGIN_LEFT, yPos, CONTENT_WIDTH, 80, 'S');
-  
-  // Amount text
-  yPos += 25;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  setColor(TEXT_DARK);
-  doc.text('Veuillezarrêter le présent devis', MARGIN_LEFT + 15, yPos);
-  
-  yPos += 16;
-  doc.text(`à la somme de ${data.amountInWords}`, MARGIN_LEFT + 15, yPos);
+  // Amount text in blue box
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  setColor(BLUE_PRIMARY);
+  const amountTextLines = doc.splitTextToSize(`Veuillez arrêter le présent devis à la somme de ${data.amountInWords}.`, CONTENT_WIDTH - 220);
+  amountTextLines.forEach((line: string) => {
+    doc.text(line, MARGIN_LEFT, yPos);
+    yPos += 12;
+  });
   
   // Amount value (right side)
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  setColor(BLUE_PRIMARY);
-  doc.text(`FORFAIT TOTAL HT: ${data.amountHT}`, PAGE_WIDTH - MARGIN_RIGHT - 200, yPos - 8);
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(12);
+  setColor(TEXT_DARK);
+  doc.text(`TOTAL HT:${data.amountHT}`, PAGE_WIDTH - MARGIN_RIGHT, yPos - 15, { align: 'right' });
 
   // 6. PAYMENT CONDITIONS
-  yPos += 50;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  setColor(TEXT_DARK);
+  yPos += 25;
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(10);
+  setColor(BLUE_PRIMARY);
   doc.text('Conditions de paiement :', MARGIN_LEFT, yPos);
   
-  yPos += 18;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
+  yPos += 16;
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  setColor(TEXT_DARK);
   data.payment.conditions.forEach(condition => {
     doc.text(`• ${condition}`, MARGIN_LEFT + 10, yPos);
-    yPos += 14;
+    yPos += 13;
   });
   
   yPos += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text('Échelonnement du Paiement:', MARGIN_LEFT, yPos);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text(data.payment.echeancier, MARGIN_LEFT + 150, yPos);
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  doc.text(`Échelonnement du Paiement: ${data.payment.echeancier}`, MARGIN_LEFT + 10, yPos);
 
   // 7. FOOTER SECTION WITH BLUE BACKGROUND
   const footerY = PAGE_HEIGHT - 120;
@@ -264,26 +267,26 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   
   // Contact section
   doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('CONTACTEZ-NOUS !', MARGIN_LEFT, footerY + 30);
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(12);
+  doc.text('CONTACTEZ-NOUS !', MARGIN_LEFT, footerY + 25);
   
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text('06 38 146-573', MARGIN_LEFT + 20, footerY + 50);
-  doc.text('www.enarva.com', MARGIN_LEFT + 20, footerY + 65);
-  doc.text('contact@enarva.com', MARGIN_LEFT + 20, footerY + 80);
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  doc.text('06 38 146-573', MARGIN_LEFT + 20, footerY + 45);
+  doc.text('www.enarva.com', MARGIN_LEFT + 20, footerY + 60);
+  doc.text('contact@enarva.com', MARGIN_LEFT + 20, footerY + 75);
   
   // Company details (right side)
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text('Enarva SARL AU', PAGE_WIDTH - 200, footerY + 30);
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(11);
+  doc.text('Enarva SARL AU', PAGE_WIDTH - 200, footerY + 25);
   
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.text(`IF: ${data.company.if}   RC: ${data.company.rc}`, PAGE_WIDTH - 200, footerY + 50);
-  doc.text(`ICE: ${data.company.ice}`, PAGE_WIDTH - 200, footerY + 65);
-  doc.text(`RIB: ${data.company.rib}`, PAGE_WIDTH - 200, footerY + 80);
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(8);
+  doc.text(`IF: ${data.company.if}  RC: ${data.company.rc}`, PAGE_WIDTH - 200, footerY + 45);
+  doc.text(`ICE: ${data.company.ice}`, PAGE_WIDTH - 200, footerY + 60);
+  doc.text(`RIB: ${data.company.rib}`, PAGE_WIDTH - 200, footerY + 75);
 
   // Convert ArrayBuffer to Uint8Array for return
   const buffer = doc.output('arraybuffer');
@@ -292,16 +295,15 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
 
 // Helper function to prepare data from database Quote to PDF format
 export function prepareQuotePDFData(
-  quote: any, // Your Quote type with relations
+  quote: any,
   docType: 'DEVIS' | 'FACTURE' = 'DEVIS'
 ): QuotePDFData {
   const today = new Date().toLocaleDateString('fr-FR', {
     day: 'numeric',
-    month: 'long',
+    month: 'short',
     year: 'numeric'
   });
 
-  // Extract services from quote line items
   const prestationsIncluses = quote.lineItems?.map((item: any) => {
     if (item.description?.toLowerCase().includes('nettoyage')) {
       return item.description;
@@ -347,13 +349,13 @@ export function prepareQuotePDFData(
     },
     prestation: {
       personnelMobilise: [
-        '1 Superviseur',
-        `${Math.ceil((quote.surface || 170) / 50)} agents de nettoyage.`,
-        '1 techniciens vitriers pour les vitres et les zones d\'accès difficile.'
+        'Chef d\'équipe : supervision et contrôle qualité',
+        `Agents de nettoyage (${Math.ceil((quote.surface || 170) / 50)} personne${Math.ceil((quote.surface || 170) / 50) > 1 ? 's' : ''})`,
+        'Assistant technicien'
       ],
       equipementsUtilises: [
         'Aspirateur industriel pour poussière et collecte de l\'eau usée.',
-        'Générateur de vapeur Emilio RA Plus pour la désinfection et les taches tenaces.',
+        'Générateur de vapeur Emilio RA PLUS pour la désinfection et les taches tenaces.',
         'Échelles selon les besoins spécifiques pour les vitres et volets roulants extérieurs.',
         'Détergent pour les surfaces carrelées.',
         'Dégraissant (pH neutre) pour les surfaces en marbre.',
@@ -363,15 +365,15 @@ export function prepareQuotePDFData(
         'Outils généraux de ménage.'
       ],
       prestationsIncluses,
-      delaiPrevu: '1 jours ouvrable'
+      delaiPrevu: '1 journée'
     },
     amountHT: formatCurrency(Number(quote.finalPrice)),
     amountInWords: numberToFrenchWords(Number(quote.finalPrice)),
     payment: {
       conditions: [
-        'Les règlements peuvent être effectués par virement bancaire ou en espèces.'
+        'Les règlements peuvent être effectués par virement bancaire ou par chèque.'
       ],
-      echeancier: '100 % à la livraison.'
+      echeancier: '30% à l\'initiation du travail et 50% à la livraison.'
     }
   };
 }
@@ -400,61 +402,67 @@ function formatCurrency(amount: number): string {
   }).format(amount) + ' MAD';
 }
 
+// NUMBER TO WORDS FUNCTION (Complete French conversion)
 function numberToFrenchWords(amount: number): string {
-  // Simplified French number to words conversion
-  const units = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf'];
-  const tens = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'soixante-dix', 'quatre-vingt', 'quatre-vingt-dix'];
+  if (amount === 0) return "zéro dirhams hors taxes";
   
-  if (amount >= 1000) {
-    const thousands = Math.floor(amount / 1000);
-    const remainder = amount % 1000;
-    let result = '';
+  const units = ["", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf"];
+  const teens = ["dix", "onze", "douze", "treize", "quatorze", "quinze", "seize", "dix-sept", "dix-huit", "dix-neuf"];
+  const tens = ["", "dix", "vingt", "trente", "quarante", "cinquante", "soixante", "soixante-dix", "quatre-vingt", "quatre-vingt-dix"];
+  
+  const toWords = (num: number): string => {
+    if (num === 0) return "";
+    let words = "";
     
-    if (thousands === 1) {
-      result = 'mille';
-    } else {
-      result = `${units[thousands]} mille`;
+    if (num >= 1000000) {
+      words += toWords(Math.floor(num / 1000000)) + " million" + (Math.floor(num / 1000000) > 1 ? "s " : " ");
+      num %= 1000000;
     }
     
-    if (remainder > 0) {
-      if (remainder >= 100) {
-        const hundreds = Math.floor(remainder / 100);
-        const rest = remainder % 100;
-        result += hundreds === 1 ? ' cent' : ` ${units[hundreds]} cents`;
-        if (rest > 0) {
-          result += ` ${numberToFrenchWords(rest).replace(' dirhams', '')}`;
-        }
+    if (num >= 1000) {
+      const thousands = Math.floor(num / 1000);
+      if (thousands > 1) {
+        words += toWords(thousands) + " mille ";
       } else {
-        result += ` ${numberToFrenchWords(remainder).replace(' dirhams', '')}`;
+        words += "mille ";
       }
+      num %= 1000;
     }
     
-    return result.trim() + ' dirhams';
-  }
-  
-  if (amount >= 100) {
-    const hundreds = Math.floor(amount / 100);
-    const remainder = amount % 100;
-    let result = hundreds === 1 ? 'cent' : `${units[hundreds]} cents`;
-    if (remainder > 0) {
-      result += ` ${numberToFrenchWords(remainder).replace(' dirhams', '')}`;
+    if (num >= 100) {
+      const hundreds = Math.floor(num / 100);
+      if (hundreds > 1) {
+        words += toWords(hundreds) + " cent" + (num % 100 === 0 ? "s " : " ");
+      } else {
+        words += "cent ";
+      }
+      num %= 100;
     }
-    return result + ' dirhams';
-  }
+    
+    if (num >= 20) {
+      const ten = Math.floor(num / 10);
+      words += tens[ten];
+      const unit = num % 10;
+      if (unit === 1 && ten < 8) {
+        words += " et un";
+      } else if (unit > 0) {
+        words += "-" + units[unit];
+      }
+    } else if (num >= 10) {
+      words += teens[num - 10];
+    } else if (num > 0) {
+      words += units[num];
+    }
+    
+    return words.trim() + " ";
+  };
   
-  if (amount >= 20) {
-    const ten = Math.floor(amount / 10);
-    const unit = amount % 10;
-    return `${tens[ten]}${unit > 0 ? ` ${units[unit]}` : ''} dirhams`;
-  }
+  const integerPart = Math.floor(amount);
+  let result = toWords(integerPart).trim();
+  result = result.charAt(0).toUpperCase() + result.slice(1) + " dirham" + (integerPart > 1 ? "s" : "");
+  result += " hors taxe" + (integerPart > 1 ? "s" : "");
   
-  if (amount >= 10) {
-    const teenWords = ['dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf'];
-    return teenWords[amount - 10] + ' dirhams';
-  }
-  
-  return (units[amount] || 'zéro') + ' dirhams';
+  return result;
 }
 
-// Export the main function
 export default generateQuotePDF;
