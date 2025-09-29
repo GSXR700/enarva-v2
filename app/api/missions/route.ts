@@ -1,177 +1,272 @@
-// app/api/missions/route.ts - FIXED VERSION WITH EXISTING SERVICES
+// app/api/missions/route.ts - FIXED VERSION WITH PROPER TYPING
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';  // Use singleton
 import { ExtendedUser } from '@/types/next-auth';
-import { missionService, CreateMissionInput } from '@/services/mission.service';
-import { validateMissionCreation } from '@/lib/validations';
-import { withErrorHandler, AppError } from '@/lib/error-handler';
+import { MissionStatus, Prisma } from '@prisma/client';
 
 // GET /api/missions - Fetch missions with filters and pagination
-export const GET = withErrorHandler(async (request: NextRequest) => {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    throw new AppError(401, 'Unauthorized');
-  }
-
-  const user = session.user as ExtendedUser;
-  if (!user.id) {
-    throw new AppError(401, 'User ID missing');
-  }
-
-  const { searchParams } = new URL(request.url);
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 50);
-  const status = searchParams.get('status');
-  const priority = searchParams.get('priority');
-  const teamLeaderId = searchParams.get('teamLeaderId');
-  const teamId = searchParams.get('teamId');
-  const search = searchParams.get('search');
-  const type = searchParams.get('type');
-
-  // Build filters object using the existing service interface
-  const filters: any = {};
-  if (status) filters.status = status;
-  if (priority) filters.priority = priority;
-  if (teamLeaderId) filters.teamLeaderId = teamLeaderId;
-  if (teamId) filters.teamId = teamId;
-  if (type) filters.type = type;
-  if (search) filters.search = search;
-
-  // Pagination options
-  const paginationOptions = {
-    page,
-    limit,
-    sortBy: 'scheduledDate',
-    sortOrder: 'asc' as const
-  };
-
+export async function GET(request: NextRequest) {
   try {
-    const result = await missionService.getAllMissions(filters, paginationOptions);
-    
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    const user = session.user as ExtendedUser;
+    if (!user.id) {
+      return new NextResponse('User ID missing', { status: 401 });
+    }
+
+    console.log('🔵 Fetching missions...');
+
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
+    const statusParam = searchParams.get('status');
+    const priority = searchParams.get('priority');
+    const teamLeaderId = searchParams.get('teamLeaderId');
+    const teamId = searchParams.get('teamId');
+    const search = searchParams.get('search');
+    const type = searchParams.get('type');
+
+    // Build where clause
+    const where: Prisma.MissionWhereInput = {};
+
+    // FIXED: Proper TypeScript handling for status
+    if (statusParam) {
+      const statusValues = statusParam.split(',').map(s => s.trim()) as MissionStatus[];
+      if (statusValues.length === 1) {
+        where.status = statusValues[0] as MissionStatus;  // FIXED: explicit cast
+      } else if (statusValues.length > 1) {
+        where.status = { in: statusValues };  // FIXED: this is correct for arrays
+      }
+    }
+
+    if (priority) {
+      const priorityValues = priority.split(',').map(p => p.trim());
+      if (priorityValues.length === 1) {
+        where.priority = priorityValues[0] as any;
+      } else {
+        where.priority = { in: priorityValues as any[] };
+      }
+    }
+
+    if (teamLeaderId) where.teamLeaderId = teamLeaderId;
+    if (teamId) where.teamId = teamId;
+    if (type) where.type = type as any;
+
+    if (search && search.trim()) {
+      where.OR = [
+        { missionNumber: { contains: search, mode: 'insensitive' } },
+        { address: { contains: search, mode: 'insensitive' } },
+        { lead: { firstName: { contains: search, mode: 'insensitive' } } },
+        { lead: { lastName: { contains: search, mode: 'insensitive' } } }
+      ];
+    }
+
+    const offset = (page - 1) * limit;
+
+    console.log('🔧 Query filters:', { where, page, limit });
+
+    // Fetch missions with pagination
+    const [missions, total] = await Promise.all([
+      prisma.mission.findMany({
+        where,
+        include: {
+          lead: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              email: true,
+              address: true,
+              company: true,
+              leadType: true
+            }
+          },
+          quote: {
+            select: {
+              id: true,
+              quoteNumber: true,
+              finalPrice: true,
+              status: true
+            }
+          },
+          teamLeader: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+              role: true
+            }
+          },
+          team: {
+            select: {
+              id: true,
+              name: true,
+              members: {
+                where: { isActive: true },
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                      image: true,
+                      role: true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          tasks: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              category: true,
+              estimatedTime: true,
+              actualTime: true
+            },
+            orderBy: { createdAt: 'asc' }
+          },
+          _count: {
+            select: {
+              tasks: true,
+              expenses: true,
+              qualityChecks: true
+            }
+          }
+        },
+        orderBy: [
+          { scheduledDate: 'asc' },
+          { createdAt: 'desc' }
+        ],
+        skip: offset,
+        take: limit
+      }),
+      prisma.mission.count({ where })
+    ]);
+
+    console.log(`✅ Successfully fetched ${missions.length} missions (total: ${total})`);
+
     return NextResponse.json({
-      missions: result.missions,
-      total: result.total,
-      page: result.page,
-      limit: result.limit,
-      totalPages: result.totalPages
+      missions,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
     });
+
   } catch (error) {
-    console.error('Failed to fetch missions:', error);
-    throw new AppError(500, 'Failed to fetch missions');
+    console.error('❌ Failed to fetch missions:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
-});
+}
 
-// POST /api/missions - Create a new mission with task support
-export const POST = withErrorHandler(async (request: NextRequest) => {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    throw new AppError(401, 'Unauthorized');
-  }
-
-  const user = session.user as ExtendedUser;
-  if (!user.id) {
-    throw new AppError(401, 'User ID missing');
-  }
-
-  // Only admins, managers, and agents can create missions
-  if (!['ADMIN', 'MANAGER', 'AGENT'].includes(user.role)) {
-    throw new AppError(403, 'Forbidden - Insufficient permissions');
-  }
-
-  const body = await request.json();
-  console.log('Creating mission with data:', body);
-
-  // Validate using existing validation schema
-  const validation = validateMissionCreation(body);
-  if (!validation.success) {
-    console.error('Mission validation failed:', validation.error.errors);
-    throw new AppError(400, 'Validation failed', true);
-  }
-
-  const validatedData = validation.data;
-
+// POST /api/missions - Create a new mission
+export async function POST(request: NextRequest) {
   try {
-    // Prepare the mission input for the existing service
-    const missionInput: CreateMissionInput = {
-      leadId: validatedData.leadId,
-      quoteId: validatedData.quoteId || null,
-      teamLeaderId: validatedData.teamLeaderId || null,
-      teamId: validatedData.teamId || null,
-      scheduledDate: validatedData.scheduledDate,
-      estimatedDuration: validatedData.estimatedDuration,
-      address: validatedData.address,
-      coordinates: validatedData.coordinates || null,
-      accessNotes: validatedData.accessNotes || null,
-      priority: validatedData.priority || 'NORMAL',
-      type: validatedData.type || 'SERVICE',
-      taskTemplateId: validatedData.taskTemplateId || null,
-      adminNotes: validatedData.adminNotes || null,
-    };
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
 
-    // Create the mission using the existing service
-    const mission = await missionService.createMission(missionInput);
+    const user = session.user as ExtendedUser;
+    if (!user.id) {
+      return new NextResponse('User ID missing', { status: 401 });
+    }
 
-    console.log('Mission created successfully:', mission.id);
+    // Only admins, managers, and agents can create missions
+    if (!['ADMIN', 'MANAGER', 'AGENT'].includes(user.role || '')) {
+      return new NextResponse('Forbidden - Insufficient permissions', { status: 403 });
+    }
+
+    console.log('🔵 Creating new mission...');
+
+    const body = await request.json();
+    console.log('🔧 Mission data:', body);
+
+    // Basic validation
+    const { leadId, scheduledDate, address } = body;
+
+    if (!leadId || !scheduledDate || !address) {
+      return NextResponse.json({
+        error: 'VALIDATION_ERROR',
+        message: 'Missing required fields: leadId, scheduledDate, or address'
+      }, { status: 400 });
+    }
+
+    // Verify lead exists
+    const lead = await prisma.lead.findUnique({
+      where: { id: leadId }
+    });
+
+    if (!lead) {
+      return NextResponse.json({
+        error: 'LEAD_NOT_FOUND',
+        message: 'Lead not found'
+      }, { status: 404 });
+    }
+
+    // Generate mission number
+    const lastMission = await prisma.mission.findFirst({
+      orderBy: { missionNumber: 'desc' },
+      select: { missionNumber: true }
+    });
+
+    const lastNumber = lastMission?.missionNumber 
+      ? parseInt(lastMission.missionNumber.replace('MSN-', ''))
+      : 0;
     
+    const missionNumber = `MSN-${String(lastNumber + 1).padStart(6, '0')}`;
+
+    // Create mission
+    const mission = await prisma.mission.create({
+      data: {
+        missionNumber,
+        leadId,
+        quoteId: body.quoteId || null,
+        teamLeaderId: body.teamLeaderId || null,
+        teamId: body.teamId || null,
+        scheduledDate: new Date(scheduledDate),
+        estimatedDuration: body.estimatedDuration || null,
+        address,
+        coordinates: body.coordinates || null,
+        accessNotes: body.accessNotes || null,
+        priority: body.priority || 'NORMAL',
+        type: body.type || 'SERVICE',
+        status: 'SCHEDULED',
+        adminNotes: body.adminNotes || null
+      },
+      include: {
+        lead: true,
+        teamLeader: true,
+        team: true
+      }
+    });
+
+    console.log(`✅ Mission created successfully: ${mission.missionNumber}`);
+
     return NextResponse.json(mission, { status: 201 });
-  } catch (error) {
-    console.error('Mission creation failed:', error);
-    
-    // Handle specific service errors
-    if (error instanceof AppError) {
-      throw error;
-    }
-    
-    // Handle other errors
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    
-    if (errorMessage.includes('Team leader not found')) {
-      throw new AppError(404, 'Team leader not found - Please ensure the team leader exists and is properly assigned to a team');
-    }
-    
-    if (errorMessage.includes('Lead not found')) {
-      throw new AppError(404, 'Lead not found - Please select a valid lead');
-    }
-    
-    if (errorMessage.includes('Quote not found')) {
-      throw new AppError(404, 'Quote not found - Please select a valid quote');
-    }
-    
-    if (errorMessage.includes('Team not found')) {
-      throw new AppError(404, 'Team not found - Please select a valid team');
-    }
 
-    // Handle Prisma-specific errors
-    if (error && typeof error === 'object' && 'code' in error) {
-      const prismaError = error as { code: string; message: string };
-      
-      switch (prismaError.code) {
-        case 'P2002':
-          throw new AppError(409, 'Duplicate constraint violation - Mission with this data already exists');
-        case 'P2003':
-          throw new AppError(400, 'Foreign key constraint failed - Invalid reference to lead, quote, or team');
-        case 'P2025':
-          throw new AppError(404, 'Required record not found during mission creation');
-        default:
-          console.error('Prisma error:', prismaError);
-          throw new AppError(500, 'Database error occurred during mission creation');
+  } catch (error) {
+    console.error('❌ Failed to create mission:', error);
+    
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2003') {
+        return NextResponse.json({
+          error: 'FOREIGN_KEY_ERROR',
+          message: 'Invalid reference to lead, quote, team leader, or team'
+        }, { status: 400 });
       }
     }
     
-    throw new AppError(500, `Failed to create mission: ${errorMessage}`);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
-});
-
-// OPTIONS endpoint for CORS
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Allow': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
-  });
 }
