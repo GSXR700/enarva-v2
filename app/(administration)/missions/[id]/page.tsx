@@ -493,80 +493,80 @@ export default function MissionDetailPage() {
     </CardTitle>
   </CardHeader>
   <CardContent className="space-y-4">
-    {/* Team Leader - Display separately */}
-    {mission.teamLeader && (
-      <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border">
+  {/* Team Leader - Display separately */}
+  {mission.teamLeader && (
+    <div className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border dark:border-purple-800/30">
+      <Avatar className="w-8 h-8">
+        <AvatarImage src={mission.teamLeader.image || undefined} />
+        <AvatarFallback>
+          {mission.teamLeader.name?.split(' ').map(n => n[0]).join('') || 'TL'}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+          <p className="text-sm font-medium">{mission.teamLeader.name}</p>
+        </div>
+        <p className="text-xs text-muted-foreground">Chef d'équipe</p>
+      </div>
+      <Badge variant="outline" className="text-xs">
+        Leader
+      </Badge>
+    </div>
+  )}
+
+  {/* Team Members - EXCLUDE TEAM LEADER */}
+  {mission.team?.members
+    .filter((member) => member.user.id !== mission.teamLeader?.id)
+    .map((member) => (
+      <div key={member.user.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border dark:border-gray-700">
         <Avatar className="w-8 h-8">
-          <AvatarImage src={mission.teamLeader.image || undefined} />
+          <AvatarImage src={member.user.image || undefined} />
           <AvatarFallback>
-            {mission.teamLeader.name?.split(' ').map(n => n[0]).join('') || 'TL'}
+            {member.user.name?.split(' ').map(n => n[0]).join('') || 'M'}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-purple-600" />
-            <p className="text-sm font-medium">{mission.teamLeader.name}</p>
-          </div>
-          <p className="text-xs text-muted-foreground">Chef d'équipe</p>
+          <p className="text-sm font-medium">{member.user.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {translate(member.user.role)}
+          </p>
         </div>
-        <Badge variant="outline" className="text-xs">
-          Leader
+        <Badge variant="secondary" className="text-xs">
+          Membre
         </Badge>
       </div>
-    )}
+    ))}
 
-    {/* Team Members - EXCLUDE TEAM LEADER */}
-    {mission.team?.members
-      .filter((member) => member.user.id !== mission.teamLeader?.id)
-      .map((member) => (
-        <div key={member.user.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-          <Avatar className="w-8 h-8">
-            <AvatarImage src={member.user.image || undefined} />
-            <AvatarFallback>
-              {member.user.name?.split(' ').map(n => n[0]).join('') || 'M'}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1">
-            <p className="text-sm font-medium">{member.user.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {translate(member.user.role)}
-            </p>
-          </div>
-          <Badge variant="secondary" className="text-xs">
-            Membre
-          </Badge>
+  {/* No Team Assigned State */}
+  {!mission.teamLeader && (!mission.team?.members || mission.team.members.length === 0) && (
+    <div className="text-center py-6">
+      <Users className="w-12 h-12 mx-auto text-gray-400 dark:text-gray-600 mb-2" />
+      <p className="text-sm text-muted-foreground">Aucune équipe assignée</p>
+    </div>
+  )}
+
+  {/* Team Stats */}
+  {(mission.teamLeader || (mission.team?.members && mission.team.members.length > 0)) && (
+    <div className="pt-3 border-t dark:border-gray-700">
+      <div className="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <span className="text-muted-foreground">Total membres:</span>
+          <span className="ml-1 font-medium">
+            {(mission.teamLeader ? 1 : 0) + (mission.team?.members?.filter(m => m.user.id !== mission.teamLeader?.id).length || 0)}
+          </span>
         </div>
-      ))}
-
-    {/* No Team Assigned State */}
-    {!mission.teamLeader && (!mission.team?.members || mission.team.members.length === 0) && (
-      <div className="text-center py-6">
-        <Users className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-        <p className="text-sm text-muted-foreground">Aucune équipe assignée</p>
-      </div>
-    )}
-
-    {/* Team Stats */}
-    {(mission.teamLeader || (mission.team?.members && mission.team.members.length > 0)) && (
-      <div className="pt-3 border-t">
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-muted-foreground">Total membres:</span>
-            <span className="ml-1 font-medium">
-              {(mission.teamLeader ? 1 : 0) + (mission.team?.members?.filter(m => m.user.id !== mission.teamLeader?.id).length || 0)}
-            </span>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Rôles:</span>
-            <span className="ml-1 font-medium">
-              {mission.teamLeader && mission.team?.members && mission.team.members.length > 1 ? 'Mixte' : 
-               mission.teamLeader ? 'Leadership' : 'Équipe'}
-            </span>
-          </div>
+        <div>
+          <span className="text-muted-foreground">Rôles:</span>
+          <span className="ml-1 font-medium">
+            {mission.teamLeader && mission.team?.members && mission.team.members.length > 1 ? 'Mixte' : 
+             mission.teamLeader ? 'Leadership' : 'Équipe'}
+          </span>
         </div>
       </div>
-    )}
-  </CardContent>
+    </div>
+  )}
+</CardContent>
 </Card>
 
           {/* Mission Notes */}
