@@ -1,11 +1,27 @@
-// app/api/tasks/[id]/route.ts - FIXED VERSION
+// app/api/tasks/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { PrismaClient } from '@prisma/client';
 import { ExtendedUser } from '@/types/next-auth';
+import { z } from 'zod';
 
 const prisma = new PrismaClient();
+
+const taskUpdateSchema = z.object({
+  status: z.enum(['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'VALIDATED', 'REJECTED']).optional(),
+  notes: z.string().optional().nullable(),
+  actualTime: z.number().min(0).optional().nullable(),
+  estimatedTime: z.number().min(0).optional().nullable(),
+  completedAt: z.string().datetime().optional().nullable(),
+  validatedAt: z.string().datetime().optional().nullable(),
+  startedAt: z.string().datetime().optional().nullable(),
+  assignedToId: z.string().optional().nullable(),
+  title: z.string().optional(),
+  description: z.string().optional().nullable(),
+  category: z.string().optional(),
+  type: z.string().optional()
+});
 
 export async function GET(
   _request: NextRequest,
@@ -86,6 +102,15 @@ async function handleTaskUpdate(
 
     console.log('🔧 Task Update Request:', { taskId: id, body, userId: user.id, userRole: user.role });
 
+    const validationResult = taskUpdateSchema.safeParse(body);
+    if (!validationResult.success) {
+      console.error('❌ Validation failed:', validationResult.error.errors);
+      return NextResponse.json(
+        { error: 'Validation failed', details: validationResult.error.errors },
+        { status: 400 }
+      );
+    }
+
     const existingTask = await prisma.task.findUnique({
       where: { id },
       include: {
@@ -103,7 +128,6 @@ async function handleTaskUpdate(
       return new NextResponse('Task not found', { status: 404 });
     }
 
-    // Authorization check - Team Leaders can manage their mission tasks, Technicians can update their own tasks
     const isAuthorized = (
       user.role === 'ADMIN' ||
       user.role === 'MANAGER' ||
@@ -121,14 +145,15 @@ async function handleTaskUpdate(
       return new NextResponse('Forbidden - You can only update tasks assigned to you or your team', { status: 403 });
     }
 
-    // Build update data using ONLY fields that exist in the schema
     const updateData: any = {};
 
-    // Handle status changes
     if (body.status) {
       updateData.status = body.status;
       
-      // Auto-set timestamps based on status
+      if (body.status === 'IN_PROGRESS' && existingTask.status === 'ASSIGNED') {
+        updateData.startedAt = new Date();
+      }
+      
       if (body.status === 'COMPLETED' && existingTask.status !== 'COMPLETED') {
         updateData.completedAt = new Date();
       } else if (body.status === 'VALIDATED' && existingTask.status !== 'VALIDATED') {
@@ -136,20 +161,24 @@ async function handleTaskUpdate(
       }
     }
 
-    // Handle fields that exist in the schema
     if (body.notes !== undefined) updateData.notes = body.notes;
     if (body.actualTime !== undefined) updateData.actualTime = body.actualTime;
     if (body.estimatedTime !== undefined) updateData.estimatedTime = body.estimatedTime;
+    if (body.title !== undefined) updateData.title = body.title;
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.category !== undefined) updateData.category = body.category;
+    if (body.type !== undefined) updateData.type = body.type;
     
-    // Handle existing datetime fields
     if (body.completedAt !== undefined) {
       updateData.completedAt = body.completedAt ? new Date(body.completedAt) : null;
     }
     if (body.validatedAt !== undefined) {
       updateData.validatedAt = body.validatedAt ? new Date(body.validatedAt) : null;
     }
+    if (body.startedAt !== undefined) {
+      updateData.startedAt = body.startedAt ? new Date(body.startedAt) : null;
+    }
 
-    // Handle assignment
     if (body.assignedToId !== undefined) {
       updateData.assignedToId = body.assignedToId;
     }
@@ -181,7 +210,6 @@ async function handleTaskUpdate(
       }
     });
 
-    // Check if all tasks in the mission are completed
     if (body.status === 'COMPLETED') {
       const missionTasks = await prisma.task.findMany({
         where: { missionId: existingTask.mission.id }
@@ -203,6 +231,22 @@ async function handleTaskUpdate(
       }
     }
 
+    if (body.assignedToId !== undefined && process.env.PUSHER_APP_ID) {
+      try {
+        const { pusherServer } = await import('@/lib/pusher')
+        await pusherServer.trigger('missions-channel', 'task-updated', {
+          taskId: updatedTask.id,
+          missionId: existingTask.mission.id,
+          assignedTo: body.assignedToId,
+          action: 'assignment',
+          updatedAt: new Date()
+        })
+        console.log('✅ Pusher notification sent for assignment')
+      } catch (pusherError) {
+        console.warn('⚠️ Pusher notification failed:', pusherError)
+      }
+    }
+
     console.log('✅ Task updated successfully:', updatedTask.id);
     return NextResponse.json(updatedTask);
 
@@ -218,7 +262,6 @@ async function handleTaskUpdate(
   }
 }
 
-// Helper function to check if user is assigned to a task
 async function isUserAssignedToTask(userId: string, taskAssignedToId: string): Promise<boolean> {
   try {
     const teamMember = await prisma.teamMember.findUnique({

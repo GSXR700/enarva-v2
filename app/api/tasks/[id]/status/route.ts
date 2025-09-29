@@ -1,4 +1,4 @@
-// app/api/tasks/[id]/status/route.ts - FIXED VERSION
+// app/api/tasks/[id]/status/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -37,7 +37,6 @@ export async function PATCH(
 
     const { status } = validationResult.data
 
-    // Check if task exists and get full context
     const task = await prisma.task.findUnique({
       where: { id: taskId },
       include: {
@@ -85,7 +84,6 @@ export async function PATCH(
       teamMembers: task.mission.team?.members?.map(m => ({ id: m.user.id, name: m.user.name }))
     })
 
-    // Enhanced permission check - FIXED
     const isAdmin = user.role === 'ADMIN' || user.role === 'MANAGER'
     const isTeamLeader = task.mission.teamLeaderId === user.id
     const isAssignedUser = task.assignedTo?.userId === user.id
@@ -106,24 +104,22 @@ export async function PATCH(
       return new NextResponse('Forbidden - You cannot update this task', { status: 403 })
     }
 
-    // Update task with proper timestamps
     const updateData: any = { status }
     
-    if (status === 'COMPLETED' && task.status !== 'COMPLETED') {
-      updateData.completedAt = new Date()
-      if (task.estimatedTime) {
-        updateData.actualTime = task.estimatedTime // Could be enhanced to track real time
-      }
-    }
-
     if (status === 'IN_PROGRESS' && task.status === 'ASSIGNED') {
       updateData.startedAt = new Date()
+    }
+
+    if (status === 'COMPLETED' && task.status !== 'COMPLETED') {
+      updateData.completedAt = new Date()
+      if (!task.actualTime && task.estimatedTime) {
+        updateData.actualTime = task.estimatedTime
+      }
     }
 
     console.log('🔧 Updating task with data:', updateData)
 
     const updatedTask = await prisma.$transaction(async (tx) => {
-      // Update the task
       const updated = await tx.task.update({
         where: { id: taskId },
         data: updateData,
@@ -150,7 +146,6 @@ export async function PATCH(
         }
       })
 
-      // Create activity log
       await tx.activity.create({
         data: {
           type: 'MISSION_STATUS_UPDATED',
@@ -166,7 +161,6 @@ export async function PATCH(
         }
       })
 
-      // Check if all tasks in mission are completed to auto-promote mission
       if (status === 'COMPLETED') {
         const allMissionTasks = await tx.task.findMany({
           where: { missionId: task.missionId }
@@ -190,6 +184,22 @@ export async function PATCH(
 
       return updated
     })
+
+    if (process.env.PUSHER_APP_ID) {
+      try {
+        const { pusherServer } = await import('@/lib/pusher')
+        await pusherServer.trigger('missions-channel', 'task-updated', {
+          taskId: updatedTask.id,
+          missionId: task.missionId,
+          status: updatedTask.status,
+          assignedTo: updatedTask.assignedTo?.user.id,
+          updatedAt: new Date()
+        })
+        console.log('✅ Pusher notification sent')
+      } catch (pusherError) {
+        console.warn('⚠️ Pusher notification failed:', pusherError)
+      }
+    }
 
     console.log('✅ Task updated successfully:', updatedTask.id)
     return NextResponse.json(updatedTask)

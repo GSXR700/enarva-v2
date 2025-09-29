@@ -1,4 +1,4 @@
-// lib/utils.ts - VERSION COMPLÈTE MISE À JOUR AVEC GESTION DECIMAL
+// lib/utils.ts
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
@@ -6,18 +6,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-/**
- * Convertit sécurisément une valeur en nombre (gère les Decimal Prisma)
- */
 function safeToNumber(value: any): number {
   if (!value && value !== 0) return 0
   
-  // Si c'est déjà un nombre
   if (typeof value === 'number') {
     return isNaN(value) ? 0 : value
   }
   
-  // Si c'est un objet Decimal de Prisma
   if (value && typeof value === 'object') {
     if (typeof value.toNumber === 'function') {
       const num = value.toNumber()
@@ -29,20 +24,15 @@ function safeToNumber(value: any): number {
     }
   }
   
-  // Si c'est une string
   if (typeof value === 'string') {
     const num = parseFloat(value)
     return isNaN(num) ? 0 : num
   }
   
-  // Fallback
   console.warn('Could not convert value to number:', value)
   return 0
 }
 
-/**
- * Formate une valeur monétaire (gère les Decimal Prisma automatiquement)
- */
 export function formatCurrency(amount: any, currency = 'MAD') {
   const numericAmount = safeToNumber(amount)
   
@@ -106,7 +96,6 @@ export function getRelativeTime(date: string | Date) {
   return formatDate(date)
 }
 
-// --- SECTION DE TRADUCTION CENTRALISÉE ---
 export const translations = {
   LeadStatus: {
     NEW: "Nouveau",
@@ -201,6 +190,10 @@ export const translations = {
     DETAIL_FINISHING: "Finitions Détail",
     SETUP: "Préparation",
     CLEANUP: "Nettoyage Final",
+    EXECUTION: "Exécution",
+    QUALITY_CHECK: "Contrôle qualité",
+    DOCUMENTATION: "Documentation",
+    CLIENT_INTERACTION: "Interaction client",
   },
   TaskStatus: {
     ASSIGNED: "Assignée",
@@ -346,24 +339,17 @@ export const translations = {
   }
 };
 
-/**
- * Traduit automatiquement une valeur d'enum
- */
 export function translate(value: string | null | undefined): string {
   if (!value) return "N/A";
   
-  // Fixed: Remove unused 'key' variable by using Object.values instead of Object.entries
   for (const translationObj of Object.values(translations)) {
     if (translationObj[value as keyof typeof translationObj]) {
       return translationObj[value as keyof typeof translationObj];
     }
   }
   
-  // Si aucune traduction trouvée, retourne une version formatée de la valeur originale
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase().replace(/_/g, ' ');
 }
-
-// --- MOTEUR DE CALCUL DE DEVIS ENARVA V2 ---
 
 export type ServiceType = 'GrandMénage' | 'FinDeChantier' | 'CristallisationMarbre' | 'MénageRégulier' | 'NettoyageVitre' | 'NettoyageBureau';
 
@@ -371,7 +357,7 @@ export interface ServiceInput {
   id: number;
   type: ServiceType;
   surface: number;
-  levels: number; // Nombre de niveaux
+  levels: number;
   distance: number;
   etage: 'RDC' | 'AvecAscenseur' | 'SansAscenseur';
   delai: 'STANDARD' | 'URGENT' | 'IMMEDIAT';
@@ -470,7 +456,6 @@ const getServiceDetail = (service: ServiceInput): string => {
 };
 
 export function generateQuote(services: ServiceInput[]): QuoteCalculation {
-    // Fixed: Remove unused 'index' parameter from map function
     const lineItems: QuoteLineItem[] = services.map((service) => {
         const amount = calculateIndividualService(service);
         return {
@@ -483,13 +468,11 @@ export function generateQuote(services: ServiceInput[]): QuoteCalculation {
     });
 
     const subTotalHT = lineItems.reduce((sum, item) => sum + item.amount, 0);
-    const vatAmount = subTotalHT * 0.20; // TVA 20%
+    const vatAmount = subTotalHT * 0.20;
     let totalTTC = subTotalHT + vatAmount;
     
-    // Prix minimum de 500 MAD
     if (totalTTC < 500) totalTTC = 500;
     
-    // Arrondir au dizaine supérieure pour le prix final
     const finalPrice = Math.round(totalTTC / 10) * 10;
 
     return {
@@ -501,7 +484,6 @@ export function generateQuote(services: ServiceInput[]): QuoteCalculation {
     };
 }
 
-// Types de services disponibles
 export const SERVICE_TYPES = [
   'Grand Ménage',
   'Nettoyage Standard', 
@@ -514,7 +496,6 @@ export const SERVICE_TYPES = [
   'Entretien Régulier'
 ] as const;
 
-// Tarification par service
 export const SERVICE_PRICING = {
   'Grand Ménage': { base: 200, perM2: 8 },
   'Nettoyage Standard': { base: 150, perM2: 6 },
@@ -527,5 +508,4 @@ export const SERVICE_PRICING = {
   'Entretien Régulier': { base: 100, perM2: 4 }
 } as const;
 
-// Utilitaires pour les Decimal Prisma (centralisées ici aussi)
 export { safeToNumber };

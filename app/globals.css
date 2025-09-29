@@ -11,7 +11,7 @@
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 217 91% 60%; /* Enarva Blue Start */
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 98%;
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
@@ -28,25 +28,24 @@
   }
 
   .dark {
-    /* Deep Black Dark Theme */
-    --background: 0 0% 0%; /* Pure black background */
-    --foreground: 0 0% 98%; /* Nearly white text */
-    --card: 0 0% 5%; /* Very dark gray for cards */
+    --background: 0 0% 0%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 5%;
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 5%;
     --popover-foreground: 0 0% 98%;
-    --primary: 217 91% 60%; /* Keep Enarva blue */
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 10%; /* Dark gray */
+    --secondary: 0 0% 10%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 8%; /* Slightly lighter than background */
-    --muted-foreground: 0 0% 65%; /* Medium gray for muted text */
+    --muted: 0 0% 8%;
+    --muted-foreground: 0 0% 65%;
     --accent: 0 0% 10%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 50%; /* Slightly lighter red for dark mode */
+    --destructive: 0 62.8% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 15%; /* Dark border */
-    --input: 0 0% 10%; /* Dark input background */
+    --border: 0 0% 15%;
+    --input: 0 0% 10%;
     --ring: 217 91% 60%;
   }
 
@@ -59,12 +58,11 @@
     transition: background-color 0.3s ease, color 0.3s ease;
   }
   
-  /* Ensure smooth transitions for theme changes */
   html {
     transition: background-color 0.3s ease;
+    scroll-behavior: smooth;
   }
 
-  /* Additional dark mode optimizations */
   .dark ::-webkit-scrollbar {
     width: 8px;
   }
@@ -82,45 +80,52 @@
     background: hsl(0 0% 30%);
   }
   
-  /* Selection colors for dark mode */
   .dark ::selection {
     background-color: hsl(217 91% 60% / 0.3);
     color: hsl(0 0% 98%);
   }
   
-  /* Focus outline improvements for dark mode */
   .dark *:focus-visible {
     outline-color: hsl(217 91% 60%);
+  }
+
+  * {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+
+  img,
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  *:focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
   }
 }
 
 @layer components {
-  /* Custom gradient for primary elements */
   .bg-enarva-gradient {
     @apply bg-gradient-to-r from-enarva-start to-enarva-end text-white;
   }
   
-  /* Update card styles with 20px radius and dark mode support */
   .thread-card {
     @apply bg-card border border-border rounded-20px shadow-sm hover:shadow-md transition-all duration-200;
   }
   
-  /* Dark mode specific enhancements for cards */
   .dark .thread-card {
     @apply shadow-gray-900/50 hover:shadow-gray-900/70;
   }
 
-  /* Responsive adjustments for main content padding */
   .main-content {
     @apply p-2 sm:p-4 md:p-6;
   }
   
-  /* Grid adjustments for responsive layouts */
   .responsive-grid {
     @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6;
   }
   
-  /* Custom scrollbar with dark mode support */
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
   }
@@ -134,7 +139,6 @@
     border-radius: 20px;
   }
   
-  /* Dark mode scrollbar styling */
   .dark .custom-scrollbar::-webkit-scrollbar-thumb {
     background-color: hsl(0 0% 20%);
   }
@@ -143,7 +147,6 @@
     background-color: hsl(0 0% 30%);
   }
 
-  /* Shining loading effect for buttons with dark mode support */
   .animate-shine {
     position: relative;
     overflow: hidden;
@@ -166,7 +169,6 @@
     animation: shine 1.5s infinite;
   }
   
-  /* Dark mode shine effect */
   .dark .animate-shine::after {
     background: linear-gradient(
       to right,
@@ -181,8 +183,24 @@
       transform: translateX(100%);
     }
   }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
   
-  /* Loading skeleton animations with theme support */
   .skeleton {
     @apply animate-pulse bg-muted rounded;
   }
@@ -191,99 +209,74 @@
     background-color: hsl(0 0% 15%);
   }
 
-  /* Mobile sidebar specific optimizations */
+  .rounded-full {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .avatar-container {
+    flex-shrink: 0;
+  }
+
   .sidebar-mobile-fix {
-    /* Prevent blur on mobile transforms */
     -webkit-transform-style: preserve-3d;
     transform-style: preserve-3d;
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
-    
-    /* Optimize rendering for mobile */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    
-    /* Force hardware acceleration without blur */
     will-change: transform;
     transform: translateZ(0);
-    
-    /* Ensure proper pixel alignment */
     image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
   }
 
-  /* Dark mode specific sidebar fixes */
   .dark .sidebar-mobile-fix {
-    /* Prevent text rendering issues in dark mode */
     color-rendering: optimizeQuality;
     text-rendering: optimizeLegibility;
-    
-    /* Better contrast for dark mode */
     -webkit-font-smoothing: subpixel-antialiased;
-    
-    /* Ensure proper layering */
     isolation: isolate;
   }
 
-  /* Icon and text rendering fixes */
   .sidebar-icon-fix {
-    /* Prevent icon distortion */
     flex-shrink: 0;
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
-    
-    /* Better icon rendering */
     shape-rendering: geometricPrecision;
   }
 
-  /* Text rendering fixes */
   .sidebar-text-fix {
-    /* Prevent text blur */
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
-    
-    /* Better text rendering */
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Dark mode icon fixes */
   .dark .sidebar-icon-fix {
-    /* Better dark mode icon visibility */
     filter: brightness(1.1);
   }
 
-  /* Overlay improvements for better interaction */
   .sidebar-overlay-fix {
-    /* Better backdrop for mobile */
     backdrop-filter: blur(8px) saturate(180%);
     -webkit-backdrop-filter: blur(8px) saturate(180%);
-    
-    /* Ensure proper interaction */
     touch-action: none;
     pointer-events: auto;
-    
-    /* Smoother animation */
     transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Logo rendering fixes */
   .sidebar-logo-fix {
-    /* Prevent logo blur */
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
     image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
-    
-    /* Ensure proper scaling */
     object-fit: contain;
     object-position: center;
   }
 
-  /* Better dark mode custom scrollbar */
   .dark .custom-scrollbar {
-    /* Better dark mode scrollbar */
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
   }
@@ -307,46 +300,62 @@
   }
 }
 
-/* Performance optimizations for mobile sidebar */
 @media (max-width: 768px) {
-  /* Mobile-specific link fixes */
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  [role="menu"],
+  [role="listbox"] {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .card {
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
   .sidebar-mobile-fix .sidebar-link {
-    /* Ensure proper touch targets */
     min-height: 44px;
     touch-action: manipulation;
-    
-    /* Prevent text blur on transform */
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
-    
-    /* Better mobile rendering */
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     user-select: none;
   }
   
   .sidebar-mobile-fix .sidebar-link:active {
-    /* Better mobile feedback */
     transform: scale(0.98);
     transition: transform 0.1s ease;
   }
 
-  /* Optimize sidebar container for mobile */
   .sidebar-container {
-    /* Better performance on mobile */
     contain: layout style paint;
-    
-    /* Reduce repaints */
     will-change: transform;
-    
-    /* Better layering */
     transform: translateZ(0);
   }
 
-  /* Reduce motion for better performance if needed */
   @media (prefers-reduced-motion: reduce) {
     .sidebar-container {
       transition: none !important;
     }
+  }
+}
+
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
   }
 }
