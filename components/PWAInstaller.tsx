@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, X, Smartphone, Share } from 'lucide-react';
+import { Download, X, Smartphone, Share, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -17,6 +17,7 @@ export default function PWAInstaller() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const checkIfInstalled = useCallback(() => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
@@ -30,17 +31,82 @@ export default function PWAInstaller() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent);
   }, []);
 
+  // Force service worker update and cache clearing
+  const forceUpdate = useCallback(async () => {
+    setIsUpdating(true);
+    try {
+      if ('serviceWorker' in navigator) {
+        // Get all registrations
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        
+        // Unregister all service workers
+        for (const registration of registrations) {
+          await registration.unregister();
+          console.log('[PWA] Service worker unregistered');
+        }
+        
+        // Clear all caches
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+        console.log('[PWA] All caches cleared');
+        
+        // Wait a bit
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Re-register service worker
+        const registration = await navigator.serviceWorker.register('/sw.js', { 
+          scope: '/',
+          updateViaCache: 'none' // Don't use HTTP cache
+        });
+        
+        console.log('[PWA] Service worker re-registered');
+        
+        // Force update
+        await registration.update();
+        
+        // Reload the page after a short delay
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('[PWA] Error forcing update:', error);
+      setIsUpdating(false);
+    }
+  }, []);
+
   useEffect(() => {
-    // Register Service Worker with better error handling
+    // Register Service Worker with better error handling and force update
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
-        .register('/sw.js', { scope: '/' })
+        .register('/sw.js', { 
+          scope: '/',
+          updateViaCache: 'none' // CRITICAL: Don't cache the service worker itself
+        })
         .then((registration) => {
           console.log('[PWA] Service Worker registered successfully:', registration.scope);
           
-          // Check for updates
+          // Force immediate update check
+          registration.update();
+          
+          // Check for updates periodically
+          setInterval(() => {
+            registration.update();
+          }, 60000); // Check every minute
+          
+          // Listen for updates
           registration.addEventListener('updatefound', () => {
             console.log('[PWA] New version available');
+            const newWorker = registration.installing;
+            
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // New service worker is ready, notify user
+                  console.log('[PWA] New version installed, reload required');
+                }
+              });
+            }
           });
         })
         .catch((error) => {
@@ -107,7 +173,7 @@ export default function PWAInstaller() {
     }
 
     if (!deferredPrompt) {
-      console.log('[PWA] No deferred prompt available');
+      console.log('[PWA] No install prompt available');
       return;
     }
 
@@ -115,7 +181,7 @@ export default function PWAInstaller() {
       await deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       
-      console.log(`[PWA] User response to install prompt: ${outcome}`);
+      console.log(`[PWA] User response: ${outcome}`);
       
       if (outcome === 'accepted') {
         setShowInstallBanner(false);
@@ -123,26 +189,19 @@ export default function PWAInstaller() {
       
       setDeferredPrompt(null);
     } catch (error) {
-      console.error('[PWA] Error showing install prompt:', error);
+      console.error('[PWA] Error during installation:', error);
     }
   };
 
-  const dismissBanner = () => {
+  const handleDismiss = () => {
     setShowInstallBanner(false);
-    
-    // Don't show again for this session
-    sessionStorage.setItem('pwa-install-dismissed', 'true');
+    // Remember dismissal
+    localStorage.setItem('pwa-install-dismissed', 'true');
   };
 
-  // Don't show if dismissed this session
-  useEffect(() => {
-    const dismissed = sessionStorage.getItem('pwa-install-dismissed');
-    if (dismissed && showInstallBanner) {
-      setShowInstallBanner(false);
-    }
-  }, [showInstallBanner]);
-
-  if (isInstalled) return null;
+  if (isInstalled) {
+    return null;
+  }
 
   return (
     <>
@@ -153,51 +212,63 @@ export default function PWAInstaller() {
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-50"
           >
-            <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-4 backdrop-blur-sm">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    {isIOS ? (
-                      <Smartphone className="w-6 h-6 text-blue-600" />
-                    ) : (
-                      <Download className="w-6 h-6 text-blue-600" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">
-                      {isIOS ? 'Ajouter à l\'écran d\'accueil' : 'Installer Enarva OS'}
-                    </h3>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {isIOS 
-                        ? 'Accès rapide depuis votre iPhone/iPad'
-                        : 'Accédez rapidement depuis votre écran d\'accueil'
-                      }
-                    </p>
+            <div className="bg-card border border-border rounded-lg shadow-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-enarva-start to-enarva-end flex items-center justify-center">
+                    <Smartphone className="w-6 h-6 text-white" />
                   </div>
                 </div>
+                
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm mb-1">
+                    Installer Enarva OS
+                  </h3>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Installez l'application pour un accès rapide et hors ligne
+                  </p>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleInstallClick}
+                      className="bg-gradient-to-r from-enarva-start to-enarva-end hover:opacity-90"
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      Installer
+                    </Button>
+                    
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={forceUpdate}
+                      disabled={isUpdating}
+                      className="gap-1"
+                    >
+                      {isUpdating ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          Actualisation...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4" />
+                          Actualiser
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                
                 <button
-                  onClick={dismissBanner}
-                  className="text-gray-400 hover:text-gray-600 p-1"
+                  onClick={handleDismiss}
+                  className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
-              </div>
-              <div className="mt-4 flex gap-2">
-                <Button
-                  onClick={handleInstallClick}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                >
-                  {isIOS ? 'Voir les instructions' : 'Installer maintenant'}
-                </Button>
-                <Button
-                  onClick={dismissBanner}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Plus tard
-                </Button>
               </div>
             </div>
           </motion.div>
@@ -211,54 +282,46 @@ export default function PWAInstaller() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4"
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowIOSInstructions(false)}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-lg p-6 max-w-sm w-full"
+              className="bg-card border border-border rounded-lg shadow-xl p-6 max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="text-center mb-4">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Share className="w-8 h-8 text-blue-600" />
+                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-enarva-start to-enarva-end flex items-center justify-center">
+                  <Share className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Installation sur iOS
+                <h3 className="font-semibold text-lg mb-2">
+                  Installer sur iOS
                 </h3>
               </div>
               
-              <div className="space-y-3 text-sm text-gray-600">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-blue-600 font-bold text-xs">1</span>
-                  </div>
-                  <p>Appuyez sur le bouton <strong>Partager</strong> en bas de votre navigateur Safari</p>
-                </div>
-                
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-blue-600 font-bold text-xs">2</span>
-                  </div>
-                  <p>Sélectionnez <strong>"Sur l'écran d'accueil"</strong> dans la liste</p>
-                </div>
-                
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-blue-600 font-bold text-xs">3</span>
-                  </div>
-                  <p>Appuyez sur <strong>"Ajouter"</strong> pour confirmer</p>
-                </div>
-              </div>
+              <ol className="space-y-3 text-sm text-muted-foreground mb-4">
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 font-semibold">1.</span>
+                  <span>Appuyez sur l'icône de partage <Share className="w-4 h-4 inline" /> en bas de Safari</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 font-semibold">2.</span>
+                  <span>Faites défiler et sélectionnez "Sur l'écran d'accueil"</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 font-semibold">3.</span>
+                  <span>Appuyez sur "Ajouter" pour confirmer</span>
+                </li>
+              </ol>
               
-              <div className="mt-6 flex gap-2">
-                <Button
-                  onClick={() => setShowIOSInstructions(false)}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                >
-                  Compris
-                </Button>
-              </div>
+              <Button
+                onClick={() => setShowIOSInstructions(false)}
+                className="w-full"
+              >
+                Compris
+              </Button>
             </motion.div>
           </motion.div>
         )}

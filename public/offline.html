@@ -1,132 +1,77 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hors ligne - Enarva OS</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            color: #333;
-        }
-        
-        .container {
-            text-align: center;
-            max-width: 400px;
-            padding: 2rem;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-        }
-        
-        .icon {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 1.5rem;
-            background: #0066FF;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 2rem;
-        }
-        
-        h1 {
-            margin: 0 0 1rem;
-            color: #0066FF;
-            font-size: 1.5rem;
-        }
-        
-        p {
-            margin: 0 0 1.5rem;
-            color: #666;
-            line-height: 1.5;
-        }
-        
-        .retry-btn {
-            background: #0066FF;
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: background-color 0.2s;
-        }
-        
-        .retry-btn:hover {
-            background: #0052CC;
-        }
-        
-        .features {
-            margin-top: 2rem;
-            text-align: left;
-        }
-        
-        .feature {
-            display: flex;
-            align-items: center;
-            margin: 0.5rem 0;
-            font-size: 0.9rem;
-            color: #666;
-        }
-        
-        .feature-icon {
-            width: 16px;
-            height: 16px;
-            margin-right: 0.5rem;
-            color: #0066FF;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hors ligne - Enarva OS</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #267df4 0%, #0050cc 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      padding: 20px;
+    }
+    .container {
+      text-align: center;
+      max-width: 500px;
+    }
+    .icon {
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 30px;
+      opacity: 0.9;
+    }
+    h1 {
+      font-size: 32px;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+    p {
+      font-size: 18px;
+      opacity: 0.9;
+      line-height: 1.6;
+      margin-bottom: 30px;
+    }
+    .button {
+      display: inline-block;
+      background: white;
+      color: #267df4;
+      padding: 14px 32px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="icon">📱</div>
-        <h1>Vous êtes hors ligne</h1>
-        <p>Il semble que votre connexion Internet soit interrompue. Certaines fonctionnalités peuvent être limitées.</p>
-        
-        <button class="retry-btn" onclick="location.reload()">
-            Réessayer
-        </button>
-        
-        <div class="features">
-            <div class="feature">
-                <span class="feature-icon">✓</span>
-                <span>Vos données sont sauvegardées localement</span>
-            </div>
-            <div class="feature">
-                <span class="feature-icon">✓</span>
-                <span>L'app se synchronisera au retour du réseau</span>
-            </div>
-            <div class="feature">
-                <span class="feature-icon">✓</span>
-                <span>Navigation hors ligne disponible</span>
-            </div>
-        </div>
-    </div>
+  <div class="container">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+      <polyline points="15 3 21 3 21 9"></polyline>
+      <line x1="10" y1="14" x2="21" y2="3"></line>
+    </svg>
     
-    <script>
-        // Auto-retry when online
-        window.addEventListener('online', () => {
-            location.reload();
-        });
-        
-        // Show connection status
-        function updateConnectionStatus() {
-            if (navigator.onLine) {
-                location.reload();
-            }
-        }
-        
-        setInterval(updateConnectionStatus, 5000);
-    </script>
+    <h1>Vous êtes hors ligne</h1>
+    <p>
+      Vérifiez votre connexion Internet et réessayez. Les fonctionnalités hors ligne seront disponibles prochainement.
+    </p>
+    
+    <a href="/" class="button">Réessayer</a>
+  </div>
 </body>
 </html>

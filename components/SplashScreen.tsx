@@ -125,7 +125,7 @@ export default function SplashScreen() {
         style={{
           background: isDarkMode 
             ? '#000000'
-            : 'linear-gradient(to right, #267df4, #2155c9)'
+            : 'linear-gradient(135deg, #267df4 0%, #2155c9 100%)'
         }}
       >
         {/* Animated Background Blobs - Only in Light Mode */}
@@ -178,69 +178,78 @@ export default function SplashScreen() {
           </>
         )}
 
-        {/* Text-Based Logo - HD Quality, matching PDF styling */}
-        <AnimatePresence>
-          {showLogo && (
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ 
-                scale: 0.9,
-                opacity: 0,
-                transition: { duration: 0.5 }
-              }}
-              transition={{ 
-                duration: 0.6,
-                ease: [0.43, 0.13, 0.23, 0.96]
-              }}
-              className="relative mb-12 z-10"
-            >
-              {/* Text-based "enarva" logo - Always white, HD quality */}
-              <div className="relative flex items-center justify-center">
+        {/* Main Content Container - Properly Centered with Margins */}
+        <div className="flex flex-col items-center justify-center px-8 w-full max-w-md">
+          
+          {/* Text-Based Logo - Professional Size like Standard Apps */}
+          <AnimatePresence>
+            {showLogo && (
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ 
+                  scale: 0.9,
+                  opacity: 0,
+                  transition: { duration: 0.5 }
+                }}
+                transition={{ 
+                  duration: 0.6,
+                  ease: [0.43, 0.13, 0.23, 0.96]
+                }}
+                className="relative z-10 mb-16"
+              >
+                {/* Text-based "enarva" logo - Properly sized */}
                 <h1 
-                  className="text-white font-bold select-none"
+                  className="text-white font-bold select-none text-center"
                   style={{
-                    fontSize: '160px',
-                    letterSpacing: '-2px',
+                    fontSize: 'clamp(48px, 12vw, 72px)', // Responsive: 48px to 72px max
+                    letterSpacing: '-1.5px',
                     fontFamily: 'Poppins, sans-serif',
-                    textShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+                    textShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
                     lineHeight: '1',
                   }}
                 >
                   enarva
                 </h1>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* Apple-style Progress Bar */}
-        <AnimatePresence>
-          {showLogo && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.5 }}
-              className="w-64 md:w-80 z-10"
-            >
-              {/* Progress Bar Container */}
-              <div className={`w-full h-1 rounded-full overflow-hidden transition-colors duration-300 ${
-                isDarkMode ? 'bg-white/10' : 'bg-white/20'
-              }`}>
-                {/* Progress Bar - animates from left to right (0% to 100% width) */}
-                <motion.div
-                  initial={{ width: '0%' }}
-                  animate={{ width: `${loadingProgress}%` }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
-                  className="h-full rounded-full transition-colors duration-300 bg-white"
-                  style={{
-                    boxShadow: '0 0 10px rgba(255, 255, 255, 0.5)'
-                  }}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          {/* Progress Bar Container - Fixed at Bottom with Proper Margins */}
+          <AnimatePresence>
+            {showLogo && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+                className="fixed bottom-16 left-0 right-0 px-8 w-full z-10"
+              >
+                {/* Progress Bar Background - Full Width */}
+                <div className="max-w-md mx-auto">
+                  <div className={`w-full h-1 rounded-full overflow-hidden transition-colors duration-300 ${
+                    isDarkMode ? 'bg-white/10' : 'bg-white/20'
+                  }`}>
+                    {/* Progress Bar Fill - Animates from 0% to 100% (left to right) */}
+                    <motion.div
+                      className="h-full rounded-full transition-colors duration-300 bg-white"
+                      style={{
+                        width: `${loadingProgress}%`,
+                        boxShadow: '0 0 10px rgba(255, 255, 255, 0.5)',
+                        transformOrigin: 'left' // CRITICAL: Ensures it grows from left
+                      }}
+                      initial={{ width: '0%' }}
+                      animate={{ width: `${loadingProgress}%` }}
+                      transition={{ 
+                        duration: 0.1, 
+                        ease: "linear" // Linear for smooth continuous progress
+                      }}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </motion.div>
     </AnimatePresence>
   );
