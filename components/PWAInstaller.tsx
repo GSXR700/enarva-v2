@@ -56,7 +56,7 @@ export default function PWAInstaller() {
         // Re-register service worker
         const registration = await navigator.serviceWorker.register('/sw.js', { 
           scope: '/',
-          updateViaCache: 'none' // Don't use HTTP cache
+          updateViaCache: 'none'
         });
         
         console.log('[PWA] Service worker re-registered');
@@ -76,15 +76,15 @@ export default function PWAInstaller() {
   }, []);
 
   useEffect(() => {
-    // Register Service Worker with better error handling and force update
+    // Register Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js', { 
           scope: '/',
-          updateViaCache: 'none' // CRITICAL: Don't cache the service worker itself
+          updateViaCache: 'none'
         })
         .then((registration) => {
-          console.log('[PWA] Service Worker registered successfully:', registration.scope);
+          console.log('[PWA] Service Worker registered:', registration.scope);
           
           // Force immediate update check
           registration.update();
@@ -92,21 +92,11 @@ export default function PWAInstaller() {
           // Check for updates periodically
           setInterval(() => {
             registration.update();
-          }, 60000); // Check every minute
+          }, 60000);
           
           // Listen for updates
           registration.addEventListener('updatefound', () => {
             console.log('[PWA] New version available');
-            const newWorker = registration.installing;
-            
-            if (newWorker) {
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // New service worker is ready, notify user
-                  console.log('[PWA] New version installed, reload required');
-                }
-              });
-            }
           });
         })
         .catch((error) => {
@@ -128,15 +118,23 @@ export default function PWAInstaller() {
       return;
     }
 
-    // For iOS, show install banner after delay
+    // Check if user dismissed banner in this session
+    const dismissed = sessionStorage.getItem('pwa-install-dismissed');
+    if (dismissed) {
+      console.log('[PWA] Banner was dismissed this session');
+      return;
+    }
+
+    // For iOS, ALWAYS show install banner after delay (iOS doesn't fire beforeinstallprompt)
     if (iOS && !installed) {
       const timer = setTimeout(() => {
+        console.log('[PWA] Showing iOS install banner');
         setShowInstallBanner(true);
       }, 3000);
       return () => clearTimeout(timer);
     }
 
-    // Listen for beforeinstallprompt (Chrome/Edge)
+    // For Android/Desktop Chrome - Listen for beforeinstallprompt
     const handleBeforeInstallPrompt = (e: Event) => {
       console.log('[PWA] beforeinstallprompt event fired');
       e.preventDefault();
@@ -149,6 +147,14 @@ export default function PWAInstaller() {
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // FALLBACK: If no beforeinstallprompt after 5 seconds on non-iOS, show banner anyway
+    const fallbackTimer = setTimeout(() => {
+      if (!iOS && !installed && !deferredPrompt) {
+        console.log('[PWA] No beforeinstallprompt received, showing banner anyway');
+        setShowInstallBanner(true);
+      }
+    }, 5000);
 
     // Listen for app installed
     const handleAppInstalled = () => {
@@ -163,8 +169,9 @@ export default function PWAInstaller() {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
+      clearTimeout(fallbackTimer);
     };
-  }, [checkIfInstalled, detectIOS]);
+  }, [checkIfInstalled, detectIOS, deferredPrompt]);
 
   const handleInstallClick = async () => {
     if (isIOS) {
@@ -172,31 +179,37 @@ export default function PWAInstaller() {
       return;
     }
 
-    if (!deferredPrompt) {
-      console.log('[PWA] No install prompt available');
-      return;
-    }
-
-    try {
-      await deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      
-      console.log(`[PWA] User response: ${outcome}`);
-      
-      if (outcome === 'accepted') {
-        setShowInstallBanner(false);
+    // If we have the deferred prompt, use it
+    if (deferredPrompt) {
+      try {
+        await deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        
+        console.log(`[PWA] User response: ${outcome}`);
+        
+        if (outcome === 'accepted') {
+          setShowInstallBanner(false);
+        }
+        
+        setDeferredPrompt(null);
+      } catch (error) {
+        console.error('[PWA] Error during installation:', error);
       }
-      
-      setDeferredPrompt(null);
-    } catch (error) {
-      console.error('[PWA] Error during installation:', error);
+    } else {
+      // Fallback: Show manual instructions for Chrome
+      alert(
+        'Pour installer cette application:\n\n' +
+        '1. Cliquez sur le menu ⋮ (3 points) en haut à droite\n' +
+        '2. Sélectionnez "Installer l\'application" ou "Ajouter à l\'écran d\'accueil"\n' +
+        '3. Confirmez l\'installation'
+      );
     }
   };
 
   const handleDismiss = () => {
     setShowInstallBanner(false);
-    // Remember dismissal
-    localStorage.setItem('pwa-install-dismissed', 'true');
+    // Remember dismissal for this session only
+    sessionStorage.setItem('pwa-install-dismissed', 'true');
   };
 
   if (isInstalled) {
@@ -228,7 +241,10 @@ export default function PWAInstaller() {
                     Installer Enarva OS
                   </h3>
                   <p className="text-xs text-muted-foreground mb-3">
-                    Installez l'application pour un accès rapide et hors ligne
+                    {isIOS 
+                      ? 'Ajoutez l\'app à votre écran d\'accueil pour un accès rapide'
+                      : 'Installez l\'application pour un accès rapide et hors ligne'
+                    }
                   </p>
                   
                   <div className="flex gap-2">
@@ -238,28 +254,30 @@ export default function PWAInstaller() {
                       className="bg-gradient-to-r from-enarva-start to-enarva-end hover:opacity-90"
                     >
                       <Download className="w-4 h-4 mr-1" />
-                      Installer
+                      {isIOS ? 'Voir comment' : 'Installer'}
                     </Button>
                     
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={forceUpdate}
-                      disabled={isUpdating}
-                      className="gap-1"
-                    >
-                      {isUpdating ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          Actualisation...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="w-4 h-4" />
-                          Actualiser
-                        </>
-                      )}
-                    </Button>
+                    {!isIOS && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={forceUpdate}
+                        disabled={isUpdating}
+                        className="gap-1"
+                      >
+                        {isUpdating ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            Actualisation...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-4 h-4" />
+                            Actualiser
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
                 
@@ -318,7 +336,7 @@ export default function PWAInstaller() {
               
               <Button
                 onClick={() => setShowIOSInstructions(false)}
-                className="w-full"
+                className="w-full bg-gradient-to-r from-enarva-start to-enarva-end"
               >
                 Compris
               </Button>

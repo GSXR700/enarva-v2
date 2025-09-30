@@ -181,7 +181,7 @@ export default function SplashScreen() {
         {/* Main Content Container - Properly Centered with Margins */}
         <div className="flex flex-col items-center justify-center px-8 w-full max-w-md">
           
-          {/* Text-Based Logo - Professional Size like Standard Apps */}
+          {/* Text-Based Logo with Shine Effect */}
           <AnimatePresence>
             {showLogo && (
               <motion.div
@@ -196,55 +196,87 @@ export default function SplashScreen() {
                   duration: 0.6,
                   ease: [0.43, 0.13, 0.23, 0.96]
                 }}
-                className="relative z-10 mb-16"
+                className="relative z-10 mb-12"
               >
-                {/* Text-based "enarva" logo - Properly sized */}
-                <h1 
-                  className="text-white font-bold select-none text-center"
-                  style={{
-                    fontSize: 'clamp(48px, 12vw, 72px)', // Responsive: 48px to 72px max
-                    letterSpacing: '-1.5px',
-                    fontFamily: 'Poppins, sans-serif',
-                    textShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-                    lineHeight: '1',
-                  }}
-                >
-                  enarva
-                </h1>
+                {/* Text-based "enarva" logo with shine effect */}
+                <div className="relative overflow-hidden">
+                  <h1 
+                    className="text-white font-bold select-none text-center relative"
+                    style={{
+                      fontSize: 'clamp(64px, 15vw, 96px)', // Increased: 64px to 96px max
+                      letterSpacing: '-2px',
+                      fontFamily: 'Poppins, sans-serif',
+                      textShadow: '0 4px 24px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.15)',
+                      lineHeight: '1',
+                    }}
+                  >
+                    enarva
+                  </h1>
+                  
+                  {/* Shine Effect Overlay */}
+                  <motion.div
+                    className="absolute inset-0 pointer-events-none"
+                    initial={{ x: '-100%' }}
+                    animate={{ x: '200%' }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      repeatDelay: 1.5,
+                      ease: "easeInOut"
+                    }}
+                    style={{
+                      background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
+                      transform: 'skewX(-20deg)',
+                    }}
+                  />
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Progress Bar Container - Fixed at Bottom with Proper Margins */}
+          {/* Progress Bar Container - Right Under the Logo */}
           <AnimatePresence>
             {showLogo && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3, duration: 0.5 }}
-                className="fixed bottom-16 left-0 right-0 px-8 w-full z-10"
+                className="w-full max-w-xs z-10"
               >
-                {/* Progress Bar Background - Full Width */}
-                <div className="max-w-md mx-auto">
-                  <div className={`w-full h-1 rounded-full overflow-hidden transition-colors duration-300 ${
-                    isDarkMode ? 'bg-white/10' : 'bg-white/20'
-                  }`}>
-                    {/* Progress Bar Fill - Animates from 0% to 100% (left to right) */}
+                {/* Progress Bar Background */}
+                <div className={`w-full h-1 rounded-full overflow-hidden transition-colors duration-300 ${
+                  isDarkMode ? 'bg-white/10' : 'bg-white/20'
+                }`}>
+                  {/* Progress Bar Fill - Animates from 0% to 100% (left to right) */}
+                  <motion.div
+                    className="h-full rounded-full transition-colors duration-300 bg-white relative overflow-hidden"
+                    style={{
+                      width: `${loadingProgress}%`,
+                      boxShadow: '0 0 12px rgba(255, 255, 255, 0.6)',
+                    }}
+                    initial={{ width: '0%' }}
+                    animate={{ width: `${loadingProgress}%` }}
+                    transition={{ 
+                      duration: 0.1, 
+                      ease: "linear"
+                    }}
+                  >
+                    {/* Inner glow effect on progress bar */}
                     <motion.div
-                      className="h-full rounded-full transition-colors duration-300 bg-white"
+                      className="absolute inset-0"
                       style={{
-                        width: `${loadingProgress}%`,
-                        boxShadow: '0 0 10px rgba(255, 255, 255, 0.5)',
-                        transformOrigin: 'left' // CRITICAL: Ensures it grows from left
+                        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)',
                       }}
-                      initial={{ width: '0%' }}
-                      animate={{ width: `${loadingProgress}%` }}
-                      transition={{ 
-                        duration: 0.1, 
-                        ease: "linear" // Linear for smooth continuous progress
+                      animate={{
+                        x: ['-100%', '100%'],
+                      }}
+                      transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        ease: "linear"
                       }}
                     />
-                  </div>
+                  </motion.div>
                 </div>
               </motion.div>
             )}
