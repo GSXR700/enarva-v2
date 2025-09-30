@@ -127,7 +127,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                        <Link href="/settings/profile" className="flex items-center gap-2 cursor-pointer">
+                        <Link href="/profile" className="flex items-center gap-2 cursor-pointer">
                             <User className="w-4 h-4" />
                             Profil
                         </Link>
