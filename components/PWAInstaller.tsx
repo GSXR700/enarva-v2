@@ -36,35 +36,27 @@ export default function PWAInstaller() {
     setIsUpdating(true);
     try {
       if ('serviceWorker' in navigator) {
-        // Get all registrations
         const registrations = await navigator.serviceWorker.getRegistrations();
         
-        // Unregister all service workers
         for (const registration of registrations) {
           await registration.unregister();
           console.log('[PWA] Service worker unregistered');
         }
         
-        // Clear all caches
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.map(name => caches.delete(name)));
         console.log('[PWA] All caches cleared');
         
-        // Wait a bit
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Re-register service worker
         const registration = await navigator.serviceWorker.register('/sw.js', { 
           scope: '/',
           updateViaCache: 'none'
         });
         
         console.log('[PWA] Service worker re-registered');
-        
-        // Force update
         await registration.update();
         
-        // Reload the page after a short delay
         setTimeout(() => {
           window.location.reload();
         }, 1000);
@@ -76,7 +68,6 @@ export default function PWAInstaller() {
   }, []);
 
   useEffect(() => {
-    // Register Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js', { 
@@ -85,16 +76,12 @@ export default function PWAInstaller() {
         })
         .then((registration) => {
           console.log('[PWA] Service Worker registered:', registration.scope);
-          
-          // Force immediate update check
           registration.update();
           
-          // Check for updates periodically
           setInterval(() => {
             registration.update();
           }, 60000);
           
-          // Listen for updates
           registration.addEventListener('updatefound', () => {
             console.log('[PWA] New version available');
           });
@@ -104,28 +91,24 @@ export default function PWAInstaller() {
         });
     }
 
-    // Check installation status
     const installed = checkIfInstalled();
     setIsInstalled(installed);
     
-    // Detect iOS
     const iOS = detectIOS();
     setIsIOS(iOS);
 
-    // Don't show banner if already installed
     if (installed) {
       console.log('[PWA] App is already installed');
       return;
     }
 
-    // Check if user dismissed banner in this session
     const dismissed = sessionStorage.getItem('pwa-install-dismissed');
     if (dismissed) {
       console.log('[PWA] Banner was dismissed this session');
       return;
     }
 
-    // For iOS, ALWAYS show install banner after delay (iOS doesn't fire beforeinstallprompt)
+    // For iOS, ALWAYS show install banner after delay
     if (iOS && !installed) {
       const timer = setTimeout(() => {
         console.log('[PWA] Showing iOS install banner');
@@ -140,7 +123,6 @@ export default function PWAInstaller() {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       
-      // Show banner after a short delay
       setTimeout(() => {
         setShowInstallBanner(true);
       }, 2000);
@@ -148,7 +130,7 @@ export default function PWAInstaller() {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // FALLBACK: If no beforeinstallprompt after 5 seconds on non-iOS, show banner anyway
+    // FALLBACK: If no beforeinstallprompt after 5 seconds, show banner anyway
     const fallbackTimer = setTimeout(() => {
       if (!iOS && !installed && !deferredPrompt) {
         console.log('[PWA] No beforeinstallprompt received, showing banner anyway');
@@ -156,7 +138,6 @@ export default function PWAInstaller() {
       }
     }, 5000);
 
-    // Listen for app installed
     const handleAppInstalled = () => {
       console.log('[PWA] App was installed');
       setIsInstalled(true);
@@ -196,19 +177,57 @@ export default function PWAInstaller() {
         console.error('[PWA] Error during installation:', error);
       }
     } else {
-      // Fallback: Show manual instructions for Chrome
-      alert(
-        'Pour installer cette application:\n\n' +
-        '1. Cliquez sur le menu ⋮ (3 points) en haut à droite\n' +
-        '2. Sélectionnez "Installer l\'application" ou "Ajouter à l\'écran d\'accueil"\n' +
-        '3. Confirmez l\'installation'
-      );
+      // IMPROVED FALLBACK: Better instructions for manual install
+      const userAgent = navigator.userAgent.toLowerCase();
+      let instructions = '';
+      
+      if (userAgent.includes('chrome') && !userAgent.includes('edg')) {
+        // Chrome
+        instructions = 
+          '📱 Pour installer Enarva OS:\n\n' +
+          '1. Appuyez sur le menu ⋮ (3 points verticaux) en haut à droite\n' +
+          '2. Cherchez "Installer l\'application" ou "Ajouter à l\'écran d\'accueil"\n' +
+          '3. Suivez les instructions pour installer\n\n' +
+          '💡 Si vous ne voyez pas l\'option, essayez d\'actualiser la page.';
+      } else if (userAgent.includes('edg')) {
+        // Edge
+        instructions = 
+          '📱 Pour installer Enarva OS:\n\n' +
+          '1. Cliquez sur le menu ⋯ (3 points) en haut à droite\n' +
+          '2. Sélectionnez "Applications" → "Installer ce site en tant qu\'application"\n' +
+          '3. Confirmez l\'installation';
+      } else if (userAgent.includes('firefox')) {
+        // Firefox
+        instructions = 
+          '📱 Firefox ne supporte pas encore pleinement les PWA.\n\n' +
+          'Pour une meilleure expérience, veuillez utiliser:\n' +
+          '• Chrome\n' +
+          '• Edge\n' +
+          '• Safari (sur iOS)';
+      } else if (userAgent.includes('samsung')) {
+        // Samsung Internet
+        instructions = 
+          '📱 Pour installer Enarva OS:\n\n' +
+          '1. Appuyez sur le menu ☰ en bas\n' +
+          '2. Sélectionnez "Ajouter une page à"\n' +
+          '3. Choisissez "Écran d\'accueil"\n' +
+          '4. Confirmez';
+      } else {
+        // Generic Android/Other
+        instructions = 
+          '📱 Pour installer Enarva OS:\n\n' +
+          '1. Ouvrez le menu de votre navigateur\n' +
+          '2. Cherchez "Installer l\'application" ou "Ajouter à l\'écran d\'accueil"\n' +
+          '3. Suivez les instructions\n\n' +
+          '💡 Recommandé: Chrome ou Edge pour la meilleure expérience';
+      }
+      
+      alert(instructions);
     }
   };
 
   const handleDismiss = () => {
     setShowInstallBanner(false);
-    // Remember dismissal for this session only
     sessionStorage.setItem('pwa-install-dismissed', 'true');
   };
 

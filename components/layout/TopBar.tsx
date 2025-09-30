@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
-import { Bell, Search, Menu, MessageSquare, User, Settings, LogOut, X, CheckCircle } from 'lucide-react'
+import { Bell, Search, Menu, MessageSquare, User, Settings, LogOut, X, CheckCircle, Moon, Sun } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -20,7 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Activity } from '@prisma/client'
 import { getRelativeTime } from '@/lib/utils'
-import { ThemeToggle } from '@/components/ThemeToggle'
+import { useTheme } from '@/hooks/useTheme'
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -33,6 +33,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
   const [isMobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [activities, setActivities] = useState<ActivityWithUser[]>([]);
   const [showNotificationDot, setShowNotificationDot] = useState(true);
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -47,6 +48,11 @@ export function TopBar({ onMenuClick }: TopBarProps) {
     };
     fetchActivities();
   }, []);
+
+  // Toggle between light and dark (no system option in topbar for simplicity)
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
 
   return (
     <header className="h-16 border-b border-border bg-card px-4 md:px-6 flex items-center justify-between sticky top-0 z-20">
@@ -70,7 +76,13 @@ export function TopBar({ onMenuClick }: TopBarProps) {
             <Search className="w-5 h-5" />
         </Button>
         <Link href="/chat"><Button variant="ghost" size="icon"><MessageSquare className="w-5 h-5" /></Button></Link>
-        <ThemeToggle />
+        
+        {/* Theme Toggle Button - Icon Only */}
+        <Button variant="ghost" size="icon" onClick={toggleTheme} title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}>
+          <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        </Button>
+        
         <DropdownMenu onOpenChange={(open) => !open && setShowNotificationDot(false)}>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
