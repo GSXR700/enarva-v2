@@ -1,16 +1,27 @@
 // public/sw.js - SERVICE WORKER FOR PWA & PUSH NOTIFICATIONS
-const CACHE_NAME = 'enarva-os-v1.0';
-const STATIC_CACHE = 'enarva-static-v1.0';
-const DYNAMIC_CACHE = 'enarva-dynamic-v1.0';
+const CACHE_VERSION = 'v2.0'; // UPDATED VERSION TO FORCE REFRESH
+const CACHE_NAME = `enarva-os-${CACHE_VERSION}`;
+const STATIC_CACHE = `enarva-static-${CACHE_VERSION}`;
+const DYNAMIC_CACHE = `enarva-dynamic-${CACHE_VERSION}`;
 
 // Essential static files to cache immediately
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
+  '/icon-72x72.png',
+  '/icon-96x96.png',
+  '/icon-128x128.png',
+  '/icon-144x144.png',
+  '/icon-152x152.png',
   '/icon-192x192.png',
+  '/icon-384x384.png',
   '/icon-512x512.png',
   '/apple-icon.png',
-  '/offline.html' // We'll create this fallback page
+  '/favicon.svg',
+  '/favicon.ico',
+  '/favicon-16x16.png',
+  '/favicon-32x32.png',
+  '/offline.html'
 ];
 
 // Routes to cache dynamically
@@ -24,31 +35,35 @@ const CACHE_ROUTES = [
 
 // INSTALLATION EVENT
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker...');
+  console.log('[SW] Installing service worker v2.0...');
   
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then((cache) => {
         console.log('[SW] Caching static assets...');
-        return cache.addAll(STATIC_ASSETS);
+        return cache.addAll(STATIC_ASSETS).catch((error) => {
+          console.error('[SW] Error caching asset:', error);
+          // Continue even if some assets fail
+          return Promise.resolve();
+        });
       })
       .then(() => {
         console.log('[SW] Static assets cached successfully');
         return self.skipWaiting();
       })
       .catch((error) => {
-        console.error('[SW] Error caching static assets:', error);
+        console.error('[SW] Error during installation:', error);
       })
   );
 });
 
 // ACTIVATION EVENT
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating service worker...');
+  console.log('[SW] Activating service worker v2.0...');
   
   event.waitUntil(
     Promise.all([
-      // Clean up old caches
+      // Clean up ALL old caches (including old versions)
       caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
@@ -84,6 +99,24 @@ self.addEventListener('fetch', (event) => {
 async function handleGetRequest(request) {
   const url = new URL(request.url);
   
+  // For manifest.json and icons, always fetch fresh to avoid stale data
+  if (url.pathname === '/manifest.json' || url.pathname.includes('/icon-') || url.pathname.includes('favicon')) {
+    try {
+      const networkResponse = await fetch(request);
+      if (networkResponse && networkResponse.status === 200) {
+        const cache = await caches.open(STATIC_CACHE);
+        cache.put(request, networkResponse.clone());
+      }
+      return networkResponse;
+    } catch (error) {
+      console.log('[SW] Network failed for manifest/icon, trying cache...');
+      const cachedResponse = await caches.match(request);
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+    }
+  }
+  
   // For static assets, try cache first
   if (isStaticAsset(url.pathname)) {
     return handleStaticAsset(request);
@@ -100,7 +133,6 @@ async function handleGetRequest(request) {
 
 function isStaticAsset(pathname) {
   return pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|webp|avif|woff|woff2)$/) ||
-         pathname === '/manifest.json' ||
          pathname.startsWith('/_next/static/');
 }
 
@@ -271,6 +303,20 @@ self.addEventListener('message', (event) => {
   }
   
   if (event.data && event.data.type === 'GET_VERSION') {
-    event.ports[0].postMessage({ version: CACHE_NAME });
+    event.ports[0].postMessage({ version: CACHE_VERSION });
+  }
+  
+  // Handle cache clearing
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
+    event.waitUntil(
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => caches.delete(cacheName))
+        );
+      }).then(() => {
+        console.log('[SW] All caches cleared');
+        event.ports[0].postMessage({ success: true });
+      })
+    );
   }
 });

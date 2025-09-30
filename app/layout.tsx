@@ -3,7 +3,6 @@ import './globals.css'
 import { Poppins } from 'next/font/google'
 import { Providers } from '@/components/providers/Providers'
 import SplashScreen from '@/components/SplashScreen'
-import PWAInstaller from '@/components/PWAInstaller'
 import { Metadata, Viewport } from 'next'
 
 const poppins = Poppins({ 
@@ -94,7 +93,6 @@ export default function RootLayout({
         <SplashScreen />
         <Providers>
           {children}
-          <PWAInstaller />
         </Providers>
       </body>
     </html>

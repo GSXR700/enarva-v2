@@ -34,17 +34,18 @@ const faviconSizes = [
 ];
 
 /**
- * Generate PNG icons from SVG source
+ * Generate PNG icons from SVG source with colored background
  */
 async function generateIconsFromSVG(svgPath, sizes, suffix = '') {
   for (const { size, name } of sizes) {
     const outputName = suffix ? name.replace('.png', `-${suffix}.png`) : name;
     const outputPath = path.join(outputDir, outputName);
     
+    // CRITICAL FIX: Use blue gradient background instead of transparent
     await sharp(svgPath)
       .resize(size, size, {
         fit: 'contain',
-        background: { r: 255, g: 255, b: 255, alpha: 0 } // Transparent background
+        background: { r: 38, g: 125, b: 244, alpha: 1 } // Blue background #267DF4
       })
       .png({ quality: 100, compressionLevel: 9 })
       .toFile(outputPath);
@@ -54,10 +55,47 @@ async function generateIconsFromSVG(svgPath, sizes, suffix = '') {
 }
 
 /**
+ * Generate maskable icons with padding for Android
+ */
+async function generateMaskableIcons(svgPath, sizes) {
+  for (const { size, name } of sizes) {
+    const outputName = name.replace('.png', '-maskable.png');
+    const outputPath = path.join(outputDir, outputName);
+    
+    // Maskable icons need padding (safe zone)
+    const logoSize = Math.floor(size * 0.6); // 60% of icon size for safe zone
+    const padding = Math.floor((size - logoSize) / 2);
+    
+    await sharp({
+      create: {
+        width: size,
+        height: size,
+        channels: 4,
+        background: { r: 38, g: 125, b: 244, alpha: 1 }
+      }
+    })
+    .composite([{
+      input: await sharp(svgPath)
+        .resize(logoSize, logoSize, {
+          fit: 'contain',
+          background: { r: 0, g: 0, b: 0, alpha: 0 }
+        })
+        .toBuffer(),
+      top: padding,
+      left: padding
+    }])
+    .png({ quality: 100, compressionLevel: 9 })
+    .toFile(outputPath);
+    
+    console.log(`   ✓ ${outputName} (${size}x${size}px - maskable)`);
+  }
+}
+
+/**
  * Generate favicon.ico (multi-size ICO file)
  */
 async function generateFavicon(svgPath) {
-  // Generate 32x32 as main favicon
+  // Generate 32x32 as main favicon with transparent background
   const faviconPath = path.join(outputDir, 'favicon.ico');
   
   await sharp(svgPath)
@@ -102,32 +140,47 @@ async function generateAllIcons() {
   }
 
   try {
-    // Generate PWA icons from light mode SVG (default)
-    console.log('📱 Génération des icônes PWA (light mode):');
+    // Generate PWA icons from light mode SVG (with blue background)
+    console.log('📱 Génération des icônes PWA (fond bleu):');
     await generateIconsFromSVG(lightLogoSVG, pwaIconSizes);
 
-    // Generate PWA icons from dark mode SVG
-    console.log('\n📱 Génération des icônes PWA (dark mode):');
-    await generateIconsFromSVG(darkLogoSVG, pwaIconSizes, 'dark');
+    // Generate maskable icons for Android (with padding + blue background)
+    console.log('\n📱 Génération des icônes maskables (Android):');
+    await generateMaskableIcons(lightLogoSVG, [
+      { size: 192, name: 'icon-192x192.png' },
+      { size: 512, name: 'icon-512x512.png' }
+    ]);
 
-    // Generate Apple Touch Icons (using light mode)
+    // Generate Apple Touch Icons (using light mode with white background)
     console.log('\n🍎 Génération des icônes Apple:');
-    await generateIconsFromSVG(lightLogoSVG, appleIconSizes);
+    for (const { size, name } of appleIconSizes) {
+      const outputPath = path.join(outputDir, name);
+      
+      await sharp(lightLogoSVG)
+        .resize(size, size, {
+          fit: 'contain',
+          background: { r: 255, g: 255, b: 255, alpha: 1 } // White for Apple
+        })
+        .png({ quality: 100, compressionLevel: 9 })
+        .toFile(outputPath);
+      
+      console.log(`   ✓ ${name} (${size}x${size}px)`);
+    }
 
-    // Generate Favicons (using light mode SVG)
+    // Generate Favicons (using light mode SVG - transparent)
     console.log('\n🌐 Génération des favicons:');
     await generateIconsFromSVG(lightLogoSVG, faviconSizes);
     await generateFavicon(lightLogoSVG);
     copySVGFavicon(lightLogoSVG);
 
-    // Generate screenshots for PWA manifest (optional, using larger sizes)
+    // Generate screenshots for PWA manifest
     console.log('\n📸 Génération des screenshots PWA:');
     
-    // Screenshot 1 - Desktop (Light mode with gradient background)
+    // Screenshot 1 - Desktop
     await sharp(lightLogoSVG)
       .resize(1280, 720, {
         fit: 'contain',
-        background: { r: 38, g: 125, b: 244, alpha: 1 } // Gradient blue
+        background: { r: 38, g: 125, b: 244, alpha: 1 }
       })
       .png({ quality: 90 })
       .toFile(path.join(outputDir, 'screenshot-wide.png'));
@@ -143,14 +196,14 @@ async function generateAllIcons() {
       .toFile(path.join(outputDir, 'screenshot-narrow.png'));
     console.log('   ✓ screenshot-narrow.png (750x1334px)');
 
-    console.log('\n✅ Toutes les icônes HD ont été générées avec succès depuis SVG!');
+    console.log('\n✅ Toutes les icônes HD ont été générées avec succès!');
     console.log(`📂 Dossier de sortie: ${path.resolve(outputDir)}`);
     
     console.log('\n📝 Prochaines étapes:');
-    console.log('   1. Les icônes sont maintenant en HD grâce au format SVG');
-    console.log('   2. Le SplashScreen utilisera du texte pour un rendu HD parfait');
-    console.log('   3. Testez avec Chrome DevTools > Application > Manifest');
-    console.log('   4. Installez l\'app sur mobile pour vérifier la qualité');
+    console.log('   1. Les icônes ont maintenant un fond bleu #267DF4');
+    console.log('   2. Les icônes maskables ont été générées pour Android');
+    console.log('   3. Rebuild l\'app: npm run build');
+    console.log('   4. Testez l\'installation PWA sur mobile');
 
   } catch (error) {
     console.error('❌ Erreur lors de la génération des icônes:', error);

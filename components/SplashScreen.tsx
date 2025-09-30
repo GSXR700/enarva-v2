@@ -5,7 +5,6 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/hooks/useTheme';
 
-// Type extension for iOS Safari
 declare global {
   interface Navigator {
     standalone?: boolean;
@@ -14,22 +13,16 @@ declare global {
 
 export default function SplashScreen() {
   const [isVisible, setIsVisible] = useState(false);
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const [showLogo, setShowLogo] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const hasShownRef = useRef(false);
   const { theme } = useTheme();
 
-  // Determine dark mode on client side only
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const checkDarkMode = () => {
-      if (theme === 'dark') {
-        return true;
-      } else if (theme === 'system') {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches;
-      }
+      if (theme === 'dark') return true;
+      if (theme === 'system') return window.matchMedia('(prefers-color-scheme: dark)').matches;
       return false;
     };
 
@@ -37,68 +30,30 @@ export default function SplashScreen() {
   }, [theme]);
 
   useEffect(() => {
-    // Ensure we're on the client
     if (typeof window === 'undefined') return;
 
-    // Check if this is a PWA launch
     const isPWA = checkIfPWA();
     
-    // Only show splash screen for PWA launches or first visit
-    if (!isPWA && hasShownRef.current) {
-      return;
-    }
-
-    // Prevent showing multiple times in same session
-    if (sessionStorage.getItem('splash-shown') && !isPWA) {
-      return;
-    }
+    if (!isPWA && hasShownRef.current) return;
+    if (sessionStorage.getItem('splash-shown') && !isPWA) return;
 
     hasShownRef.current = true;
     setIsVisible(true);
     
-    // Mark as shown in this session
     if (!isPWA) {
       sessionStorage.setItem('splash-shown', 'true');
     }
 
-    // Start logo animation immediately
-    const logoTimer = setTimeout(() => {
-      setShowLogo(true);
-    }, 100);
-
-    // Simulate app loading with smooth progress
-    const duration = 2000; // 2 seconds loading
-    const steps = 50;
-    const interval = duration / steps;
-
-    const progressInterval = setInterval(() => {
-      setLoadingProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        return prev + (100 / steps);
-      });
-    }, interval);
-
-    // Hide splash screen after loading
     const hideTimer = setTimeout(() => {
       setIsVisible(false);
-    }, duration + 500);
+    }, 2000); // 2 secondes
 
-    // Cleanup
-    return () => {
-      clearTimeout(logoTimer);
-      clearTimeout(hideTimer);
-      clearInterval(progressInterval);
-    };
+    return () => clearTimeout(hideTimer);
   }, []);
 
   const checkIfPWA = (): boolean => {
-    // Client-side check only
     if (typeof window === 'undefined') return false;
     
-    // Check if app was launched from home screen
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     const isIOSStandalone = (window.navigator as any).standalone === true;
     const isInWebApk = document.referrer.includes('android-app://');
@@ -114,14 +69,9 @@ export default function SplashScreen() {
         initial={{ opacity: 1 }}
         exit={{ 
           opacity: 0,
-          clipPath: 'polygon(0 0, 100% 0, 100% 0, 0 0)',
-          transition: { 
-            duration: 0.8, 
-            ease: [0.76, 0, 0.24, 1],
-            clipPath: { duration: 1, ease: [0.76, 0, 0.24, 1] }
-          }
+          transition: { duration: 0.5, ease: "easeOut" }
         }}
-        className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden"
+        className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
         style={{
           background: isDarkMode 
             ? '#000000'
@@ -160,128 +110,30 @@ export default function SplashScreen() {
               }}
               className="absolute -bottom-1/4 -right-1/4 h-96 w-96 rounded-full bg-blue-200/30 blur-3xl"
             />
-            <motion.div
-              animate={{
-                scale: [1, 1.15, 1],
-                opacity: [0.2, 0.4, 0.2],
-                x: [0, 30, 0],
-                y: [0, 20, 0],
-              }}
-              transition={{
-                duration: 7,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 2
-              }}
-              className="absolute top-1/3 right-1/4 h-72 w-72 rounded-full bg-sky-300/25 blur-3xl"
-            />
           </>
         )}
 
-        {/* Main Content Container - Properly Centered with Margins */}
-        <div className="flex flex-col items-center justify-center px-8 w-full max-w-md">
-          
-          {/* Text-Based Logo with Shine Effect */}
-          <AnimatePresence>
-            {showLogo && (
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ 
-                  scale: 0.9,
-                  opacity: 0,
-                  transition: { duration: 0.5 }
-                }}
-                transition={{ 
-                  duration: 0.6,
-                  ease: [0.43, 0.13, 0.23, 0.96]
-                }}
-                className="relative z-10 mb-12"
-              >
-                {/* Text-based "enarva" logo with shine effect */}
-                <div className="relative overflow-hidden">
-                  <h1 
-                    className="text-white font-bold select-none text-center relative"
-                    style={{
-                      fontSize: 'clamp(64px, 15vw, 96px)', // Increased: 64px to 96px max
-                      letterSpacing: '-2px',
-                      fontFamily: 'Poppins, sans-serif',
-                      textShadow: '0 4px 24px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.15)',
-                      lineHeight: '1',
-                    }}
-                  >
-                    enarva
-                  </h1>
-                  
-                  {/* Shine Effect Overlay */}
-                  <motion.div
-                    className="absolute inset-0 pointer-events-none"
-                    initial={{ x: '-100%' }}
-                    animate={{ x: '200%' }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      repeatDelay: 1.5,
-                      ease: "easeInOut"
-                    }}
-                    style={{
-                      background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
-                      transform: 'skewX(-20deg)',
-                    }}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Progress Bar Container - Right Under the Logo */}
-          <AnimatePresence>
-            {showLogo && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.5 }}
-                className="w-full max-w-xs z-10"
-              >
-                {/* Progress Bar Background */}
-                <div className={`w-full h-1 rounded-full overflow-hidden transition-colors duration-300 ${
-                  isDarkMode ? 'bg-white/10' : 'bg-white/20'
-                }`}>
-                  {/* Progress Bar Fill - Animates from 0% to 100% (left to right) */}
-                  <motion.div
-                    className="h-full rounded-full transition-colors duration-300 bg-white relative overflow-hidden"
-                    style={{
-                      width: `${loadingProgress}%`,
-                      boxShadow: '0 0 12px rgba(255, 255, 255, 0.6)',
-                    }}
-                    initial={{ width: '0%' }}
-                    animate={{ width: `${loadingProgress}%` }}
-                    transition={{ 
-                      duration: 0.1, 
-                      ease: "linear"
-                    }}
-                  >
-                    {/* Inner glow effect on progress bar */}
-                    <motion.div
-                      className="absolute inset-0"
-                      style={{
-                        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)',
-                      }}
-                      animate={{
-                        x: ['-100%', '100%'],
-                      }}
-                      transition={{
-                        duration: 1,
-                        repeat: Infinity,
-                        ease: "linear"
-                      }}
-                    />
-                  </motion.div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        {/* Logo Only - No Progress Bar, No Shine Effect */}
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.9, opacity: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="relative z-10"
+        >
+          <h1 
+            className="text-white font-bold select-none text-center"
+            style={{
+              fontSize: 'clamp(80px, 18vw, 120px)', // Increased: 80px to 120px
+              letterSpacing: '-2px',
+              fontFamily: 'Poppins, sans-serif',
+              textShadow: '0 4px 24px rgba(0, 0, 0, 0.2)',
+              lineHeight: '1',
+            }}
+          >
+            enarva
+          </h1>
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   );
