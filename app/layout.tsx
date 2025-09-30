@@ -68,11 +68,14 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-icon.png" />
         
         {/* PWA Meta Tags */}
-        <link rel="manifest" href="/manifest.json" />
+        <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Enarva" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Enarva OS" />
+        <meta name="application-name" content="Enarva OS" />
+        <meta name="msapplication-TileColor" content="#267DF4" />
+        <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#0066FF" media="(prefers-color-scheme: light)" />
         <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
         

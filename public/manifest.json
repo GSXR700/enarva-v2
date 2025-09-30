@@ -1,13 +1,14 @@
 {
   "name": "Enarva OS",
   "short_name": "Enarva",
-  "description": "Plateforme de gestion complète pour Enarva",
-  "start_url": "/",
+  "description": "Plateforme de gestion complète pour Enarva - CRM, Missions, Planning",
+  "start_url": "/?utm_source=pwa",
   "display": "standalone",
   "background_color": "#267DF4",
   "theme_color": "#267DF4",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "scope": "/",
+  "id": "/",
   "prefer_related_applications": false,
   "icons": [
     {
@@ -88,6 +89,22 @@
     }
   ],
   "categories": ["business", "productivity", "utilities"],
-  "lang": "fr-FR",
-  "dir": "ltr"
+  "lang": "fr",
+  "dir": "ltr",
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Accéder au tableau de bord",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Leads",
+      "short_name": "Leads",
+      "description": "Gérer les leads",
+      "url": "/leads",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
 }

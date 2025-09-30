@@ -1,9 +1,9 @@
-// components/PWAInstaller.tsx
+// components/PWAInstaller.tsx - MOBILE-ONLY NATIVE INSTALL
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, X, Smartphone, Share, RefreshCw } from 'lucide-react';
+import { Download, X, Smartphone, Share } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -17,7 +17,6 @@ export default function PWAInstaller() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
 
   const checkIfInstalled = useCallback(() => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
@@ -31,42 +30,6 @@ export default function PWAInstaller() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent);
   }, []);
 
-  // Force service worker update and cache clearing
-  const forceUpdate = useCallback(async () => {
-    setIsUpdating(true);
-    try {
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        
-        for (const registration of registrations) {
-          await registration.unregister();
-          console.log('[PWA] Service worker unregistered');
-        }
-        
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
-        console.log('[PWA] All caches cleared');
-        
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const registration = await navigator.serviceWorker.register('/sw.js', { 
-          scope: '/',
-          updateViaCache: 'none'
-        });
-        
-        console.log('[PWA] Service worker re-registered');
-        await registration.update();
-        
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-      }
-    } catch (error) {
-      console.error('[PWA] Error forcing update:', error);
-      setIsUpdating(false);
-    }
-  }, []);
-
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
@@ -77,14 +40,6 @@ export default function PWAInstaller() {
         .then((registration) => {
           console.log('[PWA] Service Worker registered:', registration.scope);
           registration.update();
-          
-          setInterval(() => {
-            registration.update();
-          }, 60000);
-          
-          registration.addEventListener('updatefound', () => {
-            console.log('[PWA] New version available');
-          });
         })
         .catch((error) => {
           console.error('[PWA] Service Worker registration failed:', error);
@@ -108,7 +63,7 @@ export default function PWAInstaller() {
       return;
     }
 
-    // For iOS, ALWAYS show install banner after delay
+    // For iOS, show install banner after delay
     if (iOS && !installed) {
       const timer = setTimeout(() => {
         console.log('[PWA] Showing iOS install banner');
@@ -117,12 +72,13 @@ export default function PWAInstaller() {
       return () => clearTimeout(timer);
     }
 
-    // For Android/Desktop Chrome - Listen for beforeinstallprompt
+    // For Android/Desktop Chrome - ONLY show banner if beforeinstallprompt fires
     const handleBeforeInstallPrompt = (e: Event) => {
-      console.log('[PWA] beforeinstallprompt event fired');
+      console.log('[PWA] beforeinstallprompt event fired - App is installable!');
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       
+      // Show banner immediately when prompt is available
       setTimeout(() => {
         setShowInstallBanner(true);
       }, 2000);
@@ -130,14 +86,7 @@ export default function PWAInstaller() {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // FALLBACK: If no beforeinstallprompt after 5 seconds, show banner anyway
-    const fallbackTimer = setTimeout(() => {
-      if (!iOS && !installed && !deferredPrompt) {
-        console.log('[PWA] No beforeinstallprompt received, showing banner anyway');
-        setShowInstallBanner(true);
-      }
-    }, 5000);
-
+    // Listen for app installed
     const handleAppInstalled = () => {
       console.log('[PWA] App was installed');
       setIsInstalled(true);
@@ -150,9 +99,8 @@ export default function PWAInstaller() {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
-      clearTimeout(fallbackTimer);
     };
-  }, [checkIfInstalled, detectIOS, deferredPrompt]);
+  }, [checkIfInstalled, detectIOS]);
 
   const handleInstallClick = async () => {
     if (isIOS) {
@@ -160,69 +108,28 @@ export default function PWAInstaller() {
       return;
     }
 
-    // If we have the deferred prompt, use it
-    if (deferredPrompt) {
-      try {
-        await deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        
-        console.log(`[PWA] User response: ${outcome}`);
-        
-        if (outcome === 'accepted') {
-          setShowInstallBanner(false);
-        }
-        
-        setDeferredPrompt(null);
-      } catch (error) {
-        console.error('[PWA] Error during installation:', error);
-      }
-    } else {
-      // IMPROVED FALLBACK: Better instructions for manual install
-      const userAgent = navigator.userAgent.toLowerCase();
-      let instructions = '';
+    // CRITICAL: Only proceed if we have a native prompt
+    if (!deferredPrompt) {
+      console.log('[PWA] No install prompt available - hiding banner');
+      setShowInstallBanner(false);
+      return;
+    }
+
+    try {
+      // Show native Chrome install dialog
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
       
-      if (userAgent.includes('chrome') && !userAgent.includes('edg')) {
-        // Chrome
-        instructions = 
-          '📱 Pour installer Enarva OS:\n\n' +
-          '1. Appuyez sur le menu ⋮ (3 points verticaux) en haut à droite\n' +
-          '2. Cherchez "Installer l\'application" ou "Ajouter à l\'écran d\'accueil"\n' +
-          '3. Suivez les instructions pour installer\n\n' +
-          '💡 Si vous ne voyez pas l\'option, essayez d\'actualiser la page.';
-      } else if (userAgent.includes('edg')) {
-        // Edge
-        instructions = 
-          '📱 Pour installer Enarva OS:\n\n' +
-          '1. Cliquez sur le menu ⋯ (3 points) en haut à droite\n' +
-          '2. Sélectionnez "Applications" → "Installer ce site en tant qu\'application"\n' +
-          '3. Confirmez l\'installation';
-      } else if (userAgent.includes('firefox')) {
-        // Firefox
-        instructions = 
-          '📱 Firefox ne supporte pas encore pleinement les PWA.\n\n' +
-          'Pour une meilleure expérience, veuillez utiliser:\n' +
-          '• Chrome\n' +
-          '• Edge\n' +
-          '• Safari (sur iOS)';
-      } else if (userAgent.includes('samsung')) {
-        // Samsung Internet
-        instructions = 
-          '📱 Pour installer Enarva OS:\n\n' +
-          '1. Appuyez sur le menu ☰ en bas\n' +
-          '2. Sélectionnez "Ajouter une page à"\n' +
-          '3. Choisissez "Écran d\'accueil"\n' +
-          '4. Confirmez';
-      } else {
-        // Generic Android/Other
-        instructions = 
-          '📱 Pour installer Enarva OS:\n\n' +
-          '1. Ouvrez le menu de votre navigateur\n' +
-          '2. Cherchez "Installer l\'application" ou "Ajouter à l\'écran d\'accueil"\n' +
-          '3. Suivez les instructions\n\n' +
-          '💡 Recommandé: Chrome ou Edge pour la meilleure expérience';
+      console.log(`[PWA] User response: ${outcome}`);
+      
+      if (outcome === 'accepted') {
+        setShowInstallBanner(false);
       }
       
-      alert(instructions);
+      setDeferredPrompt(null);
+    } catch (error) {
+      console.error('[PWA] Error during installation:', error);
+      setShowInstallBanner(false);
     }
   };
 
@@ -237,7 +144,7 @@ export default function PWAInstaller() {
 
   return (
     <>
-      {/* Install Banner */}
+      {/* Install Banner - Only shows when native prompt is available */}
       <AnimatePresence>
         {showInstallBanner && (
           <motion.div
@@ -262,42 +169,18 @@ export default function PWAInstaller() {
                   <p className="text-xs text-muted-foreground mb-3">
                     {isIOS 
                       ? 'Ajoutez l\'app à votre écran d\'accueil pour un accès rapide'
-                      : 'Installez l\'application pour un accès rapide et hors ligne'
+                      : 'Installez l\'application pour un accès rapide et des fonctionnalités hors ligne'
                     }
                   </p>
                   
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={handleInstallClick}
-                      className="bg-gradient-to-r from-enarva-start to-enarva-end hover:opacity-90"
-                    >
-                      <Download className="w-4 h-4 mr-1" />
-                      {isIOS ? 'Voir comment' : 'Installer'}
-                    </Button>
-                    
-                    {!isIOS && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={forceUpdate}
-                        disabled={isUpdating}
-                        className="gap-1"
-                      >
-                        {isUpdating ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                            Actualisation...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="w-4 h-4" />
-                            Actualiser
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleInstallClick}
+                    className="bg-gradient-to-r from-enarva-start to-enarva-end hover:opacity-90"
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    {isIOS ? 'Voir les instructions' : 'Installer maintenant'}
+                  </Button>
                 </div>
                 
                 <button
@@ -334,7 +217,7 @@ export default function PWAInstaller() {
                   <Share className="w-8 h-8 text-white" />
                 </div>
                 <h3 className="font-semibold text-lg mb-2">
-                  Installer sur iOS
+                  Installer sur iOS/Safari
                 </h3>
               </div>
               
@@ -349,7 +232,7 @@ export default function PWAInstaller() {
                 </li>
                 <li className="flex gap-2">
                   <span className="flex-shrink-0 font-semibold">3.</span>
-                  <span>Appuyez sur "Ajouter" pour confirmer</span>
+                  <span>Appuyez sur "Ajouter" pour installer l'app</span>
                 </li>
               </ol>
               
