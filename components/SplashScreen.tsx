@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -179,7 +178,7 @@ export default function SplashScreen() {
           </>
         )}
 
-        {/* Logo Container */}
+        {/* Text-Based Logo - HD Quality, matching PDF styling */}
         <AnimatePresence>
           {showLogo && (
             <motion.div
@@ -196,16 +195,20 @@ export default function SplashScreen() {
               }}
               className="relative mb-12 z-10"
             >
-              {/* Logo without shine effect */}
-              <div className="relative w-80 h-24 md:w-96 md:h-28">
-                <Image
-                  src="/images/dark-logo.png"
-                  alt="Enarva"
-                  fill
-                  priority
-                  className="object-contain"
-                  quality={100}
-                />
+              {/* Text-based "enarva" logo - Always white, HD quality */}
+              <div className="relative flex items-center justify-center">
+                <h1 
+                  className="text-white font-bold select-none"
+                  style={{
+                    fontSize: '160px',
+                    letterSpacing: '-2px',
+                    fontFamily: 'Poppins, sans-serif',
+                    textShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+                    lineHeight: '1',
+                  }}
+                >
+                  enarva
+                </h1>
               </div>
             </motion.div>
           )}

@@ -3,12 +3,13 @@ const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
-// Configuration
-const inputFile = './public/images/enarva-logo.png'; // Votre logo HD
+// Configuration - SVG sources for light and dark modes
+const lightLogoSVG = './public/images/gradient-light.svg';
+const darkLogoSVG = './public/images/logo-dark.svg';
 const outputDir = './public';
 
-// Tailles nécessaires pour le PWA
-const sizes = [
+// Icon sizes for PWA
+const pwaIconSizes = [
   { size: 72, name: 'icon-72x72.png' },
   { size: 96, name: 'icon-96x96.png' },
   { size: 128, name: 'icon-128x128.png' },
@@ -19,132 +20,137 @@ const sizes = [
   { size: 512, name: 'icon-512x512.png' },
 ];
 
-// Tailles pour Apple
-const appleSizes = [
+// Apple Touch Icon sizes
+const appleIconSizes = [
   { size: 180, name: 'apple-icon.png' },
   { size: 180, name: 'apple-icon-180x180.png' },
 ];
 
-// Favicon
+// Favicon sizes
 const faviconSizes = [
   { size: 16, name: 'favicon-16x16.png' },
   { size: 32, name: 'favicon-32x32.png' },
-  { size: 64, name: 'favicon.ico' },
+  { size: 48, name: 'favicon-48x48.png' },
 ];
 
-async function generateIcons() {
-  console.log('🎨 Génération des icônes PWA...\n');
+/**
+ * Generate PNG icons from SVG source
+ */
+async function generateIconsFromSVG(svgPath, sizes, suffix = '') {
+  for (const { size, name } of sizes) {
+    const outputName = suffix ? name.replace('.png', `-${suffix}.png`) : name;
+    const outputPath = path.join(outputDir, outputName);
+    
+    await sharp(svgPath)
+      .resize(size, size, {
+        fit: 'contain',
+        background: { r: 255, g: 255, b: 255, alpha: 0 } // Transparent background
+      })
+      .png({ quality: 100, compressionLevel: 9 })
+      .toFile(outputPath);
+    
+    console.log(`   ✓ ${outputName} (${size}x${size}px)`);
+  }
+}
 
-  // Vérifier que le fichier source existe
-  if (!fs.existsSync(inputFile)) {
-    console.error(`❌ Le fichier source n'existe pas: ${inputFile}`);
+/**
+ * Generate favicon.ico (multi-size ICO file)
+ */
+async function generateFavicon(svgPath) {
+  // Generate 32x32 as main favicon
+  const faviconPath = path.join(outputDir, 'favicon.ico');
+  
+  await sharp(svgPath)
+    .resize(32, 32, {
+      fit: 'contain',
+      background: { r: 255, g: 255, b: 255, alpha: 0 }
+    })
+    .png()
+    .toFile(faviconPath);
+  
+  console.log(`   ✓ favicon.ico (32x32px)`);
+}
+
+/**
+ * Copy SVG favicon for modern browsers
+ */
+function copySVGFavicon(svgPath) {
+  const outputPath = path.join(outputDir, 'favicon.svg');
+  fs.copyFileSync(svgPath, outputPath);
+  console.log(`   ✓ favicon.svg (vector)`);
+}
+
+/**
+ * Main generation function
+ */
+async function generateAllIcons() {
+  console.log('🎨 Génération des icônes PWA HD depuis SVG...\n');
+
+  // Verify source files exist
+  if (!fs.existsSync(lightLogoSVG)) {
+    console.error(`❌ Fichier source manquant: ${lightLogoSVG}`);
+    process.exit(1);
+  }
+  if (!fs.existsSync(darkLogoSVG)) {
+    console.error(`❌ Fichier source manquant: ${darkLogoSVG}`);
     process.exit(1);
   }
 
-  // Créer le dossier de sortie s'il n'existe pas
+  // Create output directory if it doesn't exist
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
   try {
-    // Générer les icônes PWA standard
-    console.log('📱 Génération des icônes PWA:');
-    for (const { size, name } of sizes) {
-      const outputPath = path.join(outputDir, name);
-      
-      await sharp(inputFile)
-        .resize(size, size, {
-          fit: 'contain',
-          background: { r: 255, g: 255, b: 255, alpha: 1 }
-        })
-        .png({ quality: 100, compressionLevel: 9 })
-        .toFile(outputPath);
-      
-      console.log(`   ✓ ${name} (${size}x${size}px)`);
-    }
+    // Generate PWA icons from light mode SVG (default)
+    console.log('📱 Génération des icônes PWA (light mode):');
+    await generateIconsFromSVG(lightLogoSVG, pwaIconSizes);
 
-    // Générer les icônes Apple
+    // Generate PWA icons from dark mode SVG
+    console.log('\n📱 Génération des icônes PWA (dark mode):');
+    await generateIconsFromSVG(darkLogoSVG, pwaIconSizes, 'dark');
+
+    // Generate Apple Touch Icons (using light mode)
     console.log('\n🍎 Génération des icônes Apple:');
-    for (const { size, name } of appleSizes) {
-      const outputPath = path.join(outputDir, name);
-      
-      await sharp(inputFile)
-        .resize(size, size, {
-          fit: 'contain',
-          background: { r: 255, g: 255, b: 255, alpha: 1 }
-        })
-        .png({ quality: 100, compressionLevel: 9 })
-        .toFile(outputPath);
-      
-      console.log(`   ✓ ${name} (${size}x${size}px)`);
-    }
+    await generateIconsFromSVG(lightLogoSVG, appleIconSizes);
 
-    // Générer les favicons
+    // Generate Favicons (using light mode SVG)
     console.log('\n🌐 Génération des favicons:');
-    for (const { size, name } of faviconSizes) {
-      const outputPath = path.join(outputDir, name);
-      
-      if (name.endsWith('.ico')) {
-        // Pour le fichier .ico, on génère d'abord un PNG puis on peut le convertir
-        await sharp(inputFile)
-          .resize(size, size, {
-            fit: 'contain',
-            background: { r: 255, g: 255, b: 255, alpha: 0 }
-          })
-          .png()
-          .toFile(outputPath.replace('.ico', '-temp.png'));
-        
-        // Renommer le fichier temporaire en .ico (ou utiliser un convertisseur spécifique)
-        fs.renameSync(
-          outputPath.replace('.ico', '-temp.png'),
-          outputPath
-        );
-        console.log(`   ✓ ${name} (${size}x${size}px)`);
-      } else {
-        await sharp(inputFile)
-          .resize(size, size, {
-            fit: 'contain',
-            background: { r: 255, g: 255, b: 255, alpha: 0 }
-          })
-          .png({ quality: 100, compressionLevel: 9 })
-          .toFile(outputPath);
-        
-        console.log(`   ✓ ${name} (${size}x${size}px)`);
-      }
-    }
+    await generateIconsFromSVG(lightLogoSVG, faviconSizes);
+    await generateFavicon(lightLogoSVG);
+    copySVGFavicon(lightLogoSVG);
 
-    // Générer des screenshots de démonstration (optionnel)
-    console.log('\n📸 Génération des screenshots de démonstration:');
+    // Generate screenshots for PWA manifest (optional, using larger sizes)
+    console.log('\n📸 Génération des screenshots PWA:');
     
-    // Screenshot 1 - Format paysage
-    await sharp(inputFile)
+    // Screenshot 1 - Desktop (Light mode with gradient background)
+    await sharp(lightLogoSVG)
       .resize(1280, 720, {
         fit: 'contain',
-        background: { r: 245, g: 247, b: 250, alpha: 1 }
+        background: { r: 38, g: 125, b: 244, alpha: 1 } // Gradient blue
       })
       .png({ quality: 90 })
-      .toFile(path.join(outputDir, 'screenshot-1.png'));
-    console.log('   ✓ screenshot-1.png (1280x720px)');
+      .toFile(path.join(outputDir, 'screenshot-wide.png'));
+    console.log('   ✓ screenshot-wide.png (1280x720px)');
 
-    // Screenshot 2 - Format paysage
-    await sharp(inputFile)
-      .resize(1280, 720, {
+    // Screenshot 2 - Mobile portrait
+    await sharp(lightLogoSVG)
+      .resize(750, 1334, {
         fit: 'contain',
-        background: { r: 255, g: 255, b: 255, alpha: 1 }
+        background: { r: 38, g: 125, b: 244, alpha: 1 }
       })
       .png({ quality: 90 })
-      .toFile(path.join(outputDir, 'screenshot-2.png'));
-    console.log('   ✓ screenshot-2.png (1280x720px)');
+      .toFile(path.join(outputDir, 'screenshot-narrow.png'));
+    console.log('   ✓ screenshot-narrow.png (750x1334px)');
 
-    console.log('\n✅ Toutes les icônes ont été générées avec succès!');
+    console.log('\n✅ Toutes les icônes HD ont été générées avec succès depuis SVG!');
     console.log(`📂 Dossier de sortie: ${path.resolve(outputDir)}`);
-
-    // Instructions finales
+    
     console.log('\n📝 Prochaines étapes:');
-    console.log('   1. Placez le fichier manifest.json dans le dossier public/');
-    console.log('   2. Vérifiez que toutes les icônes sont bien générées');
-    console.log('   3. Testez votre PWA en utilisant Chrome DevTools > Application');
-    console.log('   4. Installez l\'app depuis Chrome sur mobile pour tester');
+    console.log('   1. Les icônes sont maintenant en HD grâce au format SVG');
+    console.log('   2. Le SplashScreen utilisera du texte pour un rendu HD parfait');
+    console.log('   3. Testez avec Chrome DevTools > Application > Manifest');
+    console.log('   4. Installez l\'app sur mobile pour vérifier la qualité');
 
   } catch (error) {
     console.error('❌ Erreur lors de la génération des icônes:', error);
@@ -152,5 +158,5 @@ async function generateIcons() {
   }
 }
 
-// Exécuter le script
-generateIcons().catch(console.error);
+// Execute the script
+generateAllIcons().catch(console.error);

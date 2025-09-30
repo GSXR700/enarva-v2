@@ -1,18 +1,13 @@
 {
-  "name": "Enarva OS - Système de Gestion",
+  "name": "Enarva OS",
   "short_name": "Enarva",
-  "description": "Plateforme de gestion complète pour Enarva - Nettoyage professionnel",
+  "description": "Plateforme de gestion complète pour Enarva",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#0066FF",
-  "dir": "ltr",
-  "lang": "fr-FR",
+  "orientation": "portrait-primary",
   "scope": "/",
-  "id": "enarva-os-pwa",
-  "categories": ["business", "productivity"],
-  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-72x72.png",
@@ -48,7 +43,7 @@
       "src": "/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-384x384.png",
@@ -60,63 +55,32 @@
       "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
-    },
-    {
-      "src": "/icon-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
   ],
   "screenshots": [
     {
-      "src": "/screenshot-1.png",
+      "src": "/screenshot-wide.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Dashboard principal"
+      "label": "Enarva OS Dashboard"
     },
     {
-      "src": "/screenshot-2.png",
-      "sizes": "1280x720", 
+      "src": "/screenshot-narrow.png",
+      "sizes": "750x1334",
       "type": "image/png",
-      "form_factor": "wide",
-      "label": "Gestion des leads"
+      "form_factor": "narrow",
+      "label": "Enarva OS Mobile"
     }
   ],
-  "shortcuts": [
-    {
-      "name": "Nouveau Lead",
-      "short_name": "Lead",
-      "description": "Créer un nouveau lead",
-      "url": "/leads/new",
-      "icons": [
-        {
-          "src": "/icon-96x96.png",
-          "sizes": "96x96",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
-      "name": "Dashboard",
-      "short_name": "Dashboard", 
-      "description": "Voir le tableau de bord",
-      "url": "/dashboard",
-      "icons": [
-        {
-          "src": "/icon-96x96.png",
-          "sizes": "96x96",
-          "type": "image/png"
-        }
-      ]
-    }
-  ]
+  "categories": ["business", "productivity", "utilities"],
+  "lang": "fr-FR",
+  "dir": "ltr"
 }

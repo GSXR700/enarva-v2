@@ -1,4 +1,4 @@
-// app/layout.tsx - ENHANCED WITH THEME SUPPORT
+// app/layout.tsx - ENHANCED WITH SVG FAVICON
 import './globals.css'
 import { Poppins } from 'next/font/google'
 import { Providers } from '@/components/providers/Providers'
@@ -41,12 +41,15 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/favicon.ico' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
       { url: '/icon-192x192.png', sizes: '192x192', type: 'image/png' },
       { url: '/icon-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
     apple: [
-      { url: '/apple-icon.png' },
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
 }
@@ -59,12 +62,17 @@ export default function RootLayout({
   return (
     <html lang="fr" className={poppins.variable} suppressHydrationWarning>
       <head>
-        {/* PWA Meta Tags essentiels uniquement */}
-        <link rel="manifest" href="/manifest.json" />
+        {/* SVG Favicon for modern browsers */}
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/favicon.ico" sizes="32x32" />
         <link rel="apple-touch-icon" href="/apple-icon.png" />
+        
+        {/* PWA Meta Tags */}
+        <link rel="manifest" href="/manifest.json" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Enarva" />
         <meta name="theme-color" content="#0066FF" media="(prefers-color-scheme: light)" />
         <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
         
