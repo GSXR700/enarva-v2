@@ -1,4 +1,4 @@
-// scripts/generate-icons.js
+// scripts/generate-icons.js - WITH ROUNDED CORNERS
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
@@ -34,23 +34,49 @@ const faviconSizes = [
 ];
 
 /**
- * Generate PNG icons from SVG source with colored background
+ * Create rounded corners mask as SVG overlay
  */
-async function generateIconsFromSVG(svgPath, sizes, suffix = '') {
+function createRoundedMask(size, borderRadius) {
+  return Buffer.from(`
+    <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="${size}" height="${size}" rx="${borderRadius}" ry="${borderRadius}" fill="white"/>
+    </svg>
+  `);
+}
+
+/**
+ * Generate PNG icons from SVG source with colored background and rounded corners
+ */
+async function generateIconsFromSVG(svgPath, sizes, suffix = '', withRoundedCorners = true) {
   for (const { size, name } of sizes) {
     const outputName = suffix ? name.replace('.png', `-${suffix}.png`) : name;
     const outputPath = path.join(outputDir, outputName);
     
-    // CRITICAL FIX: Use blue gradient background instead of transparent
-    await sharp(svgPath)
+    // Calculate border radius (12.5% of size for nice rounded corners)
+    const borderRadius = Math.floor(size * 0.125);
+    
+    // Create base image with blue background
+    let image = sharp(svgPath)
       .resize(size, size, {
         fit: 'contain',
         background: { r: 38, g: 125, b: 244, alpha: 1 } // Blue background #267DF4
-      })
+      });
+    
+    // Apply rounded corners if requested
+    if (withRoundedCorners) {
+      const roundedMask = createRoundedMask(size, borderRadius);
+      image = image.composite([{
+        input: roundedMask,
+        blend: 'dest-in'
+      }]);
+    }
+    
+    await image
       .png({ quality: 100, compressionLevel: 9 })
       .toFile(outputPath);
     
-    console.log(`   ✓ ${outputName} (${size}x${size}px)`);
+    const roundedText = withRoundedCorners ? ' with rounded corners' : '';
+    console.log(`   ✓ ${outputName} (${size}x${size}px${roundedText})`);
   }
 }
 
@@ -65,6 +91,10 @@ async function generateMaskableIcons(svgPath, sizes) {
     // Maskable icons need padding (safe zone)
     const logoSize = Math.floor(size * 0.6); // 60% of icon size for safe zone
     const padding = Math.floor((size - logoSize) / 2);
+    const borderRadius = Math.floor(size * 0.125); // Rounded corners
+    
+    // Create base with blue background and rounded corners
+    const roundedMask = createRoundedMask(size, borderRadius);
     
     await sharp({
       create: {
@@ -74,20 +104,26 @@ async function generateMaskableIcons(svgPath, sizes) {
         background: { r: 38, g: 125, b: 244, alpha: 1 }
       }
     })
-    .composite([{
-      input: await sharp(svgPath)
-        .resize(logoSize, logoSize, {
-          fit: 'contain',
-          background: { r: 0, g: 0, b: 0, alpha: 0 }
-        })
-        .toBuffer(),
-      top: padding,
-      left: padding
-    }])
+    .composite([
+      {
+        input: await sharp(svgPath)
+          .resize(logoSize, logoSize, {
+            fit: 'contain',
+            background: { r: 0, g: 0, b: 0, alpha: 0 }
+          })
+          .toBuffer(),
+        top: padding,
+        left: padding
+      },
+      {
+        input: roundedMask,
+        blend: 'dest-in'
+      }
+    ])
     .png({ quality: 100, compressionLevel: 9 })
     .toFile(outputPath);
     
-    console.log(`   ✓ ${outputName} (${size}x${size}px - maskable)`);
+    console.log(`   ✓ ${outputName} (${size}x${size}px - maskable with rounded corners)`);
   }
 }
 
@@ -95,7 +131,7 @@ async function generateMaskableIcons(svgPath, sizes) {
  * Generate favicon.ico (multi-size ICO file)
  */
 async function generateFavicon(svgPath) {
-  // Generate 32x32 as main favicon with transparent background
+  // Generate 32x32 as main favicon with transparent background (no rounded corners for favicon)
   const faviconPath = path.join(outputDir, 'favicon.ico');
   
   await sharp(svgPath)
@@ -122,7 +158,7 @@ function copySVGFavicon(svgPath) {
  * Main generation function
  */
 async function generateAllIcons() {
-  console.log('🎨 Génération des icônes PWA HD depuis SVG...\n');
+  console.log('🎨 Génération des icônes PWA HD depuis SVG avec coins arrondis...\n');
 
   // Verify source files exist
   if (!fs.existsSync(lightLogoSVG)) {
@@ -140,67 +176,89 @@ async function generateAllIcons() {
   }
 
   try {
-    // Generate PWA icons from light mode SVG (with blue background)
-    console.log('📱 Génération des icônes PWA (fond bleu):');
-    await generateIconsFromSVG(lightLogoSVG, pwaIconSizes);
+    // Generate PWA icons from light mode SVG (with blue background + rounded corners)
+    console.log('📱 Génération des icônes PWA (fond bleu + coins arrondis):');
+    await generateIconsFromSVG(lightLogoSVG, pwaIconSizes, '', true);
 
-    // Generate maskable icons for Android (with padding + blue background)
-    console.log('\n📱 Génération des icônes maskables (Android):');
+    // Generate maskable icons for Android (with padding + blue background + rounded corners)
+    console.log('\n📱 Génération des icônes maskables (Android + coins arrondis):');
     await generateMaskableIcons(lightLogoSVG, [
       { size: 192, name: 'icon-192x192.png' },
       { size: 512, name: 'icon-512x512.png' }
     ]);
 
-    // Generate Apple Touch Icons (using light mode with white background)
-    console.log('\n🍎 Génération des icônes Apple:');
+    // Generate Apple Touch Icons (using light mode with white background + rounded corners)
+    console.log('\n🍎 Génération des icônes Apple (coins arrondis):');
     for (const { size, name } of appleIconSizes) {
       const outputPath = path.join(outputDir, name);
+      const borderRadius = Math.floor(size * 0.125);
+      const roundedMask = createRoundedMask(size, borderRadius);
       
       await sharp(lightLogoSVG)
         .resize(size, size, {
           fit: 'contain',
           background: { r: 255, g: 255, b: 255, alpha: 1 } // White for Apple
         })
+        .composite([{
+          input: roundedMask,
+          blend: 'dest-in'
+        }])
         .png({ quality: 100, compressionLevel: 9 })
         .toFile(outputPath);
       
-      console.log(`   ✓ ${name} (${size}x${size}px)`);
+      console.log(`   ✓ ${name} (${size}x${size}px with rounded corners)`);
     }
 
-    // Generate Favicons (using light mode SVG - transparent)
-    console.log('\n🌐 Génération des favicons:');
-    await generateIconsFromSVG(lightLogoSVG, faviconSizes);
+    // Generate Favicons (using light mode SVG - transparent, NO rounded corners)
+    console.log('\n🌐 Génération des favicons (sans coins arrondis):');
+    await generateIconsFromSVG(lightLogoSVG, faviconSizes, '', false);
     await generateFavicon(lightLogoSVG);
     copySVGFavicon(lightLogoSVG);
 
-    // Generate screenshots for PWA manifest
-    console.log('\n📸 Génération des screenshots PWA:');
+    // Generate screenshots for PWA manifest (with rounded corners)
+    console.log('\n📸 Génération des screenshots PWA (coins arrondis):');
     
     // Screenshot 1 - Desktop
+    const wideSize = { width: 1280, height: 720 };
+    const wideBorderRadius = Math.floor(Math.min(wideSize.width, wideSize.height) * 0.02); // 2% radius
+    const wideRoundedMask = createRoundedMask(wideSize.width, wideBorderRadius);
+    
     await sharp(lightLogoSVG)
-      .resize(1280, 720, {
+      .resize(wideSize.width, wideSize.height, {
         fit: 'contain',
         background: { r: 38, g: 125, b: 244, alpha: 1 }
       })
+      .composite([{
+        input: wideRoundedMask,
+        blend: 'dest-in'
+      }])
       .png({ quality: 90 })
       .toFile(path.join(outputDir, 'screenshot-wide.png'));
-    console.log('   ✓ screenshot-wide.png (1280x720px)');
+    console.log('   ✓ screenshot-wide.png (1280x720px with rounded corners)');
 
     // Screenshot 2 - Mobile portrait
+    const narrowSize = { width: 750, height: 1334 };
+    const narrowBorderRadius = Math.floor(Math.min(narrowSize.width, narrowSize.height) * 0.03); // 3% radius
+    const narrowRoundedMask = createRoundedMask(narrowSize.width, narrowBorderRadius);
+    
     await sharp(lightLogoSVG)
-      .resize(750, 1334, {
+      .resize(narrowSize.width, narrowSize.height, {
         fit: 'contain',
         background: { r: 38, g: 125, b: 244, alpha: 1 }
       })
+      .composite([{
+        input: narrowRoundedMask,
+        blend: 'dest-in'
+      }])
       .png({ quality: 90 })
       .toFile(path.join(outputDir, 'screenshot-narrow.png'));
-    console.log('   ✓ screenshot-narrow.png (750x1334px)');
+    console.log('   ✓ screenshot-narrow.png (750x1334px with rounded corners)');
 
-    console.log('\n✅ Toutes les icônes HD ont été générées avec succès!');
+    console.log('\n✅ Toutes les icônes HD ont été générées avec succès avec coins arrondis!');
     console.log(`📂 Dossier de sortie: ${path.resolve(outputDir)}`);
     
     console.log('\n📝 Prochaines étapes:');
-    console.log('   1. Les icônes ont maintenant un fond bleu #267DF4');
+    console.log('   1. Les icônes ont maintenant un fond bleu #267DF4 avec coins arrondis');
     console.log('   2. Les icônes maskables ont été générées pour Android');
     console.log('   3. Rebuild l\'app: npm run build');
     console.log('   4. Testez l\'installation PWA sur mobile');

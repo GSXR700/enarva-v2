@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
-import { Bell, Search, Menu, MessageSquare, User, Settings, LogOut, X, CheckCircle, BellRing } from 'lucide-react'
+import { Bell, Search, Menu, MessageSquare, User, Settings, LogOut, X, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -20,7 +20,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Activity } from '@prisma/client'
 import { getRelativeTime } from '@/lib/utils'
-import PWAInstallButton from './PWAInstallButton'; 
 import { ThemeToggle } from '@/components/ThemeToggle'
 
 interface TopBarProps {
@@ -28,12 +27,6 @@ interface TopBarProps {
 }
 
 type ActivityWithUser = Activity & { user: { name: string | null; image: string | null }};
-
-const handleEnableNotifications = () => {
-    if (typeof window !== 'undefined' && (window as any).enablePushNotifications) {
-        (window as any).enablePushNotifications();
-    }
-};
 
 export function TopBar({ onMenuClick }: TopBarProps) {
   const { data: session } = useSession();
@@ -77,7 +70,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
             <Search className="w-5 h-5" />
         </Button>
         <Link href="/chat"><Button variant="ghost" size="icon"><MessageSquare className="w-5 h-5" /></Button></Link>
-        <PWAInstallButton />
+        <ThemeToggle />
         <DropdownMenu onOpenChange={(open) => !open && setShowNotificationDot(false)}>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
@@ -110,43 +103,31 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                          <Avatar className="h-9 w-9">
                             <AvatarImage src={session.user.image || ''} alt={session.user.name || 'Utilisateur'} />
                             <AvatarFallback>{session.user.name ? session.user.name.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
-                         </Avatar>
+                        </Avatar>
                     </div>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64" align="end">
-                    <DropdownMenuLabel className="font-normal">
-                        <div className="flex flex-col space-y-1">
-                            <p className="text-sm font-medium leading-none">{session.user.name || 'Utilisateur'}</p>
-                            <p className="text-xs leading-none text-muted-foreground">
-                                {session.user.email}
-                            </p>
+                <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuLabel>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-medium">{session.user.name || 'Utilisateur'}</span>
+                            <span className="text-xs text-muted-foreground">{session.user.email}</span>
                         </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                        <Link href="/profile" className="flex items-center gap-2">
+                        <Link href="/settings/profile" className="flex items-center gap-2 cursor-pointer">
                             <User className="w-4 h-4" />
-                            Mon profil
+                            Profil
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                        <Link href="/settings" className="flex items-center gap-2">
+                        <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
                             <Settings className="w-4 h-4" />
                             Paramètres
                         </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    {/* Theme Toggle Integration */}
-                    <div className="p-1">
-                        <ThemeToggle />
-                    </div>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleEnableNotifications} className="flex items-center gap-2">
-                        <BellRing className="w-4 h-4" />
-                        Activer les notifications
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => signOut()} className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                    <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })} className="flex items-center gap-2 cursor-pointer text-red-600">
                         <LogOut className="w-4 h-4" />
                         Se déconnecter
                     </DropdownMenuItem>

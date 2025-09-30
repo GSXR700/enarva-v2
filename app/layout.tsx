@@ -1,8 +1,9 @@
-// app/layout.tsx - ENHANCED WITH SVG FAVICON
+// app/layout.tsx - ENHANCED WITH SVG FAVICON + PWA INSTALLER
 import './globals.css'
 import { Poppins } from 'next/font/google'
 import { Providers } from '@/components/providers/Providers'
 import SplashScreen from '@/components/SplashScreen'
+import PWAInstaller from '@/components/PWAInstaller'
 import { Metadata, Viewport } from 'next'
 
 const poppins = Poppins({ 
@@ -83,15 +84,18 @@ export default function RootLayout({
                 const theme = localStorage.getItem('enarva-theme') || 'light';
                 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
                 const effectiveTheme = theme === 'system' ? systemTheme : theme;
-                document.documentElement.classList.add(effectiveTheme);
+                if (effectiveTheme === 'dark') {
+                  document.documentElement.classList.add('dark');
+                }
               } catch (e) {}
             `,
           }}
         />
       </head>
-      <body className="antialiased bg-background font-poppins transition-colors duration-300" suppressHydrationWarning>
-        <SplashScreen />
+      <body className={`${poppins.className} antialiased`}>
         <Providers>
+          <SplashScreen />
+          <PWAInstaller />
           {children}
         </Providers>
       </body>
