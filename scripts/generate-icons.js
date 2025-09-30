@@ -1,4 +1,4 @@
-// scripts/generate-icons.js - WITH ROUNDED CORNERS
+// scripts/generate-icons.js - FIXED SCREENSHOT GENERATION
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
@@ -34,12 +34,23 @@ const faviconSizes = [
 ];
 
 /**
- * Create rounded corners mask as SVG overlay
+ * Create rounded corners mask as SVG overlay for square icons
  */
 function createRoundedMask(size, borderRadius) {
   return Buffer.from(`
     <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
       <rect width="${size}" height="${size}" rx="${borderRadius}" ry="${borderRadius}" fill="white"/>
+    </svg>
+  `);
+}
+
+/**
+ * Create rounded corners mask for rectangular screenshots
+ */
+function createRoundedRectMask(width, height, borderRadius) {
+  return Buffer.from(`
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="${width}" height="${height}" rx="${borderRadius}" ry="${borderRadius}" fill="white"/>
     </svg>
   `);
 }
@@ -215,43 +226,61 @@ async function generateAllIcons() {
     await generateFavicon(lightLogoSVG);
     copySVGFavicon(lightLogoSVG);
 
-    // Generate screenshots for PWA manifest (with rounded corners)
+    // Generate screenshots for PWA manifest (with rounded corners) - FIXED
     console.log('\n📸 Génération des screenshots PWA (coins arrondis):');
     
-    // Screenshot 1 - Desktop
-    const wideSize = { width: 1280, height: 720 };
-    const wideBorderRadius = Math.floor(Math.min(wideSize.width, wideSize.height) * 0.02); // 2% radius
-    const wideRoundedMask = createRoundedMask(wideSize.width, wideBorderRadius);
+    // Screenshot 1 - Desktop (wide)
+    const wideWidth = 1280;
+    const wideHeight = 720;
+    const wideBorderRadius = Math.floor(Math.min(wideWidth, wideHeight) * 0.02); // 2% radius
     
-    await sharp(lightLogoSVG)
-      .resize(wideSize.width, wideSize.height, {
+    // First create the base image
+    const wideBase = await sharp(lightLogoSVG)
+      .resize(wideWidth, wideHeight, {
         fit: 'contain',
         background: { r: 38, g: 125, b: 244, alpha: 1 }
       })
+      .png()
+      .toBuffer();
+    
+    // Then apply the rounded mask with matching dimensions
+    const wideRoundedMask = createRoundedRectMask(wideWidth, wideHeight, wideBorderRadius);
+    
+    await sharp(wideBase)
       .composite([{
         input: wideRoundedMask,
         blend: 'dest-in'
       }])
       .png({ quality: 90 })
       .toFile(path.join(outputDir, 'screenshot-wide.png'));
+    
     console.log('   ✓ screenshot-wide.png (1280x720px with rounded corners)');
 
-    // Screenshot 2 - Mobile portrait
-    const narrowSize = { width: 750, height: 1334 };
-    const narrowBorderRadius = Math.floor(Math.min(narrowSize.width, narrowSize.height) * 0.03); // 3% radius
-    const narrowRoundedMask = createRoundedMask(narrowSize.width, narrowBorderRadius);
+    // Screenshot 2 - Mobile portrait (narrow)
+    const narrowWidth = 750;
+    const narrowHeight = 1334;
+    const narrowBorderRadius = Math.floor(Math.min(narrowWidth, narrowHeight) * 0.03); // 3% radius
     
-    await sharp(lightLogoSVG)
-      .resize(narrowSize.width, narrowSize.height, {
+    // First create the base image
+    const narrowBase = await sharp(lightLogoSVG)
+      .resize(narrowWidth, narrowHeight, {
         fit: 'contain',
         background: { r: 38, g: 125, b: 244, alpha: 1 }
       })
+      .png()
+      .toBuffer();
+    
+    // Then apply the rounded mask with matching dimensions
+    const narrowRoundedMask = createRoundedRectMask(narrowWidth, narrowHeight, narrowBorderRadius);
+    
+    await sharp(narrowBase)
       .composite([{
         input: narrowRoundedMask,
         blend: 'dest-in'
       }])
       .png({ quality: 90 })
       .toFile(path.join(outputDir, 'screenshot-narrow.png'));
+    
     console.log('   ✓ screenshot-narrow.png (750x1334px with rounded corners)');
 
     console.log('\n✅ Toutes les icônes HD ont été générées avec succès avec coins arrondis!');
