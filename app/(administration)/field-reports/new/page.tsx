@@ -194,7 +194,7 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
   )
 }
 
-// ========== INVENTORY SELECTOR COMPONENT (NEW) ==========
+// ========== INVENTORY SELECTOR COMPONENT (FIXED FOR MOBILE) ==========
 interface InventoryItem {
   id: string
   name: string
@@ -308,16 +308,15 @@ const InventorySelector: React.FC<InventorySelectorProps> = ({ selectedMaterials
               Ajouter
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[85vh] p-0">
-            <DialogHeader className="p-6 pb-4">
-              <DialogTitle className="flex items-center gap-2">
+          <DialogContent className="w-[95vw] max-w-2xl h-[90vh] max-h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="p-4 md:p-6 pb-3 md:pb-4 border-b">
+              <DialogTitle className="flex items-center gap-2 text-lg md:text-xl">
                 <Package className="w-5 h-5" />
                 Sélectionner depuis l'Inventaire
               </DialogTitle>
             </DialogHeader>
             
-            <div className="px-6 space-y-4">
-              {/* Search */}
+            <div className="px-4 md:px-6 py-3 space-y-3 flex-shrink-0">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
@@ -328,32 +327,34 @@ const InventorySelector: React.FC<InventorySelectorProps> = ({ selectedMaterials
                 />
               </div>
 
-              {/* Category Filter */}
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                <Button
-                  type="button"
-                  variant={categoryFilter === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setCategoryFilter('all')}
-                >
-                  Tous
-                </Button>
-                {Object.entries(categoryTranslations).map(([key, label]) => (
+              <ScrollArea className="w-full">
+                <div className="flex gap-2 pb-2">
                   <Button
-                    key={key}
                     type="button"
-                    variant={categoryFilter === key ? 'default' : 'outline'}
+                    variant={categoryFilter === 'all' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setCategoryFilter(key)}
+                    onClick={() => setCategoryFilter('all')}
+                    className="flex-shrink-0"
                   >
-                    {label}
+                    Tous
                   </Button>
-                ))}
-              </div>
+                  {Object.entries(categoryTranslations).map(([key, label]) => (
+                    <Button
+                      key={key}
+                      type="button"
+                      variant={categoryFilter === key ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setCategoryFilter(key)}
+                      className="flex-shrink-0"
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
 
-            {/* Inventory List */}
-            <ScrollArea className="h-[400px] px-6">
+            <ScrollArea className="flex-1 px-4 md:px-6">
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -364,20 +365,20 @@ const InventorySelector: React.FC<InventorySelectorProps> = ({ selectedMaterials
                   <p className="text-gray-500">Aucun article disponible</p>
                 </div>
               ) : (
-                <div className="grid gap-3 pb-6">
+                <div className="grid gap-3 pb-4">
                   {filteredInventory.map(item => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:border-primary/50 transition-colors"
+                      className="flex items-center justify-between p-3 md:p-4 border rounded-lg hover:border-primary/50 transition-colors"
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-medium truncate">{item.name}</h4>
-                          <Badge variant="outline" className={categoryColors[item.category]}>
+                      <div className="flex-1 min-w-0 mr-3">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h4 className="font-medium truncate text-sm md:text-base">{item.name}</h4>
+                          <Badge variant="outline" className={`${categoryColors[item.category]} text-xs`}>
                             {categoryTranslations[item.category]}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-xs md:text-sm text-gray-500">
                           Stock: {item.currentStock} {item.unit}
                         </p>
                       </div>
@@ -386,6 +387,7 @@ const InventorySelector: React.FC<InventorySelectorProps> = ({ selectedMaterials
                         size="sm"
                         onClick={() => addMaterial(item)}
                         disabled={selectedMaterials.some(m => m.itemId === item.id)}
+                        className="flex-shrink-0"
                       >
                         <Plus className="w-4 h-4" />
                       </Button>
@@ -395,7 +397,7 @@ const InventorySelector: React.FC<InventorySelectorProps> = ({ selectedMaterials
               )}
             </ScrollArea>
 
-            <div className="p-6 pt-4 border-t">
+            <div className="p-4 md:p-6 pt-3 md:pt-4 border-t flex-shrink-0">
               <Button type="button" onClick={() => setIsOpen(false)} className="w-full">
                 Fermer
               </Button>
@@ -404,9 +406,8 @@ const InventorySelector: React.FC<InventorySelectorProps> = ({ selectedMaterials
         </Dialog>
       </div>
 
-      {/* Selected Materials */}
       {selectedMaterials.length === 0 ? (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 md:p-8 text-center">
           <Package className="w-10 h-10 mx-auto text-gray-300 mb-2" />
           <p className="text-sm text-gray-500">Aucun matériel sélectionné</p>
           <p className="text-xs text-gray-400 mt-1">Cliquez sur "Ajouter" pour sélectionner depuis l'inventaire</p>
@@ -414,27 +415,27 @@ const InventorySelector: React.FC<InventorySelectorProps> = ({ selectedMaterials
       ) : (
         <div className="space-y-2">
           {selectedMaterials.map(material => (
-            <div key={material.itemId} className="flex items-center gap-3 p-3 border rounded-lg bg-white">
+            <div key={material.itemId} className="flex items-center gap-2 md:gap-3 p-3 border rounded-lg bg-white">
               <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{material.name}</p>
+                <p className="font-medium truncate text-sm md:text-base">{material.name}</p>
                 <p className="text-xs text-gray-500">{material.unit}</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                 <Button
                   type="button"
                   size="icon"
                   variant="outline"
-                  className="h-8 w-8"
+                  className="h-7 w-7 md:h-8 md:w-8"
                   onClick={() => updateQuantity(material.itemId, -1)}
                 >
                   <Minus className="w-3 h-3" />
                 </Button>
-                <span className="w-12 text-center font-medium">{material.quantity}</span>
+                <span className="w-10 md:w-12 text-center font-medium text-sm md:text-base">{material.quantity}</span>
                 <Button
                   type="button"
                   size="icon"
                   variant="outline"
-                  className="h-8 w-8"
+                  className="h-7 w-7 md:h-8 md:w-8"
                   onClick={() => updateQuantity(material.itemId, 1)}
                 >
                   <Plus className="w-3 h-3" />
@@ -443,7 +444,7 @@ const InventorySelector: React.FC<InventorySelectorProps> = ({ selectedMaterials
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="h-8 w-8 text-red-600"
+                  className="h-7 w-7 md:h-8 md:w-8 text-red-600"
                   onClick={() => removeMaterial(material.itemId)}
                 >
                   <X className="w-4 h-4" />
@@ -492,11 +493,11 @@ export default function EnhancedFieldReportForm() {
 
   const fetchMissions = async () => {
     try {
-      const response = await fetch('/api/missions?status=IN_PROGRESS,QUALITY_CHECK')
+      const response = await fetch('/api/missions?limit=1000')
       if (!response.ok) throw new Error('Failed to fetch missions')
       const data = await response.json()
-      const missions = Array.isArray(data) ? data : (data.missions || [])
-      setMissions(missions)
+      const missionsData = Array.isArray(data) ? data : (data.missions || data.data || [])
+      setMissions(missionsData)
     } catch (error) {
       toast.error('Impossible de charger les missions')
     }
@@ -598,7 +599,6 @@ export default function EnhancedFieldReportForm() {
       const clientSignatureUrl = await uploadSignature(clientSignature)
       const teamLeadSignatureUrl = await uploadSignature(teamLeadSignature)
 
-      // Convert selected materials to JSON format
       const materialsUsed = selectedMaterials.reduce((acc, material) => {
         acc[material.name] = `${material.quantity} ${material.unit}`
         return acc
@@ -655,7 +655,6 @@ export default function EnhancedFieldReportForm() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Mission Selection */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle>Sélection de la Mission</CardTitle>
@@ -679,7 +678,6 @@ export default function EnhancedFieldReportForm() {
           </CardContent>
         </Card>
 
-        {/* General Information */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle>Informations Générales</CardTitle>
@@ -710,7 +708,6 @@ export default function EnhancedFieldReportForm() {
               />
             </div>
 
-            {/* ENHANCED: Inventory Selector instead of JSON */}
             <InventorySelector
               selectedMaterials={selectedMaterials}
               onMaterialsChange={setSelectedMaterials}
@@ -718,7 +715,6 @@ export default function EnhancedFieldReportForm() {
           </CardContent>
         </Card>
 
-        {/* Client Feedback */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle>Retour Client</CardTitle>
@@ -737,7 +733,6 @@ export default function EnhancedFieldReportForm() {
           </CardContent>
         </Card>
 
-        {/* ENHANCED: Photos Section */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -746,7 +741,6 @@ export default function EnhancedFieldReportForm() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Before Photos */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <Label className="text-base font-semibold">Photos Avant</Label>
@@ -799,13 +793,12 @@ export default function EnhancedFieldReportForm() {
                       <Badge className="absolute top-2 left-2 bg-blue-600 text-white">
                         {index + 1}
                       </Badge>
-                      </div>
+                    </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* After Photos */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <Label className="text-base font-semibold">Photos Après</Label>
@@ -866,7 +859,6 @@ export default function EnhancedFieldReportForm() {
           </CardContent>
         </Card>
 
-        {/* Signatures - UNCHANGED (PERFECT) */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -887,7 +879,6 @@ export default function EnhancedFieldReportForm() {
           </CardContent>
         </Card>
 
-        {/* Issues and Notes */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle>Problèmes et Notes</CardTitle>
@@ -917,7 +908,6 @@ export default function EnhancedFieldReportForm() {
           </CardContent>
         </Card>
 
-        {/* Submit Section */}
         <div className="flex justify-end gap-4 pb-6">
           <Button type="button" variant="outline" onClick={() => router.back()}>
             Annuler
