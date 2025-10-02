@@ -1,4 +1,4 @@
-// app/layout.tsx - ENHANCED WITH SVG FAVICON + PWA INSTALLER
+// app/layout.tsx - FIXED: Full immersive mobile experience
 import './globals.css'
 import { Poppins } from 'next/font/google'
 import { Providers } from '@/components/providers/Providers'
@@ -19,7 +19,7 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#0066FF' },
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
     { media: '(prefers-color-scheme: dark)', color: '#000000' }
   ],
 }
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: 'Enarva OS',
   },
   formatDetection: {
@@ -62,24 +62,23 @@ export default function RootLayout({
   return (
     <html lang="fr" className={poppins.variable} suppressHydrationWarning>
       <head>
-        {/* SVG Favicon for modern browsers */}
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="/favicon.ico" sizes="32x32" />
         <link rel="apple-touch-icon" href="/apple-icon.png" />
         
-        {/* PWA Meta Tags */}
         <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Enarva OS" />
         <meta name="application-name" content="Enarva OS" />
-        <meta name="msapplication-TileColor" content="#267DF4" />
+        <meta name="msapplication-TileColor" content="#000000" />
         <meta name="msapplication-tap-highlight" content="no" />
-        <meta name="theme-color" content="#0066FF" media="(prefers-color-scheme: light)" />
+        
+        {/* Full screen immersive mode */}
+        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
         <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
         
-        {/* Prevent flash of unstyled content */}
         <script
           dangerouslySetInnerHTML={{
             __html: `

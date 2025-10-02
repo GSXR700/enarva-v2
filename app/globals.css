@@ -1,4 +1,4 @@
-/* app/globals.css */
+/* app/globals.css - FULL UPDATED FILE */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -61,6 +61,13 @@
   html {
     transition: background-color 0.3s ease;
     scroll-behavior: smooth;
+    height: 100%;
+    height: -webkit-fill-available;
+  }
+
+  body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
   }
 
   .dark ::-webkit-scrollbar {
@@ -234,7 +241,6 @@
   }
 
   .dark .sidebar-mobile-fix {
-    color-rendering: optimizeQuality;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: subpixel-antialiased;
     isolation: isolate;
@@ -360,12 +366,23 @@
   }
 }
 
-
+/* Full screen immersive mobile experience */
 @media (display-mode: standalone) {
   body {
-    overscroll-behavior-y: contain;
+    overscroll-behavior: none;
     -webkit-user-select: none;
     user-select: none;
+    overflow-x: hidden;
+  }
+
+  html {
+    height: 100vh;
+    height: -webkit-fill-available;
+  }
+
+  body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
   }
 }
 
@@ -377,9 +394,19 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
+/* Gesture navigation for Android */
+@supports (padding: max(0px)) {
+  @media (display-mode: standalone) {
+    body {
+      padding-bottom: max(env(safe-area-inset-bottom), 20px);
+    }
+  }
+}
+
 /* Prevent pull-to-refresh on mobile */
 body {
   overscroll-behavior-y: contain;
+  overscroll-behavior-x: none;
 }
 
 /* Main content area spacing for megatopbar */
