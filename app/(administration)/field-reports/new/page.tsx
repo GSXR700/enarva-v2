@@ -1,4 +1,4 @@
-// app/(administration)/field-reports/new/page.tsx
+// app/(administration)/field-reports/new/page.tsx - FIXED MOBILE SIGNATURES
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react'
@@ -24,6 +24,7 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [hasSignature, setHasSignature] = useState(!!existingSignature)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -32,63 +33,107 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Set canvas size
-    canvas.width = 400
-    canvas.height = 200
+    // FIXED: Responsive canvas sizing
+    const updateCanvasSize = () => {
+      const container = containerRef.current
+      if (!container) return
 
-    // Set drawing styles
-    ctx.strokeStyle = '#000000'
-    ctx.lineWidth = 2
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
+      const containerWidth = container.clientWidth - 32 // Account for padding
+      const width = Math.min(containerWidth, 600)
+      const height = 200
 
-    // Clear canvas with white background
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+      // Set actual canvas size
+      canvas.width = width
+      canvas.height = height
 
-    // Load existing signature if provided
-    if (existingSignature) {
-      const img = new Image()
-      img.onload = () => ctx.drawImage(img, 0, 0)
-      img.src = existingSignature
+      // Set display size
+      canvas.style.width = `${width}px`
+      canvas.style.height = `${height}px`
+
+      // Redraw background
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      // Set drawing styles
+      ctx.strokeStyle = '#000000'
+      ctx.lineWidth = 2
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+
+      // Load existing signature if provided
+      if (existingSignature && hasSignature) {
+        const img = new Image()
+        img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        img.src = existingSignature
+      }
     }
-  }, [existingSignature])
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    updateCanvasSize()
+
+    // Handle window resize
+    window.addEventListener('resize', updateCanvasSize)
+    return () => window.removeEventListener('resize', updateCanvasSize)
+  }, [existingSignature, hasSignature])
+
+  // FIXED: Universal coordinate getter with proper type safety
+  const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas) return { x: 0, y: 0 }
+
+    const rect = canvas.getBoundingClientRect()
+    
+    if ('touches' in e) {
+      // Touch event - FIXED: Proper null check
+      const touch = e.touches[0] || e.changedTouches[0]
+      if (!touch) return { x: 0, y: 0 }
+      
+      return {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top
+      }
+    } else {
+      // Mouse event
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      }
+    }
+  }
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault() // CRITICAL: Prevent scrolling on touch
     setIsDrawing(true)
+    
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const rect = canvas.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-
+    const coords = getCoordinates(e)
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
     ctx.beginPath()
-    ctx.moveTo(x, y)
+    ctx.moveTo(coords.x, coords.y)
   }
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault() // CRITICAL: Prevent scrolling on touch
     if (!isDrawing) return
 
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const rect = canvas.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-
+    const coords = getCoordinates(e)
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    ctx.lineTo(x, y)
+    ctx.lineTo(coords.x, coords.y)
     ctx.stroke()
   }
 
-  const stopDrawing = () => {
+  const stopDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault()
     if (!isDrawing) return
+    
     setIsDrawing(false)
     setHasSignature(true)
     
@@ -114,20 +159,26 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
   }
 
   return (
-    <div className="space-y-3">
+    <div ref={containerRef} className="space-y-3">
       <Label className="text-sm font-medium">{label}</Label>
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-white">
         <canvas
           ref={canvasRef}
-          className="border border-gray-200 rounded cursor-crosshair bg-white"
+          className="border border-gray-200 rounded cursor-crosshair bg-white w-full touch-none"
+          style={{ touchAction: 'none' }}
+          // Mouse events
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
           onMouseLeave={stopDrawing}
+          // Touch events - FIXED FOR MOBILE
+          onTouchStart={startDrawing}
+          onTouchMove={draw}
+          onTouchEnd={stopDrawing}
         />
-        <div className="flex justify-between items-center mt-3">
+        <div className="flex justify-between items-center mt-3 flex-wrap gap-2">
           <p className="text-xs text-gray-500">
-            Cliquez et glissez pour signer
+            Cliquez et glissez pour signer (ou utilisez votre doigt sur mobile)
           </p>
           <div className="flex gap-2">
             <Button
@@ -173,39 +224,38 @@ export default function EnhancedFieldReportForm() {
 
   const [formData, setFormData] = useState({
     missionId: '',
+    hoursWorked: '',
     generalObservations: '',
     clientFeedback: '',
     issuesEncountered: '',
     materialsUsed: '',
-    hoursWorked: '',
     additionalNotes: ''
   })
 
   useEffect(() => {
-    const fetchCompletedMissions = async () => {
-      try {
-        const response = await fetch('/api/missions?status=COMPLETED')
-        if (!response.ok) throw new Error('Failed to fetch missions')
-        const data = await response.json()
-        setMissions(data.filter((m: any) => !m.fieldReport))
-      } catch (error) {
-        toast.error('Impossible de charger les missions')
-      }
-    }
-
-    fetchCompletedMissions()
+    fetchMissions()
   }, [])
 
+  const fetchMissions = async () => {
+    try {
+      const response = await fetch('/api/missions?status=IN_PROGRESS,QUALITY_CHECK')
+      if (!response.ok) throw new Error('Failed to fetch missions')
+      const data = await response.json()
+      setMissions(data)
+    } catch (error) {
+      toast.error('Impossible de charger les missions')
+    }
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target
-    setFormData(prev => ({ ...prev, [id]: value }))
+    setFormData({ ...formData, [e.target.id]: e.target.value })
   }
 
-  const handleSelectChange = (id: keyof typeof formData, value: string) => {
-    setFormData(prev => ({ ...prev, [id]: value }))
+  const handleSelectChange = (field: string, value: string) => {
+    setFormData({ ...formData, [field]: value })
   }
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'before' | 'after') => {
     const files = Array.from(e.target.files || [])
     if (type === 'before') {
       setBeforePhotos(prev => [...prev, ...files])
@@ -325,7 +375,7 @@ export default function EnhancedFieldReportForm() {
   }
 
   return (
-    <div className="main-content space-y-6">
+    <div className="main-content space-y-6 pb-20">
       <div className="flex items-center gap-4">
         <Link href="/field-reports">
           <Button variant="outline" size="icon">
@@ -433,105 +483,82 @@ export default function EnhancedFieldReportForm() {
           </CardContent>
         </Card>
 
-        {/* Photos Section */}
+        {/* Photos */}
         <Card className="thread-card">
           <CardHeader>
-            <CardTitle>Photos Avant/Après</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Camera className="w-5 h-5" />
+              Photos de la Mission
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Before Photos */}
             <div>
-              <Label>Photos avant intervention</Label>
-              <div className="mt-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => handlePhotoChange(e, 'before')}
-                  className="hidden"
-                  id="before-photos"
-                />
-                <label
-                  htmlFor="before-photos"
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
-                >
-                  <Camera className="w-4 h-4 mr-2" />
-                  Ajouter des photos
-                </label>
+              <Label>Photos Avant</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                multiple
+                capture="environment"
+                onChange={(e) => handlePhotoUpload(e, 'before')}
+                className="mt-2"
+              />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                {beforePhotos.map((photo, index) => (
+                  <div key={index} className="relative">
+                    <img
+                      src={URL.createObjectURL(photo)}
+                      alt={`Before ${index + 1}`}
+                      className="w-full h-32 object-cover rounded"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1 right-1 h-6 w-6"
+                      onClick={() => removePhoto(index, 'before')}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
               </div>
-              
-              {beforePhotos.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  {beforePhotos.map((photo, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={URL.createObjectURL(photo)}
-                        alt={`Avant ${index + 1}`}
-                        className="w-full h-24 object-cover rounded border"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-1 right-1 h-6 w-6 p-0"
-                        onClick={() => removePhoto(index, 'before')}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
-            {/* After Photos */}
             <div>
-              <Label>Photos après intervention</Label>
-              <div className="mt-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => handlePhotoChange(e, 'after')}
-                  className="hidden"
-                  id="after-photos"
-                />
-                <label
-                  htmlFor="after-photos"
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
-                >
-                  <Camera className="w-4 h-4 mr-2" />
-                  Ajouter des photos
-                </label>
+              <Label>Photos Après</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                multiple
+                capture="environment"
+                onChange={(e) => handlePhotoUpload(e, 'after')}
+                className="mt-2"
+              />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                {afterPhotos.map((photo, index) => (
+                  <div key={index} className="relative">
+                    <img
+                      src={URL.createObjectURL(photo)}
+                      alt={`After ${index + 1}`}
+                      className="w-full h-32 object-cover rounded"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1 right-1 h-6 w-6"
+                      onClick={() => removePhoto(index, 'after')}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
               </div>
-              
-              {afterPhotos.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  {afterPhotos.map((photo, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={URL.createObjectURL(photo)}
-                        alt={`Après ${index + 1}`}
-                        className="w-full h-24 object-cover rounded border"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-1 right-1 h-6 w-6 p-0"
-                        onClick={() => removePhoto(index, 'after')}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Signatures Section */}
+        {/* Signatures - FULLY FIXED FOR MOBILE */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -583,7 +610,7 @@ export default function EnhancedFieldReportForm() {
         </Card>
 
         {/* Submit Section */}
-        <div className="flex justify-end gap-4">
+        <div className="flex justify-end gap-4 pb-6">
           <Button type="button" variant="outline" onClick={() => router.back()}>
             Annuler
           </Button>

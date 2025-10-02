@@ -1,3 +1,4 @@
+// app/api/missions/[id]/validate/route.ts - FIXED WITH CORRECT TYPES
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
@@ -52,7 +53,8 @@ export async function POST(
       include: {
         lead: true,
         teamLeader: true,
-        tasks: true
+        tasks: true,
+        quote: true
       }
     });
 
@@ -64,38 +66,44 @@ export async function POST(
       return new NextResponse('Mission not ready for validation', { status: 400 });
     }
 
+    // CRITICAL FIX: Determine proper status based on validation outcome
+    let newStatus: string;
     let updateData: any = {
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      adminValidatedBy: user.id,
+      adminValidatedAt: new Date(),
+      adminNotes: adminNotes || null,
+      qualityScore: qualityScore || null,
     };
 
     if (approved) {
+      // ✅ APPROVED: Mission is completed
+      newStatus = 'COMPLETED';
       updateData = {
         ...updateData,
-        status: 'COMPLETED',
+        status: newStatus,
         adminValidated: true,
-        adminValidatedBy: user.id,
-        adminValidatedAt: new Date(),
-        adminNotes: adminNotes || null,
-        qualityScore: qualityScore || null,
-        actualEndTime: mission.actualEndTime || new Date()
+        actualEndTime: mission.actualEndTime || new Date(),
+        issuesFound: null,
+        correctionRequired: false
       };
 
       console.log('✅ Mission approved by admin:', user.name);
 
     } else {
-      updateData = {
-        ...updateData,
-        status: correctionNeeded ? 'IN_PROGRESS' : 'QUALITY_CHECK',
-        adminValidated: false,
-        adminValidatedBy: user.id,
-        adminValidatedAt: new Date(),
-        adminNotes: adminNotes || null,
-        qualityScore: qualityScore || null,
-        issuesFound: issuesFound || null,
-        correctionRequired: correctionNeeded || false
-      };
-
+      // ❌ REJECTED
       if (correctionNeeded) {
+        // Send back to IN_PROGRESS for corrections
+        newStatus = 'IN_PROGRESS';
+        updateData = {
+          ...updateData,
+          status: newStatus,
+          adminValidated: false,
+          issuesFound: issuesFound || 'Corrections requises',
+          correctionRequired: true
+        };
+
+        // Reset tasks that need corrections
         await prisma.task.updateMany({
           where: { 
             missionId: missionId,
@@ -105,55 +113,101 @@ export async function POST(
             validatedAt: null
           }
         });
-      }
 
-      console.log('❌ Mission rejected by admin:', user.name);
+        console.log('🔄 Mission sent back for corrections:', user.name);
+
+      } else {
+        // FIXED: LITIGE - Mission stays in QUALITY_CHECK for dispute resolution
+        newStatus = 'QUALITY_CHECK';
+        updateData = {
+          ...updateData,
+          status: newStatus,
+          adminValidated: false,
+          issuesFound: issuesFound || 'Litige en cours de résolution',
+          correctionRequired: false
+        };
+
+        console.log('⚠️ Mission marked as LITIGE (stays in quality control):', user.name);
+      }
     }
 
+    // Update mission
     const updatedMission = await prisma.mission.update({
       where: { id: missionId },
       data: updateData,
       include: {
         lead: true,
         teamLeader: true,
-        tasks: true
+        tasks: true,
+        quote: true
       }
     });
 
+    // FIXED: Create activity log with correct ActivityType
     await prisma.activity.create({
       data: {
-        type: approved ? 'MISSION_COMPLETED' : 'QUALITY_ISSUE',
-        title: approved ? 'Mission validée par l\'administration' : 'Mission rejetée par l\'administration',
+        type: approved ? 'MISSION_COMPLETED' : 'MISSION_STATUS_UPDATED', // ✅ Valid enum values
+        title: approved 
+          ? 'Mission validée par l\'administration' 
+          : correctionNeeded 
+            ? 'Mission rejetée - Corrections requises'
+            : 'Mission en litige - Contrôle qualité',
         description: approved 
-          ? `Mission ${mission.missionNumber} approuvée avec score ${qualityScore}/5`
-          : `Mission ${mission.missionNumber} rejetée - ${issuesFound}`,
+          ? `Mission ${mission.missionNumber} approuvée${qualityScore ? ` avec score ${qualityScore}/5` : ''}`
+          : correctionNeeded
+            ? `Mission ${mission.missionNumber} retournée pour corrections - ${issuesFound || 'Problèmes détectés'}`
+            : `Mission ${mission.missionNumber} maintenue en contrôle qualité - Litige: ${issuesFound || 'Client non satisfait'}`,
         userId: user.id,
         leadId: mission.leadId,
+        metadata: {
+          missionId,
+          oldStatus: mission.status,
+          newStatus,
+          approved,
+          correctionNeeded,
+          qualityScore,
+          issuesFound
+        }
       },
     });
 
+    // Update lead status appropriately
     if (approved) {
       await prisma.lead.update({
         where: { id: mission.leadId },
         data: { 
-          status: 'COMPLETED'
+          status: 'COMPLETED',
+          updatedAt: new Date()
+        }
+      });
+    } else if (!correctionNeeded) {
+      // For litige cases, mark lead as in dispute
+      await prisma.lead.update({
+        where: { id: mission.leadId },
+        data: { 
+          status: 'IN_DISPUTE',
+          updatedAt: new Date()
         }
       });
     }
 
+    // Send real-time notification to team leader
     try {
       if (mission.teamLeader) {
         const notificationData = {
-          type: approved ? 'mission_approved' : 'mission_rejected',
+          type: approved ? 'mission_approved' : correctionNeeded ? 'mission_rejected' : 'mission_litige',
           missionId: mission.id,
           missionNumber: mission.missionNumber,
           message: approved 
             ? `Mission ${mission.missionNumber} approuvée avec succès!`
-            : `Mission ${mission.missionNumber} nécessite des corrections: ${issuesFound}`,
+            : correctionNeeded
+              ? `Mission ${mission.missionNumber} nécessite des corrections: ${issuesFound}`
+              : `Mission ${mission.missionNumber} en litige - Contrôle qualité en cours`,
           timestamp: new Date().toISOString(),
           approved,
-          ...(issuesFound && { issuesFound }),
-          ...(correctionNeeded && { correctionNeeded })
+          correctionNeeded,
+          issuesFound,
+          newStatus
         };
 
         const channelName = `user-${mission.teamLeader.id}`;
@@ -165,28 +219,35 @@ export async function POST(
       console.error('Failed to send real-time notification:', pushError);
     }
 
+    // Generate invoice only if approved and not already generated
     if (approved && !mission.invoiceGenerated) {
       try {
         await generateInvoiceForMission(missionId);
         console.log('📄 Invoice generated for approved mission');
       } catch (invoiceError) {
         console.error('Failed to generate invoice:', invoiceError);
+        // Don't fail the whole request if invoice generation fails
       }
     }
 
-    console.log(`✅ Mission validation completed: ${approved ? 'APPROVED' : 'REJECTED'}`);
+    console.log(`✅ Mission validation completed: ${approved ? 'APPROVED' : correctionNeeded ? 'CORRECTIONS NEEDED' : 'LITIGE'}`);
+    console.log(`   New status: ${newStatus}`);
 
     return NextResponse.json({
       success: true,
       mission: updatedMission,
       message: approved 
         ? 'Mission approuvée avec succès'
-        : 'Mission rejetée - Équipe notifiée'
+        : correctionNeeded
+          ? 'Mission rejetée - Équipe notifiée pour corrections'
+          : 'Mission maintenue en contrôle qualité - Litige en cours de résolution'
     });
 
   } catch (error) {
     console.error('❌ Mission validation error:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
@@ -205,14 +266,25 @@ async function generateInvoiceForMission(missionId: string) {
       throw new Error('Mission or quote not found for invoice generation');
     }
 
+    // Generate unique invoice number
+    const year = new Date().getFullYear();
+    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const invoiceNumber = `INV-${year}-${randomNum}`;
+
+    // FIXED: Proper TTC amount from quote
+    const amount = mission.quote.finalPrice;
+
+    // FIXED: Invoice schema doesn't have quoteId - use missionId only
     const invoice = await prisma.invoice.create({
       data: {
-        invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)}`,
+        invoiceNumber,
         missionId: mission.id,
         leadId: mission.leadId,
-        amount: mission.quote.finalPrice,
+        // quoteId removed - not in schema
+        amount: amount,
         status: 'SENT',
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        issueDate: new Date(),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
         description: `Prestation de nettoyage - Mission ${mission.missionNumber}`,
         createdAt: new Date()
       }
@@ -222,11 +294,12 @@ async function generateInvoiceForMission(missionId: string) {
       where: { id: missionId },
       data: { 
         invoiceGenerated: true,
-        invoiceId: invoice.id
+        invoiceId: invoice.id,
+        updatedAt: new Date()
       }
     });
 
-    console.log('✅ Invoice created:', invoice.invoiceNumber);
+    console.log('✅ Invoice created:', invoiceNumber, '- Amount:', amount);
     return invoice;
 
   } catch (error) {
