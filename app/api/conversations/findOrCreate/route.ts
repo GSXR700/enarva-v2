@@ -1,41 +1,55 @@
-// app/api/conversations/findOrCreate/route.ts
+// app/api/conversations/findOrCreate/route.ts - COMPLETE FIXED VERSION
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-// POST /api/conversations/findOrCreate - Find or create a conversation
 export async function POST(request: Request) {
   try {
     const { currentUserId, otherUserId, missionId } = await request.json()
 
-    if (!currentUserId || !otherUserId || !missionId) {
-      return new NextResponse('Identifiants utilisateurs ou mission manquants', { status: 400 })
+    if (!currentUserId || !otherUserId) {
+      return new NextResponse('Current user ID and other user ID are required', { status: 400 })
     }
 
-    // Ensure IDs are strings
+    // Validate user IDs are strings
     const validatedCurrentUserId = String(currentUserId)
     const validatedOtherUserId = String(otherUserId)
-    const validatedMissionId = String(missionId)
+    const validatedMissionId = missionId ? String(missionId) : null
 
-    // Define the type for conversation to match Prisma's include structure
+    // ✅ FIXED: Type definition with missionId as nullable
     type ConversationWithDetails = {
       id: string
-      missionId: string
+      missionId: string | null  // ✅ Changed from string to string | null
       isActive: boolean
       createdAt: Date
       updatedAt: Date
-      participants: { id: string; name: string | null; email: string | null }[]
-      messages: { id: string; content: string; createdAt: Date; senderId: string; isRead: boolean }[]
+      participants: { 
+        id: string
+        name: string | null
+        email: string | null
+        image: string | null
+        role: string 
+      }[]
+      messages: { 
+        id: string
+        content: string
+        createdAt: Date
+        senderId: string
+        isRead: boolean 
+      }[]
     } | null
 
-    // 1. Check for existing conversation between the two users
+    // 1. Search for existing conversation between these two users
     let conversation: ConversationWithDetails = await prisma.conversation.findFirst({
       where: {
         AND: [
           { participants: { some: { id: validatedCurrentUserId } } },
           { participants: { some: { id: validatedOtherUserId } } },
-          { missionId: validatedMissionId },
+          // If missionId provided, match it; otherwise match conversations without missions
+          validatedMissionId 
+            ? { missionId: validatedMissionId }
+            : { missionId: null }
         ],
       },
       include: {
@@ -44,6 +58,8 @@ export async function POST(request: Request) {
             id: true,
             name: true,
             email: true,
+            image: true,
+            role: true,
           },
         },
         messages: {
@@ -60,26 +76,33 @@ export async function POST(request: Request) {
       },
     })
 
-    // 2. If no conversation exists, create a new one
+    // 2. If no conversation exists, create one
     if (!conversation) {
-      conversation = await prisma.conversation.create({
-        data: {
-          participants: {
-            connect: [
-              { id: validatedCurrentUserId },
-              { id: validatedOtherUserId },
-            ],
-          },
-          mission: { connect: { id: validatedMissionId } },
-          messages: { create: [] }, // Initialize empty messages array
-          isActive: true,
+      const createData: any = {
+        participants: {
+          connect: [
+            { id: validatedCurrentUserId },
+            { id: validatedOtherUserId },
+          ],
         },
+        isActive: true,
+      }
+
+      // Only connect mission if missionId is provided
+      if (validatedMissionId) {
+        createData.mission = { connect: { id: validatedMissionId } }
+      }
+
+      conversation = await prisma.conversation.create({
+        data: createData,
         include: {
           participants: {
             select: {
               id: true,
               name: true,
               email: true,
+              image: true,
+              role: true,
             },
           },
           messages: {
@@ -98,8 +121,8 @@ export async function POST(request: Request) {
     return NextResponse.json(conversation)
 
   } catch (error) {
-    console.error('Erreur findOrCreate conversation:', error)
-    return new NextResponse('Erreur interne du serveur', { status: 500 })
+    console.error('Error in findOrCreate conversation:', error)
+    return new NextResponse('Internal Server Error', { status: 500 })
   } finally {
     await prisma.$disconnect()
   }

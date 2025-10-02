@@ -267,8 +267,8 @@ model Task {
 // EXPLANATION: A dedicated chat/conversation thread for a specific Mission.
 model Conversation {
   id           String    @id @default(cuid())
-  missionId    String    @unique
-  mission      Mission   @relation(fields: [missionId], references: [id])
+  missionId    String?   @unique  // ✅ NOW OPTIONAL - allows general user-to-user chat
+  mission      Mission?  @relation(fields: [missionId], references: [id])
   participants User[]    @relation("ConversationParticipants")
   messages     Message[]
   isActive     Boolean   @default(true)
