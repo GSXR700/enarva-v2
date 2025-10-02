@@ -20,7 +20,7 @@ interface QualityIssue {
   description: string
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
   location: string
-  photo?: string | undefined  // Make this explicitly optional with undefined
+  photo?: string
 }
 
 interface QualityCorrection {
@@ -64,11 +64,30 @@ export default function NewQualityCheckPage() {
 
   const fetchMissions = async () => {
     try {
-      const response = await fetch('/api/missions/pending-quality-checks')
+      // ✅ FIXED: Fetch ALL missions instead of only pending quality checks
+      const response = await fetch('/api/missions?limit=1000')
       if (!response.ok) throw new Error('Failed to fetch missions')
+      
       const data = await response.json()
-      setMissions(data)
+      
+      // Handle different API response formats
+      let missionsData: MissionWithLead[] = []
+      if (Array.isArray(data)) {
+        missionsData = data
+      } else if (data.missions && Array.isArray(data.missions)) {
+        missionsData = data.missions
+      } else if (data.data && Array.isArray(data.data)) {
+        missionsData = data.data
+      }
+      
+      // Sort missions by most recent first
+      const sortedMissions = missionsData.sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      })
+      
+      setMissions(sortedMissions)
     } catch (error) {
+      console.error('Error fetching missions:', error)
       toast.error('Impossible de charger les missions')
     }
   }
@@ -95,7 +114,6 @@ export default function NewQualityCheckPage() {
       description: '',
       severity: 'LOW',
       location: ''
-      // Remove the photo: undefined line
     }])
   }
 
@@ -129,43 +147,24 @@ export default function NewQualityCheckPage() {
     setCorrections(prev => prev.filter((_, i) => i !== index))
   }
 
-  const uploadPhotos = async (photos: File[]): Promise<string[]> => {
-    const uploadPromises = photos.map(async (photo) => {
-      const formData = new FormData()
-      formData.append('file', photo)
-      
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      })
-      
-      if (!response.ok) throw new Error('Upload failed')
-      const result = await response.json()
-      return result.url
-    })
-
-    return await Promise.all(uploadPromises)
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
     if (!formData.missionId) {
       toast.error('Veuillez sélectionner une mission')
       return
     }
+
     setIsLoading(true)
 
     try {
-      // Upload photos
-      const photosUrls = photos.length > 0 ? await uploadPhotos(photos) : []
-
       const checkData = {
         missionId: formData.missionId,
         type: formData.type,
         status: formData.status,
         score: formData.score ? parseInt(formData.score) : null,
         notes: formData.notes || null,
-        photos: photosUrls.length > 0 ? photosUrls : null,
+        photos: photos.map(f => f.name),
         issues: issues.length > 0 ? issues : null,
         corrections: corrections.length > 0 ? corrections : null
       }
@@ -252,7 +251,7 @@ export default function NewQualityCheckPage() {
                 <SelectContent>
                   {missions.map((mission) => (
                     <SelectItem key={mission.id} value={mission.id}>
-                      {mission.missionNumber} - {mission.lead.firstName} {mission.lead.lastName}
+                      {mission.missionNumber} - {mission.lead.firstName} {mission.lead.lastName} - {mission.status}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -313,14 +312,14 @@ export default function NewQualityCheckPage() {
               value={formData.notes}
               onChange={(e) => handleInputChange('notes', e.target.value)}
               placeholder="Observations générales, points positifs, recommandations..."
-              className="min-h-32"
+              rows={4}
             />
           </CardContent>
         </Card>
 
         <Card className="thread-card">
           <CardHeader>
-            <CardTitle>Photos du contrôle</CardTitle>
+            <CardTitle>Photos</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Input
@@ -329,7 +328,6 @@ export default function NewQualityCheckPage() {
               multiple
               onChange={handlePhotoChange}
             />
-            
             {photos.length > 0 && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {photos.map((photo, index) => (
@@ -337,16 +335,16 @@ export default function NewQualityCheckPage() {
                     <img
                       src={URL.createObjectURL(photo)}
                       alt={`Photo ${index + 1}`}
-                      className="w-full h-24 object-cover rounded"
+                      className="w-full h-32 object-cover rounded"
                     />
                     <Button
                       type="button"
                       variant="destructive"
-                      size="sm"
-                      className="absolute top-1 right-1 h-6 w-6 p-0"
+                      size="icon"
+                      className="absolute top-2 right-2"
                       onClick={() => removePhoto(index)}
                     >
-                      <X className="h-3 w-3" />
+                      <X className="w-4 h-4" />
                     </Button>
                   </div>
                 ))}
@@ -355,49 +353,35 @@ export default function NewQualityCheckPage() {
           </CardContent>
         </Card>
 
-        {issues.length > 0 && (
-          <Card className="thread-card">
-            <CardHeader>
+        <Card className="thread-card">
+          <CardHeader>
+            <div className="flex items-center justify-between">
               <CardTitle>Problèmes identifiés</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {issues.map((issue, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-medium">Problème #{index + 1}</h4>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeIssue(index)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <Label>Description</Label>
-                      <Textarea
-                        value={issue.description}
-                        onChange={(e) => updateIssue(index, 'description', e.target.value)}
-                        placeholder="Décrivez le problème..."
-                      />
-                    </div>
-                    <div>
-                      <Label>Localisation</Label>
-                      <Input
-                        value={issue.location}
-                        onChange={(e) => updateIssue(index, 'location', e.target.value)}
-                        placeholder="Ex: Cuisine, Salle de bain..."
-                      />
-                    </div>
-                  </div>
-                  
+              <Button type="button" variant="outline" size="sm" onClick={addIssue}>
+                <Plus className="w-4 h-4 mr-2" />
+                Ajouter un problème
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {issues.map((issue, index) => (
+              <div key={index} className="p-4 border rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium">Problème #{index + 1}</h4>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeIssue(index)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <Label>Gravité</Label>
-                    <Select 
-                      value={issue.severity} 
+                    <Label>Sévérité</Label>
+                    <Select
+                      value={issue.severity}
                       onValueChange={(value) => updateIssue(index, 'severity', value)}
                     >
                       <SelectTrigger>
@@ -405,111 +389,101 @@ export default function NewQualityCheckPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="LOW">Faible</SelectItem>
-                        <SelectItem value="MEDIUM">Moyenne</SelectItem>
-                        <SelectItem value="HIGH">Élevée</SelectItem>
+                        <SelectItem value="MEDIUM">Moyen</SelectItem>
+                        <SelectItem value="HIGH">Élevé</SelectItem>
                         <SelectItem value="CRITICAL">Critique</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <Label>Localisation</Label>
+                    <Input
+                      value={issue.location}
+                      onChange={(e) => updateIssue(index, 'location', e.target.value)}
+                      placeholder="Ex: Salle de bain, Cuisine..."
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label>Description</Label>
+                    <Textarea
+                      value={issue.description}
+                      onChange={(e) => updateIssue(index, 'description', e.target.value)}
+                      placeholder="Décrivez le problème..."
+                      rows={2}
+                    />
+                  </div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" onClick={addIssue}>
-            <Plus className="w-4 h-4 mr-2" />
-            Ajouter un problème
-          </Button>
-          
-          {issues.length > 0 && (
-            <Button type="button" variant="outline" onClick={addCorrection}>
-              <Plus className="w-4 h-4 mr-2" />
-              Ajouter une correction
-            </Button>
-          )}
-        </div>
-
-        {corrections.length > 0 && (
-          <Card className="thread-card">
-            <CardHeader>
+        <Card className="thread-card">
+          <CardHeader>
+            <div className="flex items-center justify-between">
               <CardTitle>Actions correctives</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {corrections.map((correction, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-medium">Correction #{index + 1}</h4>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeCorrection(index)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+              <Button type="button" variant="outline" size="sm" onClick={addCorrection}>
+                <Plus className="w-4 h-4 mr-2" />
+                Ajouter une action
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {corrections.map((correction, index) => (
+              <div key={index} className="p-4 border rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium">Action #{index + 1}</h4>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeCorrection(index)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Date limite</Label>
+                    <Input
+                      type="date"
+                      value={correction.deadline}
+                      onChange={(e) => updateCorrection(index, 'deadline', e.target.value)}
+                    />
                   </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <Label>Action à effectuer</Label>
-                      <Textarea
-                        value={correction.action}
-                        onChange={(e) => updateCorrection(index, 'action', e.target.value)}
-                        placeholder="Action corrective à mettre en place..."
-                      />
-                    </div>
-                    <div>
-                      <Label>Assigné à</Label>
-                      <Input
-                        value={correction.assignedTo}
-                        onChange={(e) => updateCorrection(index, 'assignedTo', e.target.value)}
-                        placeholder="Nom de la personne responsable"
-                      />
-                    </div>
+                  <div>
+                    <Label>Assigné à</Label>
+                    <Input
+                      value={correction.assignedTo}
+                      onChange={(e) => updateCorrection(index, 'assignedTo', e.target.value)}
+                      placeholder="Nom de la personne"
+                    />
                   </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label>Date limite</Label>
-                      <Input
-                        type="date"
-                        value={correction.deadline}
-                        onChange={(e) => updateCorrection(index, 'deadline', e.target.value)}
-                      />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`completed-${index}`}
-                        checked={correction.completed}
-                        onChange={(e) => updateCorrection(index, 'completed', e.target.checked)}
-                        className="rounded"
-                      />
-                      <Label htmlFor={`completed-${index}`}>Terminé</Label>
-                    </div>
+                  <div className="md:col-span-2">
+                    <Label>Action à réaliser</Label>
+                    <Textarea
+                      value={correction.action}
+                      onChange={(e) => updateCorrection(index, 'action', e.target.value)}
+                      placeholder="Décrivez l'action corrective..."
+                      rows={2}
+                    />
                   </div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
 
-        <div className="flex items-center gap-4 pt-4">
-          <Button 
-            type="submit" 
-            disabled={isLoading}
-            className="bg-enarva-gradient"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            {isLoading ? 'Création...' : 'Créer le contrôle'}
-          </Button>
+        <div className="flex items-center justify-end gap-3">
           <Link href="/quality-checks">
             <Button type="button" variant="outline">
               Annuler
             </Button>
           </Link>
+          <Button type="submit" disabled={isLoading}>
+            <Save className="w-4 h-4 mr-2" />
+            {isLoading ? 'Enregistrement...' : 'Créer le contrôle'}
+          </Button>
         </div>
       </form>
     </div>
