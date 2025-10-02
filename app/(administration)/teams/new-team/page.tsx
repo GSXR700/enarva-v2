@@ -60,12 +60,14 @@ export default function NewTeamPage() {
       try {
         const response = await fetch('/api/users');
         if (response.ok) {
-          const users = await response.json();
+          const data = await response.json();
+          const users = Array.isArray(data) ? data : (data.users || []);
           setAvailableUsers(users);
         }
       } catch (error) {
         console.error('Error fetching users:', error);
         toast.error('Erreur lors du chargement des utilisateurs');
+        setAvailableUsers([]);
       }
     };
 
@@ -147,20 +149,21 @@ export default function NewTeamPage() {
     }
   };
 
-  // Group users by role for better organization
-  const usersByRole = availableUsers.reduce((acc, user) => {
-    const role = user.role;
-    if (!acc[role]) {
-      acc[role] = [];
-    }
-    // TypeScript is now certain acc[role] is an array
-    acc[role].push(user);
-    return acc;
-  }, {} as Record<string, User[]>);
+  // Group users by role for better organization - FIXED: Added defensive check
+  const usersByRole = Array.isArray(availableUsers) && availableUsers.length > 0
+    ? availableUsers.reduce((acc, user) => {
+        const role = user.role;
+        if (!acc[role]) {
+          acc[role] = [];
+        }
+        acc[role].push(user);
+        return acc;
+      }, {} as Record<string, User[]>)
+    : {};
 
   // Role order for display
   const roleOrder = ['TEAM_LEADER', 'MANAGER', 'AGENT', 'TECHNICIAN', 'ADMIN'];
-  const sortedRoles = roleOrder.filter(role => usersByRole[role]);
+  const sortedRoles = roleOrder.filter(role => usersByRole[role] && usersByRole[role].length > 0);
 
   return (
     <div className="main-content space-y-6">
@@ -251,7 +254,7 @@ export default function NewTeamPage() {
               <div className="space-y-6">
                 {sortedRoles.map((role) => {
                   const usersInRole = usersByRole[role];
-                  if (!usersInRole) return null; // Safety check
+                  if (!usersInRole || usersInRole.length === 0) return null;
 
                   return (
                     <div key={role} className="space-y-3">
