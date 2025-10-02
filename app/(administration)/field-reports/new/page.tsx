@@ -1,4 +1,4 @@
-// app/(administration)/field-reports/new/page.tsx - FIXED MOBILE SIGNATURES
+// app/(administration)/field-reports/new/page.tsx - ENHANCED WITH INVENTORY SELECTOR
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react'
@@ -11,9 +11,12 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Camera, Save, Trash2, PenTool, RotateCcw, Check } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { ArrowLeft, Camera, Save, Trash2, PenTool, RotateCcw, Check, Plus, Minus, Package, Search, X, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
+// ========== SIGNATURE PAD COMPONENT (UNCHANGED) ==========
 interface SignaturePadProps {
   onSignature: (signature: string) => void
   label: string
@@ -33,34 +36,28 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // FIXED: Responsive canvas sizing
     const updateCanvasSize = () => {
       const container = containerRef.current
       if (!container) return
 
-      const containerWidth = container.clientWidth - 32 // Account for padding
+      const containerWidth = container.clientWidth - 32
       const width = Math.min(containerWidth, 600)
       const height = 200
 
-      // Set actual canvas size
       canvas.width = width
       canvas.height = height
 
-      // Set display size
       canvas.style.width = `${width}px`
       canvas.style.height = `${height}px`
 
-      // Redraw background
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      // Set drawing styles
       ctx.strokeStyle = '#000000'
       ctx.lineWidth = 2
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
 
-      // Load existing signature if provided
       if (existingSignature && hasSignature) {
         const img = new Image()
         img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
@@ -70,12 +67,10 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
 
     updateCanvasSize()
 
-    // Handle window resize
     window.addEventListener('resize', updateCanvasSize)
     return () => window.removeEventListener('resize', updateCanvasSize)
   }, [existingSignature, hasSignature])
 
-  // FIXED: Universal coordinate getter with proper type safety
   const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
     if (!canvas) return { x: 0, y: 0 }
@@ -83,7 +78,6 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
     const rect = canvas.getBoundingClientRect()
     
     if ('touches' in e) {
-      // Touch event - FIXED: Proper null check
       const touch = e.touches[0] || e.changedTouches[0]
       if (!touch) return { x: 0, y: 0 }
       
@@ -92,7 +86,6 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
         y: touch.clientY - rect.top
       }
     } else {
-      // Mouse event
       return {
         x: e.clientX - rect.left,
         y: e.clientY - rect.top
@@ -101,7 +94,7 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
   }
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault() // CRITICAL: Prevent scrolling on touch
+    e.preventDefault()
     setIsDrawing(true)
     
     const canvas = canvasRef.current
@@ -116,7 +109,7 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
   }
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault() // CRITICAL: Prevent scrolling on touch
+    e.preventDefault()
     if (!isDrawing) return
 
     const canvas = canvasRef.current
@@ -140,7 +133,6 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
     const canvas = canvasRef.current
     if (!canvas) return
 
-    // Convert to base64 and notify parent
     const signatureData = canvas.toDataURL('image/png')
     onSignature(signatureData)
   }
@@ -166,12 +158,10 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
           ref={canvasRef}
           className="border border-gray-200 rounded cursor-crosshair bg-white w-full touch-none"
           style={{ touchAction: 'none' }}
-          // Mouse events
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
           onMouseLeave={stopDrawing}
-          // Touch events - FIXED FOR MOBILE
           onTouchStart={startDrawing}
           onTouchMove={draw}
           onTouchEnd={stopDrawing}
@@ -204,6 +194,270 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSignature, label, existin
   )
 }
 
+// ========== INVENTORY SELECTOR COMPONENT (NEW) ==========
+interface InventoryItem {
+  id: string
+  name: string
+  category: string
+  unit: string
+  currentStock: number | string
+}
+
+interface SelectedMaterial {
+  itemId: string
+  name: string
+  quantity: number
+  unit: string
+}
+
+interface InventorySelectorProps {
+  selectedMaterials: SelectedMaterial[]
+  onMaterialsChange: (materials: SelectedMaterial[]) => void
+}
+
+const InventorySelector: React.FC<InventorySelectorProps> = ({ selectedMaterials, onMaterialsChange }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [inventory, setInventory] = useState<InventoryItem[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [isLoading, setIsLoading] = useState(false)
+
+  const categoryTranslations: Record<string, string> = {
+    'CLEANING_PRODUCTS': 'Produits',
+    'EQUIPMENT': 'Équipement',
+    'CONSUMABLES': 'Consommables',
+    'PROTECTIVE_GEAR': 'Protection'
+  }
+
+  const categoryColors: Record<string, string> = {
+    'CLEANING_PRODUCTS': 'bg-blue-100 text-blue-800',
+    'EQUIPMENT': 'bg-purple-100 text-purple-800',
+    'CONSUMABLES': 'bg-green-100 text-green-800',
+    'PROTECTIVE_GEAR': 'bg-orange-100 text-orange-800'
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchInventory()
+    }
+  }, [isOpen])
+
+  const fetchInventory = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/inventory')
+      if (!response.ok) throw new Error('Failed to fetch inventory')
+      const data = await response.json()
+      const items = Array.isArray(data) ? data : (data.items || [])
+      setInventory(items.filter((item: InventoryItem) => Number(item.currentStock) > 0))
+    } catch (error) {
+      toast.error('Erreur lors du chargement de l\'inventaire')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const filteredInventory = inventory.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter
+    return matchesSearch && matchesCategory
+  })
+
+  const addMaterial = (item: InventoryItem) => {
+    const existing = selectedMaterials.find(m => m.itemId === item.id)
+    if (existing) {
+      toast.info('Cet article est déjà ajouté')
+      return
+    }
+    
+    const newMaterial: SelectedMaterial = {
+      itemId: item.id,
+      name: item.name,
+      quantity: 1,
+      unit: item.unit
+    }
+    
+    onMaterialsChange([...selectedMaterials, newMaterial])
+    toast.success(`${item.name} ajouté`)
+  }
+
+  const updateQuantity = (itemId: string, change: number) => {
+    const updated = selectedMaterials.map(m => {
+      if (m.itemId === itemId) {
+        const newQty = Math.max(0, m.quantity + change)
+        return { ...m, quantity: newQty }
+      }
+      return m
+    }).filter(m => m.quantity > 0)
+    
+    onMaterialsChange(updated)
+  }
+
+  const removeMaterial = (itemId: string) => {
+    onMaterialsChange(selectedMaterials.filter(m => m.itemId !== itemId))
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium">Matériaux et Équipements Utilisés</Label>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <DialogTrigger asChild>
+            <Button type="button" variant="outline" size="sm" className="gap-2">
+              <Plus className="w-4 h-4" />
+              Ajouter
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[85vh] p-0">
+            <DialogHeader className="p-6 pb-4">
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                Sélectionner depuis l'Inventaire
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="px-6 space-y-4">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Rechercher un article..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              {/* Category Filter */}
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                <Button
+                  type="button"
+                  variant={categoryFilter === 'all' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCategoryFilter('all')}
+                >
+                  Tous
+                </Button>
+                {Object.entries(categoryTranslations).map(([key, label]) => (
+                  <Button
+                    key={key}
+                    type="button"
+                    variant={categoryFilter === key ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setCategoryFilter(key)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Inventory List */}
+            <ScrollArea className="h-[400px] px-6">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : filteredInventory.length === 0 ? (
+                <div className="text-center py-12">
+                  <Package className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                  <p className="text-gray-500">Aucun article disponible</p>
+                </div>
+              ) : (
+                <div className="grid gap-3 pb-6">
+                  {filteredInventory.map(item => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:border-primary/50 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-medium truncate">{item.name}</h4>
+                          <Badge variant="outline" className={categoryColors[item.category]}>
+                            {categoryTranslations[item.category]}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          Stock: {item.currentStock} {item.unit}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => addMaterial(item)}
+                        disabled={selectedMaterials.some(m => m.itemId === item.id)}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+
+            <div className="p-6 pt-4 border-t">
+              <Button type="button" onClick={() => setIsOpen(false)} className="w-full">
+                Fermer
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Selected Materials */}
+      {selectedMaterials.length === 0 ? (
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+          <Package className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+          <p className="text-sm text-gray-500">Aucun matériel sélectionné</p>
+          <p className="text-xs text-gray-400 mt-1">Cliquez sur "Ajouter" pour sélectionner depuis l'inventaire</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {selectedMaterials.map(material => (
+            <div key={material.itemId} className="flex items-center gap-3 p-3 border rounded-lg bg-white">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{material.name}</p>
+                <p className="text-xs text-gray-500">{material.unit}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  onClick={() => updateQuantity(material.itemId, -1)}
+                >
+                  <Minus className="w-3 h-3" />
+                </Button>
+                <span className="w-12 text-center font-medium">{material.quantity}</span>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  onClick={() => updateQuantity(material.itemId, 1)}
+                >
+                  <Plus className="w-3 h-3" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 text-red-600"
+                  onClick={() => removeMaterial(material.itemId)}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ========== MAIN COMPONENT ==========
 interface Mission {
   id: string
   missionNumber: string
@@ -221,6 +475,7 @@ export default function EnhancedFieldReportForm() {
   const [afterPhotos, setAfterPhotos] = useState<File[]>([])
   const [clientSignature, setClientSignature] = useState('')
   const [teamLeadSignature, setTeamLeadSignature] = useState('')
+  const [selectedMaterials, setSelectedMaterials] = useState<SelectedMaterial[]>([])
 
   const [formData, setFormData] = useState({
     missionId: '',
@@ -228,7 +483,6 @@ export default function EnhancedFieldReportForm() {
     generalObservations: '',
     clientFeedback: '',
     issuesEncountered: '',
-    materialsUsed: '',
     additionalNotes: ''
   })
 
@@ -241,7 +495,8 @@ export default function EnhancedFieldReportForm() {
       const response = await fetch('/api/missions?status=IN_PROGRESS,QUALITY_CHECK')
       if (!response.ok) throw new Error('Failed to fetch missions')
       const data = await response.json()
-      setMissions(data)
+      const missions = Array.isArray(data) ? data : (data.missions || [])
+      setMissions(missions)
     } catch (error) {
       toast.error('Impossible de charger les missions')
     }
@@ -293,7 +548,6 @@ export default function EnhancedFieldReportForm() {
   const uploadSignature = async (signatureData: string): Promise<string> => {
     if (!signatureData) return ''
     
-    // Convert base64 to blob
     const response = await fetch(signatureData)
     const blob = await response.blob()
     
@@ -338,18 +592,22 @@ export default function EnhancedFieldReportForm() {
     setIsLoading(true)
 
     try {
-      // Upload photos
       const beforePhotosUrls = beforePhotos.length > 0 ? await uploadPhotos(beforePhotos) : []
       const afterPhotosUrls = afterPhotos.length > 0 ? await uploadPhotos(afterPhotos) : []
       
-      // Upload signatures
       const clientSignatureUrl = await uploadSignature(clientSignature)
       const teamLeadSignatureUrl = await uploadSignature(teamLeadSignature)
+
+      // Convert selected materials to JSON format
+      const materialsUsed = selectedMaterials.reduce((acc, material) => {
+        acc[material.name] = `${material.quantity} ${material.unit}`
+        return acc
+      }, {} as Record<string, string>)
 
       const reportData = {
         ...formData,
         hoursWorked: parseFloat(formData.hoursWorked),
-        materialsUsed: formData.materialsUsed ? JSON.parse(formData.materialsUsed) : null,
+        materialsUsed: Object.keys(materialsUsed).length > 0 ? materialsUsed : null,
         beforePhotos: beforePhotosUrls,
         afterPhotos: afterPhotosUrls,
         clientSignatureUrl,
@@ -372,6 +630,10 @@ export default function EnhancedFieldReportForm() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const triggerFileInput = (inputId: string) => {
+    document.getElementById(inputId)?.click()
   }
 
   return (
@@ -448,19 +710,11 @@ export default function EnhancedFieldReportForm() {
               />
             </div>
 
-            <div>
-              <Label htmlFor="materialsUsed">Matériaux utilisés (JSON)</Label>
-              <Textarea
-                id="materialsUsed"
-                value={formData.materialsUsed}
-                onChange={handleChange}
-                placeholder='{"produit_vitres": "5L", "chiffons_microfibre": "10 unités"}'
-                rows={3}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Format JSON pour les matériaux utilisés
-              </p>
-            </div>
+            {/* ENHANCED: Inventory Selector instead of JSON */}
+            <InventorySelector
+              selectedMaterials={selectedMaterials}
+              onMaterialsChange={setSelectedMaterials}
+            />
           </CardContent>
         </Card>
 
@@ -483,7 +737,7 @@ export default function EnhancedFieldReportForm() {
           </CardContent>
         </Card>
 
-        {/* Photos */}
+        {/* ENHANCED: Photos Section */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -492,73 +746,127 @@ export default function EnhancedFieldReportForm() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Before Photos */}
             <div>
-              <Label>Photos Avant</Label>
-              <Input
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-base font-semibold">Photos Avant</Label>
+                <Badge variant="outline">{beforePhotos.length}</Badge>
+              </div>
+              
+              <input
+                id="before-photos-input"
                 type="file"
                 accept="image/*"
                 multiple
                 capture="environment"
                 onChange={(e) => handlePhotoUpload(e, 'before')}
-                className="mt-2"
+                className="hidden"
               />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                {beforePhotos.map((photo, index) => (
-                  <div key={index} className="relative">
-                    <img
-                      src={URL.createObjectURL(photo)}
-                      alt={`Before ${index + 1}`}
-                      className="w-full h-32 object-cover rounded"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6"
-                      onClick={() => removePhoto(index, 'before')}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+              
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-24 border-2 border-dashed hover:border-primary/50 transition-colors"
+                onClick={() => triggerFileInput('before-photos-input')}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <Camera className="w-8 h-8 text-gray-400" />
+                  <span className="text-sm font-medium">Prendre ou Ajouter des Photos</span>
+                  <span className="text-xs text-gray-500">Avant le travail</span>
+                </div>
+              </Button>
+              
+              {beforePhotos.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                  {beforePhotos.map((photo, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={URL.createObjectURL(photo)}
+                        alt={`Avant ${index + 1}`}
+                        className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => removePhoto(index, 'before')}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <Badge className="absolute top-2 left-2 bg-blue-600 text-white">
+                        {index + 1}
+                      </Badge>
+                      </div>
+                  ))}
+                </div>
+              )}
             </div>
 
+            {/* After Photos */}
             <div>
-              <Label>Photos Après</Label>
-              <Input
+              <div className="flex items-center justify-between mb-3">
+                <Label className="text-base font-semibold">Photos Après</Label>
+                <Badge variant="outline">{afterPhotos.length}</Badge>
+              </div>
+              
+              <input
+                id="after-photos-input"
                 type="file"
                 accept="image/*"
                 multiple
                 capture="environment"
                 onChange={(e) => handlePhotoUpload(e, 'after')}
-                className="mt-2"
+                className="hidden"
               />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                {afterPhotos.map((photo, index) => (
-                  <div key={index} className="relative">
-                    <img
-                      src={URL.createObjectURL(photo)}
-                      alt={`After ${index + 1}`}
-                      className="w-full h-32 object-cover rounded"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6"
-                      onClick={() => removePhoto(index, 'after')}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+              
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-24 border-2 border-dashed hover:border-primary/50 transition-colors"
+                onClick={() => triggerFileInput('after-photos-input')}
+              >
+                <div className="flex flex-col items-center gap-2">
+                  <ImageIcon className="w-8 h-8 text-gray-400" />
+                  <span className="text-sm font-medium">Prendre ou Ajouter des Photos</span>
+                  <span className="text-xs text-gray-500">Après le travail</span>
+                </div>
+              </Button>
+              
+              {afterPhotos.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                  {afterPhotos.map((photo, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={URL.createObjectURL(photo)}
+                        alt={`Après ${index + 1}`}
+                        className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => removePhoto(index, 'after')}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <Badge className="absolute top-2 left-2 bg-green-600 text-white">
+                        {index + 1}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Signatures - FULLY FIXED FOR MOBILE */}
+        {/* Signatures - UNCHANGED (PERFECT) */}
         <Card className="thread-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
