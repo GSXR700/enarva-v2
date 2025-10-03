@@ -1174,17 +1174,24 @@ const NewQuoteForm = () => {
                 <div>
                   <Label className="text-sm">Catégorie de Produit</Label>
                   <Select value={productCategory} onValueChange={setProductCategory}>
-                    <SelectTrigger className="text-sm">
-                      <SelectValue placeholder="Sélectionner une catégorie" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="EQUIPEMENT" className="text-sm">Équipement de nettoyage</SelectItem>
-                      <SelectItem value="PRODUIT_CHIMIQUE" className="text-sm">Produits chimiques</SelectItem>
-                      <SelectItem value="ACCESSOIRE" className="text-sm">Accessoires</SelectItem>
-                      <SelectItem value="CONSOMMABLE" className="text-sm">Consommables</SelectItem>
-                      <SelectItem value="AUTRE" className="text-sm">Autre</SelectItem>
-                    </SelectContent>
-                  </Select>
+  <SelectTrigger className="text-sm">
+    <SelectValue placeholder="Sélectionner une catégorie" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="EQUIPMENT" className="text-sm">Équipement</SelectItem>
+    <SelectItem value="CONSUMABLES" className="text-sm">Consommables</SelectItem>
+    <SelectItem value="FURNITURE" className="text-sm">Mobilier</SelectItem>
+    <SelectItem value="ELECTRONICS" className="text-sm">Électronique</SelectItem>
+    <SelectItem value="DECORATION" className="text-sm">Décoration</SelectItem>
+    <SelectItem value="TEXTILES" className="text-sm">Textiles</SelectItem>
+    <SelectItem value="LIGHTING" className="text-sm">Éclairage</SelectItem>
+    <SelectItem value="STORAGE" className="text-sm">Rangement</SelectItem>
+    <SelectItem value="KITCHEN_ITEMS" className="text-sm">Articles de cuisine</SelectItem>
+    <SelectItem value="BATHROOM_ITEMS" className="text-sm">Articles de salle de bain</SelectItem>
+    <SelectItem value="OFFICE_SUPPLIES" className="text-sm">Fournitures de bureau</SelectItem>
+    <SelectItem value="OTHER" className="text-sm">Autre</SelectItem>
+  </SelectContent>
+</Select>
                 </div>
 
                 <div className="space-y-3">
@@ -1347,17 +1354,17 @@ const NewQuoteForm = () => {
                     <div>
                       <Label className="text-sm">Type de Livraison</Label>
                       <Select value={deliveryType} onValueChange={setDeliveryType}>
-                        <SelectTrigger className="text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="STANDARD_DELIVERY" className="text-sm">Livraison standard</SelectItem>
-                          <SelectItem value="EXPRESS_DELIVERY" className="text-sm">Livraison express</SelectItem>
-                          <SelectItem value="PICKUP" className="text-sm">Retrait sur site</SelectItem>
-                          <SelectItem value="SCHEDULED_DELIVERY" className="text-sm">Livraison planifiée</SelectItem>
-                          <SelectItem value="WHITE_GLOVE" className="text-sm">Service premium</SelectItem>
-                        </SelectContent>
-                      </Select>
+  <SelectTrigger className="text-sm">
+    <SelectValue />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="STANDARD_DELIVERY" className="text-sm">Livraison standard</SelectItem>
+    <SelectItem value="EXPRESS_DELIVERY" className="text-sm">Livraison express</SelectItem>
+    <SelectItem value="PICKUP" className="text-sm">Retrait sur site</SelectItem>
+    <SelectItem value="SCHEDULED_DELIVERY" className="text-sm">Livraison planifiée</SelectItem>
+    <SelectItem value="WHITE_GLOVE" className="text-sm">Service premium</SelectItem>
+  </SelectContent>
+</Select>
                     </div>
 
                     <div>
