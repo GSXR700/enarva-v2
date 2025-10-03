@@ -158,6 +158,8 @@ model Quote {
   vatAmount         Decimal              @default(0)
   totalTTC          Decimal              @default(0)
   finalPrice        Decimal
+  purchaseOrderNumber String?
+  orderedBy           String?
   
   // --- Relationships ---
   leadId            String

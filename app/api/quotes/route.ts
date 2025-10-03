@@ -1,21 +1,34 @@
-//app/api/quotes/route.ts - FIXED VERSION FOR NEW CLIENT CREATION
+//app/api/quotes/route.ts - ENHANCED VERSION WITH B2B AND PURCHASE ORDER SUPPORT
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
-import { PrismaClient, QuoteType, LeadStatus, ActivityType, PropertyType, ProductQuoteCategory, DeliveryType } from '@prisma/client'
+import { PrismaClient, QuoteType, LeadStatus, LeadType, ActivityType, PropertyType, ProductQuoteCategory, DeliveryType } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 import { z } from 'zod'
 
 const prisma = new PrismaClient()
 
-// FIXED: Enhanced validation schema for quote creation
+// ENHANCED: Validation schema with B2B and purchase order fields
 const createQuoteSchema = z.object({
   leadId: z.string().min(1, 'Lead ID is required').optional(),
+  
+  // Basic new client fields
   newClientName: z.string().min(1, 'Client name is required').optional(),
   newClientEmail: z.string().email('Valid email required').optional().nullable(),
-  newClientPhone: z.string().min(8, 'Valid phone number required').optional(), // FIXED: Reduced from 10 to 8
+  newClientPhone: z.string().min(8, 'Valid phone number required').optional(),
   newClientAddress: z.string().optional().nullable(),
+  newClientLeadType: z.nativeEnum(LeadType).optional(),
+  
+  // B2B specific fields - NEW
+  newClientCompany: z.string().optional().nullable(),
+  newClientIceNumber: z.string().length(15, 'ICE must be exactly 15 digits').optional().nullable(),
+  newClientActivitySector: z.string().optional().nullable(),
+  newClientContactPosition: z.string().optional().nullable(),
+  newClientDepartment: z.string().optional().nullable(),
+  
+  // Quote fields
   quoteNumber: z.string().min(1, 'Quote number is required'),
+  businessType: z.enum(['SERVICE', 'PRODUCT']).default('SERVICE'),
   lineItems: z.array(z.object({
     description: z.string().min(1, 'Description is required'),
     quantity: z.number().min(0.1, 'Quantity must be positive'),
@@ -23,57 +36,44 @@ const createQuoteSchema = z.object({
     totalPrice: z.number().min(0, 'Total price must be positive')
   })).min(1, 'At least one line item required'),
   
-  // Convert numbers to Decimal for Prisma
+  // Financial fields
   subTotalHT: z.union([z.number(), z.string()]).transform((val) => new Decimal(val)),
   vatAmount: z.union([z.number(), z.string()]).transform((val) => new Decimal(val)),
   totalTTC: z.union([z.number(), z.string()]).transform((val) => new Decimal(val)),
   finalPrice: z.union([z.number(), z.string()]).transform((val) => new Decimal(val)),
 
-  // Optional date with proper handling
   expiresAt: z.coerce.date().optional(),
-
-  // Optional quote type
   type: z.enum(['EXPRESS', 'STANDARD', 'PREMIUM']).optional(),
   
-  businessType: z.enum(['SERVICE', 'PRODUCT']).default('SERVICE'),
+  // Service specific
+  surface: z.number().optional(),
+  levels: z.number().optional(),
+  propertyType: z.nativeEnum(PropertyType).optional().nullable(),
   
-  // Additional optional fields with proper enum validation
-  surface: z.number().optional().nullable(),
-  levels: z.number().default(1).optional(),
-  
-  // Property type with correct enum values
-  propertyType: z.enum([
-    'APARTMENT_SMALL', 'APARTMENT_MEDIUM', 'APARTMENT_MULTI', 'APARTMENT_LARGE',
-    'VILLA_SMALL', 'VILLA_MEDIUM', 'VILLA_LARGE', 'PENTHOUSE',
-    'COMMERCIAL', 'STORE', 'HOTEL_STANDARD', 'HOTEL_LUXURY', 'OFFICE',
-    'RESIDENCE_B2B', 'BUILDING', 'RESTAURANT', 'WAREHOUSE', 'OTHER'
-  ]).optional(),
-  
-  // Product-specific fields
-  productCategory: z.enum(['EQUIPEMENT', 'PRODUIT_CHIMIQUE', 'ACCESSOIRE', 'CONSOMMABLE', 'OTHER']).optional(),
+  // Product specific
+  productCategory: z.nativeEnum(ProductQuoteCategory).optional().nullable(),
   productDetails: z.any().optional(),
-  deliveryType: z.enum(['PICKUP', 'STANDARD_DELIVERY', 'EXPRESS_DELIVERY', 'SCHEDULED_DELIVERY', 'WHITE_GLOVE']).optional(),
+  deliveryType: z.nativeEnum(DeliveryType).optional().nullable(),
   deliveryAddress: z.string().optional().nullable(),
   deliveryNotes: z.string().optional().nullable(),
   
-}).refine((data) => {
-  // CRITICAL: Either leadId or newClientName+newClientPhone must be provided
-  const hasExistingLead = data.leadId && data.leadId.length > 0;
-  const hasNewClientData = data.newClientName && data.newClientName.trim().length > 0 && 
-                           data.newClientPhone && data.newClientPhone.trim().length > 0;
-  
-  return hasExistingLead || hasNewClientData;
-}, {
-  message: "Either an existing lead ID or complete new client information (name + phone) must be provided",
-  path: ["leadId"]
-});
+  // Purchase Order fields - NEW
+  purchaseOrderNumber: z.string().optional().nullable(),
+  orderedBy: z.string().optional().nullable(),
+}).refine(
+  (data) => data.leadId || (data.newClientName && data.newClientPhone),
+  {
+    message: "Either leadId or complete new client information (name and phone) is required",
+    path: ["leadId"]
+  }
+)
 
-// GET /api/quotes - Récupère tous les devis avec pagination et filtres
+// GET /api/quotes - Récupère tous les devis
 export async function GET(request: Request) {
   try {
-    const url = new URL(request.url)
-    const page = parseInt(url.searchParams.get('page') || '1')
-    const limit = parseInt(url.searchParams.get('limit') || '10')
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
     const skip = (page - 1) * limit
 
     const quotes = await prisma.quote.findMany({
@@ -88,7 +88,8 @@ export async function GET(request: Request) {
             email: true,
             phone: true,
             company: true,
-            leadType: true
+            leadType: true,
+            iceNumber: true
           }
         }
       },
@@ -108,13 +109,14 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Failed to fetch quotes:', error)
     return new NextResponse('Internal Server Error', { status: 500 })
+  } finally {
+    await prisma.$disconnect()
   }
 }
 
-// POST /api/quotes - Crée un nouveau devis détaillé
+// POST /api/quotes - Crée un nouveau devis avec support B2B et bon de commande
 export async function POST(request: Request) {
   try {
-    // Get user session for activity tracking
     const session = await getServerSession(authOptions)
     const currentUserId = session?.user?.id
 
@@ -122,7 +124,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     console.log('📥 Received quote data:', body)
 
-    // CRITICAL: Validate the incoming data
+    // Validate the incoming data
     let validatedData;
     try {
       validatedData = createQuoteSchema.parse(body);
@@ -148,7 +150,16 @@ export async function POST(request: Request) {
       newClientEmail,
       newClientPhone,
       newClientAddress,
+      newClientLeadType,
+      // B2B fields - NEW
+      newClientCompany,
+      newClientIceNumber,
+      newClientActivitySector,
+      newClientContactPosition,
+      newClientDepartment,
+      // Quote fields
       quoteNumber, 
+      businessType,
       lineItems, 
       subTotalHT, 
       vatAmount, 
@@ -156,7 +167,6 @@ export async function POST(request: Request) {
       finalPrice, 
       expiresAt, 
       type,
-      businessType,
       surface,
       levels,
       propertyType,
@@ -165,43 +175,68 @@ export async function POST(request: Request) {
       deliveryType,
       deliveryAddress,
       deliveryNotes,
-      ...restData 
+      // Purchase Order fields - NEW
+      purchaseOrderNumber,
+      orderedBy
     } = validatedData;
 
     // Execute the quote creation in a transaction
     const result = await prisma.$transaction(async (tx) => {
       let targetLeadId: string = leadId || '';
 
-      // FIXED: Create new lead if no leadId provided but newClientName exists
+      // Create new lead if no leadId provided
       if (!leadId && newClientName && newClientName.trim() && newClientPhone && newClientPhone.trim()) {
-        console.log('👤 Creating new lead for:', newClientName.trim())
+        console.log('👤 Creating new lead for:', newClientName.trim(), '- Type:', newClientLeadType || 'PARTICULIER')
         
         // Extract first and last name from full name
         const nameParts = newClientName.trim().split(' ');
         const firstName = nameParts[0] || 'Client';
         const lastName = nameParts.slice(1).join(' ') || 'Nouveau';
 
-        // CRITICAL: Ensure phone number is valid
+        // Validate phone number
         const cleanPhone = newClientPhone.trim();
         if (cleanPhone.length < 8) {
           throw new Error('Le numéro de téléphone doit contenir au moins 8 caractères');
         }
 
-        // Create new lead with provided information
+        // Validate ICE if provided
+        if (newClientIceNumber && newClientIceNumber.trim().length !== 15) {
+          throw new Error('Le numéro ICE doit contenir exactement 15 chiffres');
+        }
+
+        // Build lead data object
+        const leadData: any = {
+          firstName,
+          lastName,
+          phone: cleanPhone,
+          email: newClientEmail && newClientEmail.trim() ? newClientEmail.trim() : null,
+          address: newClientAddress && newClientAddress.trim() ? newClientAddress.trim() : null,
+          status: LeadStatus.NEW,
+          leadType: newClientLeadType || LeadType.PARTICULIER,
+          channel: 'FORMULAIRE_SITE',
+          originalMessage: `Lead créé automatiquement lors de la création du devis ${quoteNumber}`,
+          score: 50,
+          propertyType: propertyType as PropertyType || null,
+        }
+
+        // Add B2B specific fields if not PARTICULIER
+        if (newClientLeadType && newClientLeadType !== LeadType.PARTICULIER) {
+          leadData.company = newClientCompany && newClientCompany.trim() ? newClientCompany.trim() : null
+          leadData.iceNumber = newClientIceNumber && newClientIceNumber.trim() ? newClientIceNumber.trim() : null
+          leadData.activitySector = newClientActivitySector && newClientActivitySector.trim() ? newClientActivitySector.trim() : null
+          leadData.contactPosition = newClientContactPosition && newClientContactPosition.trim() ? newClientContactPosition.trim() : null
+          leadData.department = newClientDepartment && newClientDepartment.trim() ? newClientDepartment.trim() : null
+          
+          console.log('🏢 Adding B2B fields:', {
+            company: leadData.company,
+            iceNumber: leadData.iceNumber,
+            activitySector: leadData.activitySector
+          })
+        }
+
+        // Create new lead
         const newLead = await tx.lead.create({
-          data: {
-            firstName,
-            lastName,
-            phone: cleanPhone, // FIXED: Use actual phone number, not placeholder
-            email: newClientEmail && newClientEmail.trim() ? newClientEmail.trim() : null,
-            address: newClientAddress && newClientAddress.trim() ? newClientAddress.trim() : null,
-            status: LeadStatus.NEW, // FIXED: Start with NEW, will be updated to QUOTE_SENT later
-            leadType: 'PARTICULIER',
-            channel: 'FORMULAIRE_SITE',
-            originalMessage: `Lead créé automatiquement lors de la création du devis ${quoteNumber}`,
-            score: 50, // Default score for new leads from quote creation
-            propertyType: propertyType as PropertyType || null,
-          }
+          data: leadData
         });
 
         targetLeadId = newLead.id;
@@ -213,7 +248,7 @@ export async function POST(request: Request) {
         throw new Error('Lead ID is required - either provide existing leadId or complete new client information');
       }
 
-      // Verify the lead exists and get current status
+      // Verify the lead exists
       const existingLead = await tx.lead.findUnique({
         where: { id: targetLeadId },
         select: { 
@@ -222,7 +257,9 @@ export async function POST(request: Request) {
           firstName: true, 
           lastName: true,
           phone: true,
-          email: true
+          email: true,
+          company: true,
+          leadType: true
         }
       });
 
@@ -232,30 +269,44 @@ export async function POST(request: Request) {
 
       console.log('📋 Creating quote for lead:', existingLead.firstName, existingLead.lastName)
 
+      // Build quote data
+      const quoteData: any = {
+        leadId: targetLeadId,
+        quoteNumber,
+        businessType: businessType || 'SERVICE',
+        lineItems,
+        subTotalHT: subTotalHT ? new Decimal(subTotalHT) : new Decimal(0),
+        vatAmount: vatAmount ? new Decimal(vatAmount) : new Decimal(0),
+        totalTTC: totalTTC ? new Decimal(totalTTC) : new Decimal(finalPrice),
+        finalPrice: new Decimal(finalPrice),
+        expiresAt: expiresAt ? new Date(expiresAt) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        type: type as QuoteType || QuoteType.STANDARD,
+        status: 'DRAFT',
+        surface: surface || null,
+        levels: levels || 1,
+        propertyType: propertyType as PropertyType || null,
+        productCategory: productCategory as ProductQuoteCategory || null,
+        productDetails: productDetails || null,
+        deliveryType: deliveryType as DeliveryType || null,
+        deliveryAddress: deliveryAddress || null,
+        deliveryNotes: deliveryNotes || null,
+      }
+
+      // Add purchase order data if provided - Store in productDetails
+      if (purchaseOrderNumber && orderedBy) {
+        console.log('📄 Adding purchase order info:', { purchaseOrderNumber, orderedBy })
+        quoteData.productDetails = {
+          ...productDetails,
+          purchaseOrder: {
+            number: purchaseOrderNumber,
+            orderedBy: orderedBy
+          }
+        }
+      }
+
       // Create the quote
       const newQuote = await tx.quote.create({
-        data: {
-          leadId: targetLeadId,
-          quoteNumber,
-          businessType: businessType || 'SERVICE',
-          lineItems,
-          subTotalHT: subTotalHT ? new Decimal(subTotalHT) : new Decimal(0),
-          vatAmount: vatAmount ? new Decimal(vatAmount) : new Decimal(0),
-          totalTTC: totalTTC ? new Decimal(totalTTC) : new Decimal(finalPrice),
-          finalPrice: new Decimal(finalPrice),
-          expiresAt: expiresAt ? new Date(expiresAt) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          type: type as QuoteType || QuoteType.STANDARD,
-          status: 'DRAFT',
-          surface: surface || null,
-          levels: levels || 1,
-          propertyType: propertyType as PropertyType || null,
-          productCategory: productCategory as ProductQuoteCategory || null,
-          productDetails: productDetails || null,
-          deliveryType: deliveryType as DeliveryType || null,
-          deliveryAddress: deliveryAddress || null,
-          deliveryNotes: deliveryNotes || null,
-          ...restData,
-        },
+        data: quoteData,
         include: {
           lead: {
             select: {
@@ -266,13 +317,14 @@ export async function POST(request: Request) {
               phone: true,
               company: true,
               leadType: true,
+              iceNumber: true,
               status: true
             }
           }
         }
       });
 
-      // CRITICAL: Update lead status to QUOTE_SENT
+      // Update lead status to QUOTE_SENT
       await tx.lead.update({
         where: { id: targetLeadId },
         data: { 
@@ -282,41 +334,40 @@ export async function POST(request: Request) {
       });
       console.log('✅ Updated lead status to QUOTE_SENT')
 
-      // Create activity log for quote generation
+      // Create activity log
       if (currentUserId) {
         try {
           await tx.activity.create({
             data: {
               type: ActivityType.QUOTE_GENERATED,
               title: `Devis ${quoteNumber} créé`,
-              description: `Devis ${quoteNumber} créé${newClientName ? 
-                ` pour le nouveau client ${newClientName}` : 
-                ` pour ${existingLead.firstName} ${existingLead.lastName}`}`,
+              description: `Devis ${quoteNumber} créé${newClientName ? ` pour ${newClientName}` : ` pour ${existingLead.firstName} ${existingLead.lastName}`}${purchaseOrderNumber ? ` (BC: ${purchaseOrderNumber})` : ''}`,
               userId: currentUserId,
               leadId: targetLeadId,
               metadata: {
                 quoteId: newQuote.id,
-                amount: finalPrice.toString(),
+                quoteNumber,
                 businessType,
-                isNewClient: !leadId
+                finalPrice: finalPrice.toString(),
+                isNewClient: !leadId,
+                leadType: existingLead.leadType,
+                hasPurchaseOrder: !!purchaseOrderNumber
               }
             }
           });
-          console.log('✅ Activity created for quote generation')
+          console.log('✅ Activity log created')
         } catch (activityError) {
-          // Log the error but don't fail the whole transaction
-          console.warn('⚠️ Failed to create activity:', activityError)
+          console.error('⚠️ Failed to create activity log:', activityError)
         }
-      } else {
-        console.log('⚠️ No user session found, skipping activity creation')
       }
 
-      console.log('🎉 Quote created successfully:', newQuote.id)
       return newQuote;
     });
 
-    // Convert Decimal fields to numbers for JSON response
-    const serializedResult = {
+    console.log('✅ Quote created successfully:', result.quoteNumber)
+
+    // Serialize Decimal fields for JSON response
+    const serializedQuote = {
       ...result,
       subTotalHT: result.subTotalHT.toNumber(),
       vatAmount: result.vatAmount.toNumber(),
@@ -324,26 +375,26 @@ export async function POST(request: Request) {
       finalPrice: result.finalPrice.toNumber(),
     };
 
-    console.log('🚀 Returning successful response with quote ID:', serializedResult.id)
-    return NextResponse.json(serializedResult, { status: 201 });
+    return NextResponse.json(serializedQuote, { status: 201 });
 
   } catch (error) {
-    console.error('💥 Failed to create quote:', error)
+    console.error('❌ Error creating quote:', error);
     
-    // Return specific error messages
     if (error instanceof Error) {
-      return NextResponse.json({ 
-        error: 'Failed to create quote', 
-        message: error.message,
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      }, { status: 500 })
+      return NextResponse.json(
+        { 
+          error: 'Quote creation failed', 
+          message: error.message 
+        },
+        { status: 500 }
+      );
     }
     
-    return NextResponse.json({ 
-      error: 'Internal Server Error',
-      message: 'An unexpected error occurred while creating the quote'
-    }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   } finally {
-    await prisma.$disconnect()
+    await prisma.$disconnect();
   }
 }

@@ -1,4 +1,4 @@
-// lib/pdf-generator.ts
+// lib/pdf-generator.ts - ENHANCED WITH B2B AND PURCHASE ORDER SUPPORT
 import jsPDF from 'jspdf';
 import { poppinsNormal, poppinsBold } from './fonts';
 
@@ -293,7 +293,7 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   return new Uint8Array(buffer);
 }
 
-// Helper function to prepare data from database Quote to PDF format
+// ENHANCED: Helper function to prepare data from database Quote to PDF format with B2B support
 export function prepareQuotePDFData(
   quote: any,
   docType: 'DEVIS' | 'FACTURE' = 'DEVIS'
@@ -304,12 +304,82 @@ export function prepareQuotePDFData(
     year: 'numeric'
   });
 
-  const prestationsIncluses = quote.lineItems?.map((item: any) => {
-    if (item.description?.toLowerCase().includes('nettoyage')) {
-      return item.description;
+  // Extract purchase order information if present
+  const hasPurchaseOrder = quote.purchaseOrderNumber && quote.orderedBy;
+
+  // Build recipient information with B2B support
+  let recipientAttention = '';
+  let recipientAddressLines: string[] = [];
+
+  if (quote.lead.leadType === 'PARTICULIER') {
+    // Individual client
+    recipientAttention = `${quote.lead.firstName} ${quote.lead.lastName}`;
+    recipientAddressLines = [
+      quote.lead.address || 'Adresse non spécifiée',
+      'Maroc'
+    ];
+  } else {
+    // B2B client
+    recipientAttention = quote.lead.company || 'Entreprise';
+    
+    // Add contact person if available
+    if (quote.lead.firstName && quote.lead.lastName) {
+      recipientAttention += ` - ${quote.lead.firstName} ${quote.lead.lastName}`;
     }
-    return null;
-  }).filter(Boolean) || [
+    
+    // Add position if available
+    if (quote.lead.contactPosition) {
+      recipientAttention += ` (${quote.lead.contactPosition})`;
+    }
+
+    recipientAddressLines = [
+      quote.lead.address || 'Adresse non spécifiée',
+      'Maroc'
+    ];
+
+    // Add ICE number if available
+    if (quote.lead.iceNumber) {
+      recipientAddressLines.push(`ICE: ${quote.lead.iceNumber}`);
+    }
+
+    // Add activity sector if available
+    if (quote.lead.activitySector) {
+      recipientAddressLines.push(`Secteur: ${quote.lead.activitySector}`);
+    }
+  }
+
+  // Build project object line - enhanced for products with purchase order
+  let projectObjet = '';
+  
+  if (quote.businessType === 'SERVICE') {
+    const propertyLabel = getPropertyTypeLabel(quote.propertyType);
+    const surface = quote.surface || 170;
+    projectObjet = `Nettoyage profond d'un ${propertyLabel} d'environ ${surface} m²`;
+  } else {
+    // Product quote
+    projectObjet = `Fourniture de produits`;
+    
+    if (quote.productCategory) {
+      projectObjet += ` - ${getProductCategoryLabel(quote.productCategory)}`;
+    }
+    
+    // Add purchase order reference if present
+    if (hasPurchaseOrder) {
+      projectObjet += ` - Bon de Commande: ${quote.purchaseOrderNumber}`;
+    }
+  }
+
+  // Extract line items
+  const prestationsIncluses = quote.lineItems?.map((item: any) => {
+    let itemDescription = item.description;
+    
+    // Add quantity and unit price for product quotes
+    if (quote.businessType === 'PRODUCT') {
+      itemDescription += ` (Qté: ${item.quantity}, Prix unitaire: ${item.unitPrice} MAD)`;
+    }
+    
+    return itemDescription;
+  }) || [
     'Nettoyage et dépoussiérage des plafonds, placards, façades, des rideaux et des embrasures.',
     'Nettoyage ciblé des résidus sur toutes les surfaces (murs, sols, vitres, plinthes).',
     'Nettoyage des interrupteurs, prises, poignées et rampes.',
@@ -319,9 +389,20 @@ export function prepareQuotePDFData(
     'Entretien et traitement des sols en fonction de leur type.'
   ];
 
+  // Build payment conditions with purchase order info
+  const paymentConditions = [
+    'Les règlements peuvent être effectués par virement bancaire ou par chèque.'
+  ];
+
+  // Add purchase order information to payment conditions if present
+  if (hasPurchaseOrder) {
+    paymentConditions.push(`Bon de commande: ${quote.purchaseOrderNumber}`);
+    paymentConditions.push(`Commandé par: ${quote.orderedBy}`);
+  }
+
   return {
     docType,
-    number: quote.quoteNumber.replace('Q-', '').replace('DEV-', ''),
+    number: quote.quoteNumber.replace('Q-', '').replace('DEV-', '').replace('DV-', ''),
     date: today,
     company: {
       name: 'Enarva sarl au',
@@ -336,24 +417,23 @@ export function prepareQuotePDFData(
       rib: '0508 1002 5011 4358 9520 0174'
     },
     recipient: {
-      attention: quote.lead.leadType === 'PARTICULIER' 
-        ? `${quote.lead.firstName} ${quote.lead.lastName}`
-        : `Madame la propriétaire`,
-      addressLines: [
-        quote.lead.address || 'Hay Riad',
-        'Rabat - Maroc'
-      ]
+      attention: recipientAttention,
+      addressLines: recipientAddressLines
     },
     project: {
-      objet: `Nettoyage profond d'un ${getPropertyTypeLabel(quote.propertyType)} d'environ ${quote.surface || 170} m²`
+      objet: projectObjet
     },
     prestation: {
-      personnelMobilise: [
+      personnelMobilise: quote.businessType === 'SERVICE' ? [
         'Chef d\'équipe : supervision et contrôle qualité',
         `Agents de nettoyage (${Math.ceil((quote.surface || 170) / 50)} personne${Math.ceil((quote.surface || 170) / 50) > 1 ? 's' : ''})`,
         'Assistant technicien'
+      ] : [
+        'Équipe logistique pour la préparation',
+        'Personnel de livraison qualifié',
+        'Service client dédié'
       ],
-      equipementsUtilises: [
+      equipementsUtilises: quote.businessType === 'SERVICE' ? [
         'Aspirateur industriel pour poussière et collecte de l\'eau usée.',
         'Générateur de vapeur Emilio RA PLUS pour la désinfection et les taches tenaces.',
         'Échelles selon les besoins spécifiques pour les vitres et volets roulants extérieurs.',
@@ -363,17 +443,25 @@ export function prepareQuotePDFData(
         'Produits et matériel de nettoyage des vitres.',
         'Détergent et polish certifiés pour les surfaces métalliques.',
         'Outils généraux de ménage.'
+      ] : [
+        'Emballage sécurisé et professionnel',
+        'Matériel de manutention approprié',
+        'Véhicules de transport adaptés',
+        'Équipement de protection',
+        'Documentation complète (fiches techniques, certificats)'
       ],
       prestationsIncluses,
-      delaiPrevu: '1 journée'
+      delaiPrevu: quote.businessType === 'SERVICE' ? '1 journée' : (quote.deliveryType === 'EXPRESS' ? '24-48h' : '3-5 jours ouvrés')
     },
     amountHT: formatCurrency(Number(quote.finalPrice)),
     amountInWords: numberToFrenchWords(Number(quote.finalPrice)),
     payment: {
-      conditions: [
-        'Les règlements peuvent être effectués par virement bancaire ou par chèque.'
-      ],
-      echeancier: '30% à l\'initiation du travail et 50% à la livraison.'
+      conditions: paymentConditions,
+      echeancier: quote.businessType === 'SERVICE' 
+        ? '30% à l\'initiation du travail et 70% à la livraison'
+        : (hasPurchaseOrder 
+            ? 'Selon les termes du bon de commande' 
+            : '50% à la commande et 50% à la livraison')
     }
   };
 }
@@ -381,18 +469,43 @@ export function prepareQuotePDFData(
 // Utility functions
 function getPropertyTypeLabel(propertyType: string | null): string {
   const labels: { [key: string]: string } = {
-    'APARTMENT_SMALL': 'appartement',
-    'APARTMENT_MEDIUM': 'appartement',
-    'APARTMENT_MULTI': 'appartement',
-    'VILLA_LARGE': 'villa',
+    'APARTMENT_SMALL': 'appartement (petit)',
+    'APARTMENT_MEDIUM': 'appartement (moyen)',
+    'APARTMENT_LARGE': 'appartement (grand)',
+    'APARTMENT_MULTI': 'appartement (multi-niveaux)',
+    'VILLA_SMALL': 'villa (petite)',
+    'VILLA_MEDIUM': 'villa (moyenne)',
+    'VILLA_LARGE': 'villa (grande)',
+    'PENTHOUSE': 'penthouse',
     'COMMERCIAL': 'local commercial',
+    'STORE': 'magasin',
     'HOTEL_STANDARD': 'hôtel',
     'HOTEL_LUXURY': 'hôtel de luxe',
     'OFFICE': 'bureau',
     'RESIDENCE_B2B': 'résidence',
-    'RESTAURANT': 'restaurant'
+    'BUILDING': 'immeuble',
+    'RESTAURANT': 'restaurant',
+    'WAREHOUSE': 'entrepôt',
+    'OTHER': 'espace'
   };
   return labels[propertyType || ''] || 'appartement';
+}
+
+function getProductCategoryLabel(category: string | null): string {
+  const labels: Record<string, string> = {
+    'EQUIPEMENT': 'Équipement de nettoyage',
+    'PRODUIT_CHIMIQUE': 'Produits chimiques',
+    'ACCESSOIRE': 'Accessoires',
+    'CONSOMMABLE': 'Consommables',
+    'CLEANING_SUPPLIES': 'Fournitures de nettoyage',
+    'EQUIPMENT': 'Équipement',
+    'CHEMICALS': 'Produits chimiques',
+    'TOOLS': 'Outils',
+    'OTHER': 'Divers',
+    'AUTRE': 'Divers'
+  };
+  
+  return labels[category || 'OTHER'] || 'Produits';
 }
 
 function formatCurrency(amount: number): string {

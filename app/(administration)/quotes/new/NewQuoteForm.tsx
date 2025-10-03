@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/Switch'
-import { Plus, X, Save, Search, User, Package, Wrench } from 'lucide-react'
+import { Plus, X, Save, Search, User, Package, Wrench, Building2, FileText } from 'lucide-react'
 
 // Types
 interface ServiceInput {
@@ -37,6 +37,9 @@ interface Lead {
   status: string
   displayName: string
   typeLabel: string
+  iceNumber?: string
+  activitySector?: string
+  contactPosition?: string
 }
 
 interface ProductItem {
@@ -80,6 +83,15 @@ const ENARVA_SERVICES = [
   'Maintenance'
 ] as const
 
+const LEAD_TYPES = [
+  { value: 'PARTICULIER', label: 'Particulier' },
+  { value: 'PROFESSIONNEL', label: 'Professionnel' },
+  { value: 'PUBLIC', label: 'Public' },
+  { value: 'NGO', label: 'ONG' },
+  { value: 'SYNDIC', label: 'Syndic' },
+  { value: 'OTHER', label: 'Autre' }
+]
+
 const NewQuoteForm = () => {
   const router = useRouter()
   
@@ -91,7 +103,12 @@ const NewQuoteForm = () => {
     email: '',
     phone: '',
     address: '',
-    company: ''
+    company: '',
+    leadType: 'PARTICULIER',
+    iceNumber: '',
+    activitySector: '',
+    contactPosition: '',
+    department: ''
   })
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Lead[]>([])
@@ -116,17 +133,30 @@ const NewQuoteForm = () => {
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [deliveryNotes, setDeliveryNotes] = useState('')
 
+  // Purchase Order (Bon de Commande) state
+  const [enablePurchaseOrder, setEnablePurchaseOrder] = useState(false)
+  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('')
+  const [orderedBy, setOrderedBy] = useState('')
+
   // Common quote state
   const [expiresAt, setExpiresAt] = useState(
     new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]
   )
 
-  // NEW: Final price override
+  // Final price override
   const [finalPriceOverride, setFinalPriceOverride] = useState<number | null>(null)
   const [enablePriceOverride, setEnablePriceOverride] = useState(false)
 
   // Error state
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Check if client is B2B
+  const isB2BClient = useMemo(() => {
+    if (selectedLead) {
+      return selectedLead.leadType !== 'PARTICULIER'
+    }
+    return newClientData.leadType !== 'PARTICULIER'
+  }, [selectedLead, newClientData.leadType])
 
   // Search functionality with debouncing
   const searchLeads = useCallback(async (query: string) => {
@@ -180,7 +210,6 @@ const NewQuoteForm = () => {
       const surface = service.surface * service.levels
       let baseRate = 20
 
-      // Service-specific base rates
       switch (service.type) {
         case 'Grand Ménage': baseRate = 25; break
         case 'Fin de chantier': baseRate = 35; break
@@ -195,7 +224,6 @@ const NewQuoteForm = () => {
         default: baseRate = 20
       }
 
-      // Apply coefficients
       let coefficient = 1.0
       if (service.distance > 10) coefficient *= 1.15
       if (service.etage === 'SansAscenseur') coefficient *= 1.3
@@ -258,14 +286,12 @@ const NewQuoteForm = () => {
   const finalQuote = useMemo(() => {
     const baseQuote = businessType === 'SERVICE' ? serviceQuoteCalculation : productQuoteCalculation
     
-    // Add custom editable line items
     const allLineItems = [...baseQuote.lineItems, ...editableLineItems]
     const subTotalHT = allLineItems.reduce((acc, item) => acc + item.totalPrice, 0)
     const vatAmount = subTotalHT * 0.20
     let totalTTC = subTotalHT + vatAmount
     if (totalTTC < 500) totalTTC = 500
     
-    // Use override price if enabled, otherwise use calculated price
     const calculatedFinalPrice = Math.round(totalTTC / 10) * 10
     const finalPrice = enablePriceOverride && finalPriceOverride !== null ? finalPriceOverride : calculatedFinalPrice
 
@@ -279,11 +305,10 @@ const NewQuoteForm = () => {
     }
   }, [serviceQuoteCalculation, productQuoteCalculation, editableLineItems, businessType, enablePriceOverride, finalPriceOverride])
 
-  // Form validation - FIXED with better logic
+  // Form validation
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    // CLIENT VALIDATION - Must have either selected lead OR complete new client data
     const hasSelectedLead = selectedLead && selectedLead.id
     const hasNewClientName = newClientData.name.trim()
     const hasNewClientPhone = newClientData.phone.trim()
@@ -292,32 +317,45 @@ const NewQuoteForm = () => {
       newErrors.client = "Veuillez sélectionner un client existant ou entrer le nom d'un nouveau client"
     }
 
-    // If creating new client, phone is required (only validate if no selected lead)
     if (!hasSelectedLead && hasNewClientName && !hasNewClientPhone) {
       newErrors.phone = "Le numéro de téléphone est requis pour un nouveau client"
     }
 
-    // BUSINESS TYPE SPECIFIC VALIDATION
+    // B2B validation
+    if (!hasSelectedLead && newClientData.leadType !== 'PARTICULIER') {
+      if (!newClientData.company.trim()) {
+        newErrors.company = "Le nom de l'entreprise est requis pour un client professionnel"
+      }
+      if (newClientData.iceNumber.trim() && newClientData.iceNumber.trim().length !== 15) {
+        newErrors.iceNumber = "Le numéro ICE doit contenir exactement 15 chiffres"
+      }
+    }
+
     if (businessType === 'SERVICE') {
-      // Must have at least one valid service
       const hasValidService = services.some(s => s.surface > 0 && s.type.trim())
       if (!hasValidService) {
         newErrors.services = "Veuillez configurer au moins un service avec une surface valide"
       }
     } else if (businessType === 'PRODUCT') {
-      // Must have at least one valid product
       const hasValidProduct = productItems.some(p => p.name.trim() && p.qty > 0 && p.unitPrice > 0)
       if (!hasValidProduct) {
         newErrors.products = "Veuillez ajouter au moins un produit valide"
       }
+
+      if (enablePurchaseOrder) {
+        if (!purchaseOrderNumber.trim()) {
+          newErrors.purchaseOrderNumber = "Le numéro de bon de commande est requis"
+        }
+        if (!orderedBy.trim()) {
+          newErrors.orderedBy = "Le nom du commanditaire est requis"
+        }
+      }
     }
 
-    // FINAL QUOTE VALIDATION - Must have line items
     if (finalQuote.lineItems.length === 0) {
       newErrors.lineItems = "Aucun élément dans le devis. Veuillez ajouter des services ou produits."
     }
 
-    // EXPIRATION DATE VALIDATION
     if (!expiresAt) {
       newErrors.expiresAt = "La date d'expiration est requise"
     }
@@ -412,20 +450,20 @@ const NewQuoteForm = () => {
     setEditableLineItems(current => current.filter(item => item.id !== id))
   }
 
-  // Handle lead selection - FIXED: Clear errors when selecting lead
+  // Handle lead selection
   const selectLead = (lead: Lead) => {
     setSelectedLead(lead)
     setSearchQuery('')
     setShowSearchResults(false)
-    // CRITICAL: Clear new client data when selecting existing lead
-    setNewClientData({ name: '', email: '', phone: '', address: '', company: '' })
-    // CRITICAL: Clear all client-related errors
+    setNewClientData({ name: '', email: '', phone: '', address: '', company: '', leadType: 'PARTICULIER', iceNumber: '', activitySector: '', contactPosition: '', department: '' })
     setErrors(prev => {
       const newErrors = { ...prev }
       delete newErrors.client
       delete newErrors.phone
       delete newErrors.name
       delete newErrors.email
+      delete newErrors.company
+      delete newErrors.iceNumber
       return newErrors
     })
   }
@@ -434,29 +472,32 @@ const NewQuoteForm = () => {
     setSelectedLead(null)
     setSearchQuery('')
     setShowSearchResults(false)
-    // Don't clear new client data when deselecting - user might want to keep it
   }
 
-  // Handle new client data changes - FIXED: Clear selected lead when typing new client
+  // Handle new client data changes
   const updateNewClientData = (field: string, value: string) => {
     setNewClientData(prev => ({ ...prev, [field]: value }))
     if (field === 'name' && value.trim()) {
-      // Clear selected lead if user starts typing new client name
       setSelectedLead(null)
       setErrors(prev => ({ ...prev, client: '' }))
     }
     if (field === 'phone' && value.trim()) {
       setErrors(prev => ({ ...prev, phone: '' }))
     }
+    if (field === 'company' && value.trim()) {
+      setErrors(prev => ({ ...prev, company: '' }))
+    }
+    if (field === 'iceNumber' && value.trim()) {
+      setErrors(prev => ({ ...prev, iceNumber: '' }))
+    }
   }
 
-  // Form submission - FIXED with better payload structure
+  // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!validateForm()) {
       toast.error("Veuillez corriger les erreurs dans le formulaire")
-      // Scroll to first error
       const firstErrorElement = document.querySelector('.border-red-500')
       if (firstErrorElement) {
         firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -470,7 +511,6 @@ const NewQuoteForm = () => {
     try {
       const quoteNumber = `DV-${businessType.substring(0, 3)}-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
 
-      // CRITICAL: Build proper payload structure matching API expectations
       const quotePayload: any = {
         quoteNumber,
         businessType,
@@ -484,21 +524,30 @@ const NewQuoteForm = () => {
         vatAmount: finalQuote.vatAmount,
         totalTTC: finalQuote.totalTTC,
         finalPrice: finalQuote.finalPrice,
-        // FIXED: Handle undefined expiresAt properly
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       }
 
-      // CRITICAL: Handle client data properly - either leadId OR new client fields
+      // Handle client data
       if (selectedLead && selectedLead.id) {
         quotePayload.leadId = selectedLead.id
         console.log('📋 Using existing lead:', selectedLead.id)
       } else if (newClientData.name.trim() && newClientData.phone.trim()) {
-        // ALL required fields for new client
         quotePayload.newClientName = newClientData.name.trim()
         quotePayload.newClientPhone = newClientData.phone.trim()
         quotePayload.newClientEmail = newClientData.email.trim() || null
         quotePayload.newClientAddress = newClientData.address.trim() || null
-        console.log('👤 Creating new client:', newClientData.name.trim())
+        quotePayload.newClientLeadType = newClientData.leadType
+        
+        // B2B specific fields
+        if (newClientData.leadType !== 'PARTICULIER') {
+          quotePayload.newClientCompany = newClientData.company.trim() || null
+          quotePayload.newClientIceNumber = newClientData.iceNumber.trim() || null
+          quotePayload.newClientActivitySector = newClientData.activitySector.trim() || null
+          quotePayload.newClientContactPosition = newClientData.contactPosition.trim() || null
+          quotePayload.newClientDepartment = newClientData.department.trim() || null
+        }
+        
+        console.log('👤 Creating new client:', newClientData.name.trim(), '- Type:', newClientData.leadType)
       } else {
         throw new Error('Client information is incomplete')
       }
@@ -509,34 +558,24 @@ const NewQuoteForm = () => {
         quotePayload.surface = services.reduce((acc, s) => acc + (s.surface * s.levels), 0)
         quotePayload.levels = services.reduce((acc, s) => Math.max(acc, s.levels), 1)
         
-        // FIXED: Determine property type from services with correct enum values
         const totalSurface = services.reduce((acc, s) => acc + (s.surface * s.levels), 0)
-        
-        // Map service types to proper property type enum values
         const hasApartment = services.some(s => s.type.toLowerCase().includes('appartement'))
         const hasVilla = services.some(s => s.type.toLowerCase().includes('villa') || s.type.toLowerCase().includes('maison'))
         const hasCommercial = services.some(s => s.type.toLowerCase().includes('bureau') || s.type.toLowerCase().includes('commercial'))
         
-        let propertyType = 'OTHER' // Default to OTHER (correct enum value)
+        let propertyType = 'OTHER'
         
         if (hasApartment) {
-          // Determine apartment size based on surface
           if (totalSurface <= 50) propertyType = 'APARTMENT_SMALL'
           else if (totalSurface <= 100) propertyType = 'APARTMENT_MEDIUM'
           else if (totalSurface <= 150) propertyType = 'APARTMENT_LARGE'
           else propertyType = 'APARTMENT_MULTI'
         } else if (hasVilla) {
-          // Determine villa size based on surface
           if (totalSurface <= 100) propertyType = 'VILLA_SMALL'
           else if (totalSurface <= 200) propertyType = 'VILLA_MEDIUM'
           else propertyType = 'VILLA_LARGE'
         } else if (hasCommercial) {
-          // Determine commercial type
-          if (services.some(s => s.type.toLowerCase().includes('bureau'))) {
-            propertyType = 'OFFICE'
-          } else {
-            propertyType = 'COMMERCIAL'
-          }
+          propertyType = services.some(s => s.type.toLowerCase().includes('bureau')) ? 'OFFICE' : 'COMMERCIAL'
         }
         
         quotePayload.propertyType = propertyType
@@ -549,6 +588,12 @@ const NewQuoteForm = () => {
         quotePayload.deliveryType = deliveryType || 'STANDARD'
         quotePayload.deliveryAddress = deliveryAddress || null
         quotePayload.deliveryNotes = deliveryNotes || null
+
+        // Purchase order data - using dedicated fields
+        if (enablePurchaseOrder) {
+          quotePayload.purchaseOrderNumber = purchaseOrderNumber.trim()
+          quotePayload.orderedBy = orderedBy.trim()
+        }
       }
 
       console.log('📤 Sending quote payload:', quotePayload)
@@ -566,7 +611,6 @@ const NewQuoteForm = () => {
       if (!response.ok) {
         console.error('❌ Quote creation failed:', responseData)
         
-        // Show specific validation errors if available
         if (responseData.details) {
           const errorMessages = Object.entries(responseData.details).map(([field, messages]: [string, any]) => 
             `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`
@@ -593,37 +637,40 @@ const NewQuoteForm = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
         {/* Header */}
         <div className="bg-card border-b border-border sticky top-0 z-10 shadow-sm">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
+          <div className="container mx-auto px-3 md:px-4 py-3 md:py-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-foreground">Nouveau Devis</h1>
-                <p className="text-muted-foreground">Créer un devis pour un client</p>
+                <h1 className="text-xl md:text-2xl font-bold text-foreground">Nouveau Devis</h1>
+                <p className="text-xs md:text-sm text-muted-foreground">Créer un devis pour un client</p>
               </div>
               <div className="flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => router.back()}
+                  className="flex-1 md:flex-none text-sm"
                 >
                   Annuler
                 </Button>
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  className="bg-primary hover:bg-primary/90"
+                  className="flex-1 md:flex-none bg-primary hover:bg-primary/90 text-sm"
                 >
                   {isLoading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Création...
+                      <span className="hidden sm:inline">Création...</span>
+                      <span className="sm:hidden">...</span>
                     </>
                   ) : (
                     <>
                       <Save className="h-4 w-4 mr-2" />
-                      Créer le Devis
+                      <span className="hidden sm:inline">Créer le Devis</span>
+                      <span className="sm:hidden">Créer</span>
                     </>
                   )}
                 </Button>
@@ -632,51 +679,51 @@ const NewQuoteForm = () => {
           </div>
         </div>
 
-        <div className="container mx-auto px-4 max-w-4xl pb-8">
-          <div className="space-y-6">
-            {/* Business Type Selection - REDESIGNED with dark mode support */}
+        <div className="container mx-auto px-3 md:px-4 max-w-4xl pb-6 md:pb-8">
+          <div className="space-y-4 md:space-y-6">
+            {/* Business Type Selection */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Wrench className="h-5 w-5" />
+              <CardHeader className="pb-3 md:pb-6">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <Wrench className="h-4 w-4 md:h-5 md:w-5" />
                   Type de Devis
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                   <div
-                    className={`relative cursor-pointer rounded-xl border-2 p-6 transition-all duration-200 ${
+                    className={`relative cursor-pointer rounded-xl border-2 p-4 md:p-6 transition-all duration-200 ${
                       businessType === 'SERVICE'
                         ? 'border-primary bg-primary/5 shadow-lg'
                         : 'border-border bg-card hover:border-primary/50 hover:shadow-md'
                     }`}
                     onClick={() => setBusinessType('SERVICE')}
                   >
-                    <div className="flex flex-col items-center text-center space-y-3">
-                      <div className={`p-3 rounded-full ${
+                    <div className="flex flex-col items-center text-center space-y-2 md:space-y-3">
+                      <div className={`p-2 md:p-3 rounded-full ${
                         businessType === 'SERVICE' ? 'bg-primary/10' : 'bg-muted'
                       }`}>
-                        <Wrench className={`h-8 w-8 ${
+                        <Wrench className={`h-6 w-6 md:h-8 md:w-8 ${
                           businessType === 'SERVICE' ? 'text-primary' : 'text-muted-foreground'
                         }`} />
                       </div>
                       <div>
-                        <h3 className={`text-lg font-semibold ${
+                        <h3 className={`text-base md:text-lg font-semibold ${
                           businessType === 'SERVICE' ? 'text-primary' : 'text-foreground'
                         }`}>
                           Devis de Service
                         </h3>
-                        <p className={`text-sm ${
+                        <p className={`text-xs md:text-sm ${
                           businessType === 'SERVICE' ? 'text-primary/80' : 'text-muted-foreground'
                         }`}>
-                          Nettoyage, maintenance, intervention
+                          Nettoyage, maintenance
                         </p>
                       </div>
                     </div>
                     {businessType === 'SERVICE' && (
                       <div className="absolute top-2 right-2">
                         <div className="bg-primary text-primary-foreground rounded-full p-1">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="w-3 h-3 md:w-4 md:h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
                         </div>
@@ -685,38 +732,38 @@ const NewQuoteForm = () => {
                   </div>
 
                   <div
-                    className={`relative cursor-pointer rounded-xl border-2 p-6 transition-all duration-200 ${
+                    className={`relative cursor-pointer rounded-xl border-2 p-4 md:p-6 transition-all duration-200 ${
                       businessType === 'PRODUCT'
                         ? 'border-primary bg-primary/5 shadow-lg'
                         : 'border-border bg-card hover:border-primary/50 hover:shadow-md'
                     }`}
                     onClick={() => setBusinessType('PRODUCT')}
                   >
-                    <div className="flex flex-col items-center text-center space-y-3">
-                      <div className={`p-3 rounded-full ${
+                    <div className="flex flex-col items-center text-center space-y-2 md:space-y-3">
+                      <div className={`p-2 md:p-3 rounded-full ${
                         businessType === 'PRODUCT' ? 'bg-primary/10' : 'bg-muted'
                       }`}>
-                        <Package className={`h-8 w-8 ${
+                        <Package className={`h-6 w-6 md:h-8 md:w-8 ${
                           businessType === 'PRODUCT' ? 'text-primary' : 'text-muted-foreground'
                         }`} />
                       </div>
                       <div>
-                        <h3 className={`text-lg font-semibold ${
+                        <h3 className={`text-base md:text-lg font-semibold ${
                           businessType === 'PRODUCT' ? 'text-primary' : 'text-foreground'
                         }`}>
                           Devis de Produit
                         </h3>
-                        <p className={`text-sm ${
+                        <p className={`text-xs md:text-sm ${
                           businessType === 'PRODUCT' ? 'text-primary/80' : 'text-muted-foreground'
                         }`}>
-                          Vente de produits, équipements
+                          Vente de produits
                         </p>
                       </div>
                     </div>
                     {businessType === 'PRODUCT' && (
                       <div className="absolute top-2 right-2">
                         <div className="bg-primary text-primary-foreground rounded-full p-1">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="w-3 h-3 md:w-4 md:h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
                         </div>
@@ -729,22 +776,28 @@ const NewQuoteForm = () => {
 
           {/* Client Selection */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
+            <CardHeader className="pb-3 md:pb-6">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                <User className="h-4 w-4 md:h-5 md:w-5" />
                 Sélection du Client
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Selected Lead Display */}
               {selectedLead ? (
-                <div className="flex items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                  <div>
-                    <h3 className="font-medium text-foreground">{selectedLead.displayName}</h3>
-                    <p className="text-sm text-muted-foreground">{selectedLead.phone}</p>
-                    <Badge variant="outline" className="mt-1 text-xs">
-                      {selectedLead.typeLabel}
-                    </Badge>
+                <div className="flex items-center justify-between p-3 md:p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-sm md:text-base text-foreground truncate">{selectedLead.displayName}</h3>
+                    <p className="text-xs md:text-sm text-muted-foreground truncate">{selectedLead.phone}</p>
+                    <div className="flex gap-2 mt-1 flex-wrap">
+                      <Badge variant="outline" className="text-xs">
+                        {selectedLead.typeLabel}
+                      </Badge>
+                      {selectedLead.iceNumber && (
+                        <Badge variant="secondary" className="text-xs">
+                          ICE: {selectedLead.iceNumber}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <Button
                     type="button"
@@ -757,7 +810,6 @@ const NewQuoteForm = () => {
                 </div>
               ) : (
                 <>
-                  {/* Search Field */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Search className="h-4 w-4 text-muted-foreground" />
@@ -766,15 +818,14 @@ const NewQuoteForm = () => {
                       placeholder="Rechercher un client existant..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 text-sm"
                     />
                   </div>
 
-                  {/* Search Results */}
                   {showSearchResults && (
                     <div className="border border-border rounded-lg bg-card shadow-sm max-h-64 overflow-y-auto">
                       {isSearching ? (
-                        <div className="p-4 text-center text-muted-foreground">
+                        <div className="p-4 text-center text-sm text-muted-foreground">
                           Recherche en cours...
                         </div>
                       ) : searchResults.length > 0 ? (
@@ -784,19 +835,19 @@ const NewQuoteForm = () => {
                             className="p-3 hover:bg-muted/50 cursor-pointer border-b border-border last:border-b-0"
                             onClick={() => selectLead(lead)}
                           >
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <h4 className="font-medium text-sm text-foreground">{lead.displayName}</h4>
-                                <p className="text-xs text-muted-foreground">{lead.phone}</p>
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-sm text-foreground truncate">{lead.displayName}</h4>
+                                <p className="text-xs text-muted-foreground truncate">{lead.phone}</p>
                               </div>
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="outline" className="text-xs shrink-0">
                                 {lead.typeLabel}
                               </Badge>
                             </div>
                           </div>
                         ))
                       ) : (
-                        <div className="p-4 text-center text-muted-foreground">
+                        <div className="p-4 text-center text-sm text-muted-foreground">
                           Aucun client trouvé
                         </div>
                       )}
@@ -805,50 +856,142 @@ const NewQuoteForm = () => {
 
                   {/* New Client Form */}
                   <div className="border-t border-border pt-4">
-                    <h3 className="font-medium mb-3 text-foreground">Ou créer un nouveau client</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <h3 className="font-medium mb-3 text-sm md:text-base text-foreground">Ou créer un nouveau client</h3>
+                    
+                    <div className="mb-4">
+                      <Label htmlFor="leadType" className="text-sm">Type de client *</Label>
+                      <Select 
+                        value={newClientData.leadType} 
+                        onValueChange={(value) => updateNewClientData('leadType', value)}
+                      >
+                        <SelectTrigger className="text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LEAD_TYPES.map(type => (
+                            <SelectItem key={type.value} value={type.value} className="text-sm">
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                       <div>
-                        <Label htmlFor="clientName">Nom complet *</Label>
+                        <Label htmlFor="clientName" className="text-sm">Nom complet *</Label>
                         <Input
                           id="clientName"
                           value={newClientData.name}
                           onChange={(e) => updateNewClientData('name', e.target.value)}
                           placeholder="Nom et prénom du client"
-                          className={errors.client ? 'border-destructive' : ''}
+                          className={`text-sm ${errors.client ? 'border-destructive' : ''}`}
                         />
                         {errors.client && <p className="text-destructive text-xs mt-1">{errors.client}</p>}
                       </div>
                       <div>
-                        <Label htmlFor="clientPhone">Téléphone *</Label>
+                        <Label htmlFor="clientPhone" className="text-sm">Téléphone *</Label>
                         <Input
                           id="clientPhone"
                           value={newClientData.phone}
                           onChange={(e) => updateNewClientData('phone', e.target.value)}
                           placeholder="+212 6XX XXX XXX"
-                          className={errors.phone ? 'border-destructive' : ''}
+                          className={`text-sm ${errors.phone ? 'border-destructive' : ''}`}
                         />
                         {errors.phone && <p className="text-destructive text-xs mt-1">{errors.phone}</p>}
                       </div>
                       <div>
-                        <Label htmlFor="clientEmail">Email</Label>
+                        <Label htmlFor="clientEmail" className="text-sm">Email</Label>
                         <Input
                           id="clientEmail"
                           type="email"
                           value={newClientData.email}
                           onChange={(e) => updateNewClientData('email', e.target.value)}
                           placeholder="email@exemple.com"
+                          className="text-sm"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="clientAddress">Adresse</Label>
+                        <Label htmlFor="clientAddress" className="text-sm">Adresse</Label>
                         <Input
                           id="clientAddress"
                           value={newClientData.address}
                           onChange={(e) => updateNewClientData('address', e.target.value)}
                           placeholder="Adresse complète"
+                          className="text-sm"
                         />
                       </div>
                     </div>
+
+                    {/* B2B FIELDS */}
+                    {newClientData.leadType !== 'PARTICULIER' && (
+                      <div className="mt-4 p-3 md:p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                          <h4 className="font-medium text-sm text-blue-900 dark:text-blue-100">Informations Entreprise</h4>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="md:col-span-2">
+                            <Label htmlFor="clientCompany" className="text-sm">Nom de l'entreprise *</Label>
+                            <Input
+                              id="clientCompany"
+                              value={newClientData.company}
+                              onChange={(e) => updateNewClientData('company', e.target.value)}
+                              placeholder="Nom de la société"
+                              className={`text-sm ${errors.company ? 'border-destructive' : ''}`}
+                            />
+                            {errors.company && <p className="text-destructive text-xs mt-1">{errors.company}</p>}
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="clientICE" className="text-sm">Numéro ICE</Label>
+                            <Input
+                              id="clientICE"
+                              value={newClientData.iceNumber}
+                              onChange={(e) => updateNewClientData('iceNumber', e.target.value)}
+                              placeholder="000000000000000 (15 chiffres)"
+                              maxLength={15}
+                              className={`text-sm ${errors.iceNumber ? 'border-destructive' : ''}`}
+                            />
+                            {errors.iceNumber && <p className="text-destructive text-xs mt-1">{errors.iceNumber}</p>}
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="activitySector" className="text-sm">Secteur d'activité</Label>
+                            <Input
+                              id="activitySector"
+                              value={newClientData.activitySector}
+                              onChange={(e) => updateNewClientData('activitySector', e.target.value)}
+                              placeholder="Ex: Industrie, Commerce..."
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="contactPosition" className="text-sm">Fonction du contact</Label>
+                            <Input
+                              id="contactPosition"
+                              value={newClientData.contactPosition}
+                              onChange={(e) => updateNewClientData('contactPosition', e.target.value)}
+                              placeholder="Ex: Directeur, Responsable..."
+                              className="text-sm"
+                            />
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="department" className="text-sm">Département</Label>
+                            <Input
+                              id="department"
+                              value={newClientData.department}
+                              onChange={(e) => updateNewClientData('department', e.target.value)}
+                              placeholder="Ex: Achats, RH..."
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -858,31 +1001,29 @@ const NewQuoteForm = () => {
           {/* Service Configuration */}
           {businessType === 'SERVICE' && (
             <Card>
-              <CardHeader>
-                <CardTitle>Configuration des Services</CardTitle>
+              <CardHeader className="pb-3 md:pb-6">
+                <CardTitle className="text-base md:text-lg">Configuration des Services</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Quote Type */}
                 <div>
-                  <Label>Type de Devis</Label>
+                  <Label className="text-sm">Type de Devis</Label>
                   <Select value={quoteType} onValueChange={(value: any) => setQuoteType(value)}>
-                    <SelectTrigger>
+                    <SelectTrigger className="text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="EXPRESS">Express (Intervention rapide)</SelectItem>
-                      <SelectItem value="STANDARD">Standard (Délai normal)</SelectItem>
-                      <SelectItem value="PREMIUM">Premium (Service haut de gamme)</SelectItem>
+                      <SelectItem value="EXPRESS" className="text-sm">Express (Intervention rapide)</SelectItem>
+                      <SelectItem value="STANDARD" className="text-sm">Standard (Délai normal)</SelectItem>
+                      <SelectItem value="PREMIUM" className="text-sm">Premium (Service haut de gamme)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Services List */}
                 <div className="space-y-3">
                   {services.map((service, index) => (
-                    <div key={service.id} className="p-4 border border-border rounded-lg bg-muted/30">
+                    <div key={service.id} className="p-3 md:p-4 border border-border rounded-lg bg-muted/30">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-foreground">Service {index + 1}</h4>
+                        <h4 className="font-medium text-sm md:text-base text-foreground">Service {index + 1}</h4>
                         {services.length > 1 && (
                           <Button
                             type="button"
@@ -896,18 +1037,18 @@ const NewQuoteForm = () => {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                          <Label>Type de Service</Label>
+                        <div className="md:col-span-3">
+                          <Label className="text-sm">Type de Service</Label>
                           <Select
                             value={service.type}
                             onValueChange={(value) => updateService(service.id, 'type', value)}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="text-sm">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               {ENARVA_SERVICES.map((serviceType) => (
-                                <SelectItem key={serviceType} value={serviceType}>
+                                <SelectItem key={serviceType} value={serviceType} className="text-sm">
                                   {serviceType}
                                 </SelectItem>
                               ))}
@@ -916,85 +1057,88 @@ const NewQuoteForm = () => {
                         </div>
 
                         <div>
-                          <Label>Surface (m²)</Label>
+                          <Label className="text-sm">Surface (m²)</Label>
                           <Input
                             type="number"
                             value={service.surface}
                             onChange={(e) => updateService(service.id, 'surface', parseFloat(e.target.value) || 0)}
                             min="0"
                             step="0.1"
+                            className="text-sm"
                           />
                         </div>
 
                         <div>
-                          <Label>Niveaux</Label>
+                          <Label className="text-sm">Niveaux</Label>
                           <Input
                             type="number"
                             value={service.levels}
                             onChange={(e) => updateService(service.id, 'levels', parseInt(e.target.value) || 1)}
                             min="1"
                             max="10"
+                            className="text-sm"
                           />
                         </div>
 
                         <div>
-                          <Label>Distance (km)</Label>
+                          <Label className="text-sm">Distance (km)</Label>
                           <Input
                             type="number"
                             value={service.distance}
                             onChange={(e) => updateService(service.id, 'distance', parseFloat(e.target.value) || 0)}
                             min="0"
                             step="0.1"
+                            className="text-sm"
                           />
                         </div>
 
                         <div>
-                          <Label>Étage</Label>
+                          <Label className="text-sm">Étage</Label>
                           <Select
                             value={service.etage}
                             onValueChange={(value: any) => updateService(service.id, 'etage', value)}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="text-sm">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="RDC">Rez-de-chaussée</SelectItem>
-                              <SelectItem value="AvecAscenseur">Avec ascenseur</SelectItem>
-                              <SelectItem value="SansAscenseur">Sans ascenseur</SelectItem>
+                              <SelectItem value="RDC" className="text-sm">Rez-de-chaussée</SelectItem>
+                              <SelectItem value="AvecAscenseur" className="text-sm">Avec ascenseur</SelectItem>
+                              <SelectItem value="SansAscenseur" className="text-sm">Sans ascenseur</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
 
                         <div>
-                          <Label>Délai</Label>
+                          <Label className="text-sm">Délai</Label>
                           <Select
                             value={service.delai}
                             onValueChange={(value: any) => updateService(service.id, 'delai', value)}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="text-sm">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="STANDARD">Standard</SelectItem>
-                              <SelectItem value="URGENT">Urgent (+40%)</SelectItem>
-                              <SelectItem value="IMMEDIAT">Immédiat (+80%)</SelectItem>
+                              <SelectItem value="STANDARD" className="text-sm">Standard</SelectItem>
+                              <SelectItem value="URGENT" className="text-sm">Urgent (+40%)</SelectItem>
+                              <SelectItem value="IMMEDIAT" className="text-sm">Immédiat (+80%)</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
 
                         <div>
-                          <Label>Difficulté</Label>
+                          <Label className="text-sm">Difficulté</Label>
                           <Select
                             value={service.difficulte}
                             onValueChange={(value: any) => updateService(service.id, 'difficulte', value)}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="text-sm">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="STANDARD">Standard</SelectItem>
-                              <SelectItem value="DIFFICILE">Difficile (+20%)</SelectItem>
-                              <SelectItem value="EXTREME">Extrême (+50%)</SelectItem>
+                              <SelectItem value="STANDARD" className="text-sm">Standard</SelectItem>
+                              <SelectItem value="DIFFICILE" className="text-sm">Difficile (+20%)</SelectItem>
+                              <SelectItem value="EXTREME" className="text-sm">Extrême (+50%)</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1006,7 +1150,7 @@ const NewQuoteForm = () => {
                     type="button"
                     variant="outline"
                     onClick={addService}
-                    className="w-full"
+                    className="w-full text-sm"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Ajouter un Service
@@ -1023,33 +1167,31 @@ const NewQuoteForm = () => {
           {/* Product Configuration */}
           {businessType === 'PRODUCT' && (
             <Card>
-              <CardHeader>
-                <CardTitle>Configuration des Produits</CardTitle>
+              <CardHeader className="pb-3 md:pb-6">
+                <CardTitle className="text-base md:text-lg">Configuration des Produits</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Product Category */}
                 <div>
-                  <Label>Catégorie de Produit</Label>
+                  <Label className="text-sm">Catégorie de Produit</Label>
                   <Select value={productCategory} onValueChange={setProductCategory}>
-                    <SelectTrigger>
+                    <SelectTrigger className="text-sm">
                       <SelectValue placeholder="Sélectionner une catégorie" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="EQUIPEMENT">Équipement de nettoyage</SelectItem>
-                      <SelectItem value="PRODUIT_CHIMIQUE">Produits chimiques</SelectItem>
-                      <SelectItem value="ACCESSOIRE">Accessoires</SelectItem>
-                      <SelectItem value="CONSOMMABLE">Consommables</SelectItem>
-                      <SelectItem value="AUTRE">Autre</SelectItem>
+                      <SelectItem value="EQUIPEMENT" className="text-sm">Équipement de nettoyage</SelectItem>
+                      <SelectItem value="PRODUIT_CHIMIQUE" className="text-sm">Produits chimiques</SelectItem>
+                      <SelectItem value="ACCESSOIRE" className="text-sm">Accessoires</SelectItem>
+                      <SelectItem value="CONSOMMABLE" className="text-sm">Consommables</SelectItem>
+                      <SelectItem value="AUTRE" className="text-sm">Autre</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Products List */}
                 <div className="space-y-3">
                   {productItems.map((product, index) => (
-                    <div key={product.id} className="p-4 border border-border rounded-lg bg-muted/30">
+                    <div key={product.id} className="p-3 md:p-4 border border-border rounded-lg bg-muted/30">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-foreground">Produit {index + 1}</h4>
+                        <h4 className="font-medium text-sm md:text-base text-foreground">Produit {index + 1}</h4>
                         {productItems.length > 1 && (
                           <Button
                             type="button"
@@ -1063,64 +1205,67 @@ const NewQuoteForm = () => {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        <div>
-                          <Label>Nom du Produit</Label>
+                        <div className="md:col-span-2 lg:col-span-3">
+                          <Label className="text-sm">Nom du Produit</Label>
                           <Input
                             value={product.name}
                             onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
                             placeholder="Nom du produit"
+                            className="text-sm"
                           />
                         </div>
 
                         <div>
-                          <Label>Quantité</Label>
+                          <Label className="text-sm">Quantité</Label>
                           <Input
                             type="number"
                             value={product.qty}
                             onChange={(e) => updateProduct(product.id, 'qty', parseFloat(e.target.value) || 0)}
                             min="0"
                             step="0.1"
+                            className="text-sm"
                           />
                         </div>
 
                         <div>
-                          <Label>Prix Unitaire (MAD)</Label>
+                          <Label className="text-sm">Prix Unitaire (MAD)</Label>
                           <Input
                             type="number"
                             value={product.unitPrice}
                             onChange={(e) => updateProduct(product.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                             min="0"
                             step="0.01"
+                            className="text-sm"
                           />
                         </div>
 
                         <div>
-                          <Label>Description</Label>
+                          <Label className="text-sm">Total</Label>
+                          <Input
+                            value={`${(product.qty * product.unitPrice).toFixed(2)} MAD`}
+                            disabled
+                            className="bg-muted text-sm"
+                          />
+                        </div>
+
+                        <div className="md:col-span-2 lg:col-span-2">
+                          <Label className="text-sm">Description</Label>
                           <Input
                             value={product.description || ''}
                             onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
                             placeholder="Description du produit"
+                            className="text-sm"
                           />
                         </div>
 
                         <div>
-                          <Label>Référence</Label>
+                          <Label className="text-sm">Référence</Label>
                           <Input
                             value={product.reference || ''}
                             onChange={(e) => updateProduct(product.id, 'reference', e.target.value)}
                             placeholder="REF-001"
+                            className="text-sm"
                           />
-                        </div>
-
-                        <div className="flex items-end">
-                          <div className="w-full">
-                            <Label>Total</Label>
-                            <Input
-                              value={`${(product.qty * product.unitPrice).toFixed(2)} MAD`}
-                              disabled
-                              className="bg-muted"
-                            />
-                          </div>
                         </div>
                       </div>
                     </div>
@@ -1130,49 +1275,108 @@ const NewQuoteForm = () => {
                     type="button"
                     variant="outline"
                     onClick={addProduct}
-                    className="w-full"
+                    className="w-full text-sm"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Ajouter un Produit
                   </Button>
                 </div>
 
+                {/* PURCHASE ORDER SECTION */}
+                {isB2BClient && (
+                  <div className="border-t border-border pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <h4 className="font-medium text-sm text-foreground">Bon de Commande</h4>
+                      </div>
+                      <Switch
+                        id="enable-purchase-order"
+                        checked={enablePurchaseOrder}
+                        onCheckedChange={setEnablePurchaseOrder}
+                      />
+                    </div>
+                    
+                    {enablePurchaseOrder && (
+                      <div className="p-3 md:p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-3">
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          Ces informations apparaîtront sur le devis et la facture
+                        </p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="purchaseOrderNumber" className="text-sm">N° Bon de Commande *</Label>
+                            <Input
+                              id="purchaseOrderNumber"
+                              value={purchaseOrderNumber}
+                              onChange={(e) => {
+                                setPurchaseOrderNumber(e.target.value)
+                                if (e.target.value.trim()) setErrors(prev => ({ ...prev, purchaseOrderNumber: '' }))
+                              }}
+                              placeholder="BC-2025-001"
+                              className={`text-sm ${errors.purchaseOrderNumber ? 'border-destructive' : ''}`}
+                            />
+                            {errors.purchaseOrderNumber && <p className="text-destructive text-xs mt-1">{errors.purchaseOrderNumber}</p>}
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="orderedBy" className="text-sm">Commandé par *</Label>
+                            <Input
+                              id="orderedBy"
+                              value={orderedBy}
+                              onChange={(e) => {
+                                setOrderedBy(e.target.value)
+                                if (e.target.value.trim()) setErrors(prev => ({ ...prev, orderedBy: '' }))
+                              }}
+                              placeholder="Nom du responsable"
+                              className={`text-sm ${errors.orderedBy ? 'border-destructive' : ''}`}
+                            />
+                            {errors.orderedBy && <p className="text-destructive text-xs mt-1">{errors.orderedBy}</p>}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Delivery Information */}
                 <div className="border-t border-border pt-4 space-y-3">
-                  <h3 className="font-medium text-foreground">Informations de Livraison</h3>
+                  <h3 className="font-medium text-sm text-foreground">Informations de Livraison</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <Label>Type de Livraison</Label>
+                      <Label className="text-sm">Type de Livraison</Label>
                       <Select value={deliveryType} onValueChange={setDeliveryType}>
-                        <SelectTrigger>
+                        <SelectTrigger className="text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="STANDARD">Livraison standard</SelectItem>
-                          <SelectItem value="EXPRESS">Livraison express</SelectItem>
-                          <SelectItem value="RETRAIT">Retrait sur site</SelectItem>
+                          <SelectItem value="STANDARD" className="text-sm">Livraison standard</SelectItem>
+                          <SelectItem value="EXPRESS" className="text-sm">Livraison express</SelectItem>
+                          <SelectItem value="RETRAIT" className="text-sm">Retrait sur site</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div>
-                      <Label>Adresse de Livraison</Label>
+                      <Label className="text-sm">Adresse de Livraison</Label>
                       <Input
                         value={deliveryAddress}
                         onChange={(e) => setDeliveryAddress(e.target.value)}
                         placeholder="Adresse de livraison"
+                        className="text-sm"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <Label>Notes de Livraison</Label>
+                    <Label className="text-sm">Notes de Livraison</Label>
                     <Textarea
                       value={deliveryNotes}
                       onChange={(e) => setDeliveryNotes(e.target.value)}
                       placeholder="Instructions spéciales pour la livraison..."
                       rows={3}
+                      className="text-sm"
                     />
                   </div>
                 </div>
@@ -1186,17 +1390,17 @@ const NewQuoteForm = () => {
 
           {/* Custom Line Items */}
           <Card>
-            <CardHeader>
-              <CardTitle>Éléments Personnalisés</CardTitle>
-              <p className="text-sm text-muted-foreground">
+            <CardHeader className="pb-3 md:pb-6">
+              <CardTitle className="text-base md:text-lg">Éléments Personnalisés</CardTitle>
+              <p className="text-xs md:text-sm text-muted-foreground">
                 Ajoutez des services ou produits personnalisés au devis
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
               {editableLineItems.map((item) => (
-                <div key={item.id} className="p-4 border border-border rounded-lg bg-muted/30">
+                <div key={item.id} className="p-3 md:p-4 border border-border rounded-lg bg-muted/30">
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-foreground">Élément personnalisé</h4>
+                    <h4 className="font-medium text-sm text-foreground">Élément personnalisé</h4>
                     <Button
                       type="button"
                       variant="ghost"
@@ -1208,55 +1412,56 @@ const NewQuoteForm = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div>
-                      <Label>Description</Label>
+                    <div className="md:col-span-2">
+                      <Label className="text-sm">Description</Label>
                       <Input
                         value={item.description}
                         onChange={(e) => updateEditableLineItem(item.id, 'description', e.target.value)}
                         placeholder="Description du service/produit"
+                        className="text-sm"
                       />
                     </div>
 
                     <div>
-                      <Label>Quantité</Label>
+                      <Label className="text-sm">Quantité</Label>
                       <Input
                         type="number"
                         value={item.quantity}
                         onChange={(e) => updateEditableLineItem(item.id, 'quantity', parseFloat(e.target.value) || 1)}
                         min="0"
                         step="0.1"
+                        className="text-sm"
                       />
                     </div>
 
                     <div>
-                      <Label>Prix Unitaire (MAD)</Label>
+                      <Label className="text-sm">Prix Unitaire (MAD)</Label>
                       <Input
                         type="number"
                         value={item.unitPrice}
                         onChange={(e) => updateEditableLineItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                         min="0"
                         step="0.01"
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Total</Label>
-                      <Input
-                        value={`${item.totalPrice.toFixed(2)} MAD`}
-                        disabled
-                        className="bg-muted"
+                        className="text-sm"
                       />
                     </div>
                   </div>
 
                   <div className="mt-3">
-                    <Label>Détails</Label>
+                    <Label className="text-sm">Détails</Label>
                     <Textarea
                       value={item.detail || ''}
                       onChange={(e) => updateEditableLineItem(item.id, 'detail', e.target.value)}
                       placeholder="Détails supplémentaires..."
                       rows={2}
+                      className="text-sm"
                     />
+                  </div>
+
+                  <div className="mt-2 text-right">
+                    <span className="text-sm font-medium text-foreground">
+                      Total: {item.totalPrice.toFixed(2)} MAD
+                    </span>
                   </div>
                 </div>
               ))}
@@ -1265,7 +1470,7 @@ const NewQuoteForm = () => {
                 type="button"
                 variant="outline"
                 onClick={addEditableLineItem}
-                className="w-full"
+                className="w-full text-sm"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Ajouter un Élément Personnalisé
@@ -1275,41 +1480,40 @@ const NewQuoteForm = () => {
 
           {/* Quote Summary with Price Override */}
           <Card>
-            <CardHeader>
-              <CardTitle>Récapitulatif du Devis</CardTitle>
+            <CardHeader className="pb-3 md:pb-6">
+              <CardTitle className="text-base md:text-lg">Récapitulatif du Devis</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Line Items Preview */}
                 <div className="space-y-2">
-                  <h4 className="font-medium text-foreground">Éléments du devis :</h4>
-                  {finalQuote.lineItems.map((item) => (
-                    <div key={item.id} className="flex justify-between text-sm py-1 border-b border-border">
-                      <div className="flex-1">
-                        <span className="font-medium text-foreground">{item.description}</span>
-                        {item.detail && <span className="text-muted-foreground ml-2">({item.detail})</span>}
+                  <h4 className="font-medium text-sm text-foreground">Éléments du devis :</h4>
+                  <div className="max-h-64 overflow-y-auto space-y-2">
+                    {finalQuote.lineItems.map((item) => (
+                      <div key={item.id} className="flex justify-between text-xs md:text-sm py-1 border-b border-border">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <span className="font-medium text-foreground block truncate">{item.description}</span>
+                          {item.detail && <span className="text-muted-foreground block truncate">({item.detail})</span>}
+                        </div>
+                        <span className="font-medium text-foreground shrink-0">{item.totalPrice.toFixed(2)} MAD</span>
                       </div>
-                      <span className="font-medium text-foreground">{item.totalPrice.toFixed(2)} MAD</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
 
-                {/* Financial Summary */}
                 <div className="border-t border-border pt-4 space-y-2">
-                  <div className="flex justify-between text-foreground">
+                  <div className="flex justify-between text-sm text-foreground">
                     <span>Sous-total HT :</span>
                     <span>{finalQuote.subTotalHT.toFixed(2)} MAD</span>
                   </div>
-                  <div className="flex justify-between text-foreground">
+                  <div className="flex justify-between text-sm text-foreground">
                     <span>TVA (20%) :</span>
                     <span>{finalQuote.vatAmount.toFixed(2)} MAD</span>
                   </div>
-                  <div className="flex justify-between font-medium text-foreground">
+                  <div className="flex justify-between font-medium text-sm md:text-base text-foreground">
                     <span>Total TTC :</span>
                     <span>{finalQuote.totalTTC.toFixed(2)} MAD</span>
                   </div>
                   
-                  {/* Price Override Section */}
                   <div className="border-t border-border pt-3 space-y-3">
                     <div className="flex items-center space-x-2">
                       <Switch
@@ -1317,14 +1521,14 @@ const NewQuoteForm = () => {
                         checked={enablePriceOverride}
                         onCheckedChange={setEnablePriceOverride}
                       />
-                      <Label htmlFor="price-override" className="text-sm">
+                      <Label htmlFor="price-override" className="text-xs md:text-sm">
                         Modifier le prix final manuellement
                       </Label>
                     </div>
 
                     {enablePriceOverride ? (
                       <div className="space-y-2">
-                        <Label htmlFor="final-price-override">Prix final personnalisé (MAD)</Label>
+                        <Label htmlFor="final-price-override" className="text-sm">Prix final personnalisé (MAD)</Label>
                         <Input
                           id="final-price-override"
                           type="number"
@@ -1333,37 +1537,30 @@ const NewQuoteForm = () => {
                           placeholder={`Prix calculé: ${finalQuote.calculatedPrice} MAD`}
                           min="0"
                           step="0.01"
+                          className="text-sm"
                         />
                         <p className="text-xs text-muted-foreground">
                           Prix calculé automatiquement : {finalQuote.calculatedPrice.toFixed(2)} MAD
                         </p>
                       </div>
-                    ) : (
-                      <div className="flex justify-between text-lg font-bold text-primary">
-                        <span>Prix final :</span>
-                        <span>{finalQuote.finalPrice.toFixed(2)} MAD</span>
-                      </div>
-                    )}
+                    ) : null}
 
-                    {enablePriceOverride && (
-                      <div className="flex justify-between text-lg font-bold text-primary">
-                        <span>Prix final :</span>
-                        <span>{finalQuote.finalPrice.toFixed(2)} MAD</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between text-base md:text-lg font-bold text-primary">
+                      <span>Prix final :</span>
+                      <span>{finalQuote.finalPrice.toFixed(2)} MAD</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Expiration Date */}
                 <div className="border-t border-border pt-3">
-                  <Label htmlFor="expiresAt">Date d'expiration du devis</Label>
+                  <Label htmlFor="expiresAt" className="text-sm">Date d'expiration du devis</Label>
                   <Input
                     id="expiresAt"
                     type="date"
                     value={expiresAt}
                     onChange={(e) => setExpiresAt(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
-                    className={errors.expiresAt ? 'border-destructive' : ''}
+                    className={`text-sm ${errors.expiresAt ? 'border-destructive' : ''}`}
                   />
                   {errors.expiresAt && (
                     <p className="text-destructive text-xs mt-1">{errors.expiresAt}</p>
@@ -1375,13 +1572,13 @@ const NewQuoteForm = () => {
 
           {/* Submit Section */}
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <CardContent className="pt-4 md:pt-6">
+              <div className="flex flex-col gap-4">
                 <Button
                   type="submit"
                   disabled={isLoading}
                   size="lg"
-                  className="w-full sm:w-auto bg-primary hover:bg-primary/90"
+                  className="w-full bg-primary hover:bg-primary/90 text-sm md:text-base"
                 >
                   {isLoading ? (
                     <>
@@ -1396,19 +1593,17 @@ const NewQuoteForm = () => {
                   )}
                 </Button>
 
-                {/* Help Text */}
-                <div className="text-xs text-muted-foreground space-y-1 text-center sm:text-right">
+                <div className="text-xs text-muted-foreground space-y-1 text-center">
                   <p>• Le devis sera automatiquement sauvegardé</p>
                   <p>• Le statut du lead sera mis à jour vers "Devis envoyé"</p>
                   <p>• Une notification sera envoyée à l'équipe</p>
                 </div>
               </div>
 
-              {/* Error Display */}
               {Object.keys(errors).length > 0 && (
                 <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                  <h4 className="text-destructive font-medium mb-2">Erreurs à corriger :</h4>
-                  <ul className="text-destructive/80 text-sm space-y-1">
+                  <h4 className="text-destructive font-medium mb-2 text-sm">Erreurs à corriger :</h4>
+                  <ul className="text-destructive/80 text-xs space-y-1">
                     {Object.entries(errors).map(([field, message]) => (
                       <li key={field}>• {message}</li>
                     ))}
