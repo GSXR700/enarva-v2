@@ -1,4 +1,4 @@
-//app/api/quotes/route.ts - ENHANCED VERSION WITH B2B AND PURCHASE ORDER SUPPORT - FIXED
+//app/api/quotes/route.ts - COMPLETE FIXED VERSION WITH CHANNEL FIELD
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
@@ -208,6 +208,7 @@ export async function POST(request: Request) {
 
         console.log('👤 Creating new lead for:', newClientName)
 
+        // CRITICAL FIX: Add required 'channel' and 'originalMessage' fields
         const leadData: any = {
           firstName: newClientName.split(' ')[0] || newClientName,
           lastName: newClientName.split(' ').slice(1).join(' ') || '',
@@ -217,7 +218,9 @@ export async function POST(request: Request) {
           leadType: newClientLeadType || LeadType.PARTICULIER,
           status: LeadStatus.NEW,
           source: 'MANUAL',
-          stage: 'NEW'
+          stage: 'NEW',
+          channel: 'MANUEL', // CRITICAL FIX: Add required channel field from LeadCanal enum
+          originalMessage: `Client créé via devis ${quoteNumber}` // CRITICAL FIX: Add required originalMessage field
         }
 
         // Add B2B fields if client is not PARTICULIER
