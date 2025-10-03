@@ -160,10 +160,10 @@ export default function PWAInstaller() {
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-enarva-start to-enarva-end flex items-center justify-center">
                     <Image 
-                      src="/apple-icon.png" 
+                      src="/public/favicon.svg" 
                       alt="Enarva" 
-                      width={24} 
-                      height={24}
+                      width={40} 
+                      height={40}
                       className="w-6 h-6 brightness-0 invert"
                     />
                   </div>
