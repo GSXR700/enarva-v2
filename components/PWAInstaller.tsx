@@ -162,8 +162,8 @@ export default function PWAInstaller() {
                     <Image 
                       src="images/dark-mobile.png" 
                       alt="Enarva" 
-                      width={40} 
-                      height={40}
+                      width={48} 
+                      height={48}
                       className="w-6 h-6 brightness-0 invert"
                     />
                   </div>
