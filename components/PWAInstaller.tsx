@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, X, Smartphone, Share } from 'lucide-react';
+import { Download, X, Share } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -158,7 +158,11 @@ export default function PWAInstaller() {
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-enarva-start to-enarva-end flex items-center justify-center">
-                    <Smartphone className="w-6 h-6 text-white" />
+                    <img 
+     src="/apple-icon.png" 
+     alt="Enarva" 
+     className="w-6 h-6"
+   />
                   </div>
                 </div>
                 
