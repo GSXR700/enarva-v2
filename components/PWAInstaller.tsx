@@ -160,7 +160,7 @@ export default function PWAInstaller() {
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-enarva-start to-enarva-end flex items-center justify-center">
                     <Image 
-                      src="/public/favicon.svg" 
+                      src="/public/logo-transparent.png" 
                       alt="Enarva" 
                       width={40} 
                       height={40}
