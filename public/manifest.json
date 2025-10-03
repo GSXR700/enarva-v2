@@ -2,10 +2,11 @@
   "name": "Enarva OS",
   "short_name": "Enarva",
   "description": "Plateforme de gestion complète pour Enarva - CRM, Missions, Planning",
+  "version": "2.0.1",
   "start_url": "/?utm_source=pwa",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "theme_color": "#2563eb",
   "orientation": "portrait-primary",
   "scope": "/",
   "id": "/",
@@ -13,61 +14,61 @@
   "display_override": ["standalone", "fullscreen"],
   "icons": [
     {
-      "src": "/icon-72x72.png",
+      "src": "/icon-72x72.png?v=2",
       "sizes": "72x72",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-96x96.png",
+      "src": "/icon-96x96.png?v=2",
       "sizes": "96x96",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-128x128.png",
+      "src": "/icon-128x128.png?v=2",
       "sizes": "128x128",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-144x144.png",
+      "src": "/icon-144x144.png?v=2",
       "sizes": "144x144",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-152x152.png",
+      "src": "/icon-152x152.png?v=2",
       "sizes": "152x152",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-192x192.png",
+      "src": "/icon-192x192.png?v=2",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-192x192-maskable.png",
+      "src": "/icon-192x192-maskable.png?v=2",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/icon-384x384.png",
+      "src": "/icon-384x384.png?v=2",
       "sizes": "384x384",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-512x512.png",
+      "src": "/icon-512x512.png?v=2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512x512-maskable.png",
+      "src": "/icon-512x512-maskable.png?v=2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -75,14 +76,14 @@
   ],
   "screenshots": [
     {
-      "src": "/screenshot-wide.png",
+      "src": "/screenshot-wide.png?v=2",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Enarva OS Dashboard"
     },
     {
-      "src": "/screenshot-narrow.png",
+      "src": "/screenshot-narrow.png?v=2",
       "sizes": "750x1334",
       "type": "image/png",
       "form_factor": "narrow",
@@ -98,14 +99,14 @@
       "short_name": "Dashboard",
       "description": "Accéder au tableau de bord",
       "url": "/dashboard",
-      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icon-192x192.png?v=2", "sizes": "192x192" }]
     },
     {
       "name": "Leads",
       "short_name": "Leads",
       "description": "Gérer les leads",
       "url": "/leads",
-      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icon-192x192.png?v=2", "sizes": "192x192" }]
     }
   ]
 }
