@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, X, Share } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -158,11 +159,13 @@ export default function PWAInstaller() {
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-enarva-start to-enarva-end flex items-center justify-center">
-                    <img 
-     src="/apple-icon.png" 
-     alt="Enarva" 
-     className="w-6 h-6"
-   />
+                    <Image 
+                      src="/apple-icon.png" 
+                      alt="Enarva" 
+                      width={24} 
+                      height={24}
+                      className="w-6 h-6 brightness-0 invert"
+                    />
                   </div>
                 </div>
                 
