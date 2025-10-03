@@ -218,7 +218,6 @@ export async function POST(request: Request) {
           leadType: newClientLeadType || LeadType.PARTICULIER,
           status: LeadStatus.NEW,
           source: 'MANUAL',
-          stage: 'NEW',
           channel: 'MANUEL', // CRITICAL FIX: Add required channel field from LeadCanal enum
           originalMessage: `Client créé via devis ${quoteNumber}` // CRITICAL FIX: Add required originalMessage field
         }
