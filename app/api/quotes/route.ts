@@ -1,4 +1,4 @@
-//app/api/quotes/route.ts - ENHANCED VERSION WITH B2B AND PURCHASE ORDER SUPPORT
+//app/api/quotes/route.ts - ENHANCED VERSION WITH B2B AND PURCHASE ORDER SUPPORT - FIXED
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
@@ -57,14 +57,29 @@ const createQuoteSchema = z.object({
   deliveryAddress: z.string().optional().nullable(),
   deliveryNotes: z.string().optional().nullable(),
   
-  // Purchase Order fields - NEW
-  purchaseOrderNumber: z.string().optional().nullable(),
-  orderedBy: z.string().optional().nullable(),
+  // Purchase Order fields - FIXED: These are direct Quote model fields
+  purchaseOrderNumber: z.string().min(1, 'Purchase order number is required').optional().nullable(),
+  orderedBy: z.string().min(1, 'Ordered by is required').optional().nullable(),
 }).refine(
   (data) => data.leadId || (data.newClientName && data.newClientPhone),
   {
     message: "Either leadId or complete new client information (name and phone) is required",
     path: ["leadId"]
+  }
+).refine(
+  (data) => {
+    // If purchase order number is provided, orderedBy must also be provided
+    if (data.purchaseOrderNumber && !data.orderedBy) {
+      return false;
+    }
+    if (data.orderedBy && !data.purchaseOrderNumber) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: "Both purchase order number and ordered by are required when using purchase orders",
+    path: ["purchaseOrderNumber"]
   }
 )
 
@@ -151,21 +166,20 @@ export async function POST(request: Request) {
       newClientPhone,
       newClientAddress,
       newClientLeadType,
-      // B2B fields - NEW
+      // B2B fields - ENHANCED
       newClientCompany,
       newClientIceNumber,
       newClientActivitySector,
       newClientContactPosition,
       newClientDepartment,
-      // Quote fields
-      quoteNumber, 
+      quoteNumber,
       businessType,
-      lineItems, 
-      subTotalHT, 
-      vatAmount, 
-      totalTTC, 
-      finalPrice, 
-      expiresAt, 
+      lineItems,
+      subTotalHT,
+      vatAmount,
+      totalTTC,
+      finalPrice,
+      expiresAt,
       type,
       surface,
       levels,
@@ -175,51 +189,38 @@ export async function POST(request: Request) {
       deliveryType,
       deliveryAddress,
       deliveryNotes,
-      // Purchase Order fields - NEW
+      // Purchase Order fields - FIXED: Extract from body directly
       purchaseOrderNumber,
       orderedBy
     } = validatedData;
 
-    // Execute the quote creation in a transaction
+    console.log('📋 Processing purchase order:', { purchaseOrderNumber, orderedBy });
+
+    // Use a transaction to ensure atomicity
     const result = await prisma.$transaction(async (tx) => {
-      let targetLeadId: string = leadId || '';
+      let targetLeadId = leadId;
 
-      // Create new lead if no leadId provided
-      if (!leadId && newClientName && newClientName.trim() && newClientPhone && newClientPhone.trim()) {
-        console.log('👤 Creating new lead for:', newClientName.trim(), '- Type:', newClientLeadType || 'PARTICULIER')
-        
-        // Extract first and last name from full name
-        const nameParts = newClientName.trim().split(' ');
-        const firstName = nameParts[0] || 'Client';
-        const lastName = nameParts.slice(1).join(' ') || 'Nouveau';
-
-        // Validate phone number
-        const cleanPhone = newClientPhone.trim();
-        if (cleanPhone.length < 8) {
-          throw new Error('Le numéro de téléphone doit contenir au moins 8 caractères');
+      // Create new lead if no existing leadId provided
+      if (!leadId) {
+        if (!newClientName || !newClientPhone) {
+          throw new Error('New client name and phone are required when creating a new client');
         }
 
-        // Validate ICE if provided
-        if (newClientIceNumber && newClientIceNumber.trim().length !== 15) {
-          throw new Error('Le numéro ICE doit contenir exactement 15 chiffres');
-        }
+        console.log('👤 Creating new lead for:', newClientName)
 
-        // Build lead data object
         const leadData: any = {
-          firstName,
-          lastName,
-          phone: cleanPhone,
-          email: newClientEmail && newClientEmail.trim() ? newClientEmail.trim() : null,
-          address: newClientAddress && newClientAddress.trim() ? newClientAddress.trim() : null,
-          status: LeadStatus.NEW,
+          firstName: newClientName.split(' ')[0] || newClientName,
+          lastName: newClientName.split(' ').slice(1).join(' ') || '',
+          email: newClientEmail || null,
+          phone: newClientPhone,
+          address: newClientAddress || null,
           leadType: newClientLeadType || LeadType.PARTICULIER,
-          channel: 'FORMULAIRE_SITE',
-          originalMessage: `Lead créé automatiquement lors de la création du devis ${quoteNumber}`,
-          score: 50,
-          propertyType: propertyType as PropertyType || null,
+          status: LeadStatus.NEW,
+          source: 'MANUAL',
+          stage: 'NEW'
         }
 
-        // Add B2B specific fields if not PARTICULIER
+        // Add B2B fields if client is not PARTICULIER
         if (newClientLeadType && newClientLeadType !== LeadType.PARTICULIER) {
           leadData.company = newClientCompany && newClientCompany.trim() ? newClientCompany.trim() : null
           leadData.iceNumber = newClientIceNumber && newClientIceNumber.trim() ? newClientIceNumber.trim() : null
@@ -269,7 +270,7 @@ export async function POST(request: Request) {
 
       console.log('📋 Creating quote for lead:', existingLead.firstName, existingLead.lastName)
 
-      // Build quote data
+      // Build quote data - FIXED: Purchase order fields are now stored directly
       const quoteData: any = {
         leadId: targetLeadId,
         quoteNumber,
@@ -292,16 +293,11 @@ export async function POST(request: Request) {
         deliveryNotes: deliveryNotes || null,
       }
 
-      // Add purchase order data if provided - Store in productDetails
+      // FIXED: Add purchase order data directly to quoteData (not in productDetails)
       if (purchaseOrderNumber && orderedBy) {
-        console.log('📄 Adding purchase order info:', { purchaseOrderNumber, orderedBy })
-        quoteData.productDetails = {
-          ...productDetails,
-          purchaseOrder: {
-            number: purchaseOrderNumber,
-            orderedBy: orderedBy
-          }
-        }
+        console.log('📄 Adding purchase order info directly to quote:', { purchaseOrderNumber, orderedBy })
+        quoteData.purchaseOrderNumber = purchaseOrderNumber.trim()
+        quoteData.orderedBy = orderedBy.trim()
       }
 
       // Create the quote
