@@ -129,7 +129,7 @@ const NewQuoteForm = () => {
   const [productItems, setProductItems] = useState<ProductItem[]>([
     { id: Date.now().toString(), name: '', qty: 1, unitPrice: 0, description: '', reference: '' }
   ])
-  const [deliveryType, setDeliveryType] = useState<string>('STANDARD')
+  const [deliveryType, setDeliveryType] = useState<string>('STANDARD_DELIVERY')
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [deliveryNotes, setDeliveryNotes] = useState('')
 
@@ -585,7 +585,7 @@ const NewQuoteForm = () => {
           items: productItems.filter(item => item.name.trim()),
           category: productCategory
         }
-        quotePayload.deliveryType = deliveryType || 'STANDARD'
+        quotePayload.deliveryType = deliveryType || 'STANDARD_DELIVERY'
         quotePayload.deliveryAddress = deliveryAddress || null
         quotePayload.deliveryNotes = deliveryNotes || null
 
@@ -1351,9 +1351,11 @@ const NewQuoteForm = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="STANDARD" className="text-sm">Livraison standard</SelectItem>
-                          <SelectItem value="EXPRESS" className="text-sm">Livraison express</SelectItem>
-                          <SelectItem value="RETRAIT" className="text-sm">Retrait sur site</SelectItem>
+                          <SelectItem value="STANDARD_DELIVERY" className="text-sm">Livraison standard</SelectItem>
+                          <SelectItem value="EXPRESS_DELIVERY" className="text-sm">Livraison express</SelectItem>
+                          <SelectItem value="PICKUP" className="text-sm">Retrait sur site</SelectItem>
+                          <SelectItem value="SCHEDULED_DELIVERY" className="text-sm">Livraison planifiée</SelectItem>
+                          <SelectItem value="WHITE_GLOVE" className="text-sm">Service premium</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
