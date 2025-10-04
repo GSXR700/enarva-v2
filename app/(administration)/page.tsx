@@ -1,5 +1,9 @@
-// Dashboard page for administration area
+// app/(administration)/page.tsx
 'use client'
+
+// Force dynamic rendering to prevent static generation
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -30,9 +34,6 @@ import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { toast } from 'sonner'
 import { usePusherChannel } from '@/hooks/usePusherClient'
 import ClientOnly from '@/components/providers/ClientOnly'
-import { useRouter } from 'next/navigation';
-
-const router = useRouter();
 
 type LeadWithAssignee = Lead & { assignedTo?: User | null };
 
@@ -52,9 +53,6 @@ type DashboardData = {
   activeMissions: ActiveMission[];
 };
 
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
-
 const getStatusColor = (status: LeadStatus) => {
   const colors: Record<string, string> = {
     NEW: 'bg-blue-100 text-blue-800',
@@ -71,6 +69,7 @@ const getStatusColor = (status: LeadStatus) => {
 };
 
 export default function Dashboard() {
+  //const router = useRouter()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [selectedLead, setSelectedLead] = useState<LeadWithAssignee | null>(null);
   const [selectedMission, setSelectedMission] = useState<ActiveMission | null>(null);
@@ -290,7 +289,6 @@ export default function Dashboard() {
           </DialogHeader>
           {selectedLead && (
             <div className="space-y-4 sm:space-y-6">
-              {/* Contact Info */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -309,7 +307,6 @@ export default function Dashboard() {
 
               <Separator />
 
-              {/* Contact Details */}
               <div className="space-y-3">
                 <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
                   <Phone className="w-4 h-4" />
@@ -322,12 +319,14 @@ export default function Dashboard() {
                       {selectedLead.phone}
                     </a>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-                    <a href={`mailto:${selectedLead.email}`} className="text-primary hover:underline truncate">
-                      {selectedLead.email}
-                    </a>
-                  </div>
+                  {selectedLead.email && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                      <a href={`mailto:${selectedLead.email}`} className="text-primary hover:underline truncate">
+                        {selectedLead.email}
+                      </a>
+                    </div>
+                  )}
                   <div className="flex items-start gap-2 text-sm">
                     <MapPin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <span className="text-muted-foreground">{selectedLead.address}</span>
@@ -335,7 +334,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Company & Channel */}
               {(selectedLead.company || selectedLead.channel) && (
                 <>
                   <Separator />
@@ -364,7 +362,6 @@ export default function Dashboard() {
                 </>
               )}
 
-              {/* Assigned To */}
               {selectedLead.assignedTo && (
                 <>
                   <Separator />
@@ -389,13 +386,8 @@ export default function Dashboard() {
 
               <Separator />
 
-              {/* Action Button */}
               <Link href={`/leads/${selectedLead.id}`}>
-                <Button 
-                  className="w-full" 
-                  size="lg"
-                  onClick={() => router.push(`/leads/${selectedLead.id}`)}
-                >
+                <Button className="w-full" size="lg">
                   Voir la fiche complète
                   <ExternalLink className="w-4 h-4 ml-2" />
                 </Button>
@@ -405,7 +397,7 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Mission Detail Dialog - Mobile Optimized */}
+      {/* Mission Detail Dialog */}
       <Dialog open={!!selectedMission} onOpenChange={() => setSelectedMission(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -416,7 +408,6 @@ export default function Dashboard() {
           </DialogHeader>
           {selectedMission && (
             <div className="space-y-4 sm:space-y-6">
-              {/* Mission Header */}
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -433,7 +424,6 @@ export default function Dashboard() {
 
               <Separator />
 
-              {/* Client Info */}
               <div className="space-y-3">
                 <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
                   <Users className="w-4 h-4" />
@@ -453,7 +443,6 @@ export default function Dashboard() {
 
               <Separator />
 
-              {/* Tasks Progress */}
               <div className="space-y-3">
                 <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4" />
@@ -481,7 +470,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Mission Dates */}
               {(selectedMission.scheduledDate || selectedMission.createdAt) && (
                 <>
                   <Separator />
@@ -508,7 +496,6 @@ export default function Dashboard() {
 
               <Separator />
 
-              {/* Action Button */}
               <Link href={`/missions/${selectedMission.id}`}>
                 <Button className="w-full" size="lg">
                   Voir la mission complète
