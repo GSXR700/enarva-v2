@@ -30,6 +30,9 @@ import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { toast } from 'sonner'
 import { usePusherChannel } from '@/hooks/usePusherClient'
 import ClientOnly from '@/components/providers/ClientOnly'
+import { useRouter } from 'next/navigation';
+
+const router = useRouter();
 
 type LeadWithAssignee = Lead & { assignedTo?: User | null };
 
@@ -385,7 +388,11 @@ export default function Dashboard() {
 
               {/* Action Button */}
               <Link href={`/leads/${selectedLead.id}`}>
-                <Button className="w-full" size="lg">
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={() => router.push(`/leads/${selectedLead.id}`)}
+                >
                   Voir la fiche complète
                   <ExternalLink className="w-4 h-4 ml-2" />
                 </Button>
