@@ -109,12 +109,9 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
 
   // Logo placeholder (right side)
   doc.setFont('Poppins', 'bold');
-  doc.setFontSize(24);
+  doc.setFontSize(34);
   doc.text('enarva', PAGE_WIDTH - 150, 60);
-  doc.setFontSize(8);
-  doc.setFont('Poppins', 'normal');
-  doc.text('Premium home &', PAGE_WIDTH - 150, 80);
-  doc.text('facility care', PAGE_WIDTH - 150, 92);
+  
 
   yPos = 150;
 
