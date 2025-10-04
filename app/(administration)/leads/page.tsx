@@ -20,7 +20,6 @@ import { formatDate, translate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CardGridSkeleton } from '@/components/skeletons/CardGridSkeleton';
-import { useRouter } from 'next/navigation';
 
 type LeadWithRelations = Lead & { assignedTo?: User | null };
 
@@ -42,7 +41,6 @@ export default function LeadsPage() {
   const limit = 20;
 
   const queryClient = useQueryClient();
-  const router = useRouter();
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -174,28 +172,7 @@ export default function LeadsPage() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const updateStatusMutation = useOptimisticMutation<void, { id: string; status: LeadStatus }>({
-    queryKey: ['leads', page, limit, statusFilter, searchTerm],
-    mutationFn: async ({ id, status }) => {
-      const response = await fetch(`/api/leads/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      if (!response.ok) throw new Error('Failed to update status');
-    },
-    optimisticUpdate: (oldData: LeadsResponse, { id, status }) => {
-      if (!oldData) return oldData;
-      return {
-        ...oldData,
-        leads: oldData.leads.map(lead =>
-          lead.id === id ? { ...lead, status } : lead
-        )
-      };
-    },
-    successMessage: 'Statut mis à jour',
-    errorMessage: 'Erreur lors de la mise à jour'
-  });
+  // Removing unused mutation since status updates are handled through Pusher events
 
   const deleteMutation = useOptimisticMutation<void, string>({
     queryKey: ['leads', page, limit, statusFilter, searchTerm],
@@ -232,10 +209,6 @@ export default function LeadsPage() {
   const handleDelete = (id: string) => {
     if (!confirm('Supprimer ce lead?')) return;
     deleteMutation.mutate(id);
-  };
-
-  const handleStatusChange = (id: string, status: LeadStatus) => {
-    updateStatusMutation.mutate({ id, status });
   };
 
   const exportToCSV = () => {
@@ -504,8 +477,8 @@ export default function LeadsPage() {
                 {filteredLeads.map((lead) => (
                   <TableRow key={lead.id} className="hover:bg-muted/50">
                     <TableCell className="py-2 md:py-3">
-                      <div className="cursor-pointer" onClick={() => { setSelectedLead(lead); setIsDetailsOpen(true); }}>
-                        <p className="font-medium text-xs md:text-sm hover:text-primary">{lead.firstName} {lead.lastName}</p>
+                      <div>
+                        <p className="font-medium text-xs md:text-sm">{lead.firstName} {lead.lastName}</p>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                           <Phone className="w-3 h-3" />
                           <span className="truncate max-w-[120px]">{lead.phone}</span>
@@ -523,24 +496,12 @@ export default function LeadsPage() {
                       )}
                     </TableCell>
                     <TableCell className="py-2 md:py-3">
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <Select value={lead.status} onValueChange={(value) => handleStatusChange(lead.id, value as LeadStatus)}>
-                          <SelectTrigger className={`${getStatusColor(lead.status)} rounded-md px-2 h-8 w-auto text-xs font-medium border-0 hover:opacity-80 transition-opacity`}>
-                            <span className="flex items-center gap-1.5">
-                              {getStatusIcon(lead.status)}
-                              <span>{translate(lead.status)}</span>
-                            </span>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="NEW">Nouveau</SelectItem>
-                            <SelectItem value="QUALIFIED">Qualifié</SelectItem>
-                            <SelectItem value="QUOTE_SENT">Devis envoyé</SelectItem>
-                            <SelectItem value="QUOTE_ACCEPTED">Accepté</SelectItem>
-                            <SelectItem value="COMPLETED">Terminé</SelectItem>
-                            <SelectItem value="CANCELLED">Annulé</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <Badge variant="outline" className={`${getStatusColor(lead.status)} text-[10px] md:text-xs px-1.5 md:px-2 py-0.5`}>
+                        <span className="flex items-center gap-1">
+                          {getStatusIcon(lead.status)}
+                          <span className="hidden md:inline">{translate(lead.status)}</span>
+                        </span>
+                      </Badge>
                     </TableCell>
                     <TableCell className="py-2 md:py-3">
                       {getScoreBadge(lead.score || 0)}
@@ -558,7 +519,7 @@ export default function LeadsPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => router.push(`/leads/${lead.id}`)} className="text-xs">
+                          <DropdownMenuItem onClick={() => { setSelectedLead(lead); setIsDetailsOpen(true); }} className="text-xs">
                             <Eye className="w-3 h-3 mr-2" />Voir
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild className="text-xs">
@@ -589,28 +550,16 @@ export default function LeadsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {filteredLeads.map((lead) => (
-            <Card key={lead.id} className="hover:shadow-lg transition-shadow border-none cursor-pointer" onClick={() => { setSelectedLead(lead); setIsDetailsOpen(true); }}>
+            <Card key={lead.id} className="hover:shadow-lg transition-shadow border-none">
               <CardHeader className="pb-2 md:pb-3 p-3 md:p-4">
                 <div className="flex justify-between items-start gap-2">
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="text-sm md:text-base truncate hover:text-primary">{lead.firstName} {lead.lastName}</CardTitle>
+                    <CardTitle className="text-sm md:text-base truncate">{lead.firstName} {lead.lastName}</CardTitle>
                     <p className="text-xs text-muted-foreground truncate">{lead.phone}</p>
                   </div>
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Select value={lead.status} onValueChange={(value) => handleStatusChange(lead.id, value as LeadStatus)}>
-                      <SelectTrigger className={`${getStatusColor(lead.status)} rounded-md px-2 py-1 h-7 w-auto text-[10px] font-medium border-0 hover:opacity-80 transition-opacity shrink-0`}>
-                        <SelectValue>{translate(lead.status)}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NEW">Nouveau</SelectItem>
-                        <SelectItem value="QUALIFIED">Qualifié</SelectItem>
-                        <SelectItem value="QUOTE_SENT">Devis envoyé</SelectItem>
-                        <SelectItem value="QUOTE_ACCEPTED">Accepté</SelectItem>
-                        <SelectItem value="COMPLETED">Terminé</SelectItem>
-                        <SelectItem value="CANCELLED">Annulé</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Badge className={`${getStatusColor(lead.status)} text-[10px] px-1.5 py-0.5 shrink-0`}>
+                    {translate(lead.status)}
+                  </Badge>
                 </div>
                 </CardHeader>
               <CardContent className="space-y-2 md:space-y-3 p-3 md:p-4 pt-0">
@@ -644,16 +593,16 @@ export default function LeadsPage() {
                     <span className="text-xs font-medium">{lead.score || 0}%</span>
                   </div>
                 </div>
-                <div className="flex justify-between items-center pt-2 border-t" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center pt-2 border-t">
                   <span className="text-[10px] md:text-xs text-muted-foreground">{formatDate(lead.createdAt)}</span>
                   <div className="flex gap-1">
-                    <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); router.push(`/leads/${lead.id}`); }} className="h-7 w-7 p-0">
+                    <Button variant="outline" size="sm" onClick={() => { setSelectedLead(lead); setIsDetailsOpen(true); }} className="h-7 w-7 p-0">
                       <Eye className="w-3 h-3" />
                     </Button>
                     <Button variant="outline" size="sm" asChild className="h-7 w-7 p-0">
-                      <Link href={`/leads/${lead.id}/edit`} onClick={(e) => e.stopPropagation()}><Edit className="w-3 h-3" /></Link>
+                      <Link href={`/leads/${lead.id}/edit`}><Edit className="w-3 h-3" /></Link>
                     </Button>
-                    <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleDelete(lead.id); }} className="h-7 w-7 p-0 text-red-600 hover:text-red-700">
+                    <Button variant="outline" size="sm" onClick={() => handleDelete(lead.id)} className="h-7 w-7 p-0 text-red-600 hover:text-red-700">
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
