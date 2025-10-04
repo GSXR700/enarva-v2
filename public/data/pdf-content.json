@@ -81,14 +81,14 @@
         "Protection textile post-nettoyage"
       ],
       "equipementsUtilises": [
-        "Machine injection-extraction professionnelle",
+        "Machine EMILIO-RA Plus injection-extraction professionnelle",
         "Produits détachants spécialisés par type de textile",
         "Traitement anti-acariens hypoallergénique",
         "Séchoir professionnel",
         "Brosses spécifiques textiles délicats"
       ],
       "pricingType": "LINEAR_METER",
-      "pricePerLinearMeter": 100,
+      "pricePerLinearMeter": 120,
       "personnelSuggestions": {
         "baseTeamSize": 1,
         "perSquareMeter": 999

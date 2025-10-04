@@ -1,6 +1,7 @@
-// lib/pdf-generator.ts - ENHANCED MODULAR PDF GENERATOR
+// lib/pdf-generator.ts - ENHANCED MODULAR PDF GENERATOR WITH IMAGES
 import jsPDF from 'jspdf';
 import { poppinsNormal, poppinsBold } from './fonts';
+import { PDF_IMAGES } from './pdf-assets';
 import {
   BLUE_PRIMARY,
   BLUE_DARK,
@@ -72,7 +73,7 @@ export type QuotePDFData = {
 };
 
 /**
- * Generates a pixel-perfect PDF document matching Enarva's design
+ * Generates a pixel-perfect PDF document matching Enarva's design with embedded images
  */
 export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   const doc = new jsPDF({
@@ -97,6 +98,7 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   setFillColor(doc, BLUE_DARK);
   doc.rect(0, 0, PAGE_WIDTH, 120, 'F');
 
+  // Document type and info (left side)
   doc.setTextColor(255, 255, 255);
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(36);
@@ -107,11 +109,39 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   doc.text(`Date: ${data.date}`, MARGIN_LEFT, 80);
   doc.text(`N ° ${data.number}`, MARGIN_LEFT, 100);
 
-  // Logo placeholder (right side)
-  doc.setFont('Poppins', 'bold');
-  doc.setFontSize(34);
-  doc.text('enarva', PAGE_WIDTH - 150, 60);
-  
+  // Enarva logo (right side) - with transparent background
+  try {
+    if (PDF_IMAGES.LOGO_TRANSPARENT) {
+      const logoWidth = 120;
+      const logoHeight = 70;
+      const logoX = PAGE_WIDTH - MARGIN_RIGHT - logoWidth;
+      const logoY = 25;
+      
+      doc.addImage(
+        PDF_IMAGES.LOGO_TRANSPARENT,
+        'PNG',
+        logoX,
+        logoY,
+        logoWidth,
+        logoHeight,
+        undefined,
+        'FAST'
+      );
+    } else {
+      throw new Error('Logo not available');
+    }
+  } catch (e) {
+    // Fallback to text if image fails
+    console.warn("Could not add logo, using text fallback:", e);
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(24);
+    doc.setTextColor(255, 255, 255);
+    doc.text('enarva', PAGE_WIDTH - 150, 60);
+    doc.setFontSize(8);
+    doc.setFont('Poppins', 'normal');
+    doc.text('Premium home &', PAGE_WIDTH - 150, 80);
+    doc.text('facility care', PAGE_WIDTH - 150, 92);
+  }
 
   yPos = 150;
 
@@ -241,6 +271,7 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   setFillColor(doc, BLUE_DARK);
   doc.rect(0, footerY, PAGE_WIDTH, 120, 'F');
   
+  // Contact info (left side)
   doc.setTextColor(255, 255, 255);
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(12);
@@ -252,16 +283,28 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   doc.text('www.enarva.com', MARGIN_LEFT + 20, footerY + 60);
   doc.text('contact@enarva.com', MARGIN_LEFT + 20, footerY + 75);
 
-  // QR Code / Barcode image in the center
+  // QR Code / Barcode (center of footer)
   try {
-    const barcodeX = (PAGE_WIDTH / 2) - 40;
-    // Placeholder for barcode image
-    // To add the actual image, uncomment:
-    // doc.addImage('/images/dark-mobile.png', 'PNG', barcodeX, footerY + 15, 80, 80);
-    doc.setFontSize(8);
-    doc.text('QR Code', barcodeX + 30, footerY + 55);
+    if (PDF_IMAGES.BARCODE) {
+      const barcodeWidth = 80;
+      const barcodeHeight = 80;
+      const barcodeX = (PAGE_WIDTH / 2) - (barcodeWidth / 2);
+      const barcodeY = footerY + 20;
+      
+      doc.addImage(
+        PDF_IMAGES.BARCODE,
+        'PNG',
+        barcodeX,
+        barcodeY,
+        barcodeWidth,
+        barcodeHeight,
+        undefined,
+        'FAST'
+      );
+    }
   } catch (e) {
     console.warn("Could not add barcode image:", e);
+    // No fallback needed - just skip the barcode
   }
   
   // Company details (right side)
