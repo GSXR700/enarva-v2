@@ -108,43 +108,20 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   // Document type (left side - vertically centered)
   doc.setTextColor(255, 255, 255);
   doc.setFont('Poppins', 'bold');
-  doc.setFontSize(32);
-  doc.text(data.docType, MARGIN_LEFT, 45);
+  doc.setFontSize(36);
+  doc.text(data.docType, MARGIN_LEFT, 50);
 
   // Date and number below DEVIS (smaller and closer)
   doc.setFont('Poppins', 'normal');
   doc.setFontSize(9);
-  doc.text(`Date: ${data.date}`, MARGIN_LEFT, 65);
-  doc.text(`N ° ${data.number}`, MARGIN_LEFT, 80);
+  doc.text(`Date: ${data.date}`, MARGIN_LEFT, 70);
+  doc.text(`N ° ${data.number}`, MARGIN_LEFT, 85);
 
-  // Enarva logo (right side - smaller and aligned)
-  try {
-    if (PDF_IMAGES.LOGO_TRANSPARENT) {
-      const logoWidth = 80;
-      const logoHeight = 50;
-      const logoX = PAGE_WIDTH - MARGIN_RIGHT - logoWidth;
-      const logoY = 25;
-      
-      doc.addImage(
-        PDF_IMAGES.LOGO_TRANSPARENT,
-        'PNG',
-        logoX,
-        logoY,
-        logoWidth,
-        logoHeight,
-        undefined,
-        'FAST'
-      );
-    } else {
-      throw new Error('Logo not available');
-    }
-  } catch (e) {
-    console.warn("Could not add logo, using text fallback:", e);
-    doc.setFont('Poppins', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(255, 255, 255);
-    doc.text('enarva', PAGE_WIDTH - 120, 50);
-  }
+  // BIG Enarva logo TEXT (right side - aligned)
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(40);
+  doc.setTextColor(255, 255, 255);
+  doc.text('enarva', PAGE_WIDTH - MARGIN_RIGHT - 130, 55);
 
   yPos = 120;
 
@@ -194,13 +171,13 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     yPos += 20;
   }
 
-  // 4. OBJET SECTION - CENTERED TEXT IN BLUE ROUNDED BOX
-  const objetBoxHeight = 30;
+  // 4. OBJET SECTION - CENTERED TEXT IN BLUE ROUNDED BOX (FABULOUS COLOR)
+  const objetBoxHeight = 32;
   const objetBoxY = yPos;
   
-  // Blue rounded rectangle with gradient
-  doc.setFillColor(41, 98, 255);
-  doc.roundedRect(MARGIN_LEFT, objetBoxY, CONTENT_WIDTH, objetBoxHeight, 5, 5, 'F');
+  // Beautiful blue rounded rectangle
+  doc.setFillColor(59, 130, 246);
+  doc.roundedRect(MARGIN_LEFT, objetBoxY, CONTENT_WIDTH, objetBoxHeight, 8, 8, 'F');
   
   // Centered white bold text
   doc.setTextColor(255, 255, 255);
@@ -209,7 +186,7 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   const objetText = `OBJET : ${data.project.objet}`;
   const objetTextWidth = doc.getTextWidth(objetText);
   const objetTextX = MARGIN_LEFT + (CONTENT_WIDTH - objetTextWidth) / 2;
-  doc.text(objetText, objetTextX, objetBoxY + 19);
+  doc.text(objetText, objetTextX, objetBoxY + 20);
 
   yPos = objetBoxY + objetBoxHeight + 25;
 
@@ -220,32 +197,30 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     yPos = renderProductTable(doc, data.lineItems, yPos, data.project.serviceType);
   }
 
-  // 6. TABLE WITH GRADIENT HEADER
+  // 6. PROFESSIONAL TABLE WITH GRADIENT HEADER AND BORDER RADIUS
   yPos += 10;
   const tableStartY = yPos;
-  const headerRowHeight = 40;
-  const dataRowHeight = 45;
+  const headerRowHeight = 45;
+  const dataRowHeight = 50;
+  const tableRadius = 8;
 
-  // Table header with gradient
-  for (let i = 0; i < headerRowHeight; i++) {
-    const ratio = i / headerRowHeight;
-    const r = Math.floor(28 + (30 - 28) * ratio);
-    const g = Math.floor(63 + (58 - 63) * ratio);
-    const b = Math.floor(145 + (138 - 145) * ratio);
-    doc.setFillColor(r, g, b);
-    doc.rect(MARGIN_LEFT, tableStartY + i, CONTENT_WIDTH, 1, 'F');
-  }
+  // Table header with gradient and rounded top
+  doc.setFillColor(30, 58, 138);
+  doc.roundedRect(MARGIN_LEFT, tableStartY, CONTENT_WIDTH, headerRowHeight, tableRadius, tableRadius, 'F');
+  
+  // Cover bottom corners to make them square
+  doc.rect(MARGIN_LEFT, tableStartY + headerRowHeight - tableRadius, CONTENT_WIDTH, tableRadius, 'F');
 
-  // Header text
+  // Header text with proper spacing
   doc.setTextColor(255, 255, 255);
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
-  doc.text('Désignation', MARGIN_LEFT + 10, tableStartY + 25);
-  doc.text('Quantité', MARGIN_LEFT + 310, tableStartY + 25, { align: 'center' });
-  doc.text('Prix unit. HT', MARGIN_LEFT + 410, tableStartY + 25, { align: 'center' });
-  doc.text('Total HT', MARGIN_LEFT + CONTENT_WIDTH - 10, tableStartY + 25, { align: 'right' });
+  doc.text('Désignation', MARGIN_LEFT + 15, tableStartY + 28);
+  doc.text('Quantité', MARGIN_LEFT + 330, tableStartY + 28, { align: 'center' });
+  doc.text('Prix unit. HT', MARGIN_LEFT + 420, tableStartY + 28, { align: 'center' });
+  doc.text('Total HT', MARGIN_LEFT + CONTENT_WIDTH - 15, tableStartY + 28, { align: 'right' });
 
-  // Data row
+  // Data row with white background
   yPos = tableStartY + headerRowHeight;
   doc.setFillColor(255, 255, 255);
   doc.rect(MARGIN_LEFT, yPos, CONTENT_WIDTH, dataRowHeight, 'F');
@@ -253,20 +228,26 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   setColor(doc, TEXT_DARK);
   doc.setFont('Poppins', 'normal');
   doc.setFontSize(9);
-  doc.text(data.project.objet, MARGIN_LEFT + 10, yPos + 25);
-  doc.text('Forfait', MARGIN_LEFT + 310, yPos + 25, { align: 'center' });
-  doc.text(formatCurrency(data.pricing.subTotalHT), MARGIN_LEFT + 410, yPos + 25, { align: 'center' });
-  doc.text(formatCurrency(data.pricing.subTotalHT), MARGIN_LEFT + CONTENT_WIDTH - 10, yPos + 25, { align: 'right' });
+  
+  // Designation (reduced width for better spacing)
+  const designationLines = doc.splitTextToSize(data.project.objet, 280);
+  designationLines.forEach((line: string, index: number) => {
+    doc.text(line, MARGIN_LEFT + 15, yPos + 20 + (index * 12));
+  });
+  
+  doc.text('Forfait', MARGIN_LEFT + 330, yPos + 28, { align: 'center' });
+  doc.text(formatCurrency(data.pricing.subTotalHT), MARGIN_LEFT + 420, yPos + 28, { align: 'center' });
+  doc.text(formatCurrency(data.pricing.subTotalHT), MARGIN_LEFT + CONTENT_WIDTH - 15, yPos + 28, { align: 'right' });
 
-  // Table border
-  doc.setDrawColor(41, 98, 255);
-  doc.setLineWidth(1);
-  doc.rect(MARGIN_LEFT, tableStartY, CONTENT_WIDTH, headerRowHeight + dataRowHeight);
+  // Table border with rounded corners
+  doc.setDrawColor(30, 58, 138);
+  doc.setLineWidth(1.5);
+  doc.roundedRect(MARGIN_LEFT, tableStartY, CONTENT_WIDTH, headerRowHeight + dataRowHeight, tableRadius, tableRadius, 'S');
   doc.line(MARGIN_LEFT, tableStartY + headerRowHeight, MARGIN_LEFT + CONTENT_WIDTH, tableStartY + headerRowHeight);
 
-  yPos += dataRowHeight + 20;
+  yPos += dataRowHeight + 25;
 
-  // 7. PRICING SECTION WITH SEPARATOR
+  // 7. PRICING SECTION WITH SEPARATOR (PRIX BIEN POSITIONNÉ)
   const pricingY = yPos;
   const amountInWordsLower = data.pricing.amountInWords.toLowerCase();
   const priceText = data.docType === 'DEVIS'
@@ -277,35 +258,37 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(9);
   setColor(doc, BLUE_PRIMARY);
-  const priceLines = doc.splitTextToSize(priceText, 320);
+  const priceLines = doc.splitTextToSize(priceText, 300);
   priceLines.forEach((line: string, index: number) => {
-    doc.text(line, MARGIN_LEFT, pricingY + (index * 12));
+    doc.text(line, MARGIN_LEFT, pricingY + (index * 14));
   });
 
   // Vertical separator (stylish blue line)
-  const separatorX = MARGIN_LEFT + 340;
-  doc.setDrawColor(41, 98, 255);
-  doc.setLineWidth(2);
-  doc.line(separatorX, pricingY - 10, separatorX, pricingY + 50);
+  const separatorX = MARGIN_LEFT + 320;
+  doc.setDrawColor(59, 130, 246);
+  doc.setLineWidth(3);
+  doc.line(separatorX, pricingY - 5, separatorX, pricingY + 45);
 
-  // Right side - prices
-  const priceBoxX = separatorX + 20;
+  // Right side - PRIX BIEN VISIBLE ET ALIGNÉ
+  const priceBoxX = separatorX + 25;
   doc.setFont('Poppins', 'bold');
-  doc.setFontSize(11);
+  doc.setFontSize(12);
   setColor(doc, TEXT_DARK);
 
   if (data.docType === 'FACTURE') {
-    doc.text('MONTANT TOTAL HT', priceBoxX, pricingY);
-    doc.text(`: ${formatCurrency(data.pricing.subTotalHT)}`, priceBoxX + 140, pricingY);
+    doc.text('MONTANT TOTAL HT', priceBoxX, pricingY + 5);
+    doc.text(`: ${formatCurrency(data.pricing.subTotalHT)}`, priceBoxX + 145, pricingY + 5);
     
-    doc.text('TVA (20%)', priceBoxX, pricingY + 18);
-    doc.text(`: ${formatCurrency(data.pricing.vatAmount)}`, priceBoxX + 140, pricingY + 18);
+    doc.text('TVA (20%)', priceBoxX, pricingY + 23);
+    doc.text(`: ${formatCurrency(data.pricing.vatAmount)}`, priceBoxX + 145, pricingY + 23);
     
-    doc.text('TOTAL TTC', priceBoxX, pricingY + 36);
-    doc.text(`: ${formatCurrency(data.pricing.totalTTC)}`, priceBoxX + 140, pricingY + 36);
+    doc.setFontSize(13);
+    doc.text('TOTAL TTC', priceBoxX, pricingY + 41);
+    doc.text(`: ${formatCurrency(data.pricing.totalTTC)}`, priceBoxX + 145, pricingY + 41);
   } else {
-    doc.text('MONTANT TOTAL HT', priceBoxX, pricingY + 15);
-    doc.text(`: ${formatCurrency(data.pricing.subTotalHT)}`, priceBoxX + 140, pricingY + 15);
+    doc.setFontSize(13);
+    doc.text('MONTANT TOTAL HT', priceBoxX, pricingY + 20);
+    doc.text(`: ${formatCurrency(data.pricing.subTotalHT)}`, priceBoxX + 160, pricingY + 20);
   }
 
   yPos += 70;
@@ -326,11 +309,11 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   });
 
   // 9. FOOTER WITH GRADIENT
-  const footerY = PAGE_HEIGHT - 100;
+  const footerY = PAGE_HEIGHT - 110;
   
   // Gradient footer
-  for (let i = 0; i < 100; i++) {
-    const ratio = i / 100;
+  for (let i = 0; i < 110; i++) {
+    const ratio = i / 110;
     const r = Math.floor(28 + (30 - 28) * ratio);
     const g = Math.floor(63 + (58 - 63) * ratio);
     const b = Math.floor(145 + (138 - 145) * ratio);
@@ -345,33 +328,37 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   doc.text('CONTACTEZ-NOUS !', MARGIN_LEFT, footerY + 25);
 
   doc.setFont('Poppins', 'normal');
-  doc.setFontSize(9);
-  doc.text('06 38 146-573', MARGIN_LEFT + 10, footerY + 45);
-  doc.text('www.enarva.com', MARGIN_LEFT + 10, footerY + 60);
-  doc.text('contact@enarva.com', MARGIN_LEFT + 10, footerY + 75);
+  doc.setFontSize(8);
+  doc.text('06 38 146-573', MARGIN_LEFT + 5, footerY + 45);
+  doc.text('www.enarva.com', MARGIN_LEFT + 5, footerY + 60);
+  doc.text('contact@enarva.com', MARGIN_LEFT + 5, footerY + 75);
 
-  // Center: QR Code (exact same position)
+  // Center: QR Code
   try {
     if (PDF_IMAGES.BARCODE) {
-      const qrSize = 70;
+      const qrSize = 75;
       const qrX = (PAGE_WIDTH / 2) - (qrSize / 2);
-      const qrY = footerY + 15;
+      const qrY = footerY + 18;
       doc.addImage(PDF_IMAGES.BARCODE, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'FAST');
     }
   } catch (e) {
     console.warn("QR code error:", e);
   }
 
-  // Right: Company info (adjusted)
+  // Right: Small enarva logo text + Company info
   doc.setFont('Poppins', 'bold');
-  doc.setFontSize(10);
-  doc.text('Enarva SARL AU', PAGE_WIDTH - MARGIN_RIGHT, footerY + 25, { align: 'right' });
+  doc.setFontSize(16);
+  doc.text('enarva', PAGE_WIDTH - MARGIN_RIGHT - 85, footerY + 22, { align: 'left' });
+  
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(9);
+  doc.text('Enarva SARL AU', PAGE_WIDTH - MARGIN_RIGHT, footerY + 40, { align: 'right' });
 
   doc.setFont('Poppins', 'normal');
-  doc.setFontSize(8);
-  doc.text(`IF: ${data.company.if}  RC: ${data.company.rc}`, PAGE_WIDTH - MARGIN_RIGHT, footerY + 45, { align: 'right' });
-  doc.text(`ICE: ${data.company.ice}`, PAGE_WIDTH - MARGIN_RIGHT, footerY + 60, { align: 'right' });
-  doc.text(`RIB: ${data.company.rib}`, PAGE_WIDTH - MARGIN_RIGHT, footerY + 75, { align: 'right' });
+  doc.setFontSize(7);
+  doc.text(`IF: ${data.company.if}  RC: ${data.company.rc}`, PAGE_WIDTH - MARGIN_RIGHT, footerY + 55, { align: 'right' });
+  doc.text(`ICE: ${data.company.ice}`, PAGE_WIDTH - MARGIN_RIGHT, footerY + 67, { align: 'right' });
+  doc.text(`RIB: ${data.company.rib}`, PAGE_WIDTH - MARGIN_RIGHT, footerY + 79, { align: 'right' });
 
   const buffer = doc.output('arraybuffer');
   return new Uint8Array(buffer);
