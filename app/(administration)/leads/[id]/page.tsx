@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Separator } from '@/components/ui/separator'
 import { 
   ArrowLeft, 
   Phone, 
@@ -21,7 +20,6 @@ import {
   Trash2,
   FileText,
   ClipboardList,
-  TrendingUp,
   User,
   Users,
   Package,
@@ -29,13 +27,12 @@ import {
   Clock,
   Target,
   AlertCircle,
-  CheckCircle2,
   Activity,
   Plus,
-  ExternalLink,
-  Loader2
+  Loader2,
+  Eye
 } from 'lucide-react'
-import { Lead, Quote, Mission, Activity as ActivityType, User as UserType } from '@prisma/client'
+import { Lead, Quote, Mission, Activity as ActivityType, User as UserType, LeadStatus, QuoteStatus } from '@prisma/client'
 import { formatDate, formatCurrency, translate } from '@/lib/utils'
 import { toast } from 'sonner'
 import { usePusherChannel } from '@/hooks/usePusherClient'
@@ -55,15 +52,61 @@ type LeadWithRelations = Lead & {
   })[]
 }
 
-const statusColors = {
+// FIXED: Complete statusColors mapping with ALL LeadStatus enum values
+const statusColors: Record<LeadStatus, string> = {
   NEW: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800',
-  CONTACTED: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800',
+  TO_QUALIFY: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
+  WAITING_INFO: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800',
   QUALIFIED: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800',
-  PROPOSAL_SENT: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
-  NEGOTIATION: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800',
-  WON: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
-  LOST: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
-  FOLLOW_UP: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+  VISIT_PLANNED: 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400 border-sky-200 dark:border-sky-800',
+  ON_VISIT: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400 border-teal-200 dark:border-teal-800',
+  VISIT_DONE: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+  QUOTE_SENT: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
+  QUOTE_ACCEPTED: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
+  QUOTE_REFUSED: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400 border-rose-200 dark:border-rose-800',
+  MISSION_SCHEDULED: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 border-violet-200 dark:border-violet-800',
+  IN_PROGRESS: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+  COMPLETED: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
+  INTERVENTION_PLANNED: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800',
+  INTERVENTION_IN_PROGRESS: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
+  INTERVENTION_DONE: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400 border-teal-200 dark:border-teal-800',
+  QUALITY_CONTROL: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800',
+  CLIENT_TO_CONFIRM_END: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800',
+  CLIENT_CONFIRMED: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+  DELIVERY_PLANNED: 'bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-400 border-lime-200 dark:border-lime-800',
+  DELIVERY_DONE: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
+  SIGNED_DELIVERY_NOTE: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+  PENDING_PAYMENT: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
+  PAID_OFFICIAL: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
+  PAID_CASH: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400 border-teal-200 dark:border-teal-800',
+  REFUNDED: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+  PENDING_REFUND: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800',
+  FOLLOW_UP_SENT: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+  UPSELL_IN_PROGRESS: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 border-violet-200 dark:border-violet-800',
+  UPSELL_CONVERTED: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
+  REWORK_PLANNED: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800',
+  REWORK_DONE: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400 border-teal-200 dark:border-teal-800',
+  UNDER_WARRANTY: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+  AFTER_SALES_SERVICE: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800',
+  CLIENT_ISSUE: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
+  IN_DISPUTE: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400 border-rose-200 dark:border-rose-800',
+  CLIENT_PAUSED: 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400 border-slate-200 dark:border-slate-800',
+  LEAD_LOST: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
+  CANCELLED: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400 border-gray-200 dark:border-gray-800',
+  CANCELED_BY_CLIENT: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
+  CANCELED_BY_ENARVA: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800',
+  INTERNAL_REVIEW: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
+  AWAITING_PARTS: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+  CONTRACT_SIGNED: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
+  UNDER_CONTRACT: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+  SUBCONTRACTED: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 border-violet-200 dark:border-violet-800',
+  OUTSOURCED: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800',
+  WAITING_THIRD_PARTY: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
+  PRODUCT_ONLY: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800',
+  PRODUCT_SUPPLIER: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400 border-teal-200 dark:border-teal-800',
+  DELIVERY_ONLY: 'bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-400 border-lime-200 dark:border-lime-800',
+  AFFILIATE_LEAD: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+  SUBCONTRACTOR_LEAD: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
 }
 
 const leadTypeIcons = {
@@ -92,13 +135,15 @@ const missionStatusColors = {
   CANCELLED: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
 }
 
-const quoteStatusColors = {
+// FIXED: Added CANCELLED status to quoteStatusColors
+const quoteStatusColors: Record<QuoteStatus, string> = {
   DRAFT: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
   SENT: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
   VIEWED: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
   ACCEPTED: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
   REJECTED: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  EXPIRED: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+  EXPIRED: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  CANCELLED: 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400'
 }
 
 export default function LeadDetailsPage() {
@@ -254,48 +299,30 @@ export default function LeadDetailsPage() {
             disabled={isDeleting}
           >
             {isDeleting ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Suppression...
+              </>
             ) : (
-              <Trash2 className="h-4 w-4 mr-2" />
+              <>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Supprimer
+              </>
             )}
-            Supprimer
           </Button>
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <Card className="thread-card bg-gradient-to-r from-enarva-start/10 to-enarva-end/10 border-enarva-start/20">
-        <CardHeader>
-          <CardTitle className="text-lg">Actions Rapides</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Link href={`/quotes/new?leadId=${lead.id}`} className="block">
-              <Button className="w-full" variant="default">
-                <FileText className="h-4 w-4 mr-2" />
-                Créer un Devis
-              </Button>
-            </Link>
-            <Link href={`/missions/new?leadId=${lead.id}`} className="block">
-              <Button className="w-full" variant="outline">
-                <ClipboardList className="h-4 w-4 mr-2" />
-                Créer une Mission
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Overview Cards - Mobile Optimized */}
+      {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="thread-card">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Score</p>
-                <p className={`text-2xl font-bold ${scoreColor}`}>{lead.score}/100</p>
+                <p className="text-sm text-muted-foreground">Score Lead</p>
+                <p className={`text-2xl font-bold ${scoreColor}`}>{lead.score || 0}%</p>
               </div>
-              <Target className={`h-8 w-8 ${scoreColor}`} />
+              <Target className="h-8 w-8 text-enarva-start" />
             </div>
           </CardContent>
         </Card>
@@ -367,51 +394,36 @@ export default function LeadDetailsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Phone className="h-5 w-5 text-enarva-start" />
-                Informations de Contact
+                Coordonnées
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Téléphone</label>
-                  <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-foreground hover:text-enarva-start transition-colors mt-1">
+                  <p className="mt-1 font-medium flex items-center gap-2">
                     <Phone className="h-4 w-4" />
                     {lead.phone}
-                  </a>
+                  </p>
                 </div>
 
                 {lead.email && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Email</label>
-                    <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-foreground hover:text-enarva-start transition-colors mt-1">
+                    <p className="mt-1 font-medium flex items-center gap-2">
                       <Mail className="h-4 w-4" />
                       {lead.email}
-                    </a>
+                    </p>
                   </div>
                 )}
 
                 {lead.address && (
                   <div className="sm:col-span-2">
                     <label className="text-sm font-medium text-muted-foreground">Adresse</label>
-                    <div className="flex items-start gap-2 mt-1">
-                      <MapPin className="h-4 w-4 mt-1 flex-shrink-0 text-muted-foreground" />
-                      <span>{lead.address}</span>
-                    </div>
-                  </div>
-                )}
-
-                {lead.gpsLocation && (
-                  <div className="sm:col-span-2">
-                    <label className="text-sm font-medium text-muted-foreground">Localisation GPS</label>
-                    <a 
-                      href={lead.gpsLocation} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline mt-1"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      Voir sur Google Maps
-                    </a>
+                    <p className="mt-1 flex items-start gap-2">
+                      <MapPin className="h-4 w-4 mt-1 flex-shrink-0" />
+                      {lead.address}
+                    </p>
                   </div>
                 )}
               </div>
@@ -429,7 +441,7 @@ export default function LeadDetailsPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
+                    <div>
                     <label className="text-sm font-medium text-muted-foreground">Type de Lead</label>
                     <p className="mt-1 font-medium">{translate(lead.leadType)}</p>
                   </div>
@@ -497,17 +509,22 @@ export default function LeadDetailsPage() {
                   </div>
                 )}
 
-                {lead.accessibility && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Accessibilité</label>
-                    <p className="mt-1">{translate(lead.accessibility)}</p>
-                  </div>
-                )}
-
                 {lead.budgetRange && (
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Budget</label>
-                    <p className="mt-1">{translate(lead.budgetRange)}</p>
+                    <p className="mt-1 flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      {lead.budgetRange}
+                    </p>
+                  </div>
+                )}
+
+                {lead.urgencyLevel && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Niveau d'Urgence</label>
+                    <Badge className={urgencyColors[lead.urgencyLevel]}>
+                      {translate(lead.urgencyLevel)}
+                    </Badge>
                   </div>
                 )}
 
@@ -518,85 +535,47 @@ export default function LeadDetailsPage() {
                   </div>
                 )}
 
-                {lead.contractType && (
+                {lead.channel && (
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Type de Contrat</label>
-                    <p className="mt-1">{translate(lead.contractType)}</p>
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Besoin de Produits</label>
-                  <p className="mt-1">{lead.needsProducts ? 'Oui' : 'Non'}</p>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Besoin d'Équipement</label>
-                  <p className="mt-1">{lead.needsEquipment ? 'Oui' : 'Non'}</p>
-                </div>
-
-                {lead.providedBy && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Fourni Par</label>
-                    <p className="mt-1">{translate(lead.providedBy)}</p>
-                  </div>
-                )}
-
-                {lead.enarvaRole && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Rôle Enarva</label>
-                    <p className="mt-1">{translate(lead.enarvaRole)}</p>
+                    <label className="text-sm font-medium text-muted-foreground">Canal d'Acquisition</label>
+                    <p className="mt-1">{translate(lead.channel)}</p>
                   </div>
                 )}
               </div>
-
-              {lead.materials && (
-                <div className="mt-4">
-                  <label className="text-sm font-medium text-muted-foreground">Matériaux Demandés</label>
-                  <div className="mt-2 p-4 bg-secondary/50 rounded-lg">
-                    <pre className="text-sm whitespace-pre-wrap">
-                      {JSON.stringify(lead.materials, null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 
-          {/* Source & Assignment */}
+          {/* Assignment Information */}
           <Card className="thread-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-enarva-start" />
-                Source & Affectation
+                <Users className="h-5 w-5 text-enarva-start" />
+                Gestion
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Canal</label>
-                  <p className="mt-1">{translate(lead.channel)}</p>
+                  <label className="text-sm font-medium text-muted-foreground">Date de Création</label>
+                  <p className="mt-1 flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    {formatDate(lead.createdAt)}
+                  </p>
                 </div>
 
-                {lead.source && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Source</label>
-                    <p className="mt-1">{lead.source}</p>
-                  </div>
-                )}
-
-                {lead.hasReferrer && lead.referrerContact && (
-                  <div className="sm:col-span-2">
-                    <label className="text-sm font-medium text-muted-foreground">Parrain</label>
-                    <p className="mt-1">{lead.referrerContact}</p>
-                  </div>
-                )}
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Dernière Mise à Jour</label>
+                  <p className="mt-1 flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    {formatDate(lead.updatedAt)}
+                  </p>
+                </div>
 
                 {lead.assignedTo && (
-                  <div className="sm:col-span-2">
+                  <div>
                     <label className="text-sm font-medium text-muted-foreground">Assigné à</label>
-                    <div className="flex items-center gap-3 mt-2">
-                      <Avatar className="h-10 w-10">
+                    <div className="mt-2 flex items-center gap-3">
+                      <Avatar>
                         <AvatarImage src={lead.assignedTo.image || undefined} />
                         <AvatarFallback>
                           {lead.assignedTo.name?.charAt(0).toUpperCase() || 'U'}
@@ -699,72 +678,39 @@ export default function LeadDetailsPage() {
               {lead.missions.map((mission) => (
                 <Card key={mission.id} className="thread-card hover:shadow-md transition-shadow">
                   <CardContent className="p-4 sm:p-6">
-                    <div className="flex flex-col gap-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-semibold text-lg">{mission.missionNumber}</h3>
-                            <Badge className={missionStatusColors[mission.status]}>
-                              {translate(mission.status)}
-                            </Badge>
-                          </div>
-                          <div className="space-y-1 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4" />
-                              <span>Planifié: {formatDate(mission.scheduledDate)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-4 w-4" />
-                              <span>Durée estimée: {mission.estimatedDuration}h</span>
-                            </div>
-                            {mission.address && (
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4" />
-                                <span>{mission.address}</span>
-                              </div>
-                            )}
-                          </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="font-semibold text-lg">{mission.missionNumber}</h3>
+                          <Badge className={missionStatusColors[mission.status]}>
+                            {translate(mission.status)}
+                          </Badge>
                         </div>
-
-                        <div className="flex flex-col gap-2">
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                          <p className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            {formatDate(mission.scheduledDate)}
+                          </p>
+                          <p className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            {mission.address}
+                          </p>
                           {mission.teamLeader && (
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={mission.teamLeader.image || undefined} />
-                                <AvatarFallback>
-                                  {mission.teamLeader.name?.charAt(0).toUpperCase() || 'T'}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="text-sm">
-                                <p className="font-medium">{mission.teamLeader.name}</p>
-                                <p className="text-muted-foreground">Chef d'équipe</p>
-                              </div>
-                            </div>
+                            <p className="flex items-center gap-2">
+                              <User className="h-4 w-4" />
+                              Chef d'équipe: {mission.teamLeader.name}
+                            </p>
                           )}
-                          <Link href={`/missions/${mission.id}`}>
-                            <Button variant="outline" size="sm" className="w-full">
-                              <Eye className="h-4 w-4 mr-2" />
-                              Voir détails
-                            </Button>
-                          </Link>
                         </div>
                       </div>
-
-                      {mission.quote && (
-                        <Separator />
-                      )}
-
-                      {mission.quote && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Devis associé:</span>
-                          <Link 
-                            href={`/quotes/${mission.quote.id}`}
-                            className="text-enarva-start hover:underline font-medium"
-                          >
-                            {mission.quote.quoteNumber}
-                          </Link>
-                        </div>
-                      )}
+                      <div className="flex flex-col sm:items-end gap-2">
+                        <Link href={`/missions/${mission.id}`}>
+                          <Button variant="outline" size="sm">
+                            <Eye className="h-4 w-4 mr-2" />
+                            Voir mission
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -792,43 +738,42 @@ export default function LeadDetailsPage() {
         {/* Activity Tab */}
         <TabsContent value="activity" className="mt-6">
           {lead.activities && lead.activities.length > 0 ? (
-            <Card className="thread-card">
-              <CardContent className="p-4 sm:p-6">
-                <div className="space-y-4">
-                  {lead.activities.map((activity, index) => (
-                    <div key={activity.id}>
-                      <div className="flex gap-4">
-                        <div className="flex-shrink-0">
-                          <div className="h-10 w-10 rounded-full bg-enarva-start/10 flex items-center justify-center">
-                            <Activity className="h-5 w-5 text-enarva-start" />
-                          </div>
+            <div className="space-y-4">
+              {lead.activities.map((activity) => (
+                <Card key={activity.id} className="thread-card">
+                  <CardContent className="p-4">
+                    <div className="flex gap-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-enarva-start/10 flex items-center justify-center">
+                          <Activity className="h-5 w-5 text-enarva-start" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1">
-                            <h4 className="font-semibold text-sm">{activity.title}</h4>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDate(activity.createdAt)}
-                            </span>
-                          </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h4 className="font-medium text-sm">{activity.title}</h4>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDate(activity.createdAt)}
+                          </span>
+                        </div>
+                        {activity.description && (
                           <p className="text-sm text-muted-foreground mb-2">
                             {activity.description}
                           </p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Badge variant="outline" className="text-xs">
-                              {translate(activity.type)}
-                            </Badge>
-                            <span>Par {activity.user.name || 'Système'}</span>
-                          </div>
+                        )}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <User className="h-3 w-3" />
+                          <span>{activity.user.name}</span>
+                          <span>•</span>
+                          <Badge variant="outline" className="text-xs">
+                            {translate(activity.type)}
+                          </Badge>
                         </div>
                       </div>
-                      {index < lead.activities.length - 1 && (
-                        <Separator className="my-4" />
-                      )}
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           ) : (
             <Card className="thread-card">
               <CardContent className="py-10 text-center">
