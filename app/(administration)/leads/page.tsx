@@ -525,10 +525,10 @@ export default function LeadsPage() {
                     <TableCell className="py-2 md:py-3">
                       <div onClick={(e) => e.stopPropagation()}>
                         <Select value={lead.status} onValueChange={(value) => handleStatusChange(lead.id, value as LeadStatus)}>
-                          <SelectTrigger className={`${getStatusColor(lead.status)} text-[10px] md:text-xs h-7 w-auto border-0`}>
-                            <span className="flex items-center gap-1">
+                          <SelectTrigger className={`${getStatusColor(lead.status)} rounded-md px-2 h-8 w-auto text-xs font-medium border-0 hover:opacity-80 transition-opacity`}>
+                            <span className="flex items-center gap-1.5">
                               {getStatusIcon(lead.status)}
-                              <span className="hidden md:inline">{translate(lead.status)}</span>
+                              <span>{translate(lead.status)}</span>
                             </span>
                           </SelectTrigger>
                           <SelectContent>
@@ -598,7 +598,7 @@ export default function LeadsPage() {
                   </div>
                   <div onClick={(e) => e.stopPropagation()}>
                     <Select value={lead.status} onValueChange={(value) => handleStatusChange(lead.id, value as LeadStatus)}>
-                      <SelectTrigger className={`${getStatusColor(lead.status)} text-[10px] px-1.5 py-0.5 h-6 w-auto border-0 shrink-0`}>
+                      <SelectTrigger className={`${getStatusColor(lead.status)} rounded-md px-2 py-1 h-7 w-auto text-[10px] font-medium border-0 hover:opacity-80 transition-opacity shrink-0`}>
                         <SelectValue>{translate(lead.status)}</SelectValue>
                       </SelectTrigger>
                       <SelectContent>
