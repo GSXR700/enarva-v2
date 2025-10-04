@@ -4,7 +4,7 @@ const path = require('path');
 
 const imagePaths = [
   'public/images/QR-Code.png',
-  'public/images/logo-transparent.png'
+  'public/images/bg-logo-enarva.png'
 ];
 
 imagePaths.forEach(imagePath => {
