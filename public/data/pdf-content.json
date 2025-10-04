@@ -1,0 +1,221 @@
+{
+  "serviceTypes": {
+    "FIN_DE_CHANTIER": {
+      "label": "Nettoyage Fin de chantier",
+      "prestationsIncluses": [
+        "Nettoyage et dépoussiérage des plafonds, placards, façades, rideaux et embrasures",
+        "Nettoyage ciblé des résidus sur toutes les surfaces (murs, sols, vitres, plinthes)",
+        "Nettoyage des interrupteurs, prises, poignées et rampes",
+        "Détartrage et désinfection des sanitaires (lavabos, douches, WC, baignoires)",
+        "Nettoyage de cuisine : placards, plan de travail, crédences, électroménagers encastrés",
+        "Nettoyage complet des vitres et encadrement avec enlèvement des traces de chantier",
+        "Entretien et traitement des sols en fonction de leur type"
+      ],
+      "equipementsUtilises": [
+        "Aspirateur professionnel haute puissance",
+        "Monobrosse pour sols durs",
+        "Nettoyeur vapeur industriel",
+        "Échafaudages et échelles télescopiques",
+        "Produits décapants écologiques",
+        "Désinfectants professionnels certifiés"
+      ],
+      "personnelSuggestions": {
+        "baseTeamSize": 2,
+        "perSquareMeter": 50
+      }
+    },
+    "GRAND_MENAGE": {
+      "label": "Grand Ménage",
+      "prestationsIncluses": [
+        "Dépoussiérage approfondi de toutes les surfaces",
+        "Nettoyage complet des vitres intérieures et extérieures",
+        "Désinfection complète de la cuisine et des sanitaires",
+        "Aspiration et nettoyage de tous les sols",
+        "Nettoyage des placards intérieurs",
+        "Élimination des toiles d'araignées",
+        "Nettoyage des luminaires et interrupteurs"
+      ],
+      "equipementsUtilises": [
+        "Aspirateur professionnel",
+        "Produits de nettoyage écologiques",
+        "Matériel de nettoyage vitres",
+        "Désinfectants sanitaires",
+        "Matériel de dépoussiérage"
+      ],
+      "personnelSuggestions": {
+        "baseTeamSize": 2,
+        "perSquareMeter": 60
+      }
+    },
+    "NETTOYAGE_PISCINE": {
+      "label": "Nettoyage de piscine",
+      "prestationsIncluses": [
+        "Nettoyage complet du bassin (parois et fond)",
+        "Nettoyage du système de filtration",
+        "Contrôle et ajustement du pH",
+        "Traitement anti-algues",
+        "Nettoyage de la ligne d'eau",
+        "Aspiration des débris",
+        "Vérification de l'équipement technique"
+      ],
+      "equipementsUtilises": [
+        "Robot nettoyeur de piscine professionnel",
+        "Kit de test de pH et chlore",
+        "Produits de traitement certifiés",
+        "Épuisette et brosse spécialisée",
+        "Aspirateur pour piscine"
+      ],
+      "personnelSuggestions": {
+        "baseTeamSize": 1,
+        "perSquareMeter": 100
+      }
+    },
+    "NETTOYAGE_CANAPES": {
+      "label": "Nettoyage de canapés et textiles",
+      "prestationsIncluses": [
+        "Aspiration profonde du textile",
+        "Détachage ciblé des taches visibles",
+        "Nettoyage en profondeur à l'injection-extraction",
+        "Traitement anti-acariens et désodorisant",
+        "Séchage rapide professionnel",
+        "Protection textile post-nettoyage"
+      ],
+      "equipementsUtilises": [
+        "Machine injection-extraction professionnelle",
+        "Produits détachants spécialisés par type de textile",
+        "Traitement anti-acariens hypoallergénique",
+        "Séchoir professionnel",
+        "Brosses spécifiques textiles délicats"
+      ],
+      "pricingType": "LINEAR_METER",
+      "pricePerLinearMeter": 100,
+      "personnelSuggestions": {
+        "baseTeamSize": 1,
+        "perSquareMeter": 999
+      }
+    },
+    "NETTOYAGE_FACADE": {
+      "label": "Nettoyage de façade",
+      "prestationsIncluses": [
+        "Nettoyage haute pression des murs extérieurs",
+        "Élimination des mousses et lichens",
+        "Nettoyage des vitres extérieures",
+        "Traitement anti-graffiti si nécessaire",
+        "Nettoyage des gouttières",
+        "Rinçage et finitions"
+      ],
+      "equipementsUtilises": [
+        "Nettoyeur haute pression professionnel",
+        "Nacelle ou échafaudage selon hauteur",
+        "Produits anti-mousse et anti-graffiti",
+        "Équipement de sécurité en hauteur",
+        "Système de récupération d'eau"
+      ],
+      "personnelSuggestions": {
+        "baseTeamSize": 2,
+        "perSquareMeter": 40
+      }
+    },
+    "NETTOYAGE_BUREAU": {
+      "label": "Nettoyage de bureaux",
+      "prestationsIncluses": [
+        "Dépoussiérage des postes de travail",
+        "Nettoyage et désinfection des sanitaires",
+        "Aspiration et lavage des sols",
+        "Vidage des corbeilles et tri sélectif",
+        "Nettoyage des vitres et surfaces vitrées",
+        "Désinfection des points de contact (poignées, interrupteurs)",
+        "Nettoyage des espaces communs"
+      ],
+      "equipementsUtilises": [
+        "Chariot de ménage professionnel",
+        "Aspirateur silencieux",
+        "Produits de nettoyage écologiques",
+        "Désinfectants certifiés",
+        "Matériel de nettoyage vitres"
+      ],
+      "personnelSuggestions": {
+        "baseTeamSize": 1,
+        "perSquareMeter": 80
+      }
+    },
+    "FOURNITURE_PRODUITS": {
+      "label": "Fourniture de produits",
+      "prestationsIncluses": [],
+      "equipementsUtilises": [],
+      "displayType": "PRODUCT_TABLE"
+    }
+  },
+  "propertyTypes": {
+    "APARTMENT_SMALL": "appartement (petit)",
+    "APARTMENT_MEDIUM": "appartement (moyen)",
+    "APARTMENT_LARGE": "appartement (grand)",
+    "APARTMENT_MULTI": "appartement multi-niveaux",
+    "VILLA_SMALL": "villa (petite)",
+    "VILLA_MEDIUM": "villa (moyenne)",
+    "VILLA_LARGE": "villa (grande)",
+    "PENTHOUSE": "penthouse",
+    "COMMERCIAL": "local commercial",
+    "STORE": "magasin",
+    "HOTEL_STANDARD": "hôtel",
+    "HOTEL_LUXURY": "hôtel de luxe",
+    "OFFICE": "bureau",
+    "RESIDENCE_B2B": "résidence",
+    "BUILDING": "immeuble",
+    "RESTAURANT": "restaurant",
+    "WAREHOUSE": "entrepôt",
+    "OTHER": "espace"
+  },
+  "paymentConditions": {
+    "DEVIS_SERVICE_PARTICULIER": {
+      "title": "Conditions de paiement :",
+      "conditions": [
+        "Les règlements peuvent être effectués par virement bancaire, par chèque ou en espèces.",
+        "Un acompte de 30% est demandé à l'initiation du travail.",
+        "Le solde de 70% est exigible à la livraison.",
+        "Toute prestation commencée est due dans son intégralité."
+      ]
+    },
+    "DEVIS_SERVICE_PRO": {
+      "title": "Conditions de paiement :",
+      "conditions": [
+        "Paiement par virement bancaire ou chèque uniquement.",
+        "Un acompte de 30% est demandé à la commande.",
+        "Le solde est exigible à réception de la prestation.",
+        "Délai de paiement : 30 jours net.",
+        "Toute facture impayée à l'échéance entraînera des pénalités de retard."
+      ]
+    },
+    "DEVIS_PRODUIT_PRO": {
+      "title": "Conditions de paiement :",
+      "conditions": [
+        "Paiement par virement bancaire ou chèque.",
+        "Selon les termes du bon de commande si applicable.",
+        "Délai de paiement : 30 jours net.",
+        "Les marchandises voyagent aux risques et périls du destinataire."
+      ]
+    },
+    "FACTURE_SERVICE": {
+      "title": "Observations générales :",
+      "conditions": [
+        "Toute réclamation doit être signalée sous 24 heures après la fin de l'intervention.",
+        "La présente facture vaut titre exécutoire en cas de non-paiement.",
+        "Pénalités de retard applicables selon les conditions générales de vente."
+      ]
+    },
+    "FACTURE_PRODUIT": {
+      "title": "Observations générales :",
+      "conditions": [
+        "Toute réclamation doit être signalée sous 48h après la livraison.",
+        "Les marchandises voyagent aux risques et périls du destinataire.",
+        "La présente facture vaut titre exécutoire en cas de non-paiement."
+      ]
+    }
+  },
+  "deliveryTimeframes": {
+    "STANDARD": "3-5 jours ouvrés",
+    "EXPRESS": "24-48 heures",
+    "URGENT": "Intervention sous 24h",
+    "CUSTOM": "À définir selon disponibilités"
+  }
+}
