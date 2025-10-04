@@ -30,8 +30,14 @@ export async function GET(request: NextRequest) {
 
     const where: Prisma.LeadWhereInput = {};
 
+    // Handle multiple statuses separated by comma
     if (statusParam && statusParam !== 'ALL') {
-      where.status = statusParam as LeadStatus;
+      const statuses = statusParam.split(',').map(s => s.trim()).filter(Boolean);
+      if (statuses.length === 1) {
+        where.status = statuses[0] as LeadStatus;
+      } else if (statuses.length > 1) {
+        where.status = { in: statuses as LeadStatus[] };
+      }
     }
 
     if (search) {
