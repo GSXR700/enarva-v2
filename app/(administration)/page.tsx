@@ -52,6 +52,9 @@ type DashboardData = {
   activeMissions: ActiveMission[];
 };
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 const getStatusColor = (status: LeadStatus) => {
   const colors: Record<string, string> = {
     NEW: 'bg-blue-100 text-blue-800',
