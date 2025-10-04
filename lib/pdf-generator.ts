@@ -183,7 +183,7 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   doc.setTextColor(255, 255, 255);
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(11);
-  const objetText = `OBJET : ${data.project.objet}`;
+  const objetText = `OBJET : ${data.project.serviceType}`;
   const objetTextWidth = doc.getTextWidth(objetText);
   const objetTextX = MARGIN_LEFT + (CONTENT_WIDTH - objetTextWidth) / 2;
   doc.text(objetText, objetTextX, objetBoxY + 20);
