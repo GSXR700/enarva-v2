@@ -411,21 +411,21 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   doc.text(
     '53, 2ème étage, Appartement 15,  Avenue Brahim Roudani - Océan, Rabat - Maroc',
     textStartX,
-    footerY + topMargin + 18
+    footerY + topMargin + 28
   );
 
   // Ligne 3: Contact (marge de 11pt après ligne 2)
   doc.text(
     'Téléphone : 06 38 146-573 • Site web : www.enarva.com • e-mail : contact@enarva.com',
     textStartX,
-    footerY + topMargin + 31
+    footerY + topMargin + 41
   );
 
   // Ligne 4: Informations légales (marge de 11pt après ligne 3)
   doc.text(
     `IF : ${data.company.if} • RC : ${data.company.rc} • ICE : ${data.company.ice} • RIB : ${data.company.rib}`,
     textStartX,
-    footerY + topMargin + 44
+    footerY + topMargin + 54
   );
 
   // ========== RIGHT SECTION: QR CODE (CENTRÉ VERTICALEMENT) ==========
