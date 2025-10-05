@@ -297,7 +297,7 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     : `veuillez arrêter la présente facture au montant de ${amountInWordsLower}, toutes taxes comprises.`;
 
   doc.setFont('Poppins', 'normal');
-  doc.setFontSize(14);
+  doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
   const priceLines = doc.splitTextToSize(priceText, leftSectionWidth - 20);
   priceLines.forEach((line: string, index: number) => {
