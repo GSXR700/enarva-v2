@@ -498,7 +498,7 @@ export default function NewExpensePage() {
 
         {/* Action buttons */}
         <div className="flex items-center justify-end gap-4">
-          <Link href="/(administration)/expenses">
+          <Link href="/expenses">
             <Button type="button" variant="outline">
               Annuler
             </Button>
