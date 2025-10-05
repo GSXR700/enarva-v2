@@ -25,18 +25,43 @@ export async function GET(
 
     const { id: leadId } = await params;
 
+    // FIXED: Fetch lead with all relations
     const lead = await leadService.getLeadById(leadId, {
       assignedTo: {
         select: {
           id: true,
           name: true,
           email: true,
+          image: true,
           role: true
         }
       },
+      quotes: {
+        orderBy: { createdAt: 'desc' }
+      },
+      missions: {
+        include: {
+          teamLeader: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true
+            }
+          },
+          quote: {
+            select: {
+              id: true,
+              quoteNumber: true,
+              finalPrice: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      },
       activities: {
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: 50,
         include: {
           user: {
             select: {
@@ -59,6 +84,16 @@ export async function GET(
     ) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
     }
+
+    // FIXED: Type assertion for debug logging
+    const leadWithRelations = lead as any;
+    console.log('Lead fetched with relations:', {
+      id: lead.id,
+      name: `${lead.firstName} ${lead.lastName}`,
+      quotesCount: leadWithRelations.quotes?.length || 0,
+      missionsCount: leadWithRelations.missions?.length || 0,
+      activitiesCount: leadWithRelations.activities?.length || 0
+    });
 
     return NextResponse.json(lead);
   } catch (error) {
