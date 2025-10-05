@@ -293,11 +293,11 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   // Left side - Prix en lettres (50%)
   const amountInWordsLower = data.pricing.amountInWords.toLowerCase();
   const priceText = data.docType === 'DEVIS'
-    ? `Veuillez arrêter le présent devis à la somme de ${amountInWordsLower}.`
-    : `Veuillez arrêter la présente facture au montant de ${amountInWordsLower}, toutes taxes comprises.`;
+    ? `veuillez arrêter le présent devis à la somme de ${amountInWordsLower}.`
+    : `veuillez arrêter la présente facture au montant de ${amountInWordsLower}, toutes taxes comprises.`;
 
   doc.setFont('Poppins', 'normal');
-  doc.setFontSize(10);
+  doc.setFontSize(14);
   setColor(doc, BLUE_PRIMARY);
   const priceLines = doc.splitTextToSize(priceText, leftSectionWidth - 20);
   priceLines.forEach((line: string, index: number) => {
