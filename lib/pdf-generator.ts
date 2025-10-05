@@ -378,60 +378,58 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   // 9. FOOTER - AVEC MARGES ET BORDER RADIUS (DESIGN PREMIUM)
   const footerHeight = 85;
   const footerY = PAGE_HEIGHT - footerHeight;
-  const footerRadius = 12; // Rayon des coins arrondis en haut
+  const footerRadius = 12;
   
   // Fond bleu avec marges gauche/droite + border radius en haut
   doc.setFillColor(30, 58, 138);
-  
-  // Rectangle avec coins arrondis en haut uniquement
-  doc.roundedRect(MARGIN_LEFT, footerY, CONTENT_WIDTH, footerHeight, footerRadius, footerRadius, 'F');
-  
-  // Cacher les coins arrondis du bas en les couvrant avec un rectangle
-  doc.rect(MARGIN_LEFT, footerY + footerHeight - footerRadius, CONTENT_WIDTH, footerRadius, 'F');
+  doc.roundedRect(MARGIN_LEFT, footerY, CONTENT_WIDTH, footerRadius, footerRadius, footerRadius, 'F');
+  doc.rect(MARGIN_LEFT, footerY + footerRadius, CONTENT_WIDTH, footerHeight - footerRadius, 'F');
 
-  // ========== LEFT SECTION: LOGO + TOUTES LES INFOS ==========
-  const leftMargin = 45; // Marge gauche selon l'image
+  // ========== LEFT SECTION: MISE EN PAGE PROFESSIONNELLE ==========
+  const textStartX = MARGIN_LEFT + 15; // Marge intérieure de 15pt depuis le bord gauche
+  const topMargin = 18; // Marge du haut
   
-  // Ligne 1: LOGO "enarva" (grand et bold)
   doc.setTextColor(255, 255, 255);
+  
+  // Ligne 1: LOGO "enarva" + "sarl au" sur la MÊME ligne
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(22);
-  doc.text('enarva', leftMargin, footerY + 22);
+  doc.text('enarva', textStartX, footerY + topMargin);
   
-  // "sarl au" juste en dessous du logo (petit)
+  const enarvaWidth = doc.getTextWidth('enarva');
   doc.setFont('Poppins', 'normal');
-  doc.setFontSize(8);
-  doc.text('sarl au', leftMargin, footerY + 32);
+  doc.setFontSize(9);
+  doc.text('sarl au', textStartX + enarvaWidth + 6, footerY + topMargin); // 6pt d'espace
 
-  // Ligne 2: Adresse complète
+  // Ligne 2: Adresse (marge de 8pt après ligne 1)
   doc.setFont('Poppins', 'normal');
   doc.setFontSize(8);
   doc.text(
     '53, 2ème étage, Appartement 15,  Avenue Brahim Roudani - Océan, Rabat - Maroc',
-    leftMargin,
-    footerY + 47
+    textStartX,
+    footerY + topMargin + 18
   );
 
-  // Ligne 3: Téléphone + Site web + Email (avec bullets •)
+  // Ligne 3: Contact (marge de 11pt après ligne 2)
   doc.text(
     'Téléphone : 06 38 146-573 • Site web : www.enarva.com • e-mail : contact@enarva.com',
-    leftMargin,
-    footerY + 60
+    textStartX,
+    footerY + topMargin + 31
   );
 
-  // Ligne 4: IF + RC + ICE + RIB (avec bullets •)
+  // Ligne 4: Informations légales (marge de 11pt après ligne 3)
   doc.text(
     `IF : ${data.company.if} • RC : ${data.company.rc} • ICE : ${data.company.ice} • RIB : ${data.company.rib}`,
-    leftMargin,
-    footerY + 73
+    textStartX,
+    footerY + topMargin + 44
   );
 
   // ========== RIGHT SECTION: QR CODE (CENTRÉ VERTICALEMENT) ==========
   try {
     if (PDF_IMAGES.BARCODE) {
-      const qrSize = 70; // Taille du QR code
-      const qrX = PAGE_WIDTH - 45 - qrSize; // Position X (marge droite 45)
-      const qrY = footerY + (footerHeight - qrSize) / 2; // CENTRÉ VERTICALEMENT
+      const qrSize = 70;
+      const qrX = MARGIN_LEFT + CONTENT_WIDTH - qrSize - 15; // 15pt de marge intérieure droite
+      const qrY = footerY + (footerHeight - qrSize) / 2;
       
       doc.addImage(PDF_IMAGES.BARCODE, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'FAST');
     }
