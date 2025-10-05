@@ -236,13 +236,13 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   // Cover bottom corners to make them square
   doc.rect(MARGIN_LEFT, tableStartY + headerRowHeight - tableRadius, CONTENT_WIDTH, tableRadius, 'F');
 
-  // Header text with proper spacing
+  // Header text with proper spacing - COLONNES RÉAJUSTÉES
   doc.setTextColor(255, 255, 255);
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   doc.text('Désignation', MARGIN_LEFT + 15, tableStartY + 28);
-  doc.text('Quantité', MARGIN_LEFT + 330, tableStartY + 28, { align: 'center' });
-  doc.text('Prix unit. HT', MARGIN_LEFT + 420, tableStartY + 28, { align: 'center' });
+  doc.text('Quantité', MARGIN_LEFT + 310, tableStartY + 28, { align: 'center' });
+  doc.text('Prix unit. HT', MARGIN_LEFT + 405, tableStartY + 28, { align: 'center' });
   doc.text('Total HT', MARGIN_LEFT + CONTENT_WIDTH - 15, tableStartY + 28, { align: 'right' });
 
   // Data row with white background
@@ -254,14 +254,14 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   doc.setFont('Poppins', 'normal');
   doc.setFontSize(9);
   
-  // Designation (reduced width for better spacing)
-  const designationLines = doc.splitTextToSize(data.project.objet, 280);
+  // Designation (reduced width to 240px pour éviter le chevauchement)
+  const designationLines = doc.splitTextToSize(data.project.objet, 240);
   designationLines.forEach((line: string, index: number) => {
     doc.text(line, MARGIN_LEFT + 15, yPos + 20 + (index * 12));
   });
   
-  doc.text('Forfait', MARGIN_LEFT + 330, yPos + 28, { align: 'center' });
-  doc.text(formatCurrency(data.pricing.subTotalHT), MARGIN_LEFT + 420, yPos + 28, { align: 'center' });
+  doc.text('Forfait', MARGIN_LEFT + 310, yPos + 28, { align: 'center' });
+  doc.text(formatCurrency(data.pricing.subTotalHT), MARGIN_LEFT + 405, yPos + 28, { align: 'center' });
   doc.text(formatCurrency(data.pricing.subTotalHT), MARGIN_LEFT + CONTENT_WIDTH - 15, yPos + 28, { align: 'right' });
 
   // Table border with rounded corners
