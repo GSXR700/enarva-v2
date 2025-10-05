@@ -795,7 +795,7 @@ export default function LeadDetailsPage() {
         </div>
 
         {/* Sticky Timeline - Desktop only */}
-        <div className="hidden lg:block lg:w-80 xl:w-96">
+        <div className="hidden lg:block lg:w-[272px] xl:w-[326px]">
           <div className="sticky top-6">
             <LeadTimeline lead={lead} />
           </div>
