@@ -375,13 +375,19 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     yPos += 14;
   });
 
-  // 9. FOOTER - DESIGN EXACT DE L'IMAGE (PIXEL PERFECT)
-  const footerHeight = 85; // Hauteur optimale pour contenir tout le contenu
+  // 9. FOOTER - AVEC MARGES ET BORDER RADIUS (DESIGN PREMIUM)
+  const footerHeight = 85;
   const footerY = PAGE_HEIGHT - footerHeight;
+  const footerRadius = 12; // Rayon des coins arrondis en haut
   
-  // Fond bleu uni professionnel
+  // Fond bleu avec marges gauche/droite + border radius en haut
   doc.setFillColor(30, 58, 138);
-  doc.rect(0, footerY, PAGE_WIDTH, footerHeight, 'F');
+  
+  // Rectangle avec coins arrondis en haut uniquement
+  doc.roundedRect(MARGIN_LEFT, footerY, CONTENT_WIDTH, footerHeight, footerRadius, footerRadius, 'F');
+  
+  // Cacher les coins arrondis du bas en les couvrant avec un rectangle
+  doc.rect(MARGIN_LEFT, footerY + footerHeight - footerRadius, CONTENT_WIDTH, footerRadius, 'F');
 
   // ========== LEFT SECTION: LOGO + TOUTES LES INFOS ==========
   const leftMargin = 45; // Marge gauche selon l'image
