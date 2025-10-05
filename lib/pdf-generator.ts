@@ -398,12 +398,12 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   // Ligne 1: LOGO "enarva" + "sarl au" sur la MÊME ligne
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(22);
-  doc.text('enarva', textStartX, footerY + topMargin);
+  doc.text('enarva', textStartX, footerY + 24);
   
   const enarvaWidth = doc.getTextWidth('enarva');
   doc.setFont('Poppins', 'normal');
   doc.setFontSize(9);
-  doc.text('sarl au', textStartX + enarvaWidth + 6, footerY + topMargin); // 6pt d'espace
+  doc.text('sarl au', textStartX + enarvaWidth + 6, footerY + 24); // 6pt d'espace
 
   // Ligne 2: Adresse (marge de 8pt après ligne 1)
   doc.setFont('Poppins', 'normal');
