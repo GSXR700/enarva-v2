@@ -380,10 +380,14 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   const footerY = PAGE_HEIGHT - footerHeight;
   const footerRadius = 12;
   
-  // Fond bleu avec marges gauche/droite + border radius en haut
+  // Fond bleu avec marges gauche/droite + border radius en haut uniquement
   doc.setFillColor(30, 58, 138);
-  doc.roundedRect(MARGIN_LEFT, footerY, CONTENT_WIDTH, footerRadius, footerRadius, footerRadius, 'F');
-  doc.rect(MARGIN_LEFT, footerY + footerRadius, CONTENT_WIDTH, footerHeight - footerRadius, 'F');
+  
+  // Rectangle avec coins arrondis en haut
+  doc.roundedRect(MARGIN_LEFT, footerY, CONTENT_WIDTH, footerHeight, footerRadius, footerRadius, 'F');
+  
+  // Couvrir les coins arrondis du BAS pour les rendre carrés
+  doc.rect(MARGIN_LEFT, footerY + footerHeight - footerRadius, CONTENT_WIDTH, footerRadius, 'F');
 
   // ========== LEFT SECTION: MISE EN PAGE PROFESSIONNELLE ==========
   const textStartX = MARGIN_LEFT + 15; // Marge intérieure de 15pt depuis le bord gauche
