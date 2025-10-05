@@ -92,6 +92,31 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     console.warn("Error loading Poppins fonts:", e);
   }
 
+  // ✅ ADD BACKGROUND WATERMARK LOGO FIRST (BEFORE ANY OTHER CONTENT)
+  try {
+    if (PDF_IMAGES.BG_LOGO) {
+      // Calculate centered position for watermark
+      const logoWidth = 400; // Adjust size as needed
+      const logoHeight = 400; // Adjust size as needed
+      const logoX = (PAGE_WIDTH - logoWidth) / 2;
+      const logoY = (PAGE_HEIGHT - logoHeight) / 2;
+      
+      // Add the background image (PNG with transparency built-in)
+      doc.addImage(
+        PDF_IMAGES.BG_LOGO,
+        'PNG',
+        logoX,
+        logoY,
+        logoWidth,
+        logoHeight,
+        undefined,
+        'FAST'
+      );
+    }
+  } catch (e) {
+    console.warn("Background logo error:", e);
+  }
+
   let yPos = 0;
 
   // 1. HEADER SECTION WITH GRADIENT BLUE BACKGROUND
