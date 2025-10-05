@@ -272,7 +272,7 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
 
   yPos += dataRowHeight + 25;
 
-  // 7. PRICING SECTION WITH SEPARATOR (REDESIGNED - COMPACT)
+  // 7. PRICING SECTION WITH SEPARATOR (50/50 SPLIT + PROFESSIONAL DESIGN)
   const pricingY = yPos;
   
   // Ligne bleue supérieure
@@ -280,72 +280,81 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   doc.setLineWidth(1.5);
   doc.line(MARGIN_LEFT, pricingY, MARGIN_LEFT + CONTENT_WIDTH, pricingY);
 
-  yPos = pricingY + 12; // Réduit de 20 à 12
+  yPos = pricingY + 15;
 
-  // Calcul des largeurs - Prix en chiffres réduit de 10%
-  const leftSectionWidth = CONTENT_WIDTH * 0.42; // Augmenté de 35% à 42%
+  // 50% / 50% split
+  const leftSectionWidth = CONTENT_WIDTH * 0.50; // 50% pour le texte en lettres
   const separatorX = MARGIN_LEFT + leftSectionWidth;
 
-  // Left side - Prix en lettres
+  // Left side - Prix en lettres (50%)
   const amountInWordsLower = data.pricing.amountInWords.toLowerCase();
   const priceText = data.docType === 'DEVIS'
     ? `Veuillez arrêter le présent devis à la somme de ${amountInWordsLower}.`
     : `Veuillez arrêter la présente facture au montant de ${amountInWordsLower}, toutes taxes comprises.`;
 
   doc.setFont('Poppins', 'normal');
-  doc.setFontSize(9.5); // Réduit de 10.5 à 9.5
+  doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
-  const priceLines = doc.splitTextToSize(priceText, leftSectionWidth - 15);
+  const priceLines = doc.splitTextToSize(priceText, leftSectionWidth - 20);
   priceLines.forEach((line: string, index: number) => {
-    doc.text(line, MARGIN_LEFT, yPos + (index * 11)); // Réduit de 13 à 11
+    doc.text(line, MARGIN_LEFT, yPos + (index * 11));
   });
 
   // Vertical separator (ligne bleue)
   doc.setDrawColor(30, 58, 138);
-  doc.setLineWidth(2);
-  const separatorHeight = data.docType === 'FACTURE' ? 40 : 28; // Hauteur adaptative
+  doc.setLineWidth(2.5);
+  const separatorHeight = data.docType === 'FACTURE' ? 50 : 32;
   doc.line(separatorX, pricingY + 5, separatorX, yPos + separatorHeight);
 
-  // Right side - Montants (58% au lieu de 65%)
-  const priceBoxX = separatorX + 15; // Réduit de 20 à 15
-  const colonX = priceBoxX + 115; // Réduit de 140 à 115
-  const amountX = colonX + 8; // Réduit de 10 à 8
-
-  doc.setFont('Poppins', 'bold');
-  doc.setFontSize(10); // Réduit de 11 à 10
-  setColor(doc, TEXT_DARK);
+  // Right side - Montants avec design professionnel (50%)
+  const priceBoxX = separatorX + 25;
 
   if (data.docType === 'FACTURE') {
-    // HT
-    doc.text('MONTANT TOTAL HT', priceBoxX, yPos + 8);
-    doc.text(':', colonX, yPos + 8);
-    doc.text(formatCurrency(data.pricing.subTotalHT), amountX, yPos + 8);
+    // FACTURE - 3 lignes (HT, TVA, TTC)
     
-    // TVA
-    doc.text('TVA (20%)', priceBoxX, yPos + 22); // Réduit espacement
-    doc.text(':', colonX, yPos + 22);
-    doc.text(formatCurrency(data.pricing.vatAmount), amountX, yPos + 22);
+    // Ligne 1: MONTANT TOTAL HT
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(10);
+    setColor(doc, TEXT_DARK);
+    doc.text('MONTANT TOTAL HT', priceBoxX, yPos + 10);
     
-    // TTC
-    doc.setFontSize(11); // Réduit de 12 à 11
-    doc.text('TOTAL TTC', priceBoxX, yPos + 38); // Réduit espacement
-    doc.text(':', colonX, yPos + 38);
-    doc.text(formatCurrency(data.pricing.totalTTC), amountX, yPos + 38);
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(10);
+    doc.text(':', priceBoxX + 125, yPos + 10);
+    doc.text(formatCurrency(data.pricing.subTotalHT), priceBoxX + 135, yPos + 10);
+    
+    // Ligne 2: TVA
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(10);
+    doc.text('TVA (20%)', priceBoxX, yPos + 26);
+    doc.text(':', priceBoxX + 125, yPos + 26);
+    doc.text(formatCurrency(data.pricing.vatAmount), priceBoxX + 135, yPos + 26);
+    
+    // Ligne 3: TOTAL TTC (plus visible)
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(12);
+    doc.text('TOTAL TTC', priceBoxX, yPos + 45);
+    doc.text(':', priceBoxX + 125, yPos + 45);
+    doc.text(formatCurrency(data.pricing.totalTTC), priceBoxX + 135, yPos + 45);
+    
   } else {
-    // DEVIS - seulement HT
-    doc.setFontSize(11);
-    doc.text('MONTANT TOTAL HT', priceBoxX, yPos + 18);
-    doc.text(':', colonX, yPos + 18);
-    doc.text(formatCurrency(data.pricing.subTotalHT), amountX, yPos + 18);
+    // DEVIS - Une seule ligne centrée verticalement
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(12);
+    setColor(doc, TEXT_DARK);
+    
+    doc.text('MONTANT TOTAL HT', priceBoxX, yPos + 20);
+    doc.text(':', priceBoxX + 135, yPos + 20);
+    doc.text(formatCurrency(data.pricing.subTotalHT), priceBoxX + 145, yPos + 20);
   }
 
   // Ligne bleue inférieure
-  yPos += data.docType === 'FACTURE' ? 48 : 35; // Hauteur adaptative (réduit de 65)
+  yPos += data.docType === 'FACTURE' ? 58 : 42;
   doc.setDrawColor(30, 58, 138);
   doc.setLineWidth(1.5);
   doc.line(MARGIN_LEFT, yPos, MARGIN_LEFT + CONTENT_WIDTH, yPos);
 
-  yPos += 15; // Réduit de 20 à 15
+  yPos += 18;
 
   // 8. PAYMENT CONDITIONS
   doc.setFont('Poppins', 'bold');
