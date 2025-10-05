@@ -96,8 +96,8 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   try {
     if (PDF_IMAGES.BG_LOGO) {
       // Calculate centered position for watermark
-      const logoWidth = 1415; // Adjust size as needed
-      const logoHeight = 2000; // Adjust size as needed
+      const logoWidth = 450; // Adjust size as needed
+      const logoHeight = 636; // Adjust size as needed
       const logoX = (PAGE_WIDTH - logoWidth) / 2;
       const logoY = (PAGE_HEIGHT - logoHeight) / 2;
       
