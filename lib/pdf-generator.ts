@@ -272,51 +272,79 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
 
   yPos += dataRowHeight + 25;
 
-  // 7. PRICING SECTION WITH SEPARATOR (PRIX BIEN POSITIONNÉ)
+  // 7. PRICING SECTION WITH SEPARATOR (REDESIGNED - RESPECTE LES MARGES)
   const pricingY = yPos;
+  
+  // Ligne bleue supérieure
+  doc.setDrawColor(30, 58, 138);
+  doc.setLineWidth(1.5);
+  doc.line(MARGIN_LEFT, pricingY, MARGIN_LEFT + CONTENT_WIDTH, pricingY);
+
+  yPos = pricingY + 20;
+
+  // Calcul des largeurs (respecte CONTENT_WIDTH)
+  const leftSectionWidth = CONTENT_WIDTH * 0.35; // 35% pour le texte en lettres
+  const separatorX = MARGIN_LEFT + leftSectionWidth;
+
+  // Left side - Prix en lettres (35%)
   const amountInWordsLower = data.pricing.amountInWords.toLowerCase();
   const priceText = data.docType === 'DEVIS'
-    ? `veuillez arrêter le présent devis à la somme de ${amountInWordsLower}.`
-    : `veuillez arrêter la présente facture au montant de ${amountInWordsLower}, toutes taxes comprises.`;
+    ? `Veuillez arrêter le présent devis à la somme de ${amountInWordsLower}.`
+    : `Veuillez arrêter la présente facture au montant de ${amountInWordsLower}, toutes taxes comprises.`;
 
-  // Left side - text in bold
-  doc.setFont('Poppins', 'bold');
-  doc.setFontSize(9);
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(10.5); // Agrandi légèrement
   setColor(doc, BLUE_PRIMARY);
-  const priceLines = doc.splitTextToSize(priceText, 300);
+  const priceLines = doc.splitTextToSize(priceText, leftSectionWidth - 15);
   priceLines.forEach((line: string, index: number) => {
-    doc.text(line, MARGIN_LEFT, pricingY + (index * 14));
+    doc.text(line, MARGIN_LEFT, yPos + (index * 13));
   });
 
-  // Vertical separator (stylish blue line)
-  const separatorX = MARGIN_LEFT + 320;
-  doc.setDrawColor(59, 130, 246);
-  doc.setLineWidth(3);
-  doc.line(separatorX, pricingY - 5, separatorX, pricingY + 45);
+  // Vertical separator (ligne bleue élégante)
+  doc.setDrawColor(30, 58, 138);
+  doc.setLineWidth(2);
+  doc.line(separatorX, pricingY + 5, separatorX, yPos + 55);
 
-  // Right side - PRIX BIEN VISIBLE ET ALIGNÉ
-  const priceBoxX = separatorX + 25;
+  // Right side - Montants alignés (65%)
+  const priceBoxX = separatorX + 20;
+  const colonX = priceBoxX + 140; // Position des deux-points
+  const amountX = colonX + 10; // Position des montants
+
   doc.setFont('Poppins', 'bold');
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   setColor(doc, TEXT_DARK);
 
   if (data.docType === 'FACTURE') {
-    doc.text('MONTANT TOTAL HT', priceBoxX, pricingY + 5);
-    doc.text(`: ${formatCurrency(data.pricing.subTotalHT)}`, priceBoxX + 145, pricingY + 5);
+    // HT
+    doc.text('MONTANT TOTAL HT', priceBoxX, yPos + 10);
+    doc.text(':', colonX, yPos + 10);
+    doc.text(formatCurrency(data.pricing.subTotalHT), amountX, yPos + 10);
     
-    doc.text('TVA (20%)', priceBoxX, pricingY + 23);
-    doc.text(`: ${formatCurrency(data.pricing.vatAmount)}`, priceBoxX + 145, pricingY + 23);
+    // TVA
+    doc.text('TVA (20%)', priceBoxX, yPos + 28);
+    doc.text(':', colonX, yPos + 28);
+    doc.text(formatCurrency(data.pricing.vatAmount), amountX, yPos + 28);
     
-    doc.setFontSize(13);
-    doc.text('TOTAL TTC', priceBoxX, pricingY + 41);
-    doc.text(`: ${formatCurrency(data.pricing.totalTTC)}`, priceBoxX + 145, pricingY + 41);
+    // TTC (plus gros)
+    doc.setFontSize(12);
+    doc.text('TOTAL TTC', priceBoxX, yPos + 48);
+    doc.text(':', colonX, yPos + 48);
+    doc.text(formatCurrency(data.pricing.totalTTC), amountX, yPos + 48);
   } else {
-    doc.setFontSize(13);
-    doc.text('MONTANT TOTAL HT', priceBoxX, pricingY + 20);
-    doc.text(`: ${formatCurrency(data.pricing.subTotalHT)}`, priceBoxX + 160, pricingY + 20);
+    // DEVIS - seulement HT
+    doc.setFontSize(12);
+    doc.text('MONTANT TOTAL HT', priceBoxX, yPos + 25);
+    doc.text(':', colonX, yPos + 25);
+    doc.text(formatCurrency(data.pricing.subTotalHT), amountX, yPos + 25);
   }
 
-  yPos += 70;
+  // Ligne bleue inférieure
+  yPos += 65;
+  doc.setDrawColor(30, 58, 138);
+  doc.setLineWidth(1.5);
+  doc.line(MARGIN_LEFT, yPos, MARGIN_LEFT + CONTENT_WIDTH, yPos);
+
+  yPos += 20;
 
   // 8. PAYMENT CONDITIONS
   doc.setFont('Poppins', 'bold');
