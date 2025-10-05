@@ -375,57 +375,46 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     yPos += 14;
   });
 
-  // 9. FOOTER WITH GRADIENT
-  const footerY = PAGE_HEIGHT - 110;
+  // 9. FOOTER - NOUVEAU DESIGN COMPACT (HAUTEUR RÉDUITE À 65PT)
+  const footerHeight = 65;
+  const footerY = PAGE_HEIGHT - footerHeight;
   
-  // Gradient footer
-  for (let i = 0; i < 110; i++) {
-    const ratio = i / 110;
-    const r = Math.floor(28 + (30 - 28) * ratio);
-    const g = Math.floor(63 + (58 - 63) * ratio);
-    const b = Math.floor(145 + (138 - 145) * ratio);
-    doc.setFillColor(r, g, b);
-    doc.rect(0, footerY + i, PAGE_WIDTH, 1, 'F');
-  }
+  // Fond bleu uni (pas de gradient)
+  doc.setFillColor(30, 58, 138); // Bleu professionnel
+  doc.rect(0, footerY, PAGE_WIDTH, footerHeight, 'F');
 
-  // Left: Contact
+  // ========== LEFT SECTION: LOGO ENARVA + INFO PRINCIPALE ==========
   doc.setTextColor(255, 255, 255);
   doc.setFont('Poppins', 'bold');
-  doc.setFontSize(11);
-  doc.text('CONTACTEZ-NOUS !', MARGIN_LEFT, footerY + 25);
-
+  doc.setFontSize(18);
+  doc.text('enarva', MARGIN_LEFT, footerY + 20);
+  
   doc.setFont('Poppins', 'normal');
-  doc.setFontSize(8);
-  doc.text('06 38 146-573', MARGIN_LEFT + 5, footerY + 45);
-  doc.text('www.enarva.com', MARGIN_LEFT + 5, footerY + 60);
-  doc.text('contact@enarva.com', MARGIN_LEFT + 5, footerY + 75);
+  doc.setFontSize(7);
+  doc.text('sarl au', MARGIN_LEFT + 2, footerY + 30);
 
-  // Center: QR Code
+  // Adresse complète (ligne 1)
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(7.5);
+  doc.text('53, 2ème étage, Appartement 15,  Avenue Brahim Roudani - Océan, Rabat - Maroc', MARGIN_LEFT, footerY + 42);
+  
+  // Ligne 2: Téléphone + Site + Email
+  doc.text('Téléphone : 06 38 146-573 • Site web : www.enarva.com • e-mail : contact@enarva.com', MARGIN_LEFT, footerY + 52);
+  
+  // Ligne 3: IF, RC, ICE, RIB
+  doc.text(`IF : ${data.company.if} • RC : ${data.company.rc} • ICE : ${data.company.ice} • RIB : ${data.company.rib}`, MARGIN_LEFT, footerY + 62);
+
+  // ========== RIGHT SECTION: QR CODE ==========
   try {
     if (PDF_IMAGES.BARCODE) {
-      const qrSize = 75;
-      const qrX = (PAGE_WIDTH / 2) - (qrSize / 2);
-      const qrY = footerY + 18;
+      const qrSize = 55; // Réduit pour s'adapter à la hauteur
+      const qrX = PAGE_WIDTH - MARGIN_RIGHT - qrSize - 5;
+      const qrY = footerY + 5;
       doc.addImage(PDF_IMAGES.BARCODE, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'FAST');
     }
   } catch (e) {
     console.warn("QR code error:", e);
   }
-
-  // Right: Small enarva logo text + Company info
-  doc.setFont('Poppins', 'bold');
-  doc.setFontSize(16);
-  doc.text('enarva', PAGE_WIDTH - MARGIN_RIGHT - 85, footerY + 22, { align: 'left' });
-  
-  doc.setFont('Poppins', 'bold');
-  doc.setFontSize(9);
-  doc.text('Enarva SARL AU', PAGE_WIDTH - MARGIN_RIGHT, footerY + 40, { align: 'right' });
-
-  doc.setFont('Poppins', 'normal');
-  doc.setFontSize(7);
-  doc.text(`IF: ${data.company.if}  RC: ${data.company.rc}`, PAGE_WIDTH - MARGIN_RIGHT, footerY + 55, { align: 'right' });
-  doc.text(`ICE: ${data.company.ice}`, PAGE_WIDTH - MARGIN_RIGHT, footerY + 67, { align: 'right' });
-  doc.text(`RIB: ${data.company.rib}`, PAGE_WIDTH - MARGIN_RIGHT, footerY + 79, { align: 'right' });
 
   const buffer = doc.output('arraybuffer');
   return new Uint8Array(buffer);
