@@ -375,41 +375,58 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     yPos += 14;
   });
 
-  // 9. FOOTER - NOUVEAU DESIGN COMPACT (HAUTEUR RÉDUITE À 65PT)
-  const footerHeight = 65;
+  // 9. FOOTER - DESIGN EXACT DE L'IMAGE (PIXEL PERFECT)
+  const footerHeight = 85; // Hauteur optimale pour contenir tout le contenu
   const footerY = PAGE_HEIGHT - footerHeight;
   
-  // Fond bleu uni (pas de gradient)
-  doc.setFillColor(30, 58, 138); // Bleu professionnel
+  // Fond bleu uni professionnel
+  doc.setFillColor(30, 58, 138);
   doc.rect(0, footerY, PAGE_WIDTH, footerHeight, 'F');
 
-  // ========== LEFT SECTION: LOGO ENARVA + INFO PRINCIPALE ==========
+  // ========== LEFT SECTION: LOGO + TOUTES LES INFOS ==========
+  const leftMargin = 45; // Marge gauche selon l'image
+  
+  // Ligne 1: LOGO "enarva" (grand et bold)
   doc.setTextColor(255, 255, 255);
   doc.setFont('Poppins', 'bold');
-  doc.setFontSize(18);
-  doc.text('enarva', MARGIN_LEFT, footerY + 20);
+  doc.setFontSize(22);
+  doc.text('enarva', leftMargin, footerY + 22);
   
+  // "sarl au" juste en dessous du logo (petit)
   doc.setFont('Poppins', 'normal');
-  doc.setFontSize(7);
-  doc.text('sarl au', MARGIN_LEFT + 2, footerY + 30);
+  doc.setFontSize(8);
+  doc.text('sarl au', leftMargin, footerY + 32);
 
-  // Adresse complète (ligne 1)
+  // Ligne 2: Adresse complète
   doc.setFont('Poppins', 'normal');
-  doc.setFontSize(7.5);
-  doc.text('53, 2ème étage, Appartement 15,  Avenue Brahim Roudani - Océan, Rabat - Maroc', MARGIN_LEFT, footerY + 42);
-  
-  // Ligne 2: Téléphone + Site + Email
-  doc.text('Téléphone : 06 38 146-573 • Site web : www.enarva.com • e-mail : contact@enarva.com', MARGIN_LEFT, footerY + 52);
-  
-  // Ligne 3: IF, RC, ICE, RIB
-  doc.text(`IF : ${data.company.if} • RC : ${data.company.rc} • ICE : ${data.company.ice} • RIB : ${data.company.rib}`, MARGIN_LEFT, footerY + 62);
+  doc.setFontSize(8);
+  doc.text(
+    '53, 2ème étage, Appartement 15,  Avenue Brahim Roudani - Océan, Rabat - Maroc',
+    leftMargin,
+    footerY + 47
+  );
 
-  // ========== RIGHT SECTION: QR CODE ==========
+  // Ligne 3: Téléphone + Site web + Email (avec bullets •)
+  doc.text(
+    'Téléphone : 06 38 146-573 • Site web : www.enarva.com • e-mail : contact@enarva.com',
+    leftMargin,
+    footerY + 60
+  );
+
+  // Ligne 4: IF + RC + ICE + RIB (avec bullets •)
+  doc.text(
+    `IF : ${data.company.if} • RC : ${data.company.rc} • ICE : ${data.company.ice} • RIB : ${data.company.rib}`,
+    leftMargin,
+    footerY + 73
+  );
+
+  // ========== RIGHT SECTION: QR CODE (CENTRÉ VERTICALEMENT) ==========
   try {
     if (PDF_IMAGES.BARCODE) {
-      const qrSize = 55; // Réduit pour s'adapter à la hauteur
-      const qrX = PAGE_WIDTH - MARGIN_RIGHT - qrSize - 5;
-      const qrY = footerY + 5;
+      const qrSize = 70; // Taille du QR code
+      const qrX = PAGE_WIDTH - 45 - qrSize; // Position X (marge droite 45)
+      const qrY = footerY + (footerHeight - qrSize) / 2; // CENTRÉ VERTICALEMENT
+      
       doc.addImage(PDF_IMAGES.BARCODE, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'FAST');
     }
   } catch (e) {
