@@ -7,7 +7,7 @@ import { fieldTranslations, LanguageCode } from '@/lib/i18n/fieldTranslations';
 type FieldLanguageContextType = {
   language: LanguageCode;
   setLanguage: (lang: LanguageCode) => void;
-  t: typeof fieldTranslations['fr']; // Changed from fieldTranslations.fr
+  t: typeof fieldTranslations['fr'];
   isRTL: boolean;
 };
 
@@ -16,19 +16,21 @@ const FieldLanguageContext = createContext<FieldLanguageContextType | undefined>
 export function FieldLanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<LanguageCode>('fr');
 
-  // Load saved language preference from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('fieldLanguage') as LanguageCode;
-    if (saved && (saved === 'fr' || saved === 'ar')) {
-      setLanguageState(saved);
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('fieldLanguage') as LanguageCode;
+      if (saved && (saved === 'fr' || saved === 'ar')) {
+        setLanguageState(saved);
+      }
     }
   }, []);
 
-  // Update localStorage and document direction when language changes
   useEffect(() => {
-    localStorage.setItem('fieldLanguage', language);
-    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
-    document.documentElement.lang = language;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fieldLanguage', language);
+      document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+      document.documentElement.lang = language;
+    }
   }, [language]);
 
   const setLanguage = (lang: LanguageCode) => {
@@ -38,7 +40,7 @@ export function FieldLanguageProvider({ children }: { children: ReactNode }) {
   const value: FieldLanguageContextType = {
     language,
     setLanguage,
-    t: fieldTranslations[language] as typeof fieldTranslations['fr'], // Type assertion added
+    t: fieldTranslations[language] as typeof fieldTranslations['fr'],
     isRTL: language === 'ar'
   };
 
@@ -49,10 +51,19 @@ export function FieldLanguageProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Modified hook with fallback
 export function useFieldLanguage() {
   const context = useContext(FieldLanguageContext);
+  
+  // If context is undefined, return default French translations (for non-field pages)
   if (context === undefined) {
-    throw new Error('useFieldLanguage must be used within a FieldLanguageProvider');
+    return {
+      language: 'fr' as LanguageCode,
+      setLanguage: () => {},
+      t: fieldTranslations.fr,
+      isRTL: false
+    };
   }
+  
   return context;
 }

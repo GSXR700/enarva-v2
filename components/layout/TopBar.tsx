@@ -22,7 +22,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Activity } from '@prisma/client'
 import { getRelativeTime } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
-import { LanguageSwitcher } from '@/components/field/LanguageSwitcher'
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -39,9 +38,21 @@ export function TopBar({ onMenuClick }: TopBarProps) {
   const { theme, setTheme } = useTheme();
 
   // Check if current route is a field route (dashboard or missions execution)
-  const isFieldRoute = pathname?.startsWith('/dashboard') || 
-                       pathname?.startsWith('/missions/') || 
-                       pathname?.includes('/execute');
+  const isFieldRoute = pathname === '/dashboard' || 
+                       (pathname?.startsWith('/missions/') && pathname?.includes('/execute'));
+
+  // Lazy load LanguageSwitcher only on field routes
+  const [LanguageSwitcher, setLanguageSwitcher] = useState<React.ComponentType | null>(null);
+
+  useEffect(() => {
+    if (isFieldRoute) {
+      import('@/components/field/LanguageSwitcher').then((mod) => {
+        setLanguageSwitcher(() => mod.LanguageSwitcher);
+      }).catch(() => {
+        // Silently fail if component doesn't exist
+      });
+    }
+  }, [isFieldRoute]);
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -92,7 +103,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
         </Button>
 
         {/* Language Switcher - Only visible on field routes */}
-        {isFieldRoute && (
+        {isFieldRoute && LanguageSwitcher && (
           <div className="hidden sm:block">
             <LanguageSwitcher />
           </div>
@@ -143,7 +154,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                     <DropdownMenuSeparator />
                     
                     {/* Mobile Language Switcher - Only on field routes */}
-                    {isFieldRoute && (
+                    {isFieldRoute && LanguageSwitcher && (
                       <>
                         <div className="sm:hidden px-2 py-2">
                           <LanguageSwitcher />
