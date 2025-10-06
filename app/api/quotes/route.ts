@@ -1,4 +1,4 @@
-//app/api/quotes/route.ts - COMPLETE FIXED VERSION WITH CHANNEL FIELD
+//app/api/quotes/route.ts - COMPLETE FIXED VERSION WITH CHANNEL FIELD AND SERVICE TYPE EXTRACTION
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
@@ -33,7 +33,8 @@ const createQuoteSchema = z.object({
     description: z.string().min(1, 'Description is required'),
     quantity: z.number().min(0.1, 'Quantity must be positive'),
     unitPrice: z.number().min(0, 'Unit price must be positive'),
-    totalPrice: z.number().min(0, 'Total price must be positive')
+    totalPrice: z.number().min(0, 'Total price must be positive'),
+    serviceType: z.string().optional()
   })).min(1, 'At least one line item required'),
   
   // Financial fields
@@ -49,6 +50,7 @@ const createQuoteSchema = z.object({
   surface: z.number().optional(),
   levels: z.number().optional(),
   propertyType: z.nativeEnum(PropertyType).optional().nullable(),
+  serviceType: z.string().optional().nullable(),
   
   // Product specific
   productCategory: z.nativeEnum(ProductQuoteCategory).optional().nullable(),
@@ -104,7 +106,10 @@ export async function GET(request: Request) {
             phone: true,
             company: true,
             leadType: true,
-            iceNumber: true
+            iceNumber: true,
+            propertyType: true,
+            estimatedSurface: true,
+            address: true
           }
         }
       },
@@ -184,6 +189,7 @@ export async function POST(request: Request) {
       surface,
       levels,
       propertyType,
+      serviceType,
       productCategory,
       productDetails,
       deliveryType,
@@ -218,8 +224,8 @@ export async function POST(request: Request) {
           leadType: newClientLeadType || LeadType.PARTICULIER,
           status: LeadStatus.NEW,
           source: 'MANUAL',
-          channel: 'MANUEL', // CRITICAL FIX: Add required channel field from LeadCanal enum
-          originalMessage: `Client créé via devis ${quoteNumber}` // CRITICAL FIX: Add required originalMessage field
+          channel: 'MANUEL',
+          originalMessage: `Client créé via devis ${quoteNumber}`
         }
 
         // Add B2B fields if client is not PARTICULIER
@@ -251,7 +257,7 @@ export async function POST(request: Request) {
         throw new Error('Lead ID is required - either provide existing leadId or complete new client information');
       }
 
-      // Verify the lead exists
+      // Verify the lead exists and get all necessary data
       const existingLead = await tx.lead.findUnique({
         where: { id: targetLeadId },
         select: { 
@@ -262,7 +268,10 @@ export async function POST(request: Request) {
           phone: true,
           email: true,
           company: true,
-          leadType: true
+          leadType: true,
+          propertyType: true,
+          estimatedSurface: true,
+          address: true
         }
       });
 
@@ -272,11 +281,39 @@ export async function POST(request: Request) {
 
       console.log('📋 Creating quote for lead:', existingLead.firstName, existingLead.lastName)
 
-      // Build quote data - FIXED: Purchase order fields are now stored directly
+      // FIXED: Extract serviceType from lineItems if available
+      let detectedServiceType: string | null = serviceType || null;
+
+      if (businessType === 'SERVICE' && lineItems && Array.isArray(lineItems) && !detectedServiceType) {
+        const firstItem = lineItems.find((item: any) => item.serviceType);
+        if (firstItem && firstItem.serviceType) {
+          detectedServiceType = firstItem.serviceType;
+          console.log('🎯 Detected serviceType from lineItems:', detectedServiceType);
+        }
+      }
+
+      // FIXED: Get surface and propertyType from Lead if available
+      let surfaceFromLead: number | null = null;
+      let propertyTypeFromLead: PropertyType | null = null;
+
+      if (businessType === 'SERVICE' && existingLead) {
+        if (existingLead.estimatedSurface) {
+          surfaceFromLead = Number(existingLead.estimatedSurface);
+          console.log('📐 Using surface from Lead:', surfaceFromLead);
+        }
+        
+        if (existingLead.propertyType) {
+          propertyTypeFromLead = existingLead.propertyType as PropertyType;
+          console.log('🏠 Using propertyType from Lead:', propertyTypeFromLead);
+        }
+      }
+
+      // Build quote data - FIXED: Add serviceType, use Lead data for surface/propertyType
       const quoteData: any = {
         leadId: targetLeadId,
         quoteNumber,
         businessType: businessType || 'SERVICE',
+        serviceType: detectedServiceType,
         lineItems,
         subTotalHT: subTotalHT ? new Decimal(subTotalHT) : new Decimal(0),
         vatAmount: vatAmount ? new Decimal(vatAmount) : new Decimal(0),
@@ -285,15 +322,22 @@ export async function POST(request: Request) {
         expiresAt: expiresAt ? new Date(expiresAt) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         type: type as QuoteType || QuoteType.STANDARD,
         status: 'DRAFT',
-        surface: surface || null,
+        surface: surfaceFromLead || surface || null,
         levels: levels || 1,
-        propertyType: propertyType as PropertyType || null,
+        propertyType: propertyTypeFromLead || (propertyType as PropertyType) || null,
         productCategory: productCategory as ProductQuoteCategory || null,
         productDetails: productDetails || null,
         deliveryType: deliveryType as DeliveryType || null,
         deliveryAddress: deliveryAddress || null,
         deliveryNotes: deliveryNotes || null,
       }
+
+      console.log('📋 Quote data to be created:', {
+        serviceType: quoteData.serviceType,
+        propertyType: quoteData.propertyType,
+        surface: quoteData.surface,
+        levels: quoteData.levels
+      });
 
       // FIXED: Add purchase order data directly to quoteData (not in productDetails)
       if (purchaseOrderNumber && orderedBy) {
@@ -316,7 +360,10 @@ export async function POST(request: Request) {
               company: true,
               leadType: true,
               iceNumber: true,
-              status: true
+              status: true,
+              propertyType: true,
+              estimatedSurface: true,
+              address: true
             }
           }
         }

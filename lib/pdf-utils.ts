@@ -87,6 +87,28 @@ export function numberToFrenchWords(amount: number): string {
   return result;
 }
 
+// Map service names to template keys
+export function normalizeServiceType(serviceType: string | null): string {
+  if (!serviceType) return 'FIN_DE_CHANTIER';
+  
+  const normalized = serviceType.toUpperCase().replace(/\s+/g, '_');
+  
+  // Map variations to standard keys
+  const mappings: Record<string, string> = {
+    'FIN_DE_CHANTIER': 'FIN_DE_CHANTIER',
+    'NETTOYAGE_FIN_DE_CHANTIER': 'FIN_DE_CHANTIER',
+    'GRAND_MENAGE': 'GRAND_MENAGE',
+    'GRAND_MÉNAGE': 'GRAND_MENAGE',
+    'NETTOYAGE_STANDARD': 'NETTOYAGE_STANDARD',
+    'NETTOYAGE_BUREAUX': 'NETTOYAGE_BUREAUX',
+    'ENTRETIEN_REGULIER': 'ENTRETIEN_REGULIER',
+    'NETTOYAGE_VITRES': 'NETTOYAGE_VITRES',
+    'CRISTALLISATION_MARBRE': 'CRISTALLISATION_MARBRE',
+  };
+  
+  return mappings[normalized] || 'FIN_DE_CHANTIER';
+}
+
 export function generateObjectTitle(
   serviceType: string | null,
   propertyType: string | null,
@@ -94,8 +116,11 @@ export function generateObjectTitle(
   levels: number | null,
   pdfContent: any
 ): string {
-  const serviceLabel = serviceType && pdfContent.serviceTypes[serviceType]
-    ? pdfContent.serviceTypes[serviceType].label
+  // Normalize serviceType before lookup
+  const normalizedServiceType = normalizeServiceType(serviceType);
+  
+  const serviceLabel = pdfContent.serviceTypes[normalizedServiceType]
+    ? pdfContent.serviceTypes[normalizedServiceType].label
     : 'Prestation';
   
   const propertyLabel = propertyType && pdfContent.propertyTypes[propertyType]
@@ -118,20 +143,107 @@ export function loadPDFContent(): any {
         prestationsIncluses: [
           "Nettoyage et dépoussiérage des plafonds, placards, façades, rideaux et embrasures",
           "Nettoyage ciblé des résidus sur toutes les surfaces (murs, sols, vitres, plinthes)",
-          "Nettoyage des interrupteurs, prises, poignées et rampes"
+          "Nettoyage des interrupteurs, prises, poignées et rampes",
+          "Détartrage et désinfection des sanitaires (lavabos, douches, WC, baignoires)",
+          "Nettoyage de cuisine : placards, plan de travail, crédences, électroménagers encastrés",
+          "Nettoyage complet des vitres et encadrement avec enlèvement des traces de chantier",
+          "Entretien et traitement des sols en fonction de leur type"
         ],
         equipementsUtilises: [
           "Aspirateur professionnel haute puissance",
           "Monobrosse pour sols durs",
-          "Nettoyeur vapeur industriel"
+          "Nettoyeur vapeur industriel",
+          "Échafaudages et échelles télescopiques",
+          "Produits décapants écologiques",
+          "Désinfectants professionnels certifiés"
         ],
         personnelSuggestions: { baseTeamSize: 2, perSquareMeter: 50 }
+      },
+      GRAND_MENAGE: {
+        label: "Grand Ménage",
+        prestationsIncluses: [
+          "Dépoussiérage approfondi de toutes les surfaces",
+          "Nettoyage complet des vitres intérieures et extérieures",
+          "Désinfection complète de la cuisine et des sanitaires",
+          "Aspiration et nettoyage de tous les sols",
+          "Nettoyage des placards intérieurs",
+          "Élimination des toiles d'araignées",
+          "Nettoyage des luminaires"
+        ],
+        equipementsUtilises: [
+          "Aspirateur professionnel",
+          "Nettoyeur vapeur",
+          "Produits désinfectants écologiques",
+          "Matériel de nettoyage haute qualité"
+        ],
+        personnelSuggestions: { baseTeamSize: 2, perSquareMeter: 60 }
+      },
+      NETTOYAGE_STANDARD: {
+        label: "Nettoyage Standard",
+        prestationsIncluses: [
+          "Dépoussiérage des surfaces",
+          "Nettoyage des sols",
+          "Nettoyage des sanitaires",
+          "Vidage des poubelles"
+        ],
+        equipementsUtilises: [
+          "Aspirateur",
+          "Balai et serpillère",
+          "Produits de nettoyage standards"
+        ],
+        personnelSuggestions: { baseTeamSize: 1, perSquareMeter: 80 }
+      },
+      NETTOYAGE_BUREAUX: {
+        label: "Nettoyage de Bureaux",
+        prestationsIncluses: [
+          "Dépoussiérage des bureaux et équipements",
+          "Nettoyage des sols",
+          "Nettoyage des sanitaires",
+          "Vidage des corbeilles",
+          "Nettoyage des espaces communs"
+        ],
+        equipementsUtilises: [
+          "Aspirateur professionnel",
+          "Monobrosse",
+          "Produits professionnels",
+          "Matériel de nettoyage bureautique"
+        ],
+        personnelSuggestions: { baseTeamSize: 1, perSquareMeter: 70 }
+      },
+      ENTRETIEN_REGULIER: {
+        label: "Entretien Régulier",
+        prestationsIncluses: [
+          "Nettoyage quotidien des surfaces",
+          "Entretien des sols",
+          "Nettoyage des sanitaires",
+          "Maintien de la propreté générale"
+        ],
+        equipementsUtilises: [
+          "Équipement standard de nettoyage",
+          "Produits d'entretien écologiques"
+        ],
+        personnelSuggestions: { baseTeamSize: 1, perSquareMeter: 100 }
       }
     },
     propertyTypes: {
       APARTMENT_SMALL: "appartement (petit)",
       APARTMENT_MEDIUM: "appartement (moyen)",
-      VILLA_MEDIUM: "villa (moyenne)"
+      APARTMENT_LARGE: "appartement (grand)",
+      APARTMENT_MULTI: "appartement multi-niveaux",
+      VILLA_SMALL: "villa (petite)",
+      VILLA_MEDIUM: "villa (moyenne)",
+      VILLA_LARGE: "villa (grande)",
+      PENTHOUSE: "penthouse",
+      COMMERCIAL: "local commercial",
+      STORE: "magasin",
+      HOTEL_STANDARD: "hôtel",
+      HOTEL_LUXURY: "hôtel de luxe",
+      OFFICE: "bureau",
+      RESIDENCE_B2B: "résidence",
+      BUILDING: "immeuble",
+      RESTAURANT: "restaurant",
+      WAREHOUSE: "entrepôt",
+      OTHER: "espace"
     },
     paymentConditions: {
       DEVIS_SERVICE_PARTICULIER: {
@@ -141,16 +253,26 @@ export function loadPDFContent(): any {
           "Un acompte de 30% est demandé à l'initiation du travail."
         ]
       },
+      DEVIS_SERVICE_PRO: {
+        title: "Conditions de paiement :",
+        conditions: [
+          "Paiement à 30 jours fin de mois.",
+          "Un acompte de 40% est demandé à la signature du contrat."
+        ]
+      },
       FACTURE_SERVICE: {
         title: "Observations générales :",
         conditions: [
-          "Toute réclamation doit être signalée sous 24 heures après la fin de l'intervention."
+          "Toute réclamation doit être signalée sous 24 heures après la fin de l'intervention.",
+          "La présente facture vaut titre exécutoire en cas de non-paiement."
         ]
       }
     },
     deliveryTimeframes: {
       STANDARD: "3-5 jours ouvrés",
-      EXPRESS: "24-48 heures"
+      EXPRESS: "24-48 heures",
+      URGENT: "Intervention sous 24h",
+      SCHEDULED: "Selon planning convenu"
     }
   };
 

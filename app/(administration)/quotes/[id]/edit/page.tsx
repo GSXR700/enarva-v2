@@ -54,6 +54,14 @@ export default function EditQuotePage() {
   const [expiresAt, setExpiresAt] = useState('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   
+  // Quote-specific fields
+  const [quoteFields, setQuoteFields] = useState({
+    serviceType: '',
+    propertyType: '' as PropertyType | '',
+    surface: '',
+    levels: '1'
+  });
+  
   // Lead data that can be updated from quote form
   const [leadUpdates, setLeadUpdates] = useState({
     estimatedSurface: '',
@@ -119,6 +127,13 @@ export default function EditQuotePage() {
       setStatus(data.status);
       setType(data.type || 'STANDARD');
       
+      // Initialize quote-specific fields
+      setQuoteFields({
+        serviceType: data.serviceType || '',
+        propertyType: data.propertyType || data.lead.propertyType || '',
+        surface: data.surface?.toString() || data.lead.estimatedSurface?.toString() || '',
+        levels: data.levels?.toString() || '1'
+      });
 
       // Initialize lead updates with current lead data
       setLeadUpdates({
@@ -128,6 +143,16 @@ export default function EditQuotePage() {
         urgencyLevel: data.lead.urgencyLevel || '',
         budgetRange: data.lead.budgetRange || ''
       });
+
+      // Set expiration date
+if (data.expiresAt) {
+  const expirationDate = new Date(data.expiresAt);
+  const isoString = expirationDate.toISOString();
+  const parts = isoString.split('T');
+  if (parts[0]) {
+    setExpiresAt(parts[0]);
+  }
+}
 
     } catch (error) {
       toast.error("Impossible de charger les données du devis.");
@@ -142,10 +167,10 @@ export default function EditQuotePage() {
   }, [fetchQuote]);
 
   // FIX: Helper function to handle lead updates safely
-  const handleLeadChange = (field: keyof typeof leadUpdates, value: string | undefined) => {
+  const handleLeadChange = (field: keyof typeof leadUpdates, value: string) => {
     setLeadUpdates(prev => ({ 
       ...prev, 
-      [field]: value || '' // Ensure value is never undefined
+      [field]: value
     }));
   };
 
@@ -231,7 +256,6 @@ export default function EditQuotePage() {
     setValidationErrors([]);
     
     try {
-      // FIX: Include ALL required fields for lineItems validation
       const formattedLineItems = editableLineItems.map(item => ({
         id: item.id,
         description: item.description,
@@ -239,20 +263,18 @@ export default function EditQuotePage() {
         amount: item.totalPrice,
         serviceType: item.serviceType,
         editable: item.editable,
-        // FIX: Add missing required fields
         quantity: item.quantity || 1,
         unitPrice: item.unitPrice || 0,
         totalPrice: item.totalPrice || 0
       }));
 
-      // Calculate surface from quote or lead
-      const surfaceValue = quote?.surface || parseInt(leadUpdates.estimatedSurface) || undefined;
+      const surfaceValue = parseFloat(quoteFields.surface) || undefined;
 
       const quoteData = {
         leadId: quote?.leadId,
         quoteNumber: quote?.quoteNumber,
         businessType: quote?.businessType || 'SERVICE',
-        lineItems: formattedLineItems, // Now includes all required fields
+        lineItems: formattedLineItems,
         subTotalHT: finalQuote.subTotalHT,
         vatAmount: finalQuote.vatAmount,
         totalTTC: finalQuote.totalTTC,
@@ -279,7 +301,6 @@ export default function EditQuotePage() {
         return;
       }
 
-      // Create the final payload for the API (matching what the API expects)
       const quotePayload = {
         lineItems: editableLineItems.map(item => ({
           id: item.id,
@@ -297,6 +318,9 @@ export default function EditQuotePage() {
         status,
         type,
         surface: surfaceValue,
+        levels: parseInt(quoteFields.levels) || 1,
+        serviceType: quoteFields.serviceType || undefined,
+        propertyType: quoteFields.propertyType || undefined,
         expiresAt: new Date(expiresAt).toISOString()
       };
 
@@ -497,6 +521,83 @@ export default function EditQuotePage() {
                   value={expiresAt}
                   onChange={(e) => setExpiresAt(e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
+                  className="bg-background border-input"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quote Details (Service Type, Property, Surface) */}
+          <Card className="transition-colors duration-300">
+            <CardHeader>
+              <CardTitle>Détails du Service</CardTitle>
+              <CardDescription>
+                Informations spécifiques au devis
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="serviceType">Type de Service</Label>
+                <Select
+                  value={quoteFields.serviceType}
+                  onValueChange={(value) => setQuoteFields(prev => ({ ...prev, serviceType: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un service" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FIN_DE_CHANTIER">Fin de chantier</SelectItem>
+                    <SelectItem value="GRAND_MENAGE">Grand Ménage</SelectItem>
+                    <SelectItem value="NETTOYAGE_STANDARD">Nettoyage Standard</SelectItem>
+                    <SelectItem value="NETTOYAGE_BUREAUX">Nettoyage Bureaux</SelectItem>
+                    <SelectItem value="ENTRETIEN_REGULIER">Entretien Régulier</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="quotePropertyType">Type de Bien</Label>
+                <Select
+                  value={quoteFields.propertyType}
+                  onValueChange={(value) => setQuoteFields(prev => ({ ...prev, propertyType: value as PropertyType }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner le type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="VILLA_SMALL">Villa (petite)</SelectItem>
+                    <SelectItem value="VILLA_MEDIUM">Villa (moyenne)</SelectItem>
+                    <SelectItem value="VILLA_LARGE">Villa (grande)</SelectItem>
+                    <SelectItem value="APARTMENT_SMALL">Appartement (petit)</SelectItem>
+                    <SelectItem value="APARTMENT_MEDIUM">Appartement (moyen)</SelectItem>
+                    <SelectItem value="APARTMENT_LARGE">Appartement (grand)</SelectItem>
+                    <SelectItem value="OFFICE">Bureau</SelectItem>
+                    <SelectItem value="COMMERCIAL">Commercial</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="quoteSurface">Surface (m²)</Label>
+                <Input
+                  id="quoteSurface"
+                  type="number"
+                  value={quoteFields.surface}
+                  onChange={(e) => setQuoteFields(prev => ({ ...prev, surface: e.target.value }))}
+                  placeholder="300"
+                  className="bg-background border-input"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="quoteLevels">Niveaux</Label>
+                <Input
+                  id="quoteLevels"
+                  type="number"
+                  min="1"
+                  value={quoteFields.levels}
+                  onChange={(e) => setQuoteFields(prev => ({ ...prev, levels: e.target.value }))}
+                  placeholder="1"
                   className="bg-background border-input"
                 />
               </div>
@@ -845,13 +946,21 @@ export default function EditQuotePage() {
                   <h4 className="font-medium text-primary mb-2">Informations du devis</h4>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
+                      <span className="text-primary/80">Service:</span>
+                      <span className="ml-2 font-medium text-foreground">{quoteFields.serviceType || 'Non défini'}</span>
+                    </div>
+                    <div>
                       <span className="text-primary/80">Type:</span>
                       <span className="ml-2 font-medium text-foreground">{type}</span>
                     </div>
                     <div>
+                      <span className="text-primary/80">Bien:</span>
+                      <span className="ml-2 font-medium text-foreground">{quoteFields.propertyType || 'Non défini'}</span>
+                    </div>
+                    <div>
                       <span className="text-primary/80">Surface:</span>
                       <span className="ml-2 font-medium text-foreground">
-                        {quote?.surface || leadUpdates.estimatedSurface || 'Non définie'} m²
+                        {quoteFields.surface || 'Non définie'} m²
                       </span>
                     </div>
                   </div>

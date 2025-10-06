@@ -34,6 +34,7 @@ interface Lead {
   leadType: string
   address?: string
   propertyType?: string
+  estimatedSurface?: number
   status: string
   displayName: string
   typeLabel: string
@@ -60,6 +61,7 @@ interface LineItem {
   unitPrice: number
   totalPrice: number
   editable: boolean
+  serviceType?: string
 }
 
 type ServiceInputState = ServiceInput & { id: number }
@@ -243,7 +245,8 @@ const NewQuoteForm = () => {
         quantity: 1,
         unitPrice: amount,
         totalPrice: amount,
-        editable: true
+        editable: true,
+        serviceType: service.type
       }
     })
 
@@ -518,7 +521,8 @@ const NewQuoteForm = () => {
           description: item.description,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          totalPrice: item.totalPrice
+          totalPrice: item.totalPrice,
+          serviceType: item.serviceType
         })),
         subTotalHT: finalQuote.subTotalHT,
         vatAmount: finalQuote.vatAmount,
@@ -555,30 +559,53 @@ const NewQuoteForm = () => {
       // Add business-specific data
       if (businessType === 'SERVICE') {
         quotePayload.type = quoteType
-        quotePayload.surface = services.reduce((acc, s) => acc + (s.surface * s.levels), 0)
-        quotePayload.levels = services.reduce((acc, s) => Math.max(acc, s.levels), 1)
         
         const totalSurface = services.reduce((acc, s) => acc + (s.surface * s.levels), 0)
-        const hasApartment = services.some(s => s.type.toLowerCase().includes('appartement'))
-        const hasVilla = services.some(s => s.type.toLowerCase().includes('villa') || s.type.toLowerCase().includes('maison'))
-        const hasCommercial = services.some(s => s.type.toLowerCase().includes('bureau') || s.type.toLowerCase().includes('commercial'))
+        quotePayload.surface = totalSurface
+        quotePayload.levels = services.reduce((acc, s) => Math.max(acc, s.levels), 1)
         
-        let propertyType = 'OTHER'
-        
-        if (hasApartment) {
-          if (totalSurface <= 50) propertyType = 'APARTMENT_SMALL'
-          else if (totalSurface <= 100) propertyType = 'APARTMENT_MEDIUM'
-          else if (totalSurface <= 150) propertyType = 'APARTMENT_LARGE'
-          else propertyType = 'APARTMENT_MULTI'
-        } else if (hasVilla) {
-          if (totalSurface <= 100) propertyType = 'VILLA_SMALL'
-          else if (totalSurface <= 200) propertyType = 'VILLA_MEDIUM'
-          else propertyType = 'VILLA_LARGE'
-        } else if (hasCommercial) {
-          propertyType = services.some(s => s.type.toLowerCase().includes('bureau')) ? 'OFFICE' : 'COMMERCIAL'
+        // Extract serviceType from first line item
+        const firstService = finalQuote.lineItems.find(item => item.serviceType)
+        if (firstService && firstService.serviceType) {
+          quotePayload.serviceType = firstService.serviceType
+          console.log('🎯 Adding serviceType to quote:', firstService.serviceType)
         }
         
-        quotePayload.propertyType = propertyType
+        // Use Lead data if selected, otherwise auto-detect
+        if (selectedLead && selectedLead.propertyType) {
+          quotePayload.propertyType = selectedLead.propertyType
+          console.log('🏠 Using propertyType from selected Lead:', selectedLead.propertyType)
+        } else {
+          // Fallback: Auto-detect based on services
+          const hasApartment = services.some(s => s.type.toLowerCase().includes('appartement'))
+          const hasVilla = services.some(s => s.type.toLowerCase().includes('villa') || s.type.toLowerCase().includes('maison'))
+          const hasCommercial = services.some(s => s.type.toLowerCase().includes('bureau') || s.type.toLowerCase().includes('commercial'))
+          
+          let propertyType = 'OTHER'
+          
+          if (hasApartment) {
+            if (totalSurface <= 50) propertyType = 'APARTMENT_SMALL'
+            else if (totalSurface <= 100) propertyType = 'APARTMENT_MEDIUM'
+            else if (totalSurface <= 150) propertyType = 'APARTMENT_LARGE'
+            else propertyType = 'APARTMENT_MULTI'
+          } else if (hasVilla) {
+            if (totalSurface <= 100) propertyType = 'VILLA_SMALL'
+            else if (totalSurface <= 200) propertyType = 'VILLA_MEDIUM'
+            else propertyType = 'VILLA_LARGE'
+          } else if (hasCommercial) {
+            propertyType = services.some(s => s.type.toLowerCase().includes('bureau')) ? 'OFFICE' : 'COMMERCIAL'
+          }
+          
+          quotePayload.propertyType = propertyType
+          console.log('🏠 Auto-detected propertyType:', propertyType)
+        }
+        
+        // If Lead has surface, use it
+        if (selectedLead && selectedLead.estimatedSurface) {
+          quotePayload.surface = selectedLead.estimatedSurface
+          console.log('📐 Using surface from selected Lead:', selectedLead.estimatedSurface)
+        }
+        
       } else {
         quotePayload.productCategory = productCategory || 'OTHER'
         quotePayload.productDetails = {
@@ -795,6 +822,16 @@ const NewQuoteForm = () => {
                       {selectedLead.iceNumber && (
                         <Badge variant="secondary" className="text-xs">
                           ICE: {selectedLead.iceNumber}
+                        </Badge>
+                      )}
+                      {selectedLead.propertyType && (
+                        <Badge variant="secondary" className="text-xs">
+                          {selectedLead.propertyType}
+                        </Badge>
+                      )}
+                      {selectedLead.estimatedSurface && (
+                        <Badge variant="secondary" className="text-xs">
+                          {selectedLead.estimatedSurface}m²
                         </Badge>
                       )}
                     </div>
@@ -1174,24 +1211,24 @@ const NewQuoteForm = () => {
                 <div>
                   <Label className="text-sm">Catégorie de Produit</Label>
                   <Select value={productCategory} onValueChange={setProductCategory}>
-  <SelectTrigger className="text-sm">
-    <SelectValue placeholder="Sélectionner une catégorie" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="EQUIPMENT" className="text-sm">Équipement</SelectItem>
-    <SelectItem value="CONSUMABLES" className="text-sm">Consommables</SelectItem>
-    <SelectItem value="FURNITURE" className="text-sm">Mobilier</SelectItem>
-    <SelectItem value="ELECTRONICS" className="text-sm">Électronique</SelectItem>
-    <SelectItem value="DECORATION" className="text-sm">Décoration</SelectItem>
-    <SelectItem value="TEXTILES" className="text-sm">Textiles</SelectItem>
-    <SelectItem value="LIGHTING" className="text-sm">Éclairage</SelectItem>
-    <SelectItem value="STORAGE" className="text-sm">Rangement</SelectItem>
-    <SelectItem value="KITCHEN_ITEMS" className="text-sm">Articles de cuisine</SelectItem>
-    <SelectItem value="BATHROOM_ITEMS" className="text-sm">Articles de salle de bain</SelectItem>
-    <SelectItem value="OFFICE_SUPPLIES" className="text-sm">Fournitures de bureau</SelectItem>
-    <SelectItem value="OTHER" className="text-sm">Autre</SelectItem>
-  </SelectContent>
-</Select>
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="Sélectionner une catégorie" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EQUIPMENT" className="text-sm">Équipement</SelectItem>
+                      <SelectItem value="CONSUMABLES" className="text-sm">Consommables</SelectItem>
+                      <SelectItem value="FURNITURE" className="text-sm">Mobilier</SelectItem>
+                      <SelectItem value="ELECTRONICS" className="text-sm">Électronique</SelectItem>
+                      <SelectItem value="DECORATION" className="text-sm">Décoration</SelectItem>
+                      <SelectItem value="TEXTILES" className="text-sm">Textiles</SelectItem>
+                      <SelectItem value="LIGHTING" className="text-sm">Éclairage</SelectItem>
+                      <SelectItem value="STORAGE" className="text-sm">Rangement</SelectItem>
+                      <SelectItem value="KITCHEN_ITEMS" className="text-sm">Articles de cuisine</SelectItem>
+                      <SelectItem value="BATHROOM_ITEMS" className="text-sm">Articles de salle de bain</SelectItem>
+                      <SelectItem value="OFFICE_SUPPLIES" className="text-sm">Fournitures de bureau</SelectItem>
+                      <SelectItem value="OTHER" className="text-sm">Autre</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-3">
@@ -1354,17 +1391,17 @@ const NewQuoteForm = () => {
                     <div>
                       <Label className="text-sm">Type de Livraison</Label>
                       <Select value={deliveryType} onValueChange={setDeliveryType}>
-  <SelectTrigger className="text-sm">
-    <SelectValue />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="STANDARD_DELIVERY" className="text-sm">Livraison standard</SelectItem>
-    <SelectItem value="EXPRESS_DELIVERY" className="text-sm">Livraison express</SelectItem>
-    <SelectItem value="PICKUP" className="text-sm">Retrait sur site</SelectItem>
-    <SelectItem value="SCHEDULED_DELIVERY" className="text-sm">Livraison planifiée</SelectItem>
-    <SelectItem value="WHITE_GLOVE" className="text-sm">Service premium</SelectItem>
-  </SelectContent>
-</Select>
+                        <SelectTrigger className="text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="STANDARD_DELIVERY" className="text-sm">Livraison standard</SelectItem>
+                          <SelectItem value="EXPRESS_DELIVERY" className="text-sm">Livraison express</SelectItem>
+                          <SelectItem value="PICKUP" className="text-sm">Retrait sur site</SelectItem>
+                          <SelectItem value="SCHEDULED_DELIVERY" className="text-sm">Livraison planifiée</SelectItem>
+                          <SelectItem value="WHITE_GLOVE" className="text-sm">Service premium</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div>

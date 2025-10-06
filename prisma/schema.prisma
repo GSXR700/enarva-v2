@@ -171,6 +171,7 @@ model Quote {
   updatedAt         DateTime             @updatedAt
   expiresAt         DateTime?
   type              QuoteType?
+  serviceType       String?
   propertyType      PropertyType?
   surface           Int?
   levels            Int?                 @default(1)
