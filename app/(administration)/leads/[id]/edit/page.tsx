@@ -80,31 +80,38 @@ export default function EditLeadPage() {
 
             // Properly parse and set form data with better error handling
             const parsedFormData: FormDataType = {
-                ...leadData,
-                estimatedSurface: leadData.estimatedSurface?.toString() || '',
-                score: leadData.score || 0,
-                materials: leadData.materials || null,
-                // Ensure all enum fields are properly handled with fallbacks
-                propertyType: leadData.propertyType || null,
-                accessibility: leadData.accessibility || 'EASY',
-                urgencyLevel: leadData.urgencyLevel || 'NORMAL',
-                frequency: leadData.frequency || 'PONCTUEL',
-                contractType: leadData.contractType || 'INTERVENTION_UNIQUE',
-                providedBy: leadData.providedBy || 'ENARVA',
-                enarvaRole: leadData.enarvaRole || 'PRESTATAIRE_PRINCIPAL',
-                assignedToId: leadData.assignedToId || '',
-                // Handle string fields that might be empty or null
+                firstName: leadData.firstName || '',
+                lastName: leadData.lastName || '',
+                phone: leadData.phone || '',
                 email: leadData.email || '',
                 address: leadData.address || '',
                 gpsLocation: leadData.gpsLocation || '',
+                leadType: leadData.leadType || 'PARTICULIER',
                 company: leadData.company || '',
                 iceNumber: leadData.iceNumber || '',
                 activitySector: leadData.activitySector || '',
                 contactPosition: leadData.contactPosition || '',
                 department: leadData.department || '',
+                propertyType: leadData.propertyType || null,
+                estimatedSurface: leadData.estimatedSurface?.toString() || '',
+                accessibility: leadData.accessibility || 'EASY',
+                urgencyLevel: leadData.urgencyLevel || 'NORMAL',
                 budgetRange: leadData.budgetRange || '',
+                frequency: leadData.frequency || 'PONCTUEL',
+                contractType: leadData.contractType || 'INTERVENTION_UNIQUE',
+                needsProducts: leadData.needsProducts || false,
+                needsEquipment: leadData.needsEquipment || false,
+                providedBy: leadData.providedBy || 'ENARVA',
+                channel: leadData.channel || 'MANUEL',
                 source: leadData.source || '',
+                hasReferrer: leadData.hasReferrer || false,
                 referrerContact: leadData.referrerContact || '',
+                enarvaRole: leadData.enarvaRole || 'PRESTATAIRE_PRINCIPAL',
+                originalMessage: leadData.originalMessage || '',
+                status: leadData.status || 'NEW',
+                score: leadData.score || 0,
+                materials: leadData.materials || null,
+                assignedToId: leadData.assignedToId || '',
             };
 
             setFormData(parsedFormData);
@@ -155,32 +162,40 @@ export default function EditLeadPage() {
     setIsSaving(true);
 
     try {
-      // Prepare submission data with proper type conversion and null handling
-      const submissionData = {
-        ...formData,
-        materials: requestType === 'PRODUCTS' ? productRequests : null,
-        estimatedSurface: formData.estimatedSurface ? parseInt(formData.estimatedSurface.toString()) : null,
-        score: formData.score ? parseInt(formData.score.toString()) : 0,
-        
-        // Handle null values for optional enum fields
-        propertyType: formData.propertyType || null,
-        urgencyLevel: formData.urgencyLevel || null,
-        frequency: formData.frequency || null,
-        contractType: formData.contractType || null,
-        assignedToId: formData.assignedToId || null,
-        
-        // Clean empty string values to null for better database consistency
+      // Prepare clean submission data - only send updateable fields
+      const submissionData: any = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
         email: formData.email || null,
         address: formData.address || null,
         gpsLocation: formData.gpsLocation || null,
+        leadType: formData.leadType,
         company: formData.company || null,
         iceNumber: formData.iceNumber || null,
         activitySector: formData.activitySector || null,
         contactPosition: formData.contactPosition || null,
         department: formData.department || null,
+        propertyType: formData.propertyType || null,
+        estimatedSurface: formData.estimatedSurface ? parseInt(formData.estimatedSurface.toString()) : null,
+        accessibility: formData.accessibility,
+        urgencyLevel: formData.urgencyLevel || null,
         budgetRange: formData.budgetRange || null,
+        frequency: formData.frequency || null,
+        contractType: formData.contractType || null,
+        needsProducts: formData.needsProducts,
+        needsEquipment: formData.needsEquipment,
+        providedBy: formData.providedBy,
+        channel: formData.channel,
         source: formData.source || null,
+        hasReferrer: formData.hasReferrer,
         referrerContact: formData.referrerContact || null,
+        enarvaRole: formData.enarvaRole,
+        originalMessage: formData.originalMessage,
+        status: formData.status,
+        score: formData.score ? parseInt(formData.score.toString()) : 0,
+        materials: requestType === 'PRODUCTS' ? productRequests : null,
+        assignedToId: formData.assignedToId || null,
       };
 
       console.log('Submitting lead update:', submissionData);
