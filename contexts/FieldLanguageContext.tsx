@@ -28,8 +28,17 @@ export function FieldLanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('fieldLanguage', language);
-      document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+      
+      // Only apply dir to main content, not entire document
+      const mainElement = document.querySelector('main');
+      if (mainElement) {
+        mainElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+      }
+      
+      // Keep document lang attribute
       document.documentElement.lang = language;
+      
+      // Don't set document.documentElement.dir - this breaks sidebar
     }
   }, [language]);
 
@@ -51,11 +60,9 @@ export function FieldLanguageProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Modified hook with fallback
 export function useFieldLanguage() {
   const context = useContext(FieldLanguageContext);
   
-  // If context is undefined, return default French translations (for non-field pages)
   if (context === undefined) {
     return {
       language: 'fr' as LanguageCode,

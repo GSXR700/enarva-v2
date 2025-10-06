@@ -474,16 +474,41 @@ canvas {
   user-select: none;
 }
 
-/* RTL Support for Arabic Language */
+/* Add at the END of your globals.css file */
+
+/* ============================================
+   RTL SUPPORT FOR ARABIC - COMPREHENSIVE FIX
+   ============================================ */
+
+/* Base RTL setup */
 [dir="rtl"] {
   direction: rtl;
   text-align: right;
 }
 
+/* Keep certain elements always LTR */
+[dir="rtl"] .sidebar,
+[dir="rtl"] nav,
+[dir="rtl"] .logo,
+[dir="rtl"] input[type="number"],
+[dir="rtl"] input[type="tel"],
+[dir="rtl"] input[type="email"],
+[dir="rtl"] code,
+[dir="rtl"] pre {
+  direction: ltr;
+  text-align: left;
+}
+
+/* Fix flex direction reversing */
 [dir="rtl"] .flex {
+  flex-direction: row;
+}
+
+[dir="rtl"] .flex-row-reverse {
   flex-direction: row-reverse;
 }
 
+/* Fix spacing utilities in RTL */
 [dir="rtl"] .space-x-2 > * + * {
   margin-left: 0;
   margin-right: 0.5rem;
@@ -494,10 +519,12 @@ canvas {
   margin-right: 1rem;
 }
 
-[dir="rtl"] .gap-2 {
-  gap: 0.5rem;
+[dir="rtl"] .gap-2,
+[dir="rtl"] .gap-4 {
+  /* Gap works fine in RTL, no changes needed */
 }
 
+/* Fix margin utilities */
 [dir="rtl"] .mr-2 {
   margin-right: 0;
   margin-left: 0.5rem;
@@ -518,37 +545,146 @@ canvas {
   margin-right: 1rem;
 }
 
-/* RTL-specific adjustments for icons */
+/* Fix padding utilities */
+[dir="rtl"] .pr-2 {
+  padding-right: 0;
+  padding-left: 0.5rem;
+}
+
+[dir="rtl"] .pl-2 {
+  padding-left: 0;
+  padding-right: 0.5rem;
+}
+
+[dir="rtl"] .pr-4 {
+  padding-right: 0;
+  padding-left: 1rem;
+}
+
+[dir="rtl"] .pl-4 {
+  padding-left: 0;
+  padding-right: 1rem;
+}
+
+/* DON'T flip icons that indicate direction */
 [dir="rtl"] .lucide {
+  transform: none;
+}
+
+/* Only flip specific directional icons */
+[dir="rtl"] .lucide-arrow-left {
   transform: scaleX(-1);
 }
 
-[dir="rtl"] .lucide-arrow-left {
-  transform: scaleX(1) rotate(180deg);
-}
-
 [dir="rtl"] .lucide-arrow-right {
-  transform: scaleX(1);
+  transform: scaleX(-1);
 }
 
-/* RTL adjustments for cards and components */
+[dir="rtl"] .lucide-chevron-left {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .lucide-chevron-right {
+  transform: scaleX(-1);
+}
+
+/* Fix card layouts in RTL */
 [dir="rtl"] .thread-card {
   text-align: right;
 }
 
-[dir="rtl"] .justify-between {
-  flex-direction: row-reverse;
+/* Fix grid layouts - keep them natural */
+[dir="rtl"] .grid {
+  direction: rtl;
 }
 
-/* Ensure proper text alignment in RTL */
+/* Fix justify-between behavior */
+[dir="rtl"] .justify-between {
+  justify-content: space-between;
+  flex-direction: row;
+}
+
+/* Fix items-center with justify-between */
+[dir="rtl"] .flex.items-center.justify-between {
+  flex-direction: row;
+}
+
+/* Ensure proper text alignment */
 [dir="rtl"] input,
 [dir="rtl"] textarea,
 [dir="rtl"] select {
   text-align: right;
 }
 
-/* RTL adjustments for badges */
+[dir="rtl"] input::placeholder,
+[dir="rtl"] textarea::placeholder {
+  text-align: right;
+}
+
+/* Fix badges and small components */
 [dir="rtl"] .badge {
   margin-left: 0;
   margin-right: 0.5rem;
+}
+
+/* Fix dropdown menus */
+[dir="rtl"] [role="menu"],
+[dir="rtl"] [role="menuitem"] {
+  text-align: right;
+}
+
+/* Fix dialog/modal content */
+[dir="rtl"] [role="dialog"] {
+  text-align: right;
+}
+
+/* Fix stat cards specifically */
+[dir="rtl"] .bg-gradient-to-br {
+  direction: rtl;
+}
+
+/* CRITICAL: Keep sidebar and navigation LTR */
+[dir="rtl"] aside,
+[dir="rtl"] .sidebar-nav,
+[dir="rtl"] header {
+  direction: ltr !important;
+}
+
+/* But keep header content RTL when in field pages */
+[dir="rtl"] header .flex.items-center.gap-4 {
+  direction: rtl;
+}
+
+/* Fix the main content area */
+[dir="rtl"] main {
+  direction: rtl;
+}
+
+/* Fix card content in RTL */
+[dir="rtl"] .p-4,
+[dir="rtl"] .p-6 {
+  direction: rtl;
+}
+
+/* Prevent double reversal */
+[dir="rtl"] .max-w-7xl,
+[dir="rtl"] .container {
+  direction: rtl;
+}
+
+/* Fix stats cards layout */
+[dir="rtl"] .grid.grid-cols-1.md\\:grid-cols-4 {
+  direction: rtl;
+}
+
+/* Keep progress bars LTR direction but RTL container */
+[dir="rtl"] [role="progressbar"] {
+  direction: ltr;
+}
+
+/* Fix mission cards */
+[dir="rtl"] .space-y-2,
+[dir="rtl"] .space-y-3,
+[dir="rtl"] .space-y-4 {
+  direction: rtl;
 }
