@@ -19,6 +19,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useFieldLanguage } from '@/contexts/FieldLanguageContext'
+import { LanguageSwitcher } from '@/components/field/LanguageSwitcher'
 
 interface TaskWithAssignment extends Task {
   assignedTo?: {
@@ -85,6 +87,7 @@ const priorityColors = {
 
 export default function FieldDashboard() {
   const { data: session } = useSession()
+  const { t, isRTL } = useFieldLanguage()
   const [missions, setMissions] = useState<FieldMission[]>([])
   const [stats, setStats] = useState<DashboardStats>({ activeMissions: 0, completedToday: 0, pendingTasks: 0, teamEfficiency: 0 })
   const [isLoading, setIsLoading] = useState(true)
@@ -128,11 +131,11 @@ export default function FieldDashboard() {
       }
     } catch (error) {
       console.error('Failed to fetch field data:', error)
-      toast.error('Impossible de charger les données')
+      toast.error(t.notifications.error)
     } finally {
       setIsLoading(false)
     }
-  }, [currentUser?.id, isTechnician, isTeamLeader, selectedMission])
+  }, [currentUser?.id, isTechnician, isTeamLeader, selectedMission, t.notifications.error])
 
   useEffect(() => {
     fetchFieldData()
@@ -142,7 +145,7 @@ export default function FieldDashboard() {
     'task-updated': (data: any) => {
       console.log('Task updated via Pusher:', data)
       fetchFieldData()
-      toast.success('Tâche mise à jour en temps réel')
+      toast.success(t.notifications.success)
     },
     'mission-updated': (data: any) => {
       console.log('Mission updated via Pusher:', data)
@@ -156,10 +159,10 @@ export default function FieldDashboard() {
       const response = await fetch(`/api/tasks/${taskId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assignedToId: memberId }) })
       if (!response.ok) throw new Error('Failed to assign task')
       await fetchFieldData()
-      toast.success(memberId ? 'Tâche assignée avec succès' : 'Assignation supprimée')
+      toast.success(memberId ? t.notifications.success : t.notifications.success)
     } catch (error) {
       console.error('Assignment error:', error)
-      toast.error('Erreur lors de l\'assignation')
+      toast.error(t.notifications.error)
     } finally {
       setIsUpdating(false)
     }
@@ -172,11 +175,11 @@ export default function FieldDashboard() {
       const response = await fetch(`/api/tasks/${selectedTask.id}/time`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estimatedTime: newEstimatedTime }) })
       if (!response.ok) throw new Error('Failed to update time')
       await fetchFieldData()
-      toast.success('Durée mise à jour')
+      toast.success(t.notifications.timeUpdated)
       setIsTimeDialogOpen(false)
     } catch (error) {
       console.error('Time update error:', error)
-      toast.error('Erreur de mise à jour')
+      toast.error(t.notifications.error)
     } finally {
       setIsUpdating(false)
     }
@@ -189,10 +192,11 @@ export default function FieldDashboard() {
       const response = await fetch(`/api/tasks/${task.id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) })
       if (!response.ok) throw new Error('Failed to update status')
       await fetchFieldData()
-      toast.success(`Tâche ${newStatus === 'IN_PROGRESS' ? 'démarrée' : 'terminée'}`)
+      const message = newStatus === 'IN_PROGRESS' ? t.notifications.taskStarted : t.notifications.taskCompleted
+      toast.success(message)
     } catch (error) {
       console.error('Status update error:', error)
-      toast.error('Erreur lors de la mise à jour du statut')
+      toast.error(t.notifications.error)
     } finally {
       setIsUpdating(false)
     }
@@ -208,10 +212,10 @@ export default function FieldDashboard() {
     try {
       const response = await fetch(`/api/missions/${missionId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'IN_PROGRESS', actualStartTime: new Date().toISOString() }) })
       if (!response.ok) throw new Error('Failed to start mission')
-      toast.success('Mission démarrée')
+      toast.success(t.notifications.missionStarted)
       fetchFieldData()
     } catch (error) {
-      toast.error('Erreur lors du démarrage')
+      toast.error(t.notifications.error)
     }
   }
 
@@ -245,15 +249,16 @@ export default function FieldDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <div className={`min-h-screen bg-background p-4 ${isRTL ? 'rtl' : 'ltr'}`}>
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Tableau de bord terrain</h1>
-            <p className="text-muted-foreground">Bonjour {currentUser?.name?.split(' ')[0] || 'Équipe'}, voici vos missions du jour</p>
-            {isTeamLeader && <Badge variant="outline" className="mt-2"><User className="w-3 h-3 mr-1" />Chef d'équipe</Badge>}
+            <h1 className="text-3xl font-bold text-foreground">{t.dashboard.title}</h1>
+            <p className="text-muted-foreground">{t.dashboard.welcome} {currentUser?.name?.split(' ')[0] || 'Équipe'}</p>
+            {isTeamLeader && <Badge variant="outline" className="mt-2"><User className="w-3 h-3 mr-1" />{t.tasks.status.ASSIGNED}</Badge>}
           </div>
           <div className="flex items-center space-x-2">
+            <LanguageSwitcher />
             <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"><Clock className="w-3 h-3 mr-1" />{formatTime(new Date())}</Badge>
           </div>
         </div>
@@ -263,7 +268,7 @@ export default function FieldDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Missions actives</p>
+                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400">{t.dashboard.stats.activeMissions}</p>
                   <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{stats.activeMissions}</p>
                 </div>
                 <Target className="h-8 w-8 text-blue-500" />
@@ -274,7 +279,7 @@ export default function FieldDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-green-600 dark:text-green-400">Terminées aujourd'hui</p>
+                  <p className="text-sm font-medium text-green-600 dark:text-green-400">{t.dashboard.stats.completedToday}</p>
                   <p className="text-2xl font-bold text-green-900 dark:text-green-100">{stats.completedToday}</p>
                 </div>
                 <CheckCircle2 className="h-8 w-8 text-green-500" />
@@ -285,7 +290,7 @@ export default function FieldDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-orange-600 dark:text-orange-400">Tâches en attente</p>
+                  <p className="text-sm font-medium text-orange-600 dark:text-orange-400">{t.dashboard.stats.pendingTasks}</p>
                   <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">{stats.pendingTasks}</p>
                 </div>
                 <AlertCircle className="h-8 w-8 text-orange-500" />
@@ -296,7 +301,7 @@ export default function FieldDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Efficacité équipe</p>
+                  <p className="text-sm font-medium text-purple-600 dark:text-purple-400">{t.dashboard.stats.teamEfficiency}</p>
                   <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">{stats.teamEfficiency}%</p>
                 </div>
                 <Users className="h-8 w-8 text-purple-500" />
@@ -309,14 +314,14 @@ export default function FieldDashboard() {
           <div className="lg:col-span-1">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5" />Missions du jour</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5" />{t.missions.title}</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="space-y-2 p-4 max-h-[600px] overflow-y-auto">
   {missions.length === 0 ? (
     <div className="text-center py-8 text-muted-foreground">
       <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-      <p>Aucune mission aujourd'hui</p>
+      <p>{t.missions.noMissions}</p>
     </div>
   ) : (
     missions.map((mission) => {
@@ -333,7 +338,7 @@ export default function FieldDashboard() {
           <div className="flex items-center justify-between mb-2">
             <span className="font-medium text-sm">{mission.missionNumber}</span>
             <Badge className={statusColors[mission.status as keyof typeof statusColors] + ' text-xs'}>
-              {translate(mission.status)}
+              {t.missions.status[mission.status as keyof typeof t.missions.status] || translate(mission.status)}
             </Badge>
           </div>
           
@@ -352,14 +357,14 @@ export default function FieldDashboard() {
           {myTasks.length > 0 && (
             <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
               <p className="text-xs text-blue-700 dark:text-blue-400">
-                Mes tâches: {completedMyTasks}/{myTasks.length}
+                {t.tasks.myTasks}: {completedMyTasks}/{myTasks.length}
               </p>
             </div>
           )}
           
           <div className="mt-3 space-y-1">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Progression</span>
+              <span>{t.missions.progress}</span>
               <span className="font-medium">{progress}%</span>
             </div>
             <Progress value={progress} className="h-2" />
@@ -383,47 +388,47 @@ export default function FieldDashboard() {
                       <p className="text-muted-foreground">{selectedMission.lead.firstName} {selectedMission.lead.lastName}{selectedMission.lead.company && ` - ${selectedMission.lead.company}`}</p>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Badge className={priorityColors[selectedMission.priority as keyof typeof priorityColors]}>{translate(selectedMission.priority)}</Badge>
-                      <Badge className={statusColors[selectedMission.status as keyof typeof statusColors]}>{translate(selectedMission.status)}</Badge>
+                      <Badge className={priorityColors[selectedMission.priority as keyof typeof priorityColors]}>{t.missions.priority[selectedMission.priority as keyof typeof t.missions.priority] || translate(selectedMission.priority)}</Badge>
+                      <Badge className={statusColors[selectedMission.status as keyof typeof statusColors]}>{t.missions.status[selectedMission.status as keyof typeof t.missions.status] || translate(selectedMission.status)}</Badge>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <Tabs defaultValue="tasks" className="w-full">
                     <TabsList className="grid w-full grid-cols-4">
-                      <TabsTrigger value="details">Détails</TabsTrigger>
-                      <TabsTrigger value="tasks">Tâches</TabsTrigger>
-                      <TabsTrigger value="team">Équipe</TabsTrigger>
-                      <TabsTrigger value="actions">Actions</TabsTrigger>
+                      <TabsTrigger value="details">{t.missions.viewDetails}</TabsTrigger>
+                      <TabsTrigger value="tasks">{t.tasks.title}</TabsTrigger>
+                      <TabsTrigger value="team">{t.common.actions}</TabsTrigger>
+                      <TabsTrigger value="actions">{t.common.actions}</TabsTrigger>
                     </TabsList>
                     <TabsContent value="details" className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-3">
                           <div>
-                            <label className="text-sm font-medium text-muted-foreground">Adresse</label>
+                            <label className="text-sm font-medium text-muted-foreground">{t.missions.address}</label>
                             <div className="flex items-center mt-1">
                               <MapPin className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                               <span>{selectedMission.address}</span>
                             </div>
                           </div>
                           <div>
-                            <label className="text-sm font-medium text-muted-foreground">Heure prévue</label>
+                            <label className="text-sm font-medium text-muted-foreground">{t.missions.scheduledFor}</label>
                             <div className="flex items-center mt-1">
                               <Clock className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                               <span>{formatDate(new Date(selectedMission.scheduledDate))} à {formatTime(new Date(selectedMission.scheduledDate))}</span>
                             </div>
                           </div>
                           <div>
-                            <label className="text-sm font-medium text-muted-foreground">Durée estimée</label>
+                            <label className="text-sm font-medium text-muted-foreground">{t.tasks.estimatedTime}</label>
                             <div className="flex items-center mt-1">
                               <Timer className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
-                              <span>{Math.round(selectedMission.estimatedDuration / 60)} heures</span>
+                              <span>{Math.round(selectedMission.estimatedDuration / 60)} {t.common.hours}</span>
                             </div>
                           </div>
                         </div>
                         <div className="space-y-3">
                           <div>
-                            <label className="text-sm font-medium text-muted-foreground">Contact client</label>
+                            <label className="text-sm font-medium text-muted-foreground">{t.common.actions}</label>
                             <div className="space-y-1 mt-1">
                               {selectedMission.lead.phone && (
                                 <div className="flex items-center">
@@ -441,7 +446,7 @@ export default function FieldDashboard() {
                           </div>
                           {selectedMission.accessNotes && (
                             <div>
-                              <label className="text-sm font-medium text-muted-foreground">Notes d'accès</label>
+                              <label className="text-sm font-medium text-muted-foreground">{t.tasks.notes}</label>
                               <div className="mt-1 p-3 bg-muted/50 rounded-md">
                                 <span className="text-sm">{selectedMission.accessNotes}</span>
                               </div>
@@ -455,14 +460,14 @@ export default function FieldDashboard() {
                         {selectedMission.tasks.length === 0 ? (
                           <div className="text-center py-8 text-muted-foreground">
                             <CheckCircle2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p>Aucune tâche assignée</p>
+                            <p>{t.tasks.noTasks}</p>
                           </div>
                         ) : (
                           selectedMission.tasks.map((task) => (
                             <div key={task.id} className="p-4 border rounded-lg bg-card">
                               <div className="flex items-center justify-between mb-2">
                                 <h4 className="font-medium">{task.title}</h4>
-                                <Badge className={taskStatusColors[task.status as keyof typeof taskStatusColors]}>{translate(task.status)}</Badge>
+                                <Badge className={taskStatusColors[task.status as keyof typeof taskStatusColors]}>{t.tasks.status[task.status as keyof typeof t.tasks.status] || translate(task.status)}</Badge>
                               </div>
                               {task.description && <p className="text-sm text-muted-foreground mb-3">{task.description}</p>}
                               <div className="flex items-center justify-between flex-wrap gap-2">
@@ -477,12 +482,12 @@ export default function FieldDashboard() {
                                                 <AvatarImage src={task.assignedTo.user.image || ''} />
                                                 <AvatarFallback className="text-[10px]">{task.assignedTo.user.name?.charAt(0) || '?'}</AvatarFallback>
                                               </Avatar>
-                                              <span className="max-w-[80px] truncate">{task.assignedTo.user.name?.split(' ')[0] || 'Assigné'}</span>
+                                              <span className="max-w-[80px] truncate">{task.assignedTo.user.name?.split(' ')[0] || t.tasks.assignedTo}</span>
                                             </>
                                           ) : (
                                             <>
                                               <User className="h-3.5 w-3.5" />
-                                              <span>Assigner</span>
+                                              <span>{t.tasks.assignedTo}</span>
                                             </>
                                           )}
                                           <ChevronDown className="h-3 w-3 opacity-50" />
@@ -502,7 +507,7 @@ export default function FieldDashboard() {
                                         {task.assignedTo && (
                                           <>
                                             <div className="h-px bg-border my-1" />
-                                            <DropdownMenuItem onClick={() => handleAssignTask(task.id, null)} className="text-red-600 cursor-pointer">Retirer l'assignation</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleAssignTask(task.id, null)} className="text-red-600 cursor-pointer">{t.common.delete}</DropdownMenuItem>
                                           </>
                                         )}
                                       </DropdownMenuContent>
@@ -513,14 +518,14 @@ export default function FieldDashboard() {
                                       <Avatar className="h-5 w-5">
                                         <AvatarImage src={task.assignedTo.user.image || ''} />
                                         <AvatarFallback className="text-[10px]">{task.assignedTo.user.name?.charAt(0) || '?'}</AvatarFallback>
-                                      </Avatar>
+                                        </Avatar>
                                       <span className="text-xs">{task.assignedTo.user.name}</span>
                                     </div>
                                   )}
                                   {task.estimatedTime && (
                                     <div className="flex items-center gap-1">
                                       <Timer className="h-3.5 w-3.5" />
-                                      <span className="text-xs">{task.estimatedTime} min</span>
+                                      <span className="text-xs">{task.estimatedTime} {t.common.minutes}</span>
                                       {isTeamLeader && (
                                         <Button variant="ghost" size="sm" className="h-6 w-6 p-0 ml-1" onClick={() => openTimeDialog(task)}>
                                           <Settings className="h-3 w-3" />
@@ -544,7 +549,7 @@ export default function FieldDashboard() {
                       {selectedMission.team ? (
                         <div className="space-y-4">
                           <div>
-                            <h4 className="font-medium mb-3 flex items-center gap-2"><Users className="h-4 w-4" />Équipe {selectedMission.team.name}</h4>
+                            <h4 className="font-medium mb-3 flex items-center gap-2"><Users className="h-4 w-4" />{selectedMission.team.name}</h4>
                             <div className="space-y-3">
                               {selectedMission.teamLeader && (
                                 <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-900/20">
@@ -556,8 +561,8 @@ export default function FieldDashboard() {
                                     <div className="flex-1">
                                       <p className="font-medium text-lg">{selectedMission.teamLeader.name}</p>
                                       <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                        <Badge variant="outline">Chef d'équipe</Badge>
-                                        <Badge variant="secondary">Expert</Badge>
+                                        <Badge variant="outline">{t.tasks.assignedTo}</Badge>
+                                        <Badge variant="secondary">{t.tasks.category.GENERAL}</Badge>
                                       </div>
                                     </div>
                                   </div>
@@ -593,29 +598,29 @@ export default function FieldDashboard() {
                       ) : (
                         <div className="text-center py-8 text-muted-foreground">
                           <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>Aucune équipe assignée</p>
+                          <p>{t.tasks.noTasks}</p>
                         </div>
                       )}
                     </TabsContent>
                     <TabsContent value="actions" className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {selectedMission.status === 'SCHEDULED' && isTeamLeader && (
-                          <Button className="w-full" onClick={() => startMission(selectedMission.id)}><Play className="h-4 w-4 mr-2" />Démarrer la mission</Button>
+                          <Button className="w-full" onClick={() => startMission(selectedMission.id)}><Play className="h-4 w-4 mr-2" />{t.missions.startMission}</Button>
                         )}
                         <Button variant="outline" className="w-full" asChild>
-                          <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedMission.address)}`} target="_blank" rel="noopener noreferrer"><Navigation className="h-4 w-4 mr-2" />Navigation GPS</a>
+                          <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedMission.address)}`} target="_blank" rel="noopener noreferrer"><Navigation className="h-4 w-4 mr-2" />{t.common.view}</a>
                         </Button>
-                        <Button variant="outline" className="w-full"><Camera className="h-4 w-4 mr-2" />Photos avant/après</Button>
-                        <Button variant="outline" className="w-full"><FileText className="h-4 w-4 mr-2" />Rapport de terrain</Button>
-                        <Button variant="outline" className="w-full"><Settings className="h-4 w-4 mr-2" />Matériaux utilisés</Button>
+                        <Button variant="outline" className="w-full"><Camera className="h-4 w-4 mr-2" />{t.common.view}</Button>
+                        <Button variant="outline" className="w-full"><FileText className="h-4 w-4 mr-2" />{t.common.view}</Button>
+                        <Button variant="outline" className="w-full"><Settings className="h-4 w-4 mr-2" />{t.common.view}</Button>
                         {selectedMission.lead.phone && (
                           <Button variant="outline" className="w-full" asChild>
-                            <a href={`tel:${selectedMission.lead.phone}`}><Phone className="h-4 w-4 mr-2" />Appeler le client</a>
+                            <a href={`tel:${selectedMission.lead.phone}`}><Phone className="h-4 w-4 mr-2" />{t.common.view}</a>
                           </Button>
                         )}
-                        <Button variant="outline" className="w-full"><MessageSquare className="h-4 w-4 mr-2" />Chat équipe</Button>
+                        <Button variant="outline" className="w-full"><MessageSquare className="h-4 w-4 mr-2" />{t.common.view}</Button>
                         <Button variant="outline" className="w-full" asChild>
-                          <Link href={`/missions/${selectedMission.id}`}><Eye className="h-4 w-4 mr-2" />Voir détails complets</Link>
+                          <Link href={`/missions/${selectedMission.id}`}><Eye className="h-4 w-4 mr-2" />{t.missions.viewDetails}</Link>
                         </Button>
                       </div>
                     </TabsContent>
@@ -627,8 +632,8 @@ export default function FieldDashboard() {
                 <CardContent className="flex items-center justify-center h-96">
                   <div className="text-center text-muted-foreground">
                     <Calendar className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-medium">Sélectionnez une mission</p>
-                    <p className="text-sm">Choisissez une mission dans la liste pour voir les détails</p>
+                    <p className="text-lg font-medium">{t.common.view}</p>
+                    <p className="text-sm">{t.missions.noMissions}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -639,18 +644,18 @@ export default function FieldDashboard() {
       <Dialog open={isTimeDialogOpen} onOpenChange={setIsTimeDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Modifier la durée estimée</DialogTitle>
-            <DialogDescription>Ajustez le temps estimé pour cette tâche</DialogDescription>
+            <DialogTitle>{t.tasks.updateTime}</DialogTitle>
+            <DialogDescription>{t.tasks.estimatedTime}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="estimatedTime" className="text-right">Durée (min)</Label>
+              <Label htmlFor="estimatedTime" className="text-right">{t.tasks.estimatedTime} ({t.common.minutes})</Label>
               <Input id="estimatedTime" type="number" value={newEstimatedTime} onChange={(e) => setNewEstimatedTime(parseInt(e.target.value))} className="col-span-3" min={1} max={480} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsTimeDialogOpen(false)}>Annuler</Button>
-            <Button onClick={handleUpdateTaskTime} disabled={isUpdating}>Enregistrer</Button>
+            <Button variant="outline" onClick={() => setIsTimeDialogOpen(false)}>{t.common.cancel}</Button>
+            <Button onClick={handleUpdateTaskTime} disabled={isUpdating}>{isUpdating ? t.common.loading : t.common.save}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

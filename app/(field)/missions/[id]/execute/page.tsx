@@ -35,6 +35,8 @@ import { Mission, Lead, Task, TaskStatus, User as UserType } from '@prisma/clien
 import { formatDate, formatTime, translate } from '@/lib/utils'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { useFieldLanguage } from '@/contexts/FieldLanguageContext'
+import { LanguageSwitcher } from '@/components/field/LanguageSwitcher'
 
 // Enhanced type definitions
 interface TaskWithAssignment extends Task {
@@ -96,20 +98,20 @@ const getMissionStatusIcon = (status: string) => {
   }
 }
 
-const getMissionStatusText = (status: string) => {
-  switch (status) {
-    case 'IN_PROGRESS': return 'En Cours'
-    case 'COMPLETED': return 'Terminée'
-    case 'SCHEDULED': return 'Planifiée'
-    case 'QUALITY_CHECK': return 'Contrôle Qualité'
-    default: return translate(status)
+const getMissionStatusText = (status: string, t: any) => {
+  const statusKey = status as keyof typeof t.missions.status
+  if (t.missions.status[statusKey]) {
+    return t.missions.status[statusKey]
   }
+  // Fallback to original translation function
+  return translate(status)
 }
 
 export default function MissionExecutePage() {
   const params = useParams()
   const router = useRouter()
   const { data: session } = useSession()
+  const { t, isRTL } = useFieldLanguage()
   const missionId = params.id as string
 
   const currentUser = session?.user as any
@@ -150,12 +152,12 @@ export default function MissionExecutePage() {
       const data = await response.json()
       setMission(data)
     } catch (error) {
-      toast.error('Impossible de charger la mission')
-      router.push('/field/dashboard')
+      toast.error(t.notifications.error)
+      router.push('/dashboard')
     } finally {
       setIsLoading(false)
     }
-  }, [missionId, router])
+  }, [missionId, router, t.notifications.error])
 
   useEffect(() => {
     fetchMission()
@@ -176,9 +178,9 @@ export default function MissionExecutePage() {
       if (!response.ok) throw new Error('Failed to start mission')
       
       await fetchMission()
-      toast.success('Mission démarrée avec succès!')
+      toast.success(t.notifications.missionStarted)
     } catch (error) {
-      toast.error('Impossible de démarrer la mission')
+      toast.error(t.notifications.error)
     } finally {
       setIsUpdating(false)
     }
@@ -195,9 +197,9 @@ export default function MissionExecutePage() {
       if (!response.ok) throw new Error('Failed to start task')
       
       await fetchMission()
-      toast.success('Tâche démarrée!')
+      toast.success(t.notifications.taskStarted)
     } catch (error) {
-      toast.error('Impossible de démarrer la tâche')
+      toast.error(t.notifications.error)
     } finally {
       setIsUpdating(false)
     }
@@ -249,9 +251,9 @@ export default function MissionExecutePage() {
       setSelectedTask(null)
       
       await fetchMission()
-      toast.success('Tâche terminée avec succès!')
+      toast.success(t.notifications.taskCompleted)
     } catch (error) {
-      toast.error('Impossible de terminer la tâche')
+      toast.error(t.notifications.error)
     } finally {
       setIsUpdating(false)
     }
@@ -272,7 +274,7 @@ export default function MissionExecutePage() {
       await fetchMission()
       toast.success(approved ? 'Tâche validée!' : 'Tâche rejetée!')
     } catch (error) {
-      toast.error('Impossible de valider la tâche')
+      toast.error(t.notifications.error)
     } finally {
       setIsUpdating(false)
     }
@@ -291,7 +293,7 @@ export default function MissionExecutePage() {
       await fetchMission()
       toast.success(memberId ? 'Tâche assignée avec succès' : 'Assignation supprimée')
     } catch (error) {
-      toast.error('Erreur lors de l\'assignation')
+      toast.error(t.notifications.error)
     }
   }
 
@@ -306,9 +308,9 @@ export default function MissionExecutePage() {
       if (!response.ok) throw new Error('Failed to update time')
 
       await fetchMission()
-      toast.success('Temps mis à jour')
+      toast.success(t.notifications.timeUpdated)
     } catch (error) {
-      toast.error('Erreur de mise à jour du temps')
+      toast.error(t.notifications.error)
     }
   }
 
@@ -351,9 +353,9 @@ export default function MissionExecutePage() {
       if (!response.ok) throw new Error('Failed to complete mission')
       
       toast.success('Mission terminée! En attente de validation administrative.')
-      router.push('/field/dashboard')
+      router.push('/dashboard')
     } catch (error) {
-      toast.error('Impossible de terminer la mission')
+      toast.error(t.notifications.error)
     } finally {
       setIsCompletingMission(false)
     }
@@ -377,12 +379,12 @@ export default function MissionExecutePage() {
   const canComplete = progress === 100 && mission.status === 'IN_PROGRESS'
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen bg-gray-50 ${isRTL ? 'rtl' : 'ltr'}`}>
       {/* Mobile Header - ENHANCED LAYOUT */}
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="flex items-center justify-between p-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/field/dashboard">
+            <Link href="/dashboard">
               <ArrowLeft className="w-4 h-4" />
             </Link>
           </Button>
@@ -392,16 +394,16 @@ export default function MissionExecutePage() {
               <div className="flex items-center justify-center gap-2 flex-wrap">
                 <span className="text-sm text-gray-600">{mission.lead.firstName} {mission.lead.lastName}</span>
                 <Badge variant="outline" className="text-xs px-2 py-1">
-                  {translate(mission.priority)}
+                  {t.missions.priority[mission.priority as keyof typeof t.missions.priority] || translate(mission.priority)}
                 </Badge>
                 <div className="flex items-center gap-1">
                   {getMissionStatusIcon(mission.status)}
-                  <span className="text-xs text-gray-600">{getMissionStatusText(mission.status)}</span>
+                  <span className="text-xs text-gray-600">{getMissionStatusText(mission.status, t)}</span>
                 </div>
               </div>
             </div>
           </div>
-          <div className="w-10"></div>
+          <LanguageSwitcher />
         </div>
       </div>
 
@@ -421,12 +423,12 @@ export default function MissionExecutePage() {
             {/* Progress Bar */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Progression</span>
+                <span className="text-sm font-medium">{t.missions.progress}</span>
                 <span className="text-sm font-medium">{progress}%</span>
               </div>
               <Progress value={progress} className="h-2" />
               <p className="text-xs text-gray-500">
-                {mission.tasks.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length} sur {mission.tasks.length} tâches terminées
+                {mission.tasks.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length} sur {mission.tasks.length} {t.tasks.title} terminées
               </p>
             </div>
 
@@ -439,7 +441,7 @@ export default function MissionExecutePage() {
                   className="flex-1 bg-green-600 hover:bg-green-700"
                 >
                   <Play className="w-4 h-4 mr-2" />
-                  Démarrer la Mission
+                  {t.missions.startMission}
                 </Button>
               )}
               
@@ -482,7 +484,7 @@ export default function MissionExecutePage() {
                 </Button>
                 <Button variant="outline" size="sm" className="text-xs">
                   <Timer className="w-3 h-3 mr-1" />
-                  Ajuster Temps
+                  {t.tasks.updateTime}
                 </Button>
               </div>
             </CardContent>
@@ -508,17 +510,17 @@ export default function MissionExecutePage() {
                         {index + 1}. {task.title}
                       </h3>
                       <p className="text-xs text-gray-500 mt-1">
-                        {translate(task.category)}
+                        {t.tasks.category[task.category as keyof typeof t.tasks.category] || translate(task.category)}
                       </p>
                       {task.notes && (
                         <p className="text-xs text-gray-500 mt-1">
-                          Notes: {task.notes}
+                          {t.tasks.notes}: {task.notes}
                         </p>
                       )}
                     </div>
                     <Badge className={`${getTaskStatusColor(task.status)} text-xs flex items-center gap-1 shrink-0`}>
                       {getTaskStatusIcon(task.status)}
-                      <span className="hidden sm:inline">{translate(task.status)}</span>
+                      <span className="hidden sm:inline">{t.tasks.status[task.status as keyof typeof t.tasks.status] || translate(task.status)}</span>
                     </Badge>
                   </div>
 
@@ -539,7 +541,7 @@ export default function MissionExecutePage() {
                   <div className="flex items-center gap-2">
                     <Timer className="w-3 h-3 text-gray-400" />
                     <span className="text-xs text-gray-600">
-                      {task.estimatedTime ? `${task.estimatedTime} min` : 'Temps non défini'}
+                      {task.estimatedTime ? `${task.estimatedTime} ${t.common.minutes}` : 'Temps non défini'}
                     </span>
                     {isTeamLeader && (
                       <Button
@@ -564,7 +566,7 @@ export default function MissionExecutePage() {
                         className="flex-1 text-xs min-w-0"
                       >
                         <Play className="w-3 h-3 mr-1" />
-                        Commencer
+                        {t.tasks.startTask}
                       </Button>
                     )}
                     
@@ -577,7 +579,7 @@ export default function MissionExecutePage() {
                         className="flex-1 text-xs bg-green-600 hover:bg-green-700 min-w-0"
                       >
                         <CheckCircle className="w-3 h-3 mr-1" />
-                        Terminer
+                        {t.tasks.completeTask}
                       </Button>
                     )}
 
@@ -654,7 +656,7 @@ export default function MissionExecutePage() {
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="task-notes" className="text-sm">Notes de la tâche</Label>
+                <Label htmlFor="task-notes" className="text-sm">{t.tasks.notes}</Label>
                 <Textarea
                   id="task-notes"
                   value={taskNotes}
@@ -717,7 +719,7 @@ export default function MissionExecutePage() {
                   onClick={() => setSelectedTask(null)}
                   size="sm"
                 >
-                  Annuler
+                  {t.common.cancel}
                 </Button>
                 <Button 
                   onClick={() => completeTask(selectedTask.id)}
@@ -738,14 +740,14 @@ export default function MissionExecutePage() {
           <DialogContent className="max-w-sm mx-4">
             <DialogHeader>
               <DialogTitle className="text-base">
-                Ajuster le temps: {selectedTaskForTime.title}
+                {t.tasks.updateTime}: {selectedTaskForTime.title}
               </DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4">
               <div>
                 <Label htmlFor="estimated-time" className="text-sm">
-                  Temps Estimé (minutes)
+                  {t.tasks.estimatedTime} ({t.common.minutes})
                 </Label>
                 <Input
                   id="estimated-time"
@@ -783,14 +785,14 @@ export default function MissionExecutePage() {
                   className="flex-1"
                   size="sm"
                 >
-                  Mettre à Jour
+                  {t.common.save}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => setIsTimeDialogOpen(false)}
                   size="sm"
                 >
-                  Annuler
+                  {t.common.cancel}
                 </Button>
               </div>
             </div>
@@ -862,7 +864,7 @@ export default function MissionExecutePage() {
                       size="sm"
                       className="text-xs text-red-600"
                     >
-                      Supprimer
+                      {t.common.delete}
                     </Button>
                   </div>
                 </div>
@@ -875,7 +877,7 @@ export default function MissionExecutePage() {
                 onClick={() => setIsAssignmentDialogOpen(false)}
                 size="sm"
               >
-                Fermer
+                {t.common.close}
               </Button>
             </div>
           </DialogContent>
@@ -927,7 +929,7 @@ export default function MissionExecutePage() {
                   onClick={() => setIsCompletingMission(false)}
                   size="sm"
                 >
-                  Annuler
+                  {t.common.cancel}
                 </Button>
                 <Button 
                   onClick={completeMission}

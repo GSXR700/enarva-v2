@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
+import { usePathname } from 'next/navigation'
 import { Bell, Search, Menu, MessageSquare, User, Settings, LogOut, X, CheckCircle, Moon, Sun } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,6 +22,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Activity } from '@prisma/client'
 import { getRelativeTime } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
+import { LanguageSwitcher } from '@/components/field/LanguageSwitcher'
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -30,10 +32,16 @@ type ActivityWithUser = Activity & { user: { name: string | null; image: string 
 
 export function TopBar({ onMenuClick }: TopBarProps) {
   const { data: session } = useSession();
+  const pathname = usePathname();
   const [isMobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [activities, setActivities] = useState<ActivityWithUser[]>([]);
   const [showNotificationDot, setShowNotificationDot] = useState(true);
   const { theme, setTheme } = useTheme();
+
+  // Check if current route is a field route (dashboard or missions execution)
+  const isFieldRoute = pathname?.startsWith('/dashboard') || 
+                       pathname?.startsWith('/missions/') || 
+                       pathname?.includes('/execute');
 
   useEffect(() => {
     const fetchActivities = async () => {
@@ -82,6 +90,13 @@ export function TopBar({ onMenuClick }: TopBarProps) {
           <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
         </Button>
+
+        {/* Language Switcher - Only visible on field routes */}
+        {isFieldRoute && (
+          <div className="hidden sm:block">
+            <LanguageSwitcher />
+          </div>
+        )}
         
         <DropdownMenu onOpenChange={(open) => !open && setShowNotificationDot(false)}>
           <DropdownMenuTrigger asChild>
@@ -126,6 +141,17 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                         </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
+                    
+                    {/* Mobile Language Switcher - Only on field routes */}
+                    {isFieldRoute && (
+                      <>
+                        <div className="sm:hidden px-2 py-2">
+                          <LanguageSwitcher />
+                        </div>
+                        <DropdownMenuSeparator className="sm:hidden" />
+                      </>
+                    )}
+                    
                     <DropdownMenuItem asChild>
                         <Link href="/profile" className="flex items-center gap-2 cursor-pointer">
                             <User className="w-4 h-4" />
