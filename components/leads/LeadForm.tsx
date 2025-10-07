@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Lead, LeadStatus, LeadType, PropertyType, AccessibilityLevel, UrgencyLevel, Frequency, ContractType, ProviderType, LeadCanal, EnarvaRole } from '@prisma/client';
+import { Lead, LeadStatus, LeadType, PropertyType, AccessibilityLevel, UrgencyLevel, Frequency, ContractType, ProviderType, LeadCanal, EnarvaRole, ServiceType  } from '@prisma/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,6 +26,7 @@ const leadSchema = z.object({
   gpsLocation: z.string().optional(),
   status: z.nativeEnum(LeadStatus),
   score: z.number().min(0).max(100).optional(),
+  serviceType: z.nativeEnum(ServiceType).optional(), // ✅ ADD THIS LINE
   
   // 2. Professional Details
   leadType: z.nativeEnum(LeadType),
@@ -95,6 +96,7 @@ export function LeadForm({ lead, onSuccess, onCancel, users = [] }: LeadFormProp
           gpsLocation: lead.gpsLocation ?? undefined,
           status: lead.status,
           score: lead.score ?? 0,
+          serviceType: lead.serviceType ?? undefined, // ✅ ADD THIS LINE
           leadType: lead.leadType,
           company: lead.company ?? undefined,
           iceNumber: lead.iceNumber ?? undefined,
@@ -318,7 +320,39 @@ export function LeadForm({ lead, onSuccess, onCancel, users = [] }: LeadFormProp
                   </div>
                 </div>
               </div>
-
+              <div>
+                  <Label htmlFor="serviceType">Type de Service *</Label>
+                  <Select
+                    value={form.watch('serviceType') || ''}
+                    onValueChange={(value) => form.setValue('serviceType', value as ServiceType)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionnez un service" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ServiceType.GRAND_MENAGE}>Grand Ménage</SelectItem>
+                      <SelectItem value={ServiceType.NETTOYAGE_FIN_CHANTIER}>Nettoyage de Fin-Chantier</SelectItem>
+                      <SelectItem value={ServiceType.NETTOYAGE_CANAPES_MATELAS}>Nettoyage des Canapés & Matelas</SelectItem>
+                      <SelectItem value={ServiceType.NETTOYAGE_TAPIS_MOQUETTES}>Nettoyage des Tapis & Moquettes</SelectItem>
+                      <SelectItem value={ServiceType.NETTOYAGE_VITRES}>Nettoyage des Vitres</SelectItem>
+                      <SelectItem value={ServiceType.TRAITEMENT_SOL}>Traitement de Sol</SelectItem>
+                      <SelectItem value={ServiceType.NETTOYAGE_FOURS}>Nettoyage des Fours</SelectItem>
+                      <SelectItem value={ServiceType.ENTRETIEN_JARDIN}>Entretien de Jardin</SelectItem>
+                      <SelectItem value={ServiceType.ENTRETIEN_PISCINE}>Entretien de Piscine</SelectItem>
+                      <SelectItem value={ServiceType.NETTOYAGE_FACADE}>Nettoyage de Façade</SelectItem>
+                      <SelectItem value={ServiceType.DESINFECTION_SANITAIRE}>Désinfection Sanitaire</SelectItem>
+                      <SelectItem value={ServiceType.NETTOYAGE_BUREAUX}>Nettoyage de Bureaux</SelectItem>
+                      <SelectItem value={ServiceType.ENTRETIEN_REGULIER}>Entretien Régulier</SelectItem>
+                      <SelectItem value={ServiceType.CRISTALLISATION_MARBRE}>Cristallisation de Marbre</SelectItem>
+                      <SelectItem value={ServiceType.VITRIFICATION_PARQUET}>Vitrification de Parquet</SelectItem>
+                      <SelectItem value={ServiceType.DECAPAGE_SOL}>Décapage de Sol</SelectItem>
+                      <SelectItem value={ServiceType.LUSTRAGE_MARBRE}>Lustrage de Marbre</SelectItem>
+                      <SelectItem value={ServiceType.POLISSAGE_BETON}>Polissage de Béton</SelectItem>
+                      <SelectItem value={ServiceType.NETTOYAGE_MOQUETTE_VAPEUR}>Nettoyage Moquette à Vapeur</SelectItem>
+                      <SelectItem value={ServiceType.AUTRES}>Autres Services</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               <div>
                 <Label htmlFor="status">Statut *</Label>
                 <Select

@@ -106,6 +106,7 @@ model Lead {
   status            LeadStatus           @default(NEW)
   score             Int?                 @default(0)
   leadType          LeadType             @default(PARTICULIER)
+  serviceType       ServiceType?
   company           String?
   iceNumber         String?
   activitySector    String?
@@ -627,6 +628,29 @@ enum LeadCanal {
   SOURCING_INTERNE
   PORTE_A_PORTE
   CHANTIER_EN_COURS
+}
+
+enum ServiceType {
+  GRAND_MENAGE                    // Grand Ménage
+  NETTOYAGE_FIN_CHANTIER         // Nettoyage de Fin-Chantier
+  NETTOYAGE_CANAPES_MATELAS      // Nettoyage des Canapés & Matelas
+  NETTOYAGE_TAPIS_MOQUETTES      // Nettoyage des Tapis & Moquettes
+  NETTOYAGE_VITRES               // Nettoyage des Vitres
+  TRAITEMENT_SOL                 // Traitement de Sol
+  NETTOYAGE_FOURS                // Nettoyage des Fours
+  ENTRETIEN_JARDIN               // Entretien de Jardin
+  ENTRETIEN_PISCINE              // Entretien de Piscine
+  NETTOYAGE_FACADE               // Nettoyage de Façade
+  DESINFECTION_SANITAIRE         // Désinfection Sanitaire
+  NETTOYAGE_BUREAUX              // Nettoyage de Bureaux
+  ENTRETIEN_REGULIER             // Entretien Régulier
+  CRISTALLISATION_MARBRE         // Cristallisation de Marbre
+  VITRIFICATION_PARQUET          // Vitrification de Parquet
+  DECAPAGE_SOL                   // Décapage de Sol
+  LUSTRAGE_MARBRE                // Lustrage de Marbre
+  POLISSAGE_BETON                // Polissage de Béton
+  NETTOYAGE_MOQUETTE_VAPEUR      // Nettoyage Moquette à Vapeur
+  AUTRES                         // Autres Services
 }
 
 enum PropertyType {

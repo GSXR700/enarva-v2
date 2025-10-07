@@ -1,5 +1,6 @@
 // lib/validations/lead-validation.ts - FOCUSED LEAD VALIDATION
 import { z } from 'zod';
+import { ServiceType } from '@prisma/client';
 
 // =============================================================================
 // LEAD VALIDATION SCHEMAS
@@ -59,6 +60,8 @@ const baseLeadSchema = z.object({
     .max(100, 'Score maximum: 100')
     .optional()
     .default(0),
+
+  serviceType: z.nativeEnum(ServiceType).optional().nullable(),
 
   // Professional Information
   leadType: z.enum(['PARTICULIER', 'PROFESSIONNEL', 'PUBLIC', 'NGO', 'SYNDIC', 'OTHER'])
@@ -208,11 +211,11 @@ export function cleanLeadData(data: any): any {
   const nullableFields = [
     'email', 'address', 'gpsLocation', 'company', 'iceNumber',
     'activitySector', 'contactPosition', 'department', 'source',
-    'referrerContact', 'budgetRange'
+    'referrerContact', 'budgetRange', 'serviceType'
   ]
 
   nullableFields.forEach(field => {
-    if (cleaned[field] === '' || cleaned[field] === undefined) {
+    if (cleaned[field] === '' || cleaned[field] === undefined || cleaned[field] === 'NONE') {
       cleaned[field] = null
     }
   })

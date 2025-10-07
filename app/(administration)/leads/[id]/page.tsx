@@ -30,13 +30,14 @@ import {
   Activity,
   Plus,
   Loader2,
-  Eye
+  Eye,
+  Briefcase
 } from 'lucide-react'
-import { Lead, Quote, Mission, Activity as ActivityType, User as UserType, LeadStatus, QuoteStatus } from '@prisma/client'
+import { Lead, Quote, Mission, Activity as ActivityType, User as UserType, LeadStatus, QuoteStatus, ServiceType } from '@prisma/client'
 import { formatDate, formatCurrency, translate } from '@/lib/utils'
 import { toast } from 'sonner'
 import { usePusherChannel } from '@/hooks/usePusherClient'
-import { LeadTimeline } from '@/components/leads/LeadTimeLine'  // ✅ Correct
+import { LeadTimeline } from '@/components/leads/LeadTimeLine'
 
 type LeadWithRelations = Lead & {
   assignedTo?: UserType | null
@@ -51,6 +52,33 @@ type LeadWithRelations = Lead & {
       role: string
     }
   })[]
+}
+
+// Translation helper for ServiceType
+const translateServiceType = (serviceType: ServiceType): string => {
+  const translations: Record<ServiceType, string> = {
+    GRAND_MENAGE: 'Grand Ménage',
+    NETTOYAGE_FIN_CHANTIER: 'Nettoyage de Fin-Chantier',
+    NETTOYAGE_CANAPES_MATELAS: 'Nettoyage des Canapés & Matelas',
+    NETTOYAGE_TAPIS_MOQUETTES: 'Nettoyage des Tapis & Moquettes',
+    NETTOYAGE_VITRES: 'Nettoyage des Vitres',
+    TRAITEMENT_SOL: 'Traitement de Sol',
+    NETTOYAGE_FOURS: 'Nettoyage des Fours',
+    ENTRETIEN_JARDIN: 'Entretien de Jardin',
+    ENTRETIEN_PISCINE: 'Entretien de Piscine',
+    NETTOYAGE_FACADE: 'Nettoyage de Façade',
+    DESINFECTION_SANITAIRE: 'Désinfection Sanitaire',
+    NETTOYAGE_BUREAUX: 'Nettoyage de Bureaux',
+    ENTRETIEN_REGULIER: 'Entretien Régulier',
+    CRISTALLISATION_MARBRE: 'Cristallisation de Marbre',
+    VITRIFICATION_PARQUET: 'Vitrification de Parquet',
+    DECAPAGE_SOL: 'Décapage de Sol',
+    LUSTRAGE_MARBRE: 'Lustrage de Marbre',
+    POLISSAGE_BETON: 'Polissage de Béton',
+    NETTOYAGE_MOQUETTE_VAPEUR: 'Nettoyage Moquette à Vapeur',
+    AUTRES: 'Autres Services',
+  }
+  return translations[serviceType] || serviceType
 }
 
 // FIXED: Complete statusColors mapping with ALL LeadStatus enum values
@@ -418,6 +446,16 @@ export default function LeadDetailsPage() {
                         <p className="mt-1 font-medium flex items-center gap-2">
                           <Mail className="h-4 w-4" />
                           {lead.email}
+                        </p>
+                      </div>
+                    )}
+
+                    {lead.serviceType && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">Service Demandé</label>
+                        <p className="mt-1 font-medium flex items-center gap-2">
+                          <Briefcase className="h-4 w-4 text-enarva-start" />
+                          {translateServiceType(lead.serviceType)}
                         </p>
                       </div>
                     )}

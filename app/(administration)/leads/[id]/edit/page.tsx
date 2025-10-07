@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ArrowLeft, Save, User, Briefcase, Search, Package, Plus, Trash2, Loader2 } from 'lucide-react';
-import { Lead, User as PrismaUser } from '@prisma/client';
+import { Lead, User as PrismaUser, ServiceType } from '@prisma/client';
 import { toast } from 'sonner';
 
 type ProductRequest = {
@@ -30,6 +30,7 @@ type FormDataType = Partial<Omit<Lead, 'materials' | 'score' | 'estimatedSurface
 
 const initialFormData: FormDataType = {
     firstName: '', lastName: '', phone: '', email: '', address: '', gpsLocation: '',
+    serviceType: null,
     leadType: 'PARTICULIER', company: '', iceNumber: '', activitySector: '', contactPosition: '', department: '',
     propertyType: null, estimatedSurface: '', accessibility: 'EASY',
     urgencyLevel: 'NORMAL', budgetRange: '', frequency: 'PONCTUEL',
@@ -86,6 +87,7 @@ export default function EditLeadPage() {
                 email: leadData.email || '',
                 address: leadData.address || '',
                 gpsLocation: leadData.gpsLocation || '',
+                serviceType: leadData.serviceType || null,
                 leadType: leadData.leadType || 'PARTICULIER',
                 company: leadData.company || '',
                 iceNumber: leadData.iceNumber || '',
@@ -170,6 +172,7 @@ export default function EditLeadPage() {
         email: formData.email || null,
         address: formData.address || null,
         gpsLocation: formData.gpsLocation || null,
+        serviceType: formData.serviceType || null,
         leadType: formData.leadType,
         company: formData.company || null,
         iceNumber: formData.iceNumber || null,
@@ -316,6 +319,40 @@ export default function EditLeadPage() {
                 value={formData.email || ''}
                 onChange={(e) => handleInputChange('email', e.target.value)}
               />
+            </div>
+            <div className="md:col-span-2">
+              <Label htmlFor="serviceType">Type de Service</Label>
+              <Select
+                value={formData.serviceType || 'NONE'}
+                onValueChange={(value) => handleInputChange('serviceType', value === 'NONE' ? null : value as ServiceType)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionnez un service" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">Aucun service sélectionné</SelectItem>
+                  <SelectItem value={ServiceType.GRAND_MENAGE}>Grand Ménage</SelectItem>
+                  <SelectItem value={ServiceType.NETTOYAGE_FIN_CHANTIER}>Nettoyage de Fin-Chantier</SelectItem>
+                  <SelectItem value={ServiceType.NETTOYAGE_CANAPES_MATELAS}>Nettoyage des Canapés & Matelas</SelectItem>
+                  <SelectItem value={ServiceType.NETTOYAGE_TAPIS_MOQUETTES}>Nettoyage des Tapis & Moquettes</SelectItem>
+                  <SelectItem value={ServiceType.NETTOYAGE_VITRES}>Nettoyage des Vitres</SelectItem>
+                  <SelectItem value={ServiceType.TRAITEMENT_SOL}>Traitement de Sol</SelectItem>
+                  <SelectItem value={ServiceType.NETTOYAGE_FOURS}>Nettoyage des Fours</SelectItem>
+                  <SelectItem value={ServiceType.ENTRETIEN_JARDIN}>Entretien de Jardin</SelectItem>
+                  <SelectItem value={ServiceType.ENTRETIEN_PISCINE}>Entretien de Piscine</SelectItem>
+                  <SelectItem value={ServiceType.NETTOYAGE_FACADE}>Nettoyage de Façade</SelectItem>
+                  <SelectItem value={ServiceType.DESINFECTION_SANITAIRE}>Désinfection Sanitaire</SelectItem>
+                  <SelectItem value={ServiceType.NETTOYAGE_BUREAUX}>Nettoyage de Bureaux</SelectItem>
+                  <SelectItem value={ServiceType.ENTRETIEN_REGULIER}>Entretien Régulier</SelectItem>
+                  <SelectItem value={ServiceType.CRISTALLISATION_MARBRE}>Cristallisation de Marbre</SelectItem>
+                  <SelectItem value={ServiceType.VITRIFICATION_PARQUET}>Vitrification de Parquet</SelectItem>
+                  <SelectItem value={ServiceType.DECAPAGE_SOL}>Décapage de Sol</SelectItem>
+                  <SelectItem value={ServiceType.LUSTRAGE_MARBRE}>Lustrage de Marbre</SelectItem>
+                  <SelectItem value={ServiceType.POLISSAGE_BETON}>Polissage de Béton</SelectItem>
+                  <SelectItem value={ServiceType.NETTOYAGE_MOQUETTE_VAPEUR}>Nettoyage Moquette à Vapeur</SelectItem>
+                  <SelectItem value={ServiceType.AUTRES}>Autres Services</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="md:col-span-2">
               <Label htmlFor="address">Adresse</Label>
