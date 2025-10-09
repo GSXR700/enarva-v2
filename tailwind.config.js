@@ -74,11 +74,16 @@ module.exports = {
         },
         "fade-in": {
           from: { opacity: "0" },
-          to: { opacity: "1" },
+          toto: { opacity: "1" },
         },
         "slide-in-from-top": {
           from: { transform: "translateY(-100%)" },
           to: { transform: "translateY(0)" },
+        },
+        "wave-rise": {
+          "0%": { transform: "translateY(100%)" },
+          "50%": { transform: "translateY(-10%)" },
+          "100%": { transform: "translateY(100%)" },
         },
       },
       animation: {
@@ -86,6 +91,7 @@ module.exports = {
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.3s ease-out",
         "slide-in-from-top": "slide-in-from-top 0.3s ease-out",
+        "wave-rise": "wave-rise 3s ease-in-out infinite",
       },
       fontFamily: {
         poppins: ['var(--font-poppins)', 'Poppins', 'system-ui', 'sans-serif'],

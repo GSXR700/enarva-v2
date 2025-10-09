@@ -43,6 +43,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { WaveLoader } from '@/components/pdf/WaveLoader'
+import '@/components/pdf/WaveLoader.css'
 
 interface Quote {
   id: string
@@ -122,6 +124,7 @@ export default function QuotesPage() {
   const [filteredQuotes, setFilteredQuotes] = useState<Quote[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [deletingQuoteId, setDeletingQuoteId] = useState<string | null>(null)
+  const [downloadingQuoteId, setDownloadingQuoteId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | 'ALL'>('ALL')
 
@@ -174,6 +177,8 @@ export default function QuotesPage() {
 
   // Handle PDF download
   const handleDownload = async (quoteId: string, quoteNumber: string) => {
+    setDownloadingQuoteId(quoteId)
+    
     try {
       const response = await fetch(`/api/quotes/${quoteId}/download`)
       if (response.ok) {
@@ -193,6 +198,8 @@ export default function QuotesPage() {
     } catch (error) {
       console.error('Error downloading PDF:', error)
       toast.error('Erreur lors du téléchargement du PDF')
+    } finally {
+      setDownloadingQuoteId(null)
     }
   }
 
@@ -245,6 +252,12 @@ export default function QuotesPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Wave Loader Modal */}
+      <WaveLoader 
+        isLoading={downloadingQuoteId !== null}
+        documentTitle="Télécharger votre document"
+      />
+
       {/* Mobile Header */}
       <div className="lg:hidden bg-card border-b border-border sticky top-0 z-10 px-4 py-3">
         <div className="flex items-center justify-between mb-3">
@@ -434,6 +447,7 @@ export default function QuotesPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={() => handleDownload(quote.id, quote.quoteNumber)}
+                              disabled={downloadingQuoteId === quote.id}
                             >
                               <Download className="mr-2 h-4 w-4" />
                               Télécharger
@@ -610,6 +624,7 @@ export default function QuotesPage() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => handleDownload(quote.id, quote.quoteNumber)}
+                                    disabled={downloadingQuoteId === quote.id}
                                     title="Télécharger le PDF"
                                   >
                                     <Download className="h-4 w-4" />

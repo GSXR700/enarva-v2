@@ -1,3 +1,4 @@
+// app/(administration)/quotes/[id]/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -49,6 +50,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { WaveLoader } from '@/components/pdf/WaveLoader'
+import '@/components/pdf/WaveLoader.css'
 
 interface QuoteLineItem {
   id: string
@@ -64,6 +67,7 @@ interface Quote {
   quoteNumber: string
   status: QuoteStatus
   businessType: 'SERVICE' | 'PRODUCT'
+  serviceType?: string
   finalPrice: number
   subTotalHT: number
   vatAmount: number
@@ -141,6 +145,7 @@ export default function QuoteDetailPage() {
   const [quote, setQuote] = useState<Quote | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
 
   // Check if user is admin
   const isAdmin = session?.user && (session.user as any).role === 'ADMIN'
@@ -171,6 +176,8 @@ export default function QuoteDetailPage() {
   const handleDownload = async () => {
     if (!quote) return
     
+    setIsGeneratingPdf(true)
+    
     try {
       const response = await fetch(`/api/quotes/${quoteId}/download`)
       if (response.ok) {
@@ -190,6 +197,8 @@ export default function QuoteDetailPage() {
     } catch (error) {
       console.error('Error downloading PDF:', error)
       toast.error('Erreur lors du téléchargement du PDF')
+    } finally {
+      setIsGeneratingPdf(false)
     }
   }
 
@@ -255,6 +264,12 @@ export default function QuoteDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Wave Loader Modal */}
+      <WaveLoader 
+        isLoading={isGeneratingPdf}
+        documentTitle="Télécharger votre document"
+      />
+
       {/* Mobile Header */}
       <div className="lg:hidden bg-card border-b border-border sticky top-0 z-10">
         <div className="flex items-center justify-between p-4">
@@ -286,7 +301,7 @@ export default function QuoteDetailPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleDownload}>
+              <DropdownMenuItem onClick={handleDownload} disabled={isGeneratingPdf}>
                 <Download className="mr-2 h-4 w-4" />
                 Télécharger PDF
               </DropdownMenuItem>
@@ -366,6 +381,7 @@ export default function QuoteDetailPage() {
               <Button
                 variant="outline"
                 onClick={handleDownload}
+                disabled={isGeneratingPdf}
                 className="h-10 w-10 p-0 rounded-full border-border hover:bg-muted"
                 title="Télécharger PDF"
               >
@@ -498,7 +514,7 @@ export default function QuoteDetailPage() {
                 )}
               </div>
               
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Badge variant="outline">
                   {quote.lead.leadType === 'PARTICULIER' ? 'Particulier' : 'Professionnel'}
                 </Badge>
@@ -509,6 +525,11 @@ export default function QuoteDetailPage() {
                     <><Package className="h-3 w-3 mr-1" />Produit</>
                   )}
                 </Badge>
+                {quote.serviceType && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    {quote.serviceType}
+                  </Badge>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -655,7 +676,7 @@ export default function QuoteDetailPage() {
 
         {/* Quick Actions - Mobile */}
         <div className="lg:hidden grid grid-cols-1 gap-3">
-          <Button onClick={handleDownload} className="bg-primary hover:bg-primary/90">
+          <Button onClick={handleDownload} disabled={isGeneratingPdf} className="bg-primary hover:bg-primary/90">
             <Download className="h-4 w-4 mr-2" />
             Télécharger le PDF
           </Button>
