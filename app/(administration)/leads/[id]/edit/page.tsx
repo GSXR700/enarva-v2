@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Save, User, Briefcase, Search, Package, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Lead, User as PrismaUser, ServiceType } from '@prisma/client';
 import { toast } from 'sonner';
@@ -38,6 +39,47 @@ const initialFormData: FormDataType = {
     channel: 'MANUEL', source: '', hasReferrer: false, referrerContact: '', enarvaRole: 'PRESTATAIRE_PRINCIPAL',
     originalMessage: '', status: 'NEW', score: 0, materials: null, assignedToId: '',
 };
+
+// Skeleton Loading Component
+function EditLeadSkeleton() {
+  return (
+    <div className="container mx-auto p-4 sm:p-6 max-w-4xl">
+      {/* Header Skeleton */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
+        <Skeleton className="h-10 w-32" />
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+      </div>
+
+      {/* Form Sections Skeleton */}
+      <div className="space-y-6">
+        {[1, 2, 3, 4, 5, 6].map((section) => (
+          <Card key={section}>
+            <CardHeader>
+              <Skeleton className="h-6 w-48" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Action Buttons Skeleton */}
+      <div className="flex flex-col sm:flex-row justify-end gap-4 mt-6">
+        <Skeleton className="h-10 w-full sm:w-24" />
+        <Skeleton className="h-10 w-full sm:w-32" />
+      </div>
+    </div>
+  );
+}
 
 export default function EditLeadPage() {
   const router = useRouter();
@@ -244,93 +286,88 @@ export default function EditLeadPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="animate-spin h-8 w-8 mx-auto mb-4" />
-            <p className="text-gray-600">Chargement du lead...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <EditLeadSkeleton />;
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
+    <div className="container mx-auto p-4 sm:p-6 max-w-4xl">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Link href="/leads">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="w-full sm:w-auto">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Retour aux leads
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Modifier le lead</h1>
-          <p className="text-gray-600">
+          <h1 className="text-xl sm:text-2xl font-bold">Modifier le lead</h1>
+          <p className="text-sm sm:text-base text-gray-600">
             {formData.firstName} {formData.lastName}
           </p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {/* Section 1: Informations Générales */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <User className="h-4 w-4 sm:h-5 sm:w-5" />
               Informations Générales
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <Label htmlFor="firstName">Prénom *</Label>
+              <Label htmlFor="firstName" className="text-sm">Prénom *</Label>
               <Input
                 id="firstName"
                 value={formData.firstName || ''}
                 onChange={(e) => handleInputChange('firstName', e.target.value)}
                 required
+                className="mt-1"
               />
             </div>
             <div>
-              <Label htmlFor="lastName">Nom *</Label>
+              <Label htmlFor="lastName" className="text-sm">Nom *</Label>
               <Input
                 id="lastName"
                 value={formData.lastName || ''}
                 onChange={(e) => handleInputChange('lastName', e.target.value)}
                 required
+                className="mt-1"
               />
             </div>
             <div>
-              <Label htmlFor="phone">Téléphone *</Label>
+              <Label htmlFor="phone" className="text-sm">Téléphone *</Label>
               <Input
                 id="phone"
                 value={formData.phone || ''}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
                 required
+                className="mt-1"
               />
             </div>
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm">Email</Label>
               <Input
                 id="email"
                 type="email"
                 value={formData.email || ''}
                 onChange={(e) => handleInputChange('email', e.target.value)}
+                className="mt-1"
               />
             </div>
-            <div className="md:col-span-2">
-              <Label htmlFor="serviceType">Type de Service</Label>
+            <div className="sm:col-span-2">
+              <Label htmlFor="serviceType" className="text-sm">Type de Service</Label>
               <Select
-                value={formData.serviceType || 'NONE'}
-                onValueChange={(value) => handleInputChange('serviceType', value === 'NONE' ? null : value as ServiceType)}
+                value={formData.serviceType || ''}
+                onValueChange={(value) => handleInputChange('serviceType', value === '' ? null : value as ServiceType)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Sélectionnez un service" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NONE">Aucun service sélectionné</SelectItem>
+                  <SelectItem value="">Sélectionnez un service</SelectItem>
                   <SelectItem value={ServiceType.GRAND_MENAGE}>Grand Ménage</SelectItem>
                   <SelectItem value={ServiceType.NETTOYAGE_FIN_CHANTIER}>Nettoyage de Fin-Chantier</SelectItem>
                   <SelectItem value={ServiceType.NETTOYAGE_CANAPES_MATELAS}>Nettoyage des Canapés & Matelas</SelectItem>
@@ -354,30 +391,32 @@ export default function EditLeadPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="md:col-span-2">
-              <Label htmlFor="address">Adresse</Label>
+            <div className="sm:col-span-2">
+              <Label htmlFor="address" className="text-sm">Adresse</Label>
               <Input
                 id="address"
                 value={formData.address || ''}
                 onChange={(e) => handleInputChange('address', e.target.value)}
+                className="mt-1"
               />
             </div>
             <div>
-              <Label htmlFor="gpsLocation">Localisation GPS</Label>
+              <Label htmlFor="gpsLocation" className="text-sm">Localisation GPS</Label>
               <Input
                 id="gpsLocation"
                 value={formData.gpsLocation || ''}
                 onChange={(e) => handleInputChange('gpsLocation', e.target.value)}
                 placeholder="33.5731, -7.5898"
+                className="mt-1"
               />
             </div>
             <div>
-              <Label htmlFor="status">Statut</Label>
+              <Label htmlFor="status" className="text-sm">Statut</Label>
               <Select
                 value={formData.status || 'NEW'}
                 onValueChange={(value) => handleInputChange('status', value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -396,74 +435,79 @@ export default function EditLeadPage() {
         {/* Section 2: Détails Professionnels */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Briefcase className="h-4 w-4 sm:h-5 sm:w-5" />
               Détails Professionnels
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Type de Lead *</Label>
+              <Label className="text-sm">Type de Lead *</Label>
               <RadioGroup
                 value={formData.leadType || 'PARTICULIER'}
                 onValueChange={(value) => handleInputChange('leadType', value)}
-                className="flex gap-4 mt-2"
+                className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-2"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="PARTICULIER" id="particulier" />
-                  <Label htmlFor="particulier">Particulier</Label>
+                  <Label htmlFor="particulier" className="text-sm font-normal cursor-pointer">Particulier</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="PROFESSIONNEL" id="professionnel" />
-                  <Label htmlFor="professionnel">Professionnel</Label>
+                  <Label htmlFor="professionnel" className="text-sm font-normal cursor-pointer">Professionnel</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="SYNDIC" id="syndic" />
-                  <Label htmlFor="syndic">Syndic</Label>
+                  <Label htmlFor="syndic" className="text-sm font-normal cursor-pointer">Syndic</Label>
                 </div>
               </RadioGroup>
             </div>
 
             {(formData.leadType === 'PROFESSIONNEL' || formData.leadType === 'SYNDIC') && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <Label htmlFor="company">Société</Label>
+                  <Label htmlFor="company" className="text-sm">Société</Label>
                   <Input
                     id="company"
                     value={formData.company || ''}
                     onChange={(e) => handleInputChange('company', e.target.value)}
+                    className="mt-1"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="iceNumber">N° ICE</Label>
+                  <Label htmlFor="iceNumber" className="text-sm">N° ICE</Label>
                   <Input
                     id="iceNumber"
                     value={formData.iceNumber || ''}
                     onChange={(e) => handleInputChange('iceNumber', e.target.value)}
+                    className="mt-1"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="activitySector">Secteur d'Activité</Label>
+                  <Label htmlFor="activitySector" className="text-sm">Secteur d'Activité</Label>
                   <Input
                     id="activitySector"
                     value={formData.activitySector || ''}
                     onChange={(e) => handleInputChange('activitySector', e.target.value)}
+                    className="mt-1"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="contactPosition">Poste du Contact</Label>
+                  <Label htmlFor="contactPosition" className="text-sm">Poste du Contact</Label>
                   <Input
                     id="contactPosition"
                     value={formData.contactPosition || ''}
                     onChange={(e) => handleInputChange('contactPosition', e.target.value)}
+                    className="mt-1"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="department">Département</Label>
+                  <Label htmlFor="department" className="text-sm">Département</Label>
                   <Input
                     id="department"
                     value={formData.department || ''}
                     onChange={(e) => handleInputChange('department', e.target.value)}
+                    className="mt-1"
                   />
                 </div>
               </div>
@@ -474,24 +518,24 @@ export default function EditLeadPage() {
         {/* Section 3: Type de Demande */}
         <Card>
           <CardHeader>
-            <CardTitle>Type de Demande</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Type de Demande</CardTitle>
           </CardHeader>
           <CardContent>
             <RadioGroup
               value={requestType}
               onValueChange={(value: 'SERVICE' | 'PRODUCTS') => setRequestType(value)}
-              className="grid grid-cols-2 gap-4"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="SERVICE" id="service" />
-                <Label htmlFor="service" className="flex items-center gap-2">
+                <Label htmlFor="service" className="flex items-center gap-2 text-sm font-normal cursor-pointer">
                   <Search className="h-4 w-4" />
                   Prestation de Service
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="PRODUCTS" id="products" />
-                <Label htmlFor="products" className="flex items-center gap-2">
+                <Label htmlFor="products" className="flex items-center gap-2 text-sm font-normal cursor-pointer">
                   <Package className="h-4 w-4" />
                   Demande de Produits
                 </Label>
@@ -504,20 +548,20 @@ export default function EditLeadPage() {
         {requestType === 'SERVICE' ? (
           <Card>
             <CardHeader>
-              <CardTitle>Détails de la Prestation</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Détails de la Prestation</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                  <Label htmlFor="propertyType">Type de Propriété</Label>
+                  <Label htmlFor="propertyType" className="text-sm">Type de Propriété</Label>
                   <Select
-                    value={formData.propertyType || 'NONE'}
-                    onValueChange={(value) => handleInputChange('propertyType', value === 'NONE' ? null : value)}
+                    value={formData.propertyType || ''}
+                    onValueChange={(value) => handleInputChange('propertyType', value === '' ? null : value)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Sélectionner..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="NONE">Aucun</SelectItem>
+                      <SelectItem value="">Aucun</SelectItem>
                       <SelectItem value="APARTMENT_SMALL">Appartement Petit</SelectItem>
                       <SelectItem value="APARTMENT_MEDIUM">Appartement Moyen</SelectItem>
                       <SelectItem value="APARTMENT_LARGE">Appartement Grand</SelectItem>
@@ -531,21 +575,22 @@ export default function EditLeadPage() {
                   </Select>
                 </div>
               <div>
-                <Label htmlFor="estimatedSurface">Surface Estimée (m²)</Label>
+                <Label htmlFor="estimatedSurface" className="text-sm">Surface Estimée (m²)</Label>
                 <Input
                   id="estimatedSurface"
                   type="number"
                   value={formData.estimatedSurface || ''}
                   onChange={(e) => handleInputChange('estimatedSurface', e.target.value)}
+                  className="mt-1"
                 />
               </div>
               <div>
-                <Label htmlFor="accessibility">Accessibilité</Label>
+                <Label htmlFor="accessibility" className="text-sm">Accessibilité</Label>
                 <Select
                   value={formData.accessibility || 'EASY'}
                   onValueChange={(value) => handleInputChange('accessibility', value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -556,12 +601,12 @@ export default function EditLeadPage() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="urgencyLevel">Niveau d'Urgence</Label>
+                <Label htmlFor="urgencyLevel" className="text-sm">Niveau d'Urgence</Label>
                 <Select
                   value={formData.urgencyLevel || 'NORMAL'}
                   onValueChange={(value) => handleInputChange('urgencyLevel', value === 'NORMAL' ? 'NORMAL' : value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -573,21 +618,22 @@ export default function EditLeadPage() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="budgetRange">Budget</Label>
+                <Label htmlFor="budgetRange" className="text-sm">Budget</Label>
                 <Input
                   id="budgetRange"
                   value={formData.budgetRange || ''}
                   onChange={(e) => handleInputChange('budgetRange', e.target.value)}
                   placeholder="1000-5000 DH"
+                  className="mt-1"
                 />
               </div>
               <div>
-                <Label htmlFor="frequency">Fréquence</Label>
+                <Label htmlFor="frequency" className="text-sm">Fréquence</Label>
                 <Select
                   value={formData.frequency || 'PONCTUEL'}
                   onValueChange={(value) => handleInputChange('frequency', value === 'PONCTUEL' ? 'PONCTUEL' : value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -603,61 +649,67 @@ export default function EditLeadPage() {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle>Demandes de Produits</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Demandes de Produits</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {productRequests.map((request, index) => (
-                  <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg">
+                  <div key={index} className="grid grid-cols-1 gap-3 p-3 sm:p-4 border rounded-lg">
                     <div>
-                      <Label htmlFor={`product-name-${index}`}>Nom du Produit</Label>
+                      <Label htmlFor={`product-name-${index}`} className="text-sm">Nom du Produit</Label>
                       <Input
                         id={`product-name-${index}`}
                         value={request.name}
                         onChange={(e) => handleProductRequestChange(index, 'name', e.target.value)}
                         placeholder="Ex: Table en bois"
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`product-category-${index}`}>Catégorie</Label>
+                      <Label htmlFor={`product-category-${index}`} className="text-sm">Catégorie</Label>
                       <Input
                         id={`product-category-${index}`}
                         value={request.category}
                         onChange={(e) => handleProductRequestChange(index, 'category', e.target.value)}
                         placeholder="Ex: Mobilier"
+                        className="mt-1"
                       />
                     </div>
-                    <div>
-                      <Label htmlFor={`product-quantity-${index}`}>Quantité</Label>
-                      <Input
-                        id={`product-quantity-${index}`}
-                        type="number"
-                        value={request.quantity}
-                        onChange={(e) => handleProductRequestChange(index, 'quantity', parseInt(e.target.value) || 1)}
-                        min="1"
-                      />
-                    </div>
-                    <div className="flex items-end gap-2">
-                      <div className="flex-1">
-                        <Label htmlFor={`product-unit-${index}`}>Unité</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor={`product-quantity-${index}`} className="text-sm">Quantité</Label>
+                        <Input
+                          id={`product-quantity-${index}`}
+                          type="number"
+                          value={request.quantity}
+                          onChange={(e) => handleProductRequestChange(index, 'quantity', parseInt(e.target.value) || 1)}
+                          min="1"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`product-unit-${index}`} className="text-sm">Unité</Label>
                         <Input
                           id={`product-unit-${index}`}
                           value={request.unit}
                           onChange={(e) => handleProductRequestChange(index, 'unit', e.target.value)}
                           placeholder="Ex: pcs, kg"
+                          className="mt-1"
                         />
                       </div>
-                      {productRequests.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeProductRequest(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
                     </div>
+                    {productRequests.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeProductRequest(index)}
+                        className="w-full"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Supprimer ce produit
+                      </Button>
+                    )}
                   </div>
                 ))}
                 <Button
@@ -677,16 +729,16 @@ export default function EditLeadPage() {
         {/* Section 5: Canal et Source */}
         <Card>
           <CardHeader>
-            <CardTitle>Canal et Source</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Canal et Source</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <Label htmlFor="channel">Canal d'Acquisition *</Label>
+              <Label htmlFor="channel" className="text-sm">Canal d'Acquisition *</Label>
               <Select
                 value={formData.channel || 'MANUEL'}
                 onValueChange={(value) => handleInputChange('channel', value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -700,12 +752,13 @@ export default function EditLeadPage() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="source">Source Détaillée</Label>
+              <Label htmlFor="source" className="text-sm">Source Détaillée</Label>
               <Input
                 id="source"
                 value={formData.source || ''}
                 onChange={(e) => handleInputChange('source', e.target.value)}
                 placeholder="Ex: Google Ads, Page Facebook"
+                className="mt-1"
               />
             </div>
           </CardContent>
@@ -714,11 +767,11 @@ export default function EditLeadPage() {
         {/* Section 6: Message et Attribution */}
         <Card>
           <CardHeader>
-            <CardTitle>Message et Attribution</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Message et Attribution</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 sm:space-y-4">
             <div>
-              <Label htmlFor="originalMessage">Message Original *</Label>
+              <Label htmlFor="originalMessage" className="text-sm">Message Original *</Label>
               <Textarea
                 id="originalMessage"
                 value={formData.originalMessage || ''}
@@ -726,19 +779,20 @@ export default function EditLeadPage() {
                 rows={4}
                 placeholder="Description de la demande du client..."
                 required
+                className="mt-1"
               />
             </div>
             <div>
-              <Label htmlFor="assignedToId">Assigné à</Label>
+              <Label htmlFor="assignedToId" className="text-sm">Assigné à</Label>
               <Select
-                value={formData.assignedToId || 'UNASSIGNED'}
-                onValueChange={(value) => handleInputChange('assignedToId', value === 'UNASSIGNED' ? null : value)}
+                value={formData.assignedToId || ''}
+                onValueChange={(value) => handleInputChange('assignedToId', value === '' ? null : value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Sélectionner un utilisateur..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="UNASSIGNED">Non assigné</SelectItem>
+                  <SelectItem value="">Non assigné</SelectItem>
                   {Array.isArray(assignableUsers) && assignableUsers.map(user => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name} ({user.role})
@@ -748,7 +802,7 @@ export default function EditLeadPage() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="score">Score (0-100)</Label>
+              <Label htmlFor="score" className="text-sm">Score (0-100)</Label>
               <Input
                 id="score"
                 type="number"
@@ -756,19 +810,20 @@ export default function EditLeadPage() {
                 max="100"
                 value={formData.score || 0}
                 onChange={(e) => handleInputChange('score', parseInt(e.target.value) || 0)}
+                className="mt-1"
               />
             </div>
           </CardContent>
         </Card>
 
         {/* Bouton de Soumission */}
-        <div className="flex justify-end gap-4">
-          <Link href="/leads">
-            <Button type="button" variant="outline" disabled={isSaving}>
+        <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-2">
+          <Link href="/leads" className="w-full sm:w-auto">
+            <Button type="button" variant="outline" disabled={isSaving} className="w-full">
               Annuler
             </Button>
           </Link>
-          <Button type="submit" disabled={isSaving}>
+          <Button type="submit" disabled={isSaving} className="w-full sm:w-auto">
             {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
