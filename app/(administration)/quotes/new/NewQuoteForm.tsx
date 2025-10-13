@@ -41,6 +41,7 @@ interface Lead {
   iceNumber?: string
   activitySector?: string
   contactPosition?: string
+  serviceType?: string
 }
 
 interface ProductItem {
@@ -84,6 +85,30 @@ const ENARVA_SERVICES = [
   'Remise en état',
   'Maintenance'
 ] as const
+
+// Map Prisma ServiceType enum to display names
+const SERVICE_TYPE_MAPPING: Record<string, string> = {
+  'GRAND_MENAGE': 'Grand Ménage',
+  'NETTOYAGE_FIN_CHANTIER': 'Fin de chantier',
+  'NETTOYAGE_CANAPES_MATELAS': 'Nettoyage Canapés & Matelas',
+  'NETTOYAGE_TAPIS_MOQUETTES': 'Nettoyage Tapis & Moquettes',
+  'NETTOYAGE_VITRES': 'Nettoyage Vitres',
+  'TRAITEMENT_SOL': 'Traitement de Sol',
+  'NETTOYAGE_FOURS': 'Nettoyage des Fours',
+  'ENTRETIEN_JARDIN': 'Entretien de Jardin',
+  'ENTRETIEN_PISCINE': 'Entretien de Piscine',
+  'NETTOYAGE_FACADE': 'Nettoyage de Façade',
+  'DESINFECTION_SANITAIRE': 'Désinfection Sanitaire',
+  'NETTOYAGE_BUREAUX': 'Nettoyage Bureaux',
+  'ENTRETIEN_REGULIER': 'Entretien Régulier',
+  'CRISTALLISATION_MARBRE': 'Cristallisation Marbre',
+  'VITRIFICATION_PARQUET': 'Vitrification de Parquet',
+  'DECAPAGE_SOL': 'Décapage de Sol',
+  'LUSTRAGE_MARBRE': 'Lustrage de Marbre',
+  'POLISSAGE_BETON': 'Polissage de Béton',
+  'NETTOYAGE_MOQUETTE_VAPEUR': 'Nettoyage Moquette à Vapeur',
+  'AUTRES': 'Maintenance'
+}
 
 const LEAD_TYPES = [
   { value: 'PARTICULIER', label: 'Particulier' },
@@ -159,6 +184,53 @@ const NewQuoteForm = () => {
     }
     return newClientData.leadType !== 'PARTICULIER'
   }, [selectedLead, newClientData.leadType])
+
+  // 🔥 NEW: Auto-populate services when lead is selected
+  useEffect(() => {
+    if (selectedLead && businessType === 'SERVICE') {
+      console.log('🎯 Auto-populating service fields from selected lead:', selectedLead)
+      
+      // Map ServiceType enum to display name
+      let serviceDisplayName = 'Grand Ménage' // Default fallback
+      if (selectedLead.serviceType) {
+        serviceDisplayName = SERVICE_TYPE_MAPPING[selectedLead.serviceType] || 'Grand Ménage'
+        console.log('📋 Mapped serviceType:', selectedLead.serviceType, '→', serviceDisplayName)
+      }
+
+      // Determine surface - use estimatedSurface from lead, or fallback to 50
+      const leadSurface = selectedLead.estimatedSurface || 50
+
+      // Determine levels - if it's a villa or large property, default to 2 levels, otherwise 1
+      let defaultLevels = 1
+      if (selectedLead.propertyType) {
+        const multiLevelTypes = ['VILLA_MEDIUM', 'VILLA_LARGE', 'BUILDING', 'APARTMENT_MULTI']
+        if (multiLevelTypes.includes(selectedLead.propertyType)) {
+          defaultLevels = 2
+        }
+      }
+
+      // Update the services array with lead data
+      setServices([
+        {
+          id: Date.now(),
+          type: serviceDisplayName,
+          surface: leadSurface,
+          levels: defaultLevels,
+          distance: 5, // Default distance
+          etage: 'RDC',
+          delai: 'STANDARD',
+          difficulte: 'STANDARD'
+        }
+      ])
+
+      console.log('✅ Service fields populated:', {
+        type: serviceDisplayName,
+        surface: leadSurface,
+        levels: defaultLevels,
+        propertyType: selectedLead.propertyType
+      })
+    }
+  }, [selectedLead, businessType])
 
   // Search functionality with debouncing
   const searchLeads = useCallback(async (query: string) => {
@@ -475,6 +547,11 @@ const NewQuoteForm = () => {
     setSelectedLead(null)
     setSearchQuery('')
     setShowSearchResults(false)
+    
+    // Reset services to default when clearing lead
+    setServices([
+      { id: Date.now(), type: 'Grand Ménage', surface: 50, levels: 1, distance: 5, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }
+    ])
   }
 
   // Handle new client data changes
@@ -600,7 +677,7 @@ const NewQuoteForm = () => {
           console.log('🏠 Auto-detected propertyType:', propertyType)
         }
         
-        // If Lead has surface, use it
+        // If Lead has surface, use it (override calculated totalSurface)
         if (selectedLead && selectedLead.estimatedSurface) {
           quotePayload.surface = selectedLead.estimatedSurface
           console.log('📐 Using surface from selected Lead:', selectedLead.estimatedSurface)
@@ -834,6 +911,11 @@ const NewQuoteForm = () => {
                           {selectedLead.estimatedSurface}m²
                         </Badge>
                       )}
+                      {selectedLead.serviceType && (
+                        <Badge variant="secondary" className="text-xs">
+                          {SERVICE_TYPE_MAPPING[selectedLead.serviceType] || selectedLead.serviceType}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <Button
@@ -876,6 +958,9 @@ const NewQuoteForm = () => {
                               <div className="flex-1 min-w-0">
                                 <h4 className="font-medium text-sm text-foreground truncate">{lead.displayName}</h4>
                                 <p className="text-xs text-muted-foreground truncate">{lead.phone}</p>
+                                {lead.estimatedSurface && (
+                                  <p className="text-xs text-muted-foreground">Surface: {lead.estimatedSurface}m²</p>
+                                )}
                               </div>
                               <Badge variant="outline" className="text-xs shrink-0">
                                 {lead.typeLabel}
@@ -1040,6 +1125,11 @@ const NewQuoteForm = () => {
             <Card>
               <CardHeader className="pb-3 md:pb-6">
                 <CardTitle className="text-base md:text-lg">Configuration des Services</CardTitle>
+                {selectedLead && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ✅ Les informations du lead ont été automatiquement remplies
+                  </p>
+                )}
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
