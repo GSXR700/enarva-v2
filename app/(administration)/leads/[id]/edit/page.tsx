@@ -214,14 +214,14 @@ export default function EditLeadPage() {
         email: formData.email || null,
         address: formData.address || null,
         gpsLocation: formData.gpsLocation || null,
-        serviceType: formData.serviceType || null,
+        serviceType: (formData.serviceType as any) === 'NONE' ? null : formData.serviceType || null,
         leadType: formData.leadType,
         company: formData.company || null,
         iceNumber: formData.iceNumber || null,
         activitySector: formData.activitySector || null,
         contactPosition: formData.contactPosition || null,
         department: formData.department || null,
-        propertyType: formData.propertyType || null,
+        propertyType: (formData.propertyType as any) === 'NONE' ? null : formData.propertyType || null,
         estimatedSurface: formData.estimatedSurface ? parseInt(formData.estimatedSurface.toString()) : null,
         accessibility: formData.accessibility,
         urgencyLevel: formData.urgencyLevel || null,
@@ -240,7 +240,7 @@ export default function EditLeadPage() {
         status: formData.status,
         score: formData.score ? parseInt(formData.score.toString()) : 0,
         materials: requestType === 'PRODUCTS' ? productRequests : null,
-        assignedToId: formData.assignedToId || null,
+        assignedToId: (formData.assignedToId as any) === 'UNASSIGNED' ? null : formData.assignedToId || null,
       };
 
       console.log('Submitting lead update:', submissionData);
@@ -360,14 +360,14 @@ export default function EditLeadPage() {
             <div className="sm:col-span-2">
               <Label htmlFor="serviceType" className="text-sm">Type de Service</Label>
               <Select
-                value={formData.serviceType || ''}
-                onValueChange={(value) => handleInputChange('serviceType', value === '' ? null : value as ServiceType)}
+                value={(formData.serviceType as any) || 'NONE'}
+                onValueChange={(value) => handleInputChange('serviceType', value === 'NONE' ? null : value as ServiceType)}
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Sélectionnez un service" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sélectionnez un service</SelectItem>
+                  <SelectItem value="NONE">Sélectionnez un service</SelectItem>
                   <SelectItem value={ServiceType.GRAND_MENAGE}>Grand Ménage</SelectItem>
                   <SelectItem value={ServiceType.NETTOYAGE_FIN_CHANTIER}>Nettoyage de Fin-Chantier</SelectItem>
                   <SelectItem value={ServiceType.NETTOYAGE_CANAPES_MATELAS}>Nettoyage des Canapés & Matelas</SelectItem>
@@ -554,14 +554,14 @@ export default function EditLeadPage() {
               <div>
                   <Label htmlFor="propertyType" className="text-sm">Type de Propriété</Label>
                   <Select
-                    value={formData.propertyType || ''}
-                    onValueChange={(value) => handleInputChange('propertyType', value === '' ? null : value)}
+                    value={(formData.propertyType as any) || 'NONE'}
+                    onValueChange={(value) => handleInputChange('propertyType', value === 'NONE' ? null : value)}
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Sélectionner..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Aucun</SelectItem>
+                      <SelectItem value="NONE">Aucun</SelectItem>
                       <SelectItem value="APARTMENT_SMALL">Appartement Petit</SelectItem>
                       <SelectItem value="APARTMENT_MEDIUM">Appartement Moyen</SelectItem>
                       <SelectItem value="APARTMENT_LARGE">Appartement Grand</SelectItem>
@@ -785,14 +785,14 @@ export default function EditLeadPage() {
             <div>
               <Label htmlFor="assignedToId" className="text-sm">Assigné à</Label>
               <Select
-                value={formData.assignedToId || ''}
-                onValueChange={(value) => handleInputChange('assignedToId', value === '' ? null : value)}
+                value={formData.assignedToId || 'UNASSIGNED'}
+                onValueChange={(value) => handleInputChange('assignedToId', value === 'UNASSIGNED' ? null : value)}
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Sélectionner un utilisateur..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Non assigné</SelectItem>
+                  <SelectItem value="UNASSIGNED">Non assigné</SelectItem>
                   {Array.isArray(assignableUsers) && assignableUsers.map(user => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name} ({user.role})
