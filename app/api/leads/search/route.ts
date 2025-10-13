@@ -4,7 +4,6 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-// GET /api/leads/search?q=search_term
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -14,7 +13,6 @@ export async function GET(request: Request) {
       return NextResponse.json([])
     }
 
-    // Search leads by first name, last name, company, or email
     const leads = await prisma.lead.findMany({
       where: {
         OR: [
@@ -54,6 +52,14 @@ export async function GET(request: Request) {
         leadType: true,
         address: true,
         propertyType: true,
+        estimatedSurface: true,
+        serviceType: true,
+        iceNumber: true,
+        activitySector: true,
+        contactPosition: true,
+        urgencyLevel: true,
+        budgetRange: true,
+        accessibility: true,
         status: true,
         createdAt: true
       },
@@ -61,10 +67,9 @@ export async function GET(request: Request) {
         { updatedAt: 'desc' },
         { createdAt: 'desc' }
       ],
-      take: 10 // Limit results to 10 for performance
+      take: 10
     })
 
-    // Transform the results to include a display name
     const transformedLeads = leads.map(lead => ({
       ...lead,
       displayName: lead.company 
