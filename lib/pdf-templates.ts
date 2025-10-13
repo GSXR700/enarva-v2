@@ -170,110 +170,116 @@ export const SERVICE_TEMPLATES: Record<string, ServiceTemplate> = {
       'Aspiration et nettoyage de tous les sols',
       'Nettoyage des placards intérieurs',
       'Élimination des toiles d\'araignées',
-      'Nettoyage des luminaires et interrupteurs'
+      'Nettoyage des luminaires'
     ],
     defaultEquipments: [
       'Aspirateur professionnel',
-      'Produits de nettoyage écologiques',
+      'Nettoyeur vapeur',
+      'Produits de nettoyage multi-surfaces',
       'Matériel de nettoyage vitres',
-      'Désinfectants sanitaires',
-      'Matériel de dépoussiérage'
+      'Désinfectants pour sanitaires'
+    ],
+    teamSizeCalculation: (_surface: number) => Math.ceil(_surface / 70),
+    displayType: 'DETAILED'
+  },
+  NETTOYAGE_STANDARD: {
+    serviceType: 'NETTOYAGE_STANDARD',
+    label: 'Nettoyage Standard',
+    defaultPrestations: [
+      'Dépoussiérage des surfaces',
+      'Aspiration des sols',
+      'Lavage des sols',
+      'Nettoyage des sanitaires',
+      'Vider les poubelles'
+    ],
+    defaultEquipments: [
+      'Aspirateur standard',
+      'Matériel de lavage sols',
+      'Produits de nettoyage basiques'
+    ],
+    teamSizeCalculation: (_surface: number) => Math.ceil(_surface / 100),
+    displayType: 'TABLE'
+  },
+  NETTOYAGE_BUREAUX: {
+    serviceType: 'NETTOYAGE_BUREAUX',
+    label: 'Nettoyage Bureaux',
+    defaultPrestations: [
+      'Dépoussiérage des postes de travail',
+      'Aspiration des sols et moquettes',
+      'Nettoyage des sanitaires',
+      'Vider les corbeilles',
+      'Nettoyage des espaces communs'
+    ],
+    defaultEquipments: [
+      'Aspirateur professionnel',
+      'Matériel de dépoussiérage',
+      'Produits de nettoyage bureaux',
+      'Matériel désinfection'
+    ],
+    teamSizeCalculation: (_surface: number) => Math.ceil(_surface / 80),
+    displayType: 'TABLE'
+  },
+  CRISTALLISATION_MARBRE: {
+    serviceType: 'CRISTALLISATION_MARBRE',
+    label: 'Cristallisation de marbre',
+    defaultPrestations: [
+      'Préparation et nettoyage initial du marbre',
+      'Ponçage et polissage professionnel',
+      'Application de cristallisant',
+      'Lustrage haute brillance',
+      'Protection finale'
+    ],
+    defaultEquipments: [
+      'Monobrosse professionnelle',
+      'Disques de cristallisation',
+      'Produits cristallisants spécialisés',
+      'Matériel de polissage',
+      'Aspirateur à eau'
     ],
     teamSizeCalculation: (_surface: number) => Math.ceil(_surface / 60),
     displayType: 'DETAILED'
   },
-  NETTOYAGE_PISCINE: {
-    serviceType: 'NETTOYAGE_PISCINE',
-    label: 'Nettoyage de piscine',
+  NETTOYAGE_VITRES: {
+    serviceType: 'NETTOYAGE_VITRES',
+    label: 'Nettoyage de vitres',
     defaultPrestations: [
-      'Nettoyage complet du bassin (parois et fond)',
-      'Nettoyage du système de filtration',
-      'Contrôle et ajustement du pH',
-      'Traitement anti-algues',
-      'Nettoyage de la ligne d\'eau',
-      'Aspiration des débris',
-      'Vérification de l\'équipement technique'
+      'Nettoyage intérieur des vitres',
+      'Nettoyage extérieur des vitres',
+      'Nettoyage des cadres',
+      'Élimination des traces',
+      'Séchage professionnel'
     ],
     defaultEquipments: [
-      'Robot nettoyeur de piscine professionnel',
-      'Kit de test de pH et chlore',
-      'Produits de traitement certifiés',
-      'Épuisette et brosse spécialisée',
-      'Aspirateur pour piscine'
+      'Perches télescopiques',
+      'Raclettes professionnelles',
+      'Produits vitres professionnels',
+      'Échelles sécurisées',
+      'Matériel d\'accès en hauteur'
     ],
-    teamSizeCalculation: (_surface: number) => 1,
-    displayType: 'DETAILED'
-  },
-  NETTOYAGE_CANAPES: {
-    serviceType: 'NETTOYAGE_CANAPES',
-    label: 'Nettoyage de canapés et textiles',
-    defaultPrestations: [
-      'Aspiration profonde du textile',
-      'Détachage ciblé des taches visibles',
-      'Nettoyage en profondeur à l\'injection-extraction',
-      'Traitement anti-acariens et désodorisant',
-      'Séchage rapide professionnel',
-      'Protection textile post-nettoyage'
-    ],
-    defaultEquipments: [
-      'Machine injection-extraction professionnelle',
-      'Produits détachants spécialisés par type de textile',
-      'Traitement anti-acariens hypoallergénique',
-      'Séchoir professionnel',
-      'Brosses spécifiques textiles délicats'
-    ],
-    teamSizeCalculation: (_surface: number) => 1,
+    teamSizeCalculation: (_surface: number) => Math.ceil(_surface / 100),
     displayType: 'TABLE'
   },
-  NETTOYAGE_FACADE: {
-    serviceType: 'NETTOYAGE_FACADE',
-    label: 'Nettoyage de façade',
+  ENTRETIEN_REGULIER: {
+    serviceType: 'ENTRETIEN_REGULIER',
+    label: 'Entretien Régulier',
     defaultPrestations: [
-      'Nettoyage haute pression des murs extérieurs',
-      'Élimination des mousses et lichens',
-      'Nettoyage des vitres extérieures',
-      'Traitement anti-graffiti si nécessaire',
-      'Nettoyage des gouttières',
-      'Rinçage et finitions'
+      'Nettoyage quotidien des surfaces',
+      'Entretien des sols',
+      'Nettoyage des sanitaires',
+      'Maintien de la propreté générale'
     ],
     defaultEquipments: [
-      'Nettoyeur haute pression professionnel',
-      'Nacelle ou échafaudage selon hauteur',
-      'Produits anti-mousse et anti-graffiti',
-      'Équipement de sécurité en hauteur',
-      'Système de récupération d\'eau'
+      'Équipement standard de nettoyage',
+      'Produits d\'entretien écologiques'
     ],
-    teamSizeCalculation: (_surface: number) => Math.ceil(_surface / 40),
-    displayType: 'DETAILED'
-  },
-  NETTOYAGE_BUREAU: {
-    serviceType: 'NETTOYAGE_BUREAU',
-    label: 'Nettoyage de bureaux',
-    defaultPrestations: [
-      'Dépoussiérage des postes de travail',
-      'Nettoyage et désinfection des sanitaires',
-      'Aspiration et lavage des sols',
-      'Vidage des corbeilles et tri sélectif',
-      'Nettoyage des vitres et surfaces vitrées',
-      'Désinfection des points de contact (poignées, interrupteurs)',
-      'Nettoyage des espaces communs'
-    ],
-    defaultEquipments: [
-      'Chariot de ménage professionnel',
-      'Aspirateur silencieux',
-      'Produits de nettoyage écologiques',
-      'Désinfectants certifiés',
-      'Matériel de nettoyage vitres'
-    ],
-    teamSizeCalculation: (_surface: number) => Math.ceil(_surface / 80),
-    displayType: 'DETAILED'
+    teamSizeCalculation: (_surface: number) => Math.ceil(_surface / 100),
+    displayType: 'TABLE'
   }
 };
 
 export interface PaymentConditionTemplate {
   title: string;
   conditions: string[];
-  echeancier?: string;
 }
 
 export const PAYMENT_CONDITIONS: Record<string, PaymentConditionTemplate> = {
@@ -281,48 +287,34 @@ export const PAYMENT_CONDITIONS: Record<string, PaymentConditionTemplate> = {
     title: "Conditions de paiement :",
     conditions: [
       "Les règlements peuvent être effectués par virement bancaire, par chèque ou en espèces.",
-      "Un acompte de 30% est demandé à l'initiation du travail.",
-      "Le solde de 70% est exigible à la livraison.",
-      "Toute prestation commencée est due dans son intégralité."
-    ],
-    echeancier: "30% à l'initiation du travail et 70% à la livraison"
+      "Un acompte de 30% est demandé à l'initiation du travail."
+    ]
   },
   DEVIS_SERVICE_PRO: {
     title: "Conditions de paiement :",
     conditions: [
-      "Paiement par virement bancaire ou chèque uniquement.",
-      "Un acompte de 30% est demandé à la commande.",
-      "Le solde est exigible à réception de la prestation.",
-      "Délai de paiement : 30 jours net.",
-      "Toute facture impayée à l'échéance entraînera des pénalités de retard au taux légal."
-    ],
-    echeancier: "30% à la commande et 70% à la livraison"
+      "Paiement à 30 jours fin de mois.",
+      "Un acompte de 40% est demandé à la signature du contrat."
+    ]
   },
   DEVIS_PRODUIT_PRO: {
     title: "Conditions de paiement :",
     conditions: [
-      "Paiement par virement bancaire ou chèque.",
-      "Selon les termes du bon de commande si applicable.",
-      "Délai de paiement : 30 jours net.",
-      "Les marchandises voyagent aux risques et périls du destinataire.",
-      "Toute commande passée est ferme et définitive."
-    ],
-    echeancier: "50% à la commande et 50% à la livraison"
+      "Paiement à 30 jours fin de mois.",
+      "Un acompte de 50% est demandé à la commande."
+    ]
   },
   FACTURE_SERVICE: {
     title: "Observations générales :",
     conditions: [
       "Toute réclamation doit être signalée sous 24 heures après la fin de l'intervention.",
-      "La présente facture vaut titre exécutoire en cas de non-paiement.",
-      "Pénalités de retard applicables selon les conditions générales de vente.",
-      "En cas de retard de paiement, une indemnité forfaitaire de 40€ pour frais de recouvrement sera exigible."
+      "La présente facture vaut titre exécutoire en cas de non-paiement."
     ]
   },
   FACTURE_PRODUIT: {
     title: "Observations générales :",
     conditions: [
-      "Toute réclamation doit être signalée sous 48h après la livraison.",
-      "Les marchandises voyagent aux risques et périls du destinataire.",
+      "Toute réclamation doit être signalée sous 48h après réception.",
       "La présente facture vaut titre exécutoire en cas de non-paiement.",
       "Aucun retour de marchandise ne sera accepté sans accord préalable."
     ]
@@ -347,13 +339,13 @@ export const DELIVERY_TIMEFRAMES: Record<string, string> = {
 };
 
 export const PROPERTY_TYPE_LABELS: Record<string, string> = {
-  APARTMENT_SMALL: "appartement (petit)",
-  APARTMENT_MEDIUM: "appartement (moyen)",
-  APARTMENT_LARGE: "appartement (grand)",
+  APARTMENT_SMALL: "appartement",
+  APARTMENT_MEDIUM: "appartement",
+  APARTMENT_LARGE: "appartement",
   APARTMENT_MULTI: "appartement multi-niveaux",
-  VILLA_SMALL: "villa (petite)",
-  VILLA_MEDIUM: "villa (moyenne)",
-  VILLA_LARGE: "villa (grande)",
+  VILLA_SMALL: "villa",
+  VILLA_MEDIUM: "villa",
+  VILLA_LARGE: "villa",
   PENTHOUSE: "penthouse",
   COMMERCIAL: "local commercial",
   STORE: "magasin",
