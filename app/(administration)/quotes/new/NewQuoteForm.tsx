@@ -42,6 +42,9 @@ interface Lead {
   activitySector?: string
   contactPosition?: string
   serviceType?: string
+  urgencyLevel?: string
+  budgetRange?: string
+  accessibility?: string
 }
 
 interface ProductItem {
@@ -68,7 +71,6 @@ interface LineItem {
 type ServiceInputState = ServiceInput & { id: number }
 type QuoteBusinessType = 'SERVICE' | 'PRODUCT'
 
-// Complete list of Enarva services
 const ENARVA_SERVICES = [
   'Grand Ménage',
   'Fin de chantier', 
@@ -86,7 +88,6 @@ const ENARVA_SERVICES = [
   'Maintenance'
 ] as const
 
-// Map Prisma ServiceType enum to display names
 const SERVICE_TYPE_MAPPING: Record<string, string> = {
   'GRAND_MENAGE': 'Grand Ménage',
   'NETTOYAGE_FIN_CHANTIER': 'Fin de chantier',
@@ -122,7 +123,6 @@ const LEAD_TYPES = [
 const NewQuoteForm = () => {
   const router = useRouter()
   
-  // Core form state
   const [businessType, setBusinessType] = useState<QuoteBusinessType>('SERVICE')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [newClientData, setNewClientData] = useState({
@@ -144,14 +144,12 @@ const NewQuoteForm = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [searchTimeoutId, setSearchTimeoutId] = useState<NodeJS.Timeout | null>(null)
 
-  // Service-specific state
   const [services, setServices] = useState<ServiceInputState[]>([
     { id: Date.now(), type: 'Grand Ménage', surface: 50, levels: 1, distance: 5, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }
   ])
   const [quoteType, setQuoteType] = useState<'EXPRESS' | 'STANDARD' | 'PREMIUM'>('STANDARD')
   const [editableLineItems, setEditableLineItems] = useState<LineItem[]>([])
 
-  // Product-specific state
   const [productCategory, setProductCategory] = useState<string>('')
   const [productItems, setProductItems] = useState<ProductItem[]>([
     { id: Date.now().toString(), name: '', qty: 1, unitPrice: 0, description: '', reference: '' }
@@ -160,24 +158,19 @@ const NewQuoteForm = () => {
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [deliveryNotes, setDeliveryNotes] = useState('')
 
-  // Purchase Order (Bon de Commande) state
   const [enablePurchaseOrder, setEnablePurchaseOrder] = useState(false)
   const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('')
   const [orderedBy, setOrderedBy] = useState('')
 
-  // Common quote state
   const [expiresAt, setExpiresAt] = useState(
     new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]
   )
 
-  // Final price override
   const [finalPriceOverride, setFinalPriceOverride] = useState<number | null>(null)
   const [enablePriceOverride, setEnablePriceOverride] = useState(false)
 
-  // Error state
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Check if client is B2B
   const isB2BClient = useMemo(() => {
     if (selectedLead) {
       return selectedLead.leadType !== 'PARTICULIER'
@@ -185,22 +178,18 @@ const NewQuoteForm = () => {
     return newClientData.leadType !== 'PARTICULIER'
   }, [selectedLead, newClientData.leadType])
 
-  // 🔥 NEW: Auto-populate services when lead is selected
   useEffect(() => {
     if (selectedLead && businessType === 'SERVICE') {
       console.log('🎯 Auto-populating service fields from selected lead:', selectedLead)
       
-      // Map ServiceType enum to display name
-      let serviceDisplayName = 'Grand Ménage' // Default fallback
+      let serviceDisplayName = 'Grand Ménage'
       if (selectedLead.serviceType) {
         serviceDisplayName = SERVICE_TYPE_MAPPING[selectedLead.serviceType] || 'Grand Ménage'
         console.log('📋 Mapped serviceType:', selectedLead.serviceType, '→', serviceDisplayName)
       }
 
-      // Determine surface - use estimatedSurface from lead, or fallback to 50
       const leadSurface = selectedLead.estimatedSurface || 50
 
-      // Determine levels - if it's a villa or large property, default to 2 levels, otherwise 1
       let defaultLevels = 1
       if (selectedLead.propertyType) {
         const multiLevelTypes = ['VILLA_MEDIUM', 'VILLA_LARGE', 'BUILDING', 'APARTMENT_MULTI']
@@ -209,14 +198,13 @@ const NewQuoteForm = () => {
         }
       }
 
-      // Update the services array with lead data
       setServices([
         {
           id: Date.now(),
           type: serviceDisplayName,
           surface: leadSurface,
           levels: defaultLevels,
-          distance: 5, // Default distance
+          distance: 5,
           etage: 'RDC',
           delai: 'STANDARD',
           difficulte: 'STANDARD'
@@ -232,7 +220,6 @@ const NewQuoteForm = () => {
     }
   }, [selectedLead, businessType])
 
-  // Search functionality with debouncing
   const searchLeads = useCallback(async (query: string) => {
     if (query.length < 2) {
       setSearchResults([])
@@ -261,7 +248,6 @@ const NewQuoteForm = () => {
     }
   }, [])
 
-  // Debounced search effect
   useEffect(() => {
     if (searchTimeoutId) {
       clearTimeout(searchTimeoutId)
@@ -276,7 +262,6 @@ const NewQuoteForm = () => {
     return () => clearTimeout(timeoutId)
   }, [searchQuery, searchLeads])
 
-  // Service quote calculation
   const serviceQuoteCalculation = useMemo(() => {
     if (businessType !== 'SERVICE') return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 }
 
@@ -331,7 +316,6 @@ const NewQuoteForm = () => {
     return { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice }
   }, [services, businessType])
 
-  // Product quote calculation
   const productQuoteCalculation = useMemo(() => {
     if (businessType !== 'PRODUCT') return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 }
 
@@ -357,7 +341,6 @@ const NewQuoteForm = () => {
     return { lineItems, subTotalHT, vatAmount, totalTTC, finalPrice }
   }, [productItems, businessType])
 
-  // Final quote calculation with override
   const finalQuote = useMemo(() => {
     const baseQuote = businessType === 'SERVICE' ? serviceQuoteCalculation : productQuoteCalculation
     
@@ -380,7 +363,6 @@ const NewQuoteForm = () => {
     }
   }, [serviceQuoteCalculation, productQuoteCalculation, editableLineItems, businessType, enablePriceOverride, finalPriceOverride])
 
-  // Form validation
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
@@ -396,7 +378,6 @@ const NewQuoteForm = () => {
       newErrors.phone = "Le numéro de téléphone est requis pour un nouveau client"
     }
 
-    // B2B validation
     if (!hasSelectedLead && newClientData.leadType !== 'PARTICULIER') {
       if (!newClientData.company.trim()) {
         newErrors.company = "Le nom de l'entreprise est requis pour un client professionnel"
@@ -439,7 +420,6 @@ const NewQuoteForm = () => {
     return Object.keys(newErrors).length === 0
   }
 
-  // Handle service changes
   const updateService = (id: number, field: keyof ServiceInput, value: any) => {
     setServices(current =>
       current.map(service =>
@@ -466,7 +446,6 @@ const NewQuoteForm = () => {
     setServices(current => current.filter(service => service.id !== id))
   }
 
-  // Handle product changes
   const updateProduct = (id: string, field: keyof ProductItem, value: any) => {
     setProductItems(current =>
       current.map(item =>
@@ -491,7 +470,6 @@ const NewQuoteForm = () => {
     setProductItems(current => current.filter(item => item.id !== id))
   }
 
-  // Handle editable line items
   const updateEditableLineItem = (id: string, field: keyof LineItem, value: any) => {
     setEditableLineItems(current =>
       current.map(item =>
@@ -525,7 +503,6 @@ const NewQuoteForm = () => {
     setEditableLineItems(current => current.filter(item => item.id !== id))
   }
 
-  // Handle lead selection
   const selectLead = (lead: Lead) => {
     setSelectedLead(lead)
     setSearchQuery('')
@@ -548,13 +525,11 @@ const NewQuoteForm = () => {
     setSearchQuery('')
     setShowSearchResults(false)
     
-    // Reset services to default when clearing lead
     setServices([
       { id: Date.now(), type: 'Grand Ménage', surface: 50, levels: 1, distance: 5, etage: 'RDC', delai: 'STANDARD', difficulte: 'STANDARD' }
     ])
   }
 
-  // Handle new client data changes
   const updateNewClientData = (field: string, value: string) => {
     setNewClientData(prev => ({ ...prev, [field]: value }))
     if (field === 'name' && value.trim()) {
@@ -572,7 +547,6 @@ const NewQuoteForm = () => {
     }
   }
 
-  // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -608,7 +582,6 @@ const NewQuoteForm = () => {
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       }
 
-      // Handle client data
       if (selectedLead && selectedLead.id) {
         quotePayload.leadId = selectedLead.id
         console.log('📋 Using existing lead:', selectedLead.id)
@@ -619,7 +592,6 @@ const NewQuoteForm = () => {
         quotePayload.newClientAddress = newClientData.address.trim() || null
         quotePayload.newClientLeadType = newClientData.leadType
         
-        // B2B specific fields
         if (newClientData.leadType !== 'PARTICULIER') {
           quotePayload.newClientCompany = newClientData.company.trim() || null
           quotePayload.newClientIceNumber = newClientData.iceNumber.trim() || null
@@ -633,7 +605,6 @@ const NewQuoteForm = () => {
         throw new Error('Client information is incomplete')
       }
 
-      // Add business-specific data
       if (businessType === 'SERVICE') {
         quotePayload.type = quoteType
         
@@ -641,19 +612,16 @@ const NewQuoteForm = () => {
         quotePayload.surface = totalSurface
         quotePayload.levels = services.reduce((acc, s) => Math.max(acc, s.levels), 1)
         
-        // Extract serviceType from first line item
         const firstService = finalQuote.lineItems.find(item => item.serviceType)
         if (firstService && firstService.serviceType) {
           quotePayload.serviceType = firstService.serviceType
           console.log('🎯 Adding serviceType to quote:', firstService.serviceType)
         }
         
-        // Use Lead data if selected, otherwise auto-detect
         if (selectedLead && selectedLead.propertyType) {
           quotePayload.propertyType = selectedLead.propertyType
           console.log('🏠 Using propertyType from selected Lead:', selectedLead.propertyType)
         } else {
-          // Fallback: Auto-detect based on services
           const hasApartment = services.some(s => s.type.toLowerCase().includes('appartement'))
           const hasVilla = services.some(s => s.type.toLowerCase().includes('villa') || s.type.toLowerCase().includes('maison'))
           const hasCommercial = services.some(s => s.type.toLowerCase().includes('bureau') || s.type.toLowerCase().includes('commercial'))
@@ -677,7 +645,6 @@ const NewQuoteForm = () => {
           console.log('🏠 Auto-detected propertyType:', propertyType)
         }
         
-        // If Lead has surface, use it (override calculated totalSurface)
         if (selectedLead && selectedLead.estimatedSurface) {
           quotePayload.surface = selectedLead.estimatedSurface
           console.log('📐 Using surface from selected Lead:', selectedLead.estimatedSurface)
@@ -693,7 +660,6 @@ const NewQuoteForm = () => {
         quotePayload.deliveryAddress = deliveryAddress || null
         quotePayload.deliveryNotes = deliveryNotes || null
 
-        // Purchase order data - using dedicated fields
         if (enablePurchaseOrder) {
           quotePayload.purchaseOrderNumber = purchaseOrderNumber.trim()
           quotePayload.orderedBy = orderedBy.trim()
@@ -741,8 +707,7 @@ const NewQuoteForm = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
-        {/* Header */}
+      <form onSubmit={handleSubmit} className="space-y-4md:space-y-6">
         <div className="bg-card border-b border-border sticky top-0 z-10 shadow-sm">
           <div className="container mx-auto px-3 md:px-4 py-3 md:py-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -785,7 +750,6 @@ const NewQuoteForm = () => {
 
         <div className="container mx-auto px-3 md:px-4 max-w-4xl pb-6 md:pb-8">
           <div className="space-y-4 md:space-y-6">
-            {/* Business Type Selection */}
             <Card>
               <CardHeader className="pb-3 md:pb-6">
                 <CardTitle className="flex items-center gap-2 text-base md:text-lg">
@@ -878,7 +842,6 @@ const NewQuoteForm = () => {
               </CardContent>
             </Card>
 
-          {/* Client Selection */}
           <Card>
             <CardHeader className="pb-3 md:pb-6">
               <CardTitle className="flex items-center gap-2 text-base md:text-lg">
@@ -976,7 +939,6 @@ const NewQuoteForm = () => {
                     </div>
                   )}
 
-                  {/* New Client Form */}
                   <div className="border-t border-border pt-4">
                     <h3 className="font-medium mb-3 text-sm md:text-base text-foreground">Ou créer un nouveau client</h3>
                     
@@ -1045,7 +1007,6 @@ const NewQuoteForm = () => {
                       </div>
                     </div>
 
-                    {/* B2B FIELDS */}
                     {newClientData.leadType !== 'PARTICULIER' && (
                       <div className="mt-4 p-3 md:p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                         <div className="flex items-center gap-2 mb-3">
@@ -1120,14 +1081,14 @@ const NewQuoteForm = () => {
             </CardContent>
           </Card>
 
-          {/* Service Configuration */}
           {businessType === 'SERVICE' && (
             <Card>
               <CardHeader className="pb-3 md:pb-6">
                 <CardTitle className="text-base md:text-lg">Configuration des Services</CardTitle>
                 {selectedLead && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ✅ Les informations du lead ont été automatiquement remplies
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full"></span>
+                    Les informations du lead ont été automatiquement remplies
                   </p>
                 )}
               </CardHeader>
@@ -1291,7 +1252,6 @@ const NewQuoteForm = () => {
             </Card>
           )}
 
-          {/* Product Configuration */}
           {businessType === 'PRODUCT' && (
             <Card>
               <CardHeader className="pb-3 md:pb-6">
@@ -1416,7 +1376,6 @@ const NewQuoteForm = () => {
                   </Button>
                 </div>
 
-                {/* PURCHASE ORDER SECTION */}
                 {isB2BClient && (
                   <div className="border-t border-border pt-4 space-y-3">
                     <div className="flex items-center justify-between">
@@ -1473,7 +1432,6 @@ const NewQuoteForm = () => {
                   </div>
                 )}
 
-                {/* Delivery Information */}
                 <div className="border-t border-border pt-4 space-y-3">
                   <h3 className="font-medium text-sm text-foreground">Informations de Livraison</h3>
                   
@@ -1524,7 +1482,6 @@ const NewQuoteForm = () => {
             </Card>
           )}
 
-          {/* Custom Line Items */}
           <Card>
             <CardHeader className="pb-3 md:pb-6">
               <CardTitle className="text-base md:text-lg">Éléments Personnalisés</CardTitle>
@@ -1614,7 +1571,6 @@ const NewQuoteForm = () => {
             </CardContent>
           </Card>
 
-          {/* Quote Summary with Price Override */}
           <Card>
             <CardHeader className="pb-3 md:pb-6">
               <CardTitle className="text-base md:text-lg">Récapitulatif du Devis</CardTitle>
@@ -1706,7 +1662,6 @@ const NewQuoteForm = () => {
             </CardContent>
           </Card>
 
-          {/* Submit Section */}
           <Card>
             <CardContent className="pt-4 md:pt-6">
               <div className="flex flex-col gap-4">
