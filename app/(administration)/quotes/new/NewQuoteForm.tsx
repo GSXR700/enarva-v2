@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/Switch'
 import { Plus, X, Save, Search, User, Package, Wrench, Building2, FileText } from 'lucide-react'
 
-// Types
 interface ServiceInput {
   type: string
   surface: number
@@ -122,9 +121,12 @@ const LEAD_TYPES = [
 
 const NewQuoteForm = () => {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const leadIdFromUrl = searchParams.get('leadId')
   
   const [businessType, setBusinessType] = useState<QuoteBusinessType>('SERVICE')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [isLoadingLead, setIsLoadingLead] = useState(false)
   const [newClientData, setNewClientData] = useState({
     name: '',
     email: '',
@@ -179,12 +181,41 @@ const NewQuoteForm = () => {
   }, [selectedLead, newClientData.leadType])
 
   useEffect(() => {
+    if (leadIdFromUrl) {
+      const fetchLead = async () => {
+        setIsLoadingLead(true)
+        try {
+          const response = await fetch(`/api/leads/${leadIdFromUrl}`)
+          if (response.ok) {
+            const leadData = await response.json()
+            const processedLead = {
+              ...leadData,
+              displayName: `${leadData.firstName} ${leadData.lastName}${leadData.company ? ` (${leadData.company})` : ''}`,
+              typeLabel: leadData.leadType === 'PARTICULIER' ? 'Particulier' : 'Entreprise'
+            }
+            setSelectedLead(processedLead)
+            console.log('✅ Lead loaded from URL:', processedLead)
+          } else {
+            toast.error('Impossible de charger le lead')
+          }
+        } catch (error) {
+          console.error('Error loading lead:', error)
+          toast.error('Erreur lors du chargement du lead')
+        } finally {
+          setIsLoadingLead(false)
+        }
+      }
+      fetchLead()
+    }
+  }, [leadIdFromUrl])
+
+  useEffect(() => {
     if (selectedLead && businessType === 'SERVICE') {
       console.log('🎯 Auto-populating service fields from selected lead:', selectedLead)
       
       let serviceDisplayName = 'Grand Ménage'
-      if (selectedLead.serviceType) {
-        serviceDisplayName = SERVICE_TYPE_MAPPING[selectedLead.serviceType] || 'Grand Ménage'
+      if (selectedLead.serviceType && selectedLead.serviceType.trim()) {
+        serviceDisplayName = SERVICE_TYPE_MAPPING[selectedLead.serviceType] || selectedLead.serviceType
         console.log('📋 Mapped serviceType:', selectedLead.serviceType, '→', serviceDisplayName)
       }
 
@@ -705,9 +736,20 @@ const NewQuoteForm = () => {
     }
   }
 
+  if (isLoadingLead) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Chargement des informations du lead...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      <form onSubmit={handleSubmit} className="space-y-4md:space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
         <div className="bg-card border-b border-border sticky top-0 z-10 shadow-sm">
           <div className="container mx-auto px-3 md:px-4 py-3 md:py-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1252,7 +1294,7 @@ const NewQuoteForm = () => {
             </Card>
           )}
 
-          {businessType === 'PRODUCT' && (
+{businessType === 'PRODUCT' && (
             <Card>
               <CardHeader className="pb-3 md:pb-6">
                 <CardTitle className="text-base md:text-lg">Configuration des Produits</CardTitle>
@@ -1307,7 +1349,7 @@ const NewQuoteForm = () => {
                             placeholder="Nom du produit"
                             className="text-sm"
                           />
-                        </div>
+                          </div>
 
                         <div>
                           <Label className="text-sm">Quantité</Label>
