@@ -3,21 +3,17 @@
     "FIN_DE_CHANTIER": {
       "label": "Nettoyage Fin de chantier",
       "prestationsIncluses": [
-        "Nettoyage et dépoussiérage des plafonds, placards, façades, rideaux et embrasures",
-        "Nettoyage ciblé des résidus sur toutes les surfaces (murs, sols, vitres, plinthes)",
-        "Nettoyage des interrupteurs, prises, poignées et rampes",
-        "Détartrage et désinfection des sanitaires (lavabos, douches, WC, baignoires)",
-        "Nettoyage de cuisine : placards, plan de travail, crédences, électroménagers encastrés",
-        "Nettoyage complet des vitres et encadrement avec enlèvement des traces de chantier",
-        "Entretien et traitement des sols en fonction de leur type"
+        "Nettoyage et dépoussiérage complet des surfaces",
+        "Élimination des résidus de chantier",
+        "NettoyAGE approfondi des sanitaires et cuisine",
+        "Traitement des vitres et menuiseries",
+        "Entretien adapté des sols selon leur nature"
       ],
       "equipementsUtilises": [
         "Aspirateur professionnel haute puissance",
         "Monobrosse pour sols durs",
         "Nettoyeur vapeur industriel",
-        "Échafaudages et échelles télescopiques",
-        "Produits décapants écologiques",
-        "Désinfectants professionnels certifiés"
+        "Matériel de nettoyage en hauteur"
       ],
       "personnelSuggestions": {
         "baseTeamSize": 2,
@@ -27,24 +23,21 @@
     "GRAND_MENAGE": {
       "label": "Grand Ménage",
       "prestationsIncluses": [
-        "Dépoussiérage approfondi de toutes les surfaces",
-        "Nettoyage complet des vitres intérieures et extérieures",
-        "Désinfection complète de la cuisine et des sanitaires",
-        "Aspiration et nettoyage de tous les sols",
+        "Dépoussiérage approfondi toutes surfaces",
+        "Nettoyage complet des vitres",
+        "Désinfection cuisine et sanitaires",
         "Nettoyage des placards intérieurs",
-        "Élimination des toiles d'araignées",
-        "Nettoyage des luminaires et interrupteurs"
+        "Traitement des sols adapté aux matériaux"
       ],
       "equipementsUtilises": [
         "Aspirateur professionnel",
-        "Produits de nettoyage écologiques",
+        "Nettoyeur vapeur",
         "Matériel de nettoyage vitres",
-        "Désinfectants sanitaires",
-        "Matériel de dépoussiérage"
+        "Chariots de nettoyage complets"
       ],
       "personnelSuggestions": {
         "baseTeamSize": 2,
-        "perSquareMeter": 60
+        "perSquareMeter": 70
       }
     },
     "NETTOYAGE_PISCINE": {
@@ -144,16 +137,108 @@
       "prestationsIncluses": [],
       "equipementsUtilises": [],
       "displayType": "PRODUCT_TABLE"
+    },
+    "NETTOYAGE_STANDARD": {
+      "label": "Nettoyage Standard",
+      "prestationsIncluses": [
+        "Dépoussiérage des surfaces",
+        "Nettoyage des sols",
+        "Nettoyage des sanitaires",
+        "Vidage des poubelles"
+      ],
+      "equipementsUtilises": [
+        "Aspirateur standard",
+        "Matériel de nettoyage basique",
+        "Produits d'entretien courants"
+      ],
+      "personnelSuggestions": {
+        "baseTeamSize": 1,
+        "perSquareMeter": 80
+      }
+    },
+    "NETTOYAGE_VITRES": {
+      "label": "Nettoyage de vitres",
+      "prestationsIncluses": [
+        "Nettoyage intérieur et extérieur des vitres",
+        "Nettoyage des cadres et rebords",
+        "Élimination des traces et calcaire",
+        "Finition sans traces"
+      ],
+      "equipementsUtilises": [
+        "Perches télescopiques",
+        "Raclettes professionnelles",
+        "Produits vitres écologiques"
+      ],
+      "personnelSuggestions": {
+        "baseTeamSize": 2,
+        "perSquareMeter": 100
+      }
+    },
+    "CRISTALLISATION_MARBRE": {
+      "label": "Cristallisation de marbre",
+      "prestationsIncluses": [
+        "Préparation et nettoyage du marbre",
+        "Ponçage diamant si nécessaire",
+        "Application du cristallisant",
+        "Lustrage haute brillance",
+        "Protection finale"
+      ],
+      "equipementsUtilises": [
+        "Monobrosse professionnelle",
+        "Disques de cristallisation",
+        "Produits cristallisants premium",
+        "Matériel de protection"
+      ],
+      "personnelSuggestions": {
+        "baseTeamSize": 2,
+        "perSquareMeter": 60
+      }
+    },
+    "NETTOYAGE_BUREAUX": {
+      "label": "Nettoyage Bureaux",
+      "prestationsIncluses": [
+        "Dépoussiérage des postes de travail",
+        "Aspiration sols et moquettes",
+        "Nettoyage des sanitaires",
+        "Vidage des corbeilles",
+        "Désinfection des points de contact"
+      ],
+      "equipementsUtilises": [
+        "Aspirateur silencieux",
+        "Chariots de nettoyage",
+        "Produits désinfectants certifiés"
+      ],
+      "personnelSuggestions": {
+        "baseTeamSize": 1,
+        "perSquareMeter": 70
+      }
+    },
+    "ENTRETIEN_REGULIER": {
+      "label": "Entretien Régulier",
+      "prestationsIncluses": [
+        "Maintien de la propreté générale",
+        "Entretien courant des sols",
+        "Nettoyage des sanitaires",
+        "Gestion des déchets"
+      ],
+      "equipementsUtilises": [
+        "Matériel d'entretien standard",
+        "Produits écologiques"
+      ],
+      "personnelSuggestions": {
+        "baseTeamSize": 1,
+        "perSquareMeter": 100
+      }
     }
   },
   "propertyTypes": {
-    "APARTMENT_SMALL": "appartement (petit)",
-    "APARTMENT_MEDIUM": "appartement (moyen)",
-    "APARTMENT_LARGE": "appartement (grand)",
+    "APARTMENT_SMALL": "petit appartement",
+    "APARTMENT_MEDIUM": "appartement",
+    "APARTMENT_LARGE": "grand appartement",
     "APARTMENT_MULTI": "appartement multi-niveaux",
-    "VILLA_SMALL": "villa (petite)",
-    "VILLA_MEDIUM": "villa (moyenne)",
-    "VILLA_LARGE": "villa (grande)",
+    "VILLA_SMALL": "petite villa",
+    "VILLA_MEDIUM": "villa",
+    "VILLA_LARGE": "grande villa",
     "PENTHOUSE": "penthouse",
     "COMMERCIAL": "local commercial",
     "STORE": "magasin",
@@ -172,43 +257,49 @@
       "conditions": [
         "Les règlements peuvent être effectués par virement bancaire, par chèque ou en espèces.",
         "Un acompte de 30% est demandé à l'initiation du travail.",
-        "Le solde de 70% est exigible à la livraison.",
-        "Toute prestation commencée est due dans son intégralité."
+        "Le solde est à régler à la fin de l'intervention.",
+        "Devis valable 30 jours."
       ]
     },
     "DEVIS_SERVICE_PRO": {
       "title": "Conditions de paiement :",
       "conditions": [
-        "Paiement par virement bancaire ou chèque uniquement.",
-        "Un acompte de 30% est demandé à la commande.",
-        "Le solde est exigible à réception de la prestation.",
-        "Délai de paiement : 30 jours net.",
-        "Toute facture impayée à l'échéance entraînera des pénalités de retard."
+        "Paiement à 30 jours fin de mois.",
+        "Un acompte de 40% est demandé à la signature du contrat.",
+        "Pénalités de retard : 3 fois le taux d'intérêt légal.",
+        "Devis valable 30 jours."
       ]
     },
     "DEVIS_PRODUIT_PRO": {
       "title": "Conditions de paiement :",
       "conditions": [
-        "Paiement par virement bancaire ou chèque.",
-        "Selon les termes du bon de commande si applicable.",
-        "Délai de paiement : 30 jours net.",
-        "Les marchandises voyagent aux risques et périls du destinataire."
+        "Paiement à 30 jours date de facture.",
+        "Franco de port à partir de 1000 DH.",
+        "Escompte de 2% pour paiement comptant."
       ]
     },
     "FACTURE_SERVICE": {
       "title": "Observations générales :",
       "conditions": [
-        "Toute réclamation doit être signalée sous 24 heures après la fin de l'intervention.",
+        "Toute réclamation doit être signalée sous 24 heures.",
         "La présente facture vaut titre exécutoire en cas de non-paiement.",
-        "Pénalités de retard applicables selon les conditions générales de vente."
+        "Conservation obligatoire : 10 ans."
       ]
     },
     "FACTURE_PRODUIT": {
-      "title": "Observations générales :",
+      "title": "Conditions générales :",
       "conditions": [
-        "Toute réclamation doit être signalée sous 48h après la livraison.",
-        "Les marchandises voyagent aux risques et périls du destinataire.",
-        "La présente facture vaut titre exécutoire en cas de non-paiement."
+        "Marchandise livrée reste notre propriété jusqu'au paiement intégral.",
+        "Toute réclamation doit être faite dans les 48h suivant la livraison.",
+        "En cas de retard de paiement, application des pénalités légales."
+      ]
+    },
+    "DEVIS_PRODUIT_PARTICULIER": {
+      "title": "Conditions de paiement :",
+      "conditions": [
+        "Paiement intégral à la commande.",
+        "Livraison après encaissement.",
+        "Retours acceptés sous 14 jours."
       ]
     }
   },
@@ -216,6 +307,78 @@
     "STANDARD": "3-5 jours ouvrés",
     "EXPRESS": "24-48 heures",
     "URGENT": "Intervention sous 24h",
-    "CUSTOM": "À définir selon disponibilités"
+    "CUSTOM": "À définir selon disponibilités",
+    "SCHEDULED": "Selon planning convenu"
+  },
+  "dynamicPhrases": {
+    "materialSpecific": {
+      "marble": {
+        "introduction": "Pour vos surfaces en marbre, nous utilisons des produits spécialisés garantissant brillance et protection.",
+        "careNote": "Traitement adapté au marbre pour préserver sa noblesse et son éclat naturel."
+      },
+      "parquet": {
+        "introduction": "Vos parquets bénéficieront de notre expertise avec des produits respectueux du bois.",
+        "careNote": "Protection et entretien spécifiques pour la longévité de vos surfaces bois."
+      },
+      "tiles": {
+        "introduction": "Pour vos carrelages, nous appliquons des techniques professionnelles de nettoyage en profondeur.",
+        "careNote": "Traitement anti-calcaire et rénovation des joints pour un résultat impeccable."
+      },
+      "porcelain": {
+        "introduction": "Vos surfaces en porcelaine seront traitées avec le plus grand soin.",
+        "careNote": "Produits doux pH neutre pour préserver la finesse de la porcelaine."
+      },
+      "carpet": {
+        "introduction": "Vos moquettes retrouveront fraîcheur et propreté grâce à nos méthodes d'extraction.",
+        "careNote": "Nettoyage en profondeur avec désodorisation pour un résultat optimal."
+      },
+      "concrete": {
+        "introduction": "Pour vos sols en béton, nous proposons un traitement adapté et durable.",
+        "careNote": "Décapage et traitement anti-poussière pour des surfaces propres et saines."
+      },
+      "composite_wood": {
+        "introduction": "Vos surfaces en bois composite seront nettoyées avec des produits spécialement formulés.",
+        "careNote": "Protection UV et rénovation pour maintenir l'aspect neuf de vos surfaces."
+      },
+      "pvc": {
+        "introduction": "Pour vos surfaces PVC, nous utilisons des produits adaptés sans risque de détérioration.",
+        "careNote": "Nettoyage et rénovation pour redonner éclat et propreté à vos surfaces PVC."
+      }
+    },
+    "serviceDescriptions": {
+      "FIN_DE_CHANTIER": {
+        "withMaterials": "Notre équipe interviendra avec une attention particulière aux matériaux présents sur votre chantier, utilisant des produits et techniques adaptés à chaque surface.",
+        "standard": "Nous effectuerons un nettoyage complet post-travaux pour vous livrer un espace impeccable et prêt à l'usage."
+      },
+      "GRAND_MENAGE": {
+        "withMaterials": "Le grand ménage sera réalisé en tenant compte des spécificités de vos surfaces, avec des produits sélectionnés pour chaque type de matériau.",
+        "standard": "Notre intervention permettra de rafraîchir en profondeur l'ensemble de votre espace."
+      },
+      "NETTOYAGE_BUREAUX": {
+        "withMaterials": "L'entretien de vos bureaux sera optimisé selon les matériaux présents, garantissant propreté et durabilité.",
+        "standard": "Nous assurerons la propreté et l'hygiène de vos espaces de travail."
+      },
+      "CRISTALLISATION_MARBRE": {
+        "withMaterials": "La cristallisation sera complétée par l'entretien des autres surfaces présentes dans votre espace.",
+        "standard": "Vos surfaces en marbre retrouveront leur brillance d'origine grâce à notre expertise."
+      }
+    },
+    "closingStatements": {
+      "professional": "Nous restons à votre disposition pour tout complément d'information et nous engageons à respecter les délais convenus.",
+      "particular": "Nous sommes à votre écoute pour répondre à toutes vos questions et garantir votre satisfaction.",
+      "withMaterials": "Notre expertise dans le traitement de surfaces spécifiques vous garantit un résultat optimal et durable."
+    }
+  },
+  "qualityStatements": {
+    "general": "Nous nous engageons à fournir un service de qualité professionnelle avec garantie de satisfaction.",
+    "materials": "L'utilisation de produits adaptés à chaque matériau garantit un résultat optimal sans risque de détérioration.",
+    "eco": "Nos produits sont sélectionnés pour leur efficacité et leur respect de l'environnement.",
+    "team": "Notre équipe formée et expérimentée assure un travail soigné dans le respect de vos biens."
+  },
+  "warrantyStatements": {
+    "service": "Garantie de reprise gratuite sous 48h en cas d'insatisfaction justifiée.",
+    "product": "Tous nos produits sont garantis conformes aux normes en vigueur.",
+    "marble": "Garantie brillance 6 mois pour la cristallisation du marbre.",
+    "parquet": "Protection garantie 12 mois pour la vitrification parquet."
   }
 }

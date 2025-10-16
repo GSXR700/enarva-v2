@@ -64,14 +64,41 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
     originalMessage: lead?.originalMessage || '',
     assignedToId: lead?.assignedToId || '',
     
-    // Materials (JSON field)
+    // Materials (JSON field) - UPDATED
     materials: {
       marble: false,
       parquet: false,
       tiles: false,
       carpet: false,
       concrete: false,
+      porcelain: false, // ADDED
+      cladding: false, // ADDED
+      composite_wood: false, // ADDED
+      pvc: false, // ADDED
       other: ''
+    }
+  })
+
+  // Initialize materials from existing lead data if available
+  // THIS IS THE NEW HOOK YOU ADDED - IT'S A GOOD FIX
+  useState(() => {
+    if (lead?.materials && typeof lead.materials === 'object') {
+      const existingMaterials = lead.materials as any
+      setFormData(prev => ({
+        ...prev,
+        materials: {
+          marble: existingMaterials.marble || false,
+          parquet: existingMaterials.parquet || false,
+          tiles: existingMaterials.tiles || false,
+          carpet: existingMaterials.carpet || false,
+          concrete: existingMaterials.concrete || false,
+          porcelain: existingMaterials.porcelain || false,
+          cladding: existingMaterials.cladding || false,
+          composite_wood: existingMaterials.composite_wood || false,
+          pvc: existingMaterials.pvc || false,
+          other: existingMaterials.other || ''
+        }
+      }))
     }
   })
 
@@ -336,7 +363,7 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
             </div>
           </div>
 
-          {/* Materials Selection */}
+          {/* Materials Selection - UPDATED */}
           <div>
             <Label>Matériaux à nettoyer</Label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2">
@@ -380,6 +407,40 @@ export function EnhancedLeadForm({ lead, onSubmit, isLoading = false }: Enhanced
                 />
                 <Label htmlFor="concrete">Béton</Label>
               </div>
+              {/* --- ADDED FIELDS START --- */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="porcelain"
+                  checked={formData.materials.porcelain}
+                  onCheckedChange={(checked) => handleMaterialChange('porcelain', !!checked)}
+                />
+                <Label htmlFor="porcelain">Porcelaine</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="cladding"
+                  checked={formData.materials.cladding}
+                  onCheckedChange={(checked) => handleMaterialChange('cladding', !!checked)}
+                />
+                <Label htmlFor="cladding">Bardage</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="composite_wood"
+                  checked={formData.materials.composite_wood}
+                  onCheckedChange={(checked) => handleMaterialChange('composite_wood', !!checked)}
+                />
+                <Label htmlFor="composite_wood">Bois composite</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="pvc"
+                  checked={formData.materials.pvc}
+                  onCheckedChange={(checked) => handleMaterialChange('pvc', !!checked)}
+                />
+                <Label htmlFor="pvc">PVC</Label>
+              </div>
+               {/* --- ADDED FIELDS END --- */}
               <div>
                 <Label htmlFor="other">Autre</Label>
                 <Input

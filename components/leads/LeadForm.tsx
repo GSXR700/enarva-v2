@@ -26,7 +26,7 @@ const leadSchema = z.object({
   gpsLocation: z.string().optional(),
   status: z.nativeEnum(LeadStatus),
   score: z.number().min(0).max(100).optional(),
-  serviceType: z.nativeEnum(ServiceType).optional(), // ✅ ADD THIS LINE
+  serviceType: z.nativeEnum(ServiceType).optional(), // ✅ THIS WAS ALREADY HERE
   
   // 2. Professional Details
   leadType: z.nativeEnum(LeadType),
@@ -46,6 +46,10 @@ const leadSchema = z.object({
     tiles: z.boolean().optional(),
     carpet: z.boolean().optional(),
     concrete: z.boolean().optional(),
+    porcelain: z.boolean().optional(), // ADDED
+    cladding: z.boolean().optional(), // ADDED
+    composite_wood: z.boolean().optional(), // ADDED
+    pvc: z.boolean().optional(), // ADDED
     other: z.string().optional(),
   }).optional(),
   urgencyLevel: z.nativeEnum(UrgencyLevel).optional(),
@@ -96,7 +100,7 @@ export function LeadForm({ lead, onSuccess, onCancel, users = [] }: LeadFormProp
           gpsLocation: lead.gpsLocation ?? undefined,
           status: lead.status,
           score: lead.score ?? 0,
-          serviceType: lead.serviceType ?? undefined, // ✅ ADD THIS LINE
+          serviceType: lead.serviceType ?? undefined, // ✅ THIS WAS ALREADY HERE
           leadType: lead.leadType,
           company: lead.company ?? undefined,
           iceNumber: lead.iceNumber ?? undefined,
@@ -112,6 +116,10 @@ export function LeadForm({ lead, onSuccess, onCancel, users = [] }: LeadFormProp
             tiles: false,
             carpet: false,
             concrete: false,
+            porcelain: false, // ADDED
+            cladding: false, // ADDED
+            composite_wood: false, // ADDED
+            pvc: false, // ADDED
             other: ''
           },
           urgencyLevel: lead.urgencyLevel ?? undefined,
@@ -148,6 +156,10 @@ export function LeadForm({ lead, onSuccess, onCancel, users = [] }: LeadFormProp
             tiles: false,
             carpet: false,
             concrete: false,
+            porcelain: false, // ADDED
+            cladding: false, // ADDED
+            composite_wood: false, // ADDED
+            pvc: false, // ADDED
             other: ''
           }
         },
@@ -526,7 +538,6 @@ export function LeadForm({ lead, onSuccess, onCancel, users = [] }: LeadFormProp
                       <SelectItem value={PropertyType.VILLA_LARGE}>Villa Grande</SelectItem>
                       <SelectItem value={PropertyType.PENTHOUSE}>Penthouse</SelectItem>
                       <SelectItem value={PropertyType.COMMERCIAL}>Local Commercial</SelectItem>
-                      <SelectItem value={PropertyType.STORE}>Magasin</SelectItem>
                       <SelectItem value={PropertyType.HOTEL_STANDARD}>Hôtel Standard</SelectItem>
                       <SelectItem value={PropertyType.HOTEL_LUXURY}>Hôtel de Luxe</SelectItem>
                       <SelectItem value={PropertyType.OFFICE}>Bureau</SelectItem>
@@ -631,7 +642,7 @@ export function LeadForm({ lead, onSuccess, onCancel, users = [] }: LeadFormProp
                 </div>
               </div>
 
-              {/* Enhanced Materials Selection */}
+              {/* Enhanced Materials Selection - UPDATED */}
               <div className="col-span-2">
                 <Label className="mb-3 block">Matériaux présents</Label>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -640,7 +651,11 @@ export function LeadForm({ lead, onSuccess, onCancel, users = [] }: LeadFormProp
                     { key: 'parquet', label: 'Parquet' },
                     { key: 'tiles', label: 'Carrelage' },
                     { key: 'carpet', label: 'Moquette' },
-                    { key: 'concrete', label: 'Béton' }
+                    { key: 'concrete', label: 'Béton' },
+                    { key: 'porcelain', label: 'Porcelaine' }, // ADDED
+                    { key: 'cladding', label: 'Bardage' }, // ADDED
+                    { key: 'composite_wood', label: 'Bois composite' }, // ADDED
+                    { key: 'pvc', label: 'PVC' } // ADDED
                   ].map(({ key, label }) => (
                     <div key={key} className="flex items-center space-x-2">
                       <Checkbox

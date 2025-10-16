@@ -1,4 +1,4 @@
-// lib/pdf-generator.ts - ENHANCED MODULAR PDF GENERATOR WITH IMAGES
+// lib/pdf-generator.ts - ENHANCED MODULAR PDF GENERATOR WITH MATERIAL-SPECIFIC PRODUCTS
 import jsPDF from 'jspdf';
 import { poppinsNormal, poppinsBold } from './fonts';
 import { PDF_IMAGES } from './pdf-assets';
@@ -16,6 +16,7 @@ import {
   generateObjectTitle,
   loadPDFContent
 } from './pdf-utils';
+import { mapLeadMaterialsToProductKeys, getProductsForMaterials } from './pdf-material-products';
 
 // Type definitions for the PDF data structure
 export type QuotePDFData = {
@@ -56,6 +57,7 @@ export type QuotePDFData = {
     personnelMobilise: string[];
     equipementsUtilises: string[];
     prestationsIncluses: string[];
+    produitsSpecifiques?: string[];
     delaiPrevu: string;
   } | undefined;
   pricing: {
@@ -477,28 +479,51 @@ function renderServiceSection(
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
-  doc.text('2- Équipements & Produits Utilisés:', MARGIN_LEFT, yPos);
+  doc.text('2- Équipements utilisés:', MARGIN_LEFT, yPos);
   yPos += 14;
   
   doc.setFont('Poppins', 'normal');
   doc.setFontSize(9);
   setColor(doc, TEXT_DARK);
-  prestation.equipementsUtilises.slice(0, 3).forEach((item) => {
+  prestation.equipementsUtilises.forEach((item) => {
     doc.text(`• ${item}`, MARGIN_LEFT + 10, yPos);
     yPos += 13;
   });
 
+  // 3. Produits spécifiques (NEW - based on materials)
+  if (prestation.produitsSpecifiques && prestation.produitsSpecifiques.length > 0) {
+    yPos += 8;
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(10);
+    setColor(doc, BLUE_PRIMARY);
+    doc.text('3- Produits spécifiques aux matériaux:', MARGIN_LEFT, yPos);
+    yPos += 14;
+    
+    doc.setFont('Poppins', 'normal');
+    doc.setFontSize(9);
+    setColor(doc, TEXT_DARK);
+    prestation.produitsSpecifiques.forEach((item) => {
+      const lines = doc.splitTextToSize(`• ${item}`, CONTENT_WIDTH - 20);
+      lines.forEach((line: string) => {
+        doc.text(line, MARGIN_LEFT + 10, yPos);
+        yPos += 13;
+      });
+    });
+  }
+
+  // 4. Prestations (renumbered)
   yPos += 8;
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
-  doc.text('3- Détail des prestations:', MARGIN_LEFT, yPos);
+  const prestationNumber = prestation.produitsSpecifiques ? '4' : '3';
+  doc.text(`${prestationNumber}- Détail des prestations:`, MARGIN_LEFT, yPos);
   yPos += 14;
   
   doc.setFont('Poppins', 'normal');
   doc.setFontSize(9);
   setColor(doc, TEXT_DARK);
-  prestation.prestationsIncluses.slice(0, 3).forEach((item) => {
+  prestation.prestationsIncluses.forEach((item) => {
     const lines = doc.splitTextToSize(`• ${item}`, CONTENT_WIDTH - 20);
     lines.forEach((line: string) => {
       doc.text(line, MARGIN_LEFT + 10, yPos);
@@ -506,11 +531,13 @@ function renderServiceSection(
     });
   });
 
+  // 5. Délai (renumbered)
   yPos += 8;
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
-  doc.text('4- Délai prévu de la prestation:', MARGIN_LEFT, yPos);
+  const delaiNumber = prestation.produitsSpecifiques ? '5' : '4';
+  doc.text(`${delaiNumber}- Délai prévu de la prestation:`, MARGIN_LEFT, yPos);
   yPos += 14;
   
   doc.setFont('Poppins', 'normal');
@@ -626,7 +653,8 @@ function renderProductTable(
 }
 
 export function prepareQuotePDFData(
-  quote: any,docType: 'DEVIS' | 'FACTURE' = 'DEVIS'
+  quote: any,
+  docType: 'DEVIS' | 'FACTURE' = 'DEVIS'
 ): QuotePDFData {
   const today = new Date().toLocaleDateString('fr-FR', {
     day: '2-digit',
@@ -669,6 +697,7 @@ export function prepareQuotePDFData(
     personnelMobilise: string[];
     equipementsUtilises: string[];
     prestationsIncluses: string[];
+    produitsSpecifiques?: string[];
     delaiPrevu: string;
   } | undefined = undefined;
 
@@ -689,10 +718,21 @@ export function prepareQuotePDFData(
       `Agent${teamSize > 1 ? 's' : ''} de nettoyage (${teamSize} personne${teamSize > 1 ? 's' : ''})`
     ];
 
+    // Get material-specific products
+    let produitsSpecifiques: string[] = [];
+    if (quote.lead && quote.lead.materials) {
+      const materialMap = mapLeadMaterialsToProductKeys(quote.lead.materials);
+      const materialProducts = getProductsForMaterials(materialMap);
+      produitsSpecifiques = materialProducts.map(product => 
+        product.description ? `${product.name} - ${product.description}` : product.name
+      );
+    }
+
     prestationData = {
       personnelMobilise,
       equipementsUtilises: serviceConfig.equipementsUtilises || [],
       prestationsIncluses: serviceConfig.prestationsIncluses || [],
+      ...(produitsSpecifiques.length > 0 && { produitsSpecifiques }),
       delaiPrevu: pdfContent.deliveryTimeframes[quote.deliveryType || 'STANDARD'] || '3-5 jours ouvrés'
     };
   } else if (quote.lineItems && Array.isArray(quote.lineItems)) {
@@ -705,19 +745,45 @@ export function prepareQuotePDFData(
     }));
   }
 
+  // Calculate payment percentages
+  const subTotalHT = Number(quote.subTotalHT) || Number(quote.finalPrice);
+  const vatAmount = Number(quote.vatAmount) || (subTotalHT * 0.20);
+  const totalTTC = docType === 'FACTURE' ? (subTotalHT + vatAmount) : subTotalHT;
+
+  // Calculate deposit amount (30% for B2C, 40% for B2B)
+  const depositPercentage = isB2B ? 40 : 30;
+  const depositAmount = (subTotalHT * depositPercentage) / 100;
+
+  // Payment configuration with dynamic deposit calculation
   let paymentConfig;
   if (docType === 'FACTURE') {
     paymentConfig = quote.businessType === 'SERVICE' 
       ? pdfContent.paymentConditions.FACTURE_SERVICE
       : (pdfContent.paymentConditions.FACTURE_PRODUIT || pdfContent.paymentConditions.FACTURE_SERVICE);
   } else {
-    if (isB2B) {
-      paymentConfig = quote.businessType === 'SERVICE'
-        ? (pdfContent.paymentConditions.DEVIS_SERVICE_PRO || pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER)
-        : (pdfContent.paymentConditions.DEVIS_PRODUIT_PRO || pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER);
-    } else {
-      paymentConfig = pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER;
-    }
+    // For DEVIS, create dynamic payment conditions with deposit amount
+    const baseConditions = isB2B
+      ? pdfContent.paymentConditions.DEVIS_SERVICE_PRO || pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER
+      : pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER;
+
+    // Create dynamic deposit text
+    const depositText = isB2B
+      ? `Un acompte de ${depositPercentage}% du montant total, soit la somme de ${formatCurrency(depositAmount)}, est exigible à la signature du présent devis pour le démarrage des prestations.`
+      : `Un acompte de ${depositPercentage}% du montant total, soit la somme de ${formatCurrency(depositAmount)}, est exigible à la signature du présent devis pour la validation de votre commande.`;
+
+    // Replace the generic deposit condition with the specific one
+    const dynamicConditions = baseConditions.conditions.map((condition: string) => {
+      // Replace any existing deposit condition with our dynamic one
+      if (condition.includes('acompte') || condition.includes('%')) {
+        return depositText;
+      }
+      return condition;
+    });
+
+    paymentConfig = {
+      title: baseConditions.title,
+      conditions: dynamicConditions
+    };
   }
 
   const paymentConditions = [...paymentConfig.conditions];
@@ -725,10 +791,6 @@ export function prepareQuotePDFData(
     paymentConditions.unshift(`Commandé par: ${quote.orderedBy}`);
     paymentConditions.unshift(`Bon de commande: ${quote.purchaseOrderNumber}`);
   }
-
-  const subTotalHT = Number(quote.subTotalHT) || Number(quote.finalPrice);
-  const vatAmount = Number(quote.vatAmount) || (subTotalHT * 0.20);
-  const totalTTC = docType === 'FACTURE' ? (subTotalHT + vatAmount) : subTotalHT;
 
   const result: QuotePDFData = {
     docType,
