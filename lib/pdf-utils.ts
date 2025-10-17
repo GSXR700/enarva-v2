@@ -158,9 +158,9 @@ export function loadPDFContent(): any {
       FIN_DE_CHANTIER: {
         label: "Nettoyage Fin de chantier",
         prestationsIncluses: [
-          "Dépoussiérage complet (plafonds, placards, façades, rideaux) et nettoyage des points de contact (prises, poignées)",
+          "Dépoussiérage complet (plafonds, placards, façades, rideaux) et nettoyage des points de contact",
           "Nettoyage ciblé des résidus de chantier sur toutes les surfaces (murs, sols, plinthes)",
-          "Détartrage et désinfection approfondis des sanitaires (WC, douches) et de la cuisine (placards, plans de travail)",
+          "Détartrage et désinfection approfondis des sanitaires et de la cuisine (placards, plans de travail)",
           "Nettoyage complet des vitres et encadrements, et traitement spécifique de tous les types de sols"
         ],
         equipementsUtilises: [
