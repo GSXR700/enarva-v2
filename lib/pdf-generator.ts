@@ -495,7 +495,7 @@ function renderServiceSection(
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
-  doc.text('2- Équipements utilisés:', MARGIN_LEFT, yPos);
+  doc.text('2- Équipements & Produits utilisés:', MARGIN_LEFT, yPos);
   yPos += 14;
   
   doc.setFont('Poppins', 'normal');

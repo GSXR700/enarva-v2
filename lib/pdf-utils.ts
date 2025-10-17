@@ -166,7 +166,7 @@ export function loadPDFContent(): any {
         equipementsUtilises: [
           "Aspirateurs professionnels haute puissance",
           "Monobrosse pour sols durs et nettoyeur vapeur industriel",
-          "Équipement d'accès en hauteur",
+          "Échelles et équipements d'accès en hauteur",
           "Produits décapants écologiques et désinfectants professionnels certifiés"
         ],
         personnelSuggestions: { baseTeamSize: 2, perSquareMeter: 50 }
