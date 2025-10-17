@@ -532,7 +532,7 @@ function renderServiceSection(
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
-  const prestationNumber = prestation.produitsSpecifiques ? '4' : '3';
+  const prestationNumber = prestation.produitsSpecifiques && prestation.produitsSpecifiques.length > 0 ? '4' : '3';
   doc.text(`${prestationNumber}- Détail des prestations:`, MARGIN_LEFT, yPos);
   yPos += 14;
   
@@ -552,7 +552,7 @@ function renderServiceSection(
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
-  const delaiNumber = prestation.produitsSpecifiques ? '5' : '4';
+  const delaiNumber = prestation.produitsSpecifiques && prestation.produitsSpecifiques.length > 0 ? '5' : '4';
   doc.text(`${delaiNumber}- Délai prévu de la prestation:`, MARGIN_LEFT, yPos);
   yPos += 14;
   
@@ -738,7 +738,31 @@ export function prepareQuotePDFData(
     let produitsSpecifiques: string[] = [];
     if (quote.lead && quote.lead.materials) {
       const materialMap = mapLeadMaterialsToProductKeys(quote.lead.materials);
-      const materialProducts = getProductsForMaterials(materialMap);
+      let materialProducts = getProductsForMaterials(materialMap);
+
+      // =================================================================================
+      // NEW LOGIC: Filter out finishing products for "Fin de chantier" service
+      // =================================================================================
+      if (quote.serviceType === 'FIN_DE_CHANTIER') {
+        const finishingKeywords = [
+          'cristallisant', 
+          'polish', 
+          'poudre de cristallisation', 
+          'vitrificateur', 
+          'cire', 
+          'rénovateur', 
+          'huile d\'entretien', 
+          'imperméabilisant'
+        ];
+
+        materialProducts = materialProducts.filter(product => {
+          const productNameLower = product.name.toLowerCase();
+          // Keep the product ONLY if its name does NOT contain any finishing keywords
+          return !finishingKeywords.some(keyword => productNameLower.includes(keyword));
+        });
+      }
+      // =================================================================================
+
       produitsSpecifiques = materialProducts.map(product => 
         product.description ? `${product.name} - ${product.description}` : product.name
       );
