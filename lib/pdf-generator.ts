@@ -374,9 +374,25 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   doc.setFont('Poppins', 'normal');
   doc.setFontSize(9);
   setColor(doc, TEXT_DARK);
+
+  // Définir les largeurs pour l'alignement
+  const bulletIndent = 10;
+  const textIndent = 18; // Espace pour la puce "• " et l'alignement
+  // Calcule la largeur max du texte pour qu'il s'arrête à la marge droite
+  const conditionsMaxWidth = CONTENT_WIDTH - textIndent;
+
   data.payment.conditions.forEach((condition) => {
-    doc.text(`• ${condition}`, MARGIN_LEFT + 10, yPos);
-    yPos += 14;
+    // Sépare la condition (le texte long) en plusieurs lignes
+    const lines = doc.splitTextToSize(condition, conditionsMaxWidth);
+
+    // Affiche la puce une seule fois
+    doc.text('•', MARGIN_LEFT + bulletIndent, yPos);
+
+    // Affiche chaque ligne de texte, correctement indentée
+    lines.forEach((line: string) => {
+      doc.text(line, MARGIN_LEFT + textIndent, yPos);
+      yPos += 14; // Augmente yPos pour CHAQUE ligne (c'est ce qui corrige le bug)
+    });
   });
 
   // 9. FOOTER - AVEC MARGES ET BORDER RADIUS (DESIGN PREMIUM)
@@ -767,7 +783,9 @@ export function prepareQuotePDFData(
       : pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER;
 
     // Create dynamic deposit text
-    const depositText = `Acompte de ${depositPercentage}% (${formatCurrency(depositAmount)}), ${isB2B ? 'exigible à la signature pour début des prestations' : 'payable à la signature pour validation de commande'}.`;
+    const depositText = isB2B
+      ? `Un acompte de ${depositPercentage}% du montant total, soit la somme de ${formatCurrency(depositAmount)}, exigible à la signature pour début des prestations.`
+      : `Un acompte de ${depositPercentage}% du montant total, soit la somme de ${formatCurrency(depositAmount)}, payable à la signature pour validation de commande.`;
 
     // Replace the generic deposit condition with the specific one
     const dynamicConditions = baseConditions.conditions.map((condition: string) => {
