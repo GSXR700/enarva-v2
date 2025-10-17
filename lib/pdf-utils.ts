@@ -167,7 +167,7 @@ export function loadPDFContent(): any {
           "Aspirateurs professionnels haute puissance",
           "Monobrosse pour sols durs et nettoyeur vapeur industriel",
           "Échelles et équipements d'accès en hauteur",
-          "Produits décapants écologiques et désinfectants professionnels certifiés"
+          "Matériel général de ménage et de désinfection"
         ],
         personnelSuggestions: { baseTeamSize: 2, perSquareMeter: 50 }
       },

@@ -27,12 +27,7 @@ export const MATERIAL_PRODUCTS: Record<string, MaterialProduct[]> = {
       unit: "L",
       category: "CLEANING_PRODUCTS"
     },
-    {
-      name: "Pad cristallisation",
-      description: "Disques spéciaux pour monobrosse",
-      unit: "pcs",
-      category: "CONSUMABLES"
-    },
+
     {
       name: "Poudre de cristallisation",
       description: "Poudre pour lustrage haute brillance",
@@ -78,29 +73,12 @@ export const MATERIAL_PRODUCTS: Record<string, MaterialProduct[]> = {
   // Carrelage (Tiles)
   tiles: [
     {
-      name: "Détergent dégraissant sols",
+      name: "Détergent dégraissant sols - Anti-calcaire sanitaires",
       description: "Nettoyant puissant pour carrelage",
       unit: "L",
       category: "CLEANING_PRODUCTS"
-    },
-    {
-      name: "Décapant joints",
-      description: "Produit spécial nettoyage des joints",
-      unit: "L",
-      category: "CLEANING_PRODUCTS"
-    },
-    {
-      name: "Imperméabilisant carrelage",
-      description: "Protection hydrofuge pour carrelage",
-      unit: "L",
-      category: "CLEANING_PRODUCTS"
-    },
-    {
-      name: "Anti-calcaire sanitaires",
-      description: "Détartrant pour surfaces carrelées",
-      unit: "L",
-      category: "CLEANING_PRODUCTS"
     }
+
   ],
 
   // Porcelaine (Porcelain)
