@@ -147,7 +147,7 @@ export function generateObjectTitle(
   const surfaceText = surface ? `de ${surface} m²` : '';
   const levelsText = levels && levels > 1 ? `- ${levels} niveaux` : '';
 
-  return `${serviceLabel} d'un(e) ${propertyLabel} ${surfaceText} ${levelsText}`.trim();
+  return `${serviceLabel} pour ${propertyLabel} ${surfaceText} ${levelsText}`.trim();
 }
 
 // Load PDF content from JSON - will return default if file doesn't exist
