@@ -158,44 +158,34 @@ export function loadPDFContent(): any {
       FIN_DE_CHANTIER: {
         label: "Nettoyage Fin de chantier",
         prestationsIncluses: [
-          "Nettoyage et dépoussiérage des plafonds, placards, façades, rideaux et embrasures",
-          "Nettoyage ciblé des résidus sur toutes les surfaces (murs, sols, vitres, plinthes)",
-          "Nettoyage des interrupteurs, prises, poignées et rampes",
-          "Détartrage et désinfection des sanitaires (lavabos, douches, WC, baignoires)",
-          "Nettoyage de cuisine : placards, plan de travail, crédences, électroménagers encastrés",
-          "Nettoyage complet des vitres et encadrement avec enlèvement des traces de chantier",
-          "Entretien et traitement des sols en fonction de leur type"
+          "Dépoussiérage complet (plafonds, placards, façades, rideaux) et nettoyage des points de contact (prises, poignées)",
+          "Nettoyage ciblé des résidus de chantier sur toutes les surfaces (murs, sols, plinthes)",
+          "Détartrage et désinfection approfondis des sanitaires (WC, douches) et de la cuisine (placards, plans de travail)",
+          "Nettoyage complet des vitres et encadrements, et traitement spécifique de tous les types de sols"
         ],
         equipementsUtilises: [
-          "Aspirateur professionnel haute puissance",
-          "Monobrosse pour sols durs",
-          "Nettoyeur vapeur industriel",
-          "Échafaudages et échelles télescopiques",
-          "Produits décapants écologiques",
-          "Désinfectants professionnels certifiés"
+          "Aspirateurs professionnels haute puissance (x2)",
+          "Monobrosse pour sols durs et nettoyeur vapeur industriel",
+          "Équipement d'accès en hauteur (échafaudages et échelles télescopiques)",
+          "Produits décapants écologiques et désinfectants professionnels certifiés"
         ],
         personnelSuggestions: { baseTeamSize: 2, perSquareMeter: 50 }
       },
       GRAND_MENAGE: {
-        label: "Grand Ménage",
-        prestationsIncluses: [
-          "Dépoussiérage approfondi de toutes les surfaces",
-          "Nettoyage complet des vitres intérieures et extérieures",
-          "Désinfection complète de la cuisine et des sanitaires",
-          "Aspiration et nettoyage de tous les sols",
-          "Nettoyage des placards intérieurs",
-          "Élimination des toiles d'araignées",
-          "Nettoyage des luminaires"
-        ],
-        equipementsUtilises: [
-          "Aspirateur professionnel",
-          "Nettoyeur vapeur",
-          "Produits de nettoyage multi-surfaces",
-          "Matériel de nettoyage vitres",
-          "Désinfectants pour sanitaires"
-        ],
-        personnelSuggestions: { baseTeamSize: 2, perSquareMeter: 70 }
-      },
+    label: "Grand Ménage",
+    prestationsIncluses: [
+        "Dépoussiérage approfondi (surfaces, luminaires, toiles d'araignées)",
+        "Nettoyage complet des vitres (int/ext) et des placards intérieurs",
+        "Désinfection complète de la cuisine et des sanitaires",
+        "Aspiration et nettoyage de tous les sols"
+    ],
+    equipementsUtilises: [
+        "Aspirateurs professionnels et nettoyeur vapeur",
+        "Matériel de nettoyage vitres",
+        "Produits de nettoyage multi-surfaces et désinfectants sanitaires"
+    ],
+    personnelSuggestions: { baseTeamSize: 2, perSquareMeter: 70 }
+},
       NETTOYAGE_STANDARD: { // Restored from original file
         label: "Nettoyage Standard",
         prestationsIncluses: [
