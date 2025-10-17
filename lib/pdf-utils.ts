@@ -164,9 +164,9 @@ export function loadPDFContent(): any {
           "Nettoyage complet des vitres et encadrements, et traitement spécifique de tous les types de sols"
         ],
         equipementsUtilises: [
-          "Aspirateurs professionnels haute puissance (x2)",
+          "Aspirateurs professionnels haute puissance",
           "Monobrosse pour sols durs et nettoyeur vapeur industriel",
-          "Équipement d'accès en hauteur (échafaudages et échelles télescopiques)",
+          "Équipement d'accès en hauteur",
           "Produits décapants écologiques et désinfectants professionnels certifiés"
         ],
         personnelSuggestions: { baseTeamSize: 2, perSquareMeter: 50 }

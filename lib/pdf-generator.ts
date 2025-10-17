@@ -767,9 +767,7 @@ export function prepareQuotePDFData(
       : pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER;
 
     // Create dynamic deposit text
-    const depositText = isB2B
-      ? `Un acompte de ${depositPercentage}% du montant total, soit la somme de ${formatCurrency(depositAmount)}, exigible à la signature pour début des prestations.`
-      : `Un acompte de ${depositPercentage}% du montant total, soit la somme de ${formatCurrency(depositAmount)}, payable à la signature pour validation de commande.`;
+    const depositText = `Acompte de ${depositPercentage}% (${formatCurrency(depositAmount)}), ${isB2B ? 'exigible à la signature pour début des prestations' : 'payable à la signature pour validation de commande'}.`;
 
     // Replace the generic deposit condition with the specific one
     const dynamicConditions = baseConditions.conditions.map((condition: string) => {
