@@ -1,4 +1,4 @@
-// lib/pdf-generator.ts - ENHANCED MODULAR PDF GENERATOR WITH PAGINATION
+// lib/pdf-generator.ts - ENHANCED MODULAR PDF GENERATOR WITH MATERIAL-SPECIFIC PRODUCTS
 import jsPDF from 'jspdf';
 import { poppinsNormal, poppinsBold } from './fonts';
 import { PDF_IMAGES } from './pdf-assets';
@@ -17,11 +17,6 @@ import {
   loadPDFContent
 } from './pdf-utils';
 import { mapLeadMaterialsToProductKeys, getProductsForMaterials } from './pdf-material-products';
-
-// PAGINATION CONSTANTS
-const FOOTER_HEIGHT = 85;
-const FOOTER_START_Y = PAGE_HEIGHT - FOOTER_HEIGHT;
-const SAFE_CONTENT_END_Y = FOOTER_START_Y - 30; // 30pt margin before footer
 
 // Type definitions for the PDF data structure
 export type QuotePDFData = {
@@ -78,161 +73,7 @@ export type QuotePDFData = {
 };
 
 /**
- * Adds header to current page
- */
-function addHeader(doc: jsPDF, data: QuotePDFData) {
-  // 1. HEADER SECTION WITH GRADIENT BLUE BACKGROUND
-  const headerHeight = 100;
-  for (let i = 0; i < headerHeight; i++) {
-    const ratio = i / headerHeight;
-    const r = Math.floor(28 + (30 - 28) * ratio);
-    const g = Math.floor(63 + (58 - 63) * ratio);
-    const b = Math.floor(145 + (138 - 145) * ratio);
-    doc.setFillColor(r, g, b);
-    doc.rect(0, i, PAGE_WIDTH, 1, 'F');
-  }
-
-  // Document type (left side - vertically centered)
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('Poppins', 'bold');
-  doc.setFontSize(36);
-  doc.text(data.docType, MARGIN_LEFT, 50);
-
-  // OPTIMIZED: Document info on LEFT side (replaces company info)
-  doc.setFont('Poppins', 'normal');
-  doc.setFontSize(9);
-  let leftYPos = 70;
-  
-  doc.text(`Date: ${data.date}`, MARGIN_LEFT, leftYPos);
-  leftYPos += 12;
-  
-  doc.text(`N° ${data.number}`, MARGIN_LEFT, leftYPos);
-  leftYPos += 12;
-  
-  // Add Purchase Order info if exists
-  if (data.purchaseOrderNumber) {
-    doc.text(`Bon de commande: ${data.purchaseOrderNumber}`, MARGIN_LEFT, leftYPos);
-    leftYPos += 12;
-  }
-  
-  if (data.orderedBy) {
-    doc.text(`Commandé par: ${data.orderedBy}`, MARGIN_LEFT, leftYPos);
-  }
-
-  // BIG Enarva logo TEXT (right side - aligned)
-  doc.setFont('Poppins', 'bold');
-  doc.setFontSize(40);
-  doc.setTextColor(255, 255, 255);
-  doc.text('enarva', PAGE_WIDTH - MARGIN_RIGHT - 130, 55);
-}
-
-/**
- * Adds footer to current page
- */
-function addFooter(doc: jsPDF, data: QuotePDFData) {
-  const footerY = FOOTER_START_Y;
-  const footerRadius = 12;
-  
-  // Fond bleu avec marges gauche/droite + border radius en haut uniquement
-  doc.setFillColor(30, 58, 138);
-  doc.roundedRect(MARGIN_LEFT, footerY, CONTENT_WIDTH, FOOTER_HEIGHT, footerRadius, footerRadius, 'F');
-  doc.rect(MARGIN_LEFT, footerY + FOOTER_HEIGHT - footerRadius, CONTENT_WIDTH, footerRadius, 'F');
-
-  const textStartX = MARGIN_LEFT + 15;
-  const topMargin = 18;
-  
-  doc.setTextColor(255, 255, 255);
-  
-  // Ligne 1: LOGO "enarva" + "sarl au"
-  doc.setFont('Poppins', 'bold');
-  doc.setFontSize(22);
-  doc.text('enarva', textStartX, footerY + 28);
-  
-  const enarvaWidth = doc.getTextWidth('enarva');
-  doc.setFont('Poppins', 'normal');
-  doc.setFontSize(9);
-  doc.text('sarl au', textStartX + enarvaWidth + 6, footerY + 28);
-
-  // Ligne 2: Adresse
-  doc.setFont('Poppins', 'normal');
-  doc.setFontSize(8);
-  doc.text(
-    '53, 2ème étage, Appartement 15,  Avenue Brahim Roudani - Océan, Rabat - Maroc',
-    textStartX,
-    footerY + topMargin + 28
-  );
-
-  // Ligne 3: Contact
-  doc.text(
-    'Téléphone : 06 38 146-573 • Site web : www.enarva.com • e-mail : contact@enarva.com',
-    textStartX,
-    footerY + topMargin + 41
-  );
-
-  // Ligne 4: Informations légales
-  doc.text(
-    `IF : ${data.company.if} • RC : ${data.company.rc} • ICE : ${data.company.ice} • RIB : ${data.company.rib}`,
-    textStartX,
-    footerY + topMargin + 54
-  );
-
-  // QR CODE
-  try {
-    if (PDF_IMAGES.BARCODE) {
-      const qrSize = 70;
-      const qrX = MARGIN_LEFT + CONTENT_WIDTH - qrSize - 15;
-      const qrY = footerY + (FOOTER_HEIGHT - qrSize) / 2;
-      
-      doc.addImage(PDF_IMAGES.BARCODE, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'FAST');
-    }
-  } catch (e) {
-    console.warn("QR code error:", e);
-  }
-}
-
-/**
- * Adds background watermark
- */
-function addBackgroundWatermark(doc: jsPDF) {
-  try {
-    if (PDF_IMAGES.BG_LOGO) {
-      const logoWidth = 600;
-      const logoHeight = 848;
-      const logoX = (PAGE_WIDTH - logoWidth) / 2;
-      const logoY = (PAGE_HEIGHT - logoHeight) / 2;
-      
-      doc.addImage(
-        PDF_IMAGES.BG_LOGO,
-        'PNG',
-        logoX,
-        logoY,
-        logoWidth,
-        logoHeight,
-        undefined,
-        'FAST'
-      );
-    }
-  } catch (e) {
-    console.warn("Background logo error:", e);
-  }
-}
-
-/**
- * Checks if content will overflow and adds new page if needed
- */
-function checkAndAddPage(doc: jsPDF, currentY: number, requiredSpace: number, data: QuotePDFData): number {
-  if (currentY + requiredSpace > SAFE_CONTENT_END_Y) {
-    doc.addPage();
-    addBackgroundWatermark(doc);
-    addHeader(doc, data);
-    addFooter(doc, data);
-    return 130; // Start below header on new page
-  }
-  return currentY;
-}
-
-/**
- * Generates a pixel-perfect PDF document with pagination support
+ * Generates a pixel-perfect PDF document matching Enarva's design with embedded images
  */
 export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   const doc = new jsPDF({
@@ -251,14 +92,79 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     console.warn("Error loading Poppins fonts:", e);
   }
 
-  // Add background, header, and footer for first page
-  addBackgroundWatermark(doc);
-  addHeader(doc, data);
-  addFooter(doc, data);
+  // ✅ ADD BACKGROUND WATERMARK LOGO FIRST (BEFORE ANY OTHER CONTENT)
+  try {
+    if (PDF_IMAGES.BG_LOGO) {
+      // Calculate centered position for watermark
+      const logoWidth = 600; // Adjust size as needed
+      const logoHeight = 848; // Adjust size as needed
+      const logoX = (PAGE_WIDTH - logoWidth) / 2;
+      const logoY = (PAGE_HEIGHT - logoHeight) / 2;
+      
+      // Add the background image (PNG with transparency built-in)
+      doc.addImage(
+        PDF_IMAGES.BG_LOGO,
+        'PNG',
+        logoX,
+        logoY,
+        logoWidth,
+        logoHeight,
+        undefined,
+        'FAST'
+      );
+    }
+  } catch (e) {
+    console.warn("Background logo error:", e);
+  }
 
-  let yPos = 120;
+  let yPos = 0;
 
-  // Client info (right aligned) - ONLY ON FIRST PAGE
+  // 1. HEADER SECTION WITH GRADIENT BLUE BACKGROUND
+  const headerHeight = 100;
+  for (let i = 0; i < headerHeight; i++) {
+    const ratio = i / headerHeight;
+    const r = Math.floor(28 + (30 - 28) * ratio);
+    const g = Math.floor(63 + (58 - 63) * ratio);
+    const b = Math.floor(145 + (138 - 145) * ratio);
+    doc.setFillColor(r, g, b);
+    doc.rect(0, i, PAGE_WIDTH, 1, 'F');
+  }
+
+  // Document type (left side - vertically centered)
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(36);
+  doc.text(data.docType, MARGIN_LEFT, 50);
+
+  // Date and number below DEVIS (smaller and closer)
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  doc.text(`Date: ${data.date}`, MARGIN_LEFT, 70);
+  doc.text(`N ° ${data.number}`, MARGIN_LEFT, 85);
+
+  // BIG Enarva logo TEXT (right side - aligned)
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(40);
+  doc.setTextColor(255, 255, 255);
+  doc.text('enarva', PAGE_WIDTH - MARGIN_RIGHT - 130, 55);
+
+  yPos = 120;
+
+  // 2. COMPANY AND CLIENT INFO (TWO COLUMNS)
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(10);
+  setColor(doc, TEXT_DARK);
+  doc.text(data.company.name, MARGIN_LEFT, yPos);
+
+  yPos += 14;
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  data.company.address.forEach((line) => {
+    doc.text(line, MARGIN_LEFT, yPos);
+    yPos += 12;
+  });
+
+  // Client info (right aligned)
   let clientYPos = 120;
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
@@ -279,17 +185,27 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
 
   yPos = Math.max(yPos, clientYPos) + 20;
 
-  // Check if we need new page before OBJET section
-  yPos = checkAndAddPage(doc, yPos, 60, data);
+  // 3. PURCHASE ORDER INFO (if applicable)
+  if (data.purchaseOrderNumber && data.orderedBy) {
+    doc.setFont('Poppins', 'normal');
+    doc.setFontSize(9);
+    setColor(doc, BLUE_PRIMARY);
+    doc.text(`N° Bon de Commande: ${data.purchaseOrderNumber}`, MARGIN_LEFT, yPos);
+    yPos += 15;
+    doc.text(`Commandé par: ${data.orderedBy}`, MARGIN_LEFT, yPos);
+    yPos += 20;
+  }
 
-  // OBJET SECTION - UNIQUEMENT POUR LES SERVICES
+  // 4. OBJET SECTION - UNIQUEMENT POUR LES SERVICES
   if (data.project.businessType === 'SERVICE') {
     const objetBoxHeight = 32;
     const objetBoxY = yPos;
     
+    // Beautiful blue rounded rectangle
     doc.setFillColor(59, 130, 246);
     doc.roundedRect(MARGIN_LEFT, objetBoxY, CONTENT_WIDTH, objetBoxHeight, 8, 8, 'F');
     
+    // Centered white bold text
     doc.setTextColor(255, 255, 255);
     doc.setFont('Poppins', 'bold');
     doc.setFontSize(11);
@@ -301,17 +217,14 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     yPos = objetBoxY + objetBoxHeight + 25;
   }
 
-  // CONTENT SECTION WITH PAGINATION
+  // 5. CONTENT SECTION
   if (data.project.businessType === 'SERVICE' && data.prestation) {
-    yPos = renderServiceSectionWithPagination(doc, data.prestation, yPos, data);
+    yPos = renderServiceSection(doc, data.prestation, yPos);
   } else if (data.lineItems) {
-    yPos = renderProductTableWithPagination(doc, data.lineItems, yPos, data);
+    yPos = renderProductTable(doc, data.lineItems, yPos, data.project.serviceType);
   }
 
-  // Check before table
-  yPos = checkAndAddPage(doc, yPos, 100, data);
-
-  // TABLEAU FORFAIT - UNIQUEMENT POUR LES SERVICES
+  // 6. TABLEAU FORFAIT - UNIQUEMENT POUR LES SERVICES
   if (data.project.businessType === 'SERVICE') {
     yPos += 10;
     const tableStartY = yPos;
@@ -319,10 +232,14 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     const dataRowHeight = 50;
     const tableRadius = 8;
 
+    // Table header with gradient and rounded top
     doc.setFillColor(30, 58, 138);
     doc.roundedRect(MARGIN_LEFT, tableStartY, CONTENT_WIDTH, headerRowHeight, tableRadius, tableRadius, 'F');
+    
+    // Cover bottom corners to make them square
     doc.rect(MARGIN_LEFT, tableStartY + headerRowHeight - tableRadius, CONTENT_WIDTH, tableRadius, 'F');
 
+    // Header text with proper spacing - COLONNES OPTIMALES
     doc.setTextColor(255, 255, 255);
     doc.setFont('Poppins', 'bold');
     doc.setFontSize(10);
@@ -331,6 +248,7 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     doc.text('Prix unit. HT', MARGIN_LEFT + 395, tableStartY + 28, { align: 'center' });
     doc.text('Total HT', MARGIN_LEFT + CONTENT_WIDTH - 15, tableStartY + 28, { align: 'right' });
 
+    // Data row with white background
     yPos = tableStartY + headerRowHeight;
     doc.setFillColor(255, 255, 255);
     doc.rect(MARGIN_LEFT, yPos, CONTENT_WIDTH, dataRowHeight, 'F');
@@ -339,6 +257,7 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     doc.setFont('Poppins', 'normal');
     doc.setFontSize(9);
     
+    // Designation (width réduit à 220px + centré verticalement)
     const designationLines = doc.splitTextToSize(data.project.objet, 220);
     const designationHeight = designationLines.length * 12;
     const designationStartY = yPos + (dataRowHeight - designationHeight) / 2 + 10;
@@ -347,10 +266,12 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
       doc.text(line, MARGIN_LEFT + 15, designationStartY + (index * 12));
     });
     
+    // Autres colonnes (centrées verticalement)
     doc.text('Forfait', MARGIN_LEFT + 300, yPos + 28, { align: 'center' });
     doc.text(formatCurrency(data.pricing.subTotalHT), MARGIN_LEFT + 395, yPos + 28, { align: 'center' });
     doc.text(formatCurrency(data.pricing.subTotalHT), MARGIN_LEFT + CONTENT_WIDTH - 15, yPos + 28, { align: 'right' });
 
+    // Table border with rounded corners
     doc.setDrawColor(30, 58, 138);
     doc.setLineWidth(1.5);
     doc.roundedRect(MARGIN_LEFT, tableStartY, CONTENT_WIDTH, headerRowHeight + dataRowHeight, tableRadius, tableRadius, 'S');
@@ -359,32 +280,197 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     yPos += dataRowHeight + 25;
   }
 
-  // Check before pricing section
-  yPos = checkAndAddPage(doc, yPos, 120, data);
+  // 7. PRICING SECTION WITH SEPARATOR (50/50 SPLIT + PROFESSIONAL DESIGN)
+  const pricingY = yPos;
+  
+  // Ligne bleue supérieure
+  doc.setDrawColor(30, 58, 138);
+  doc.setLineWidth(1.5);
+  doc.line(MARGIN_LEFT, pricingY, MARGIN_LEFT + CONTENT_WIDTH, pricingY);
 
-  // PRICING SECTION
-  yPos = renderPricingSection(doc, data, yPos);
+  yPos = pricingY + 15;
 
-  // Check before payment conditions
-  yPos = checkAndAddPage(doc, yPos, 80, data);
+  // 50% / 50% split
+  const leftSectionWidth = CONTENT_WIDTH * 0.50; // 50% pour le texte en lettres
+  const separatorX = MARGIN_LEFT + leftSectionWidth;
 
-  // PAYMENT CONDITIONS
-  yPos = renderPaymentConditions(doc, data, yPos);
+  // Left side - Prix en lettres (50%)
+  const amountInWordsLower = data.pricing.amountInWords.toLowerCase();
+  const priceText = data.docType === 'DEVIS'
+    ? `veuillez arrêter le présent devis à la somme de ${amountInWordsLower}.`
+    : `veuillez arrêter la présente facture au montant de ${amountInWordsLower}, toutes taxes comprises.`;
+
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(10);
+  setColor(doc, BLUE_PRIMARY);
+  const priceLines = doc.splitTextToSize(priceText, leftSectionWidth - 20);
+  priceLines.forEach((line: string, index: number) => {
+    doc.text(line, MARGIN_LEFT, yPos + (index * 11));
+  });
+
+  // Vertical separator (ligne bleue)
+  doc.setDrawColor(30, 58, 138);
+  doc.setLineWidth(2.5);
+  const separatorHeight = data.docType === 'FACTURE' ? 50 : 32;
+  doc.line(separatorX, pricingY + 5, separatorX, yPos + separatorHeight);
+
+  // Right side - Montants avec design professionnel (50%)
+  const priceBoxX = separatorX + 25;
+
+  if (data.docType === 'FACTURE') {
+    // FACTURE - 3 lignes (HT, TVA, TTC)
+    
+    // Ligne 1: MONTANT TOTAL HT
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(10);
+    setColor(doc, TEXT_DARK);
+    doc.text('MONTANT TOTAL HT', priceBoxX, yPos + 10);
+    
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(10);
+    doc.text(':', priceBoxX + 125, yPos + 10);
+    doc.text(formatCurrency(data.pricing.subTotalHT), priceBoxX + 135, yPos + 10);
+    
+    // Ligne 2: TVA
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(10);
+    doc.text('TVA (20%)', priceBoxX, yPos + 26);
+    doc.text(':', priceBoxX + 125, yPos + 26);
+    doc.text(formatCurrency(data.pricing.vatAmount), priceBoxX + 135, yPos + 26);
+    
+    // Ligne 3: TOTAL TTC (plus visible)
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(12);
+    doc.text('TOTAL TTC', priceBoxX, yPos + 45);
+    doc.text(':', priceBoxX + 125, yPos + 45);
+    doc.text(formatCurrency(data.pricing.totalTTC), priceBoxX + 135, yPos + 45);
+    
+  } else {
+    // DEVIS - Une seule ligne centrée verticalement
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(12);
+    setColor(doc, TEXT_DARK);
+    
+    doc.text('MONTANT TOTAL HT', priceBoxX, yPos + 20);
+    doc.text(':', priceBoxX + 135, yPos + 20);
+    doc.text(formatCurrency(data.pricing.subTotalHT), priceBoxX + 145, yPos + 20);
+  }
+
+  // Ligne bleue inférieure
+  yPos += data.docType === 'FACTURE' ? 58 : 42;
+  doc.setDrawColor(30, 58, 138);
+  doc.setLineWidth(1.5);
+  doc.line(MARGIN_LEFT, yPos, MARGIN_LEFT + CONTENT_WIDTH, yPos);
+
+  yPos += 18;
+
+  // 8. PAYMENT CONDITIONS
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(10);
+  setColor(doc, BLUE_PRIMARY);
+  doc.text(data.payment.title, MARGIN_LEFT, yPos);
+  
+  yPos += 16;
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  setColor(doc, TEXT_DARK);
+
+  // Définir les largeurs pour l'alignement
+  const bulletIndent = 10;
+  const textIndent = 18; // Espace pour la puce "• " et l'alignement
+  // Calcule la largeur max du texte pour qu'il s'arrête à la marge droite
+  const conditionsMaxWidth = CONTENT_WIDTH - textIndent;
+
+  data.payment.conditions.forEach((condition) => {
+    // Sépare la condition (le texte long) en plusieurs lignes
+    const lines = doc.splitTextToSize(condition, conditionsMaxWidth);
+
+    // Affiche la puce une seule fois
+    doc.text('•', MARGIN_LEFT + bulletIndent, yPos);
+
+    // Affiche chaque ligne de texte, correctement indentée
+    lines.forEach((line: string) => {
+      doc.text(line, MARGIN_LEFT + textIndent, yPos);
+      yPos += 14; // Augmente yPos pour CHAQUE ligne (c'est ce qui corrige le bug)
+    });
+  });
+
+  // 9. FOOTER - AVEC MARGES ET BORDER RADIUS (DESIGN PREMIUM)
+  const footerHeight = 85;
+  const footerY = PAGE_HEIGHT - footerHeight;
+  const footerRadius = 12;
+  
+  // Fond bleu avec marges gauche/droite + border radius en haut uniquement
+  doc.setFillColor(30, 58, 138);
+  
+  // Rectangle avec coins arrondis en haut
+  doc.roundedRect(MARGIN_LEFT, footerY, CONTENT_WIDTH, footerHeight, footerRadius, footerRadius, 'F');
+  
+  // Couvrir les coins arrondis du BAS pour les rendre carrés
+  doc.rect(MARGIN_LEFT, footerY + footerHeight - footerRadius, CONTENT_WIDTH, footerRadius, 'F');
+
+  // ========== LEFT SECTION: MISE EN PAGE PROFESSIONNELLE ==========
+  const textStartX = MARGIN_LEFT + 15; // Marge intérieure de 15pt depuis le bord gauche
+  const topMargin = 18; // Marge du haut
+  
+  doc.setTextColor(255, 255, 255);
+  
+  // Ligne 1: LOGO "enarva" + "sarl au" sur la MÊME ligne
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(22);
+  doc.text('enarva', textStartX, footerY + 28);
+  
+  const enarvaWidth = doc.getTextWidth('enarva');
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  doc.text('sarl au', textStartX + enarvaWidth + 6, footerY + 28); // 6pt d'espace
+
+  // Ligne 2: Adresse (marge de 8pt après ligne 1)
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(8);
+  doc.text(
+    '53, 2ème étage, Appartement 15,  Avenue Brahim Roudani - Océan, Rabat - Maroc',
+    textStartX,
+    footerY + topMargin + 28
+  );
+
+  // Ligne 3: Contact (marge de 11pt après ligne 2)
+  doc.text(
+    'Téléphone : 06 38 146-573 • Site web : www.enarva.com • e-mail : contact@enarva.com',
+    textStartX,
+    footerY + topMargin + 41
+  );
+
+  // Ligne 4: Informations légales (marge de 11pt après ligne 3)
+  doc.text(
+    `IF : ${data.company.if} • RC : ${data.company.rc} • ICE : ${data.company.ice} • RIB : ${data.company.rib}`,
+    textStartX,
+    footerY + topMargin + 54
+  );
+
+  // ========== RIGHT SECTION: QR CODE (CENTRÉ VERTICALEMENT) ==========
+  try {
+    if (PDF_IMAGES.BARCODE) {
+      const qrSize = 70;
+      const qrX = MARGIN_LEFT + CONTENT_WIDTH - qrSize - 15; // 15pt de marge intérieure droite
+      const qrY = footerY + (footerHeight - qrSize) / 2;
+      
+      doc.addImage(PDF_IMAGES.BARCODE, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'FAST');
+    }
+  } catch (e) {
+    console.warn("QR code error:", e);
+  }
 
   const buffer = doc.output('arraybuffer');
   return new Uint8Array(buffer);
 }
 
-function renderServiceSectionWithPagination(
+function renderServiceSection(
   doc: jsPDF,
   prestation: NonNullable<QuotePDFData['prestation']>,
-  startY: number,
-  data: QuotePDFData
+  startY: number
 ): number {
   let yPos = startY;
-
-  // Check space for title
-  yPos = checkAndAddPage(doc, yPos, 30, data);
 
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(11);
@@ -392,9 +478,6 @@ function renderServiceSectionWithPagination(
   doc.text('I. PRESTATIONS INCLUSES', MARGIN_LEFT, yPos);
   yPos += 18;
 
-  // 1- Personnel
-  yPos = checkAndAddPage(doc, yPos, 20 + (prestation.personnelMobilise.length * 13), data);
-  
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   doc.text('1- Personnel mobilisé:', MARGIN_LEFT, yPos);
@@ -404,15 +487,11 @@ function renderServiceSectionWithPagination(
   doc.setFontSize(9);
   setColor(doc, TEXT_DARK);
   prestation.personnelMobilise.forEach((item) => {
-    yPos = checkAndAddPage(doc, yPos, 13, data);
     doc.text(`• ${item}`, MARGIN_LEFT + 10, yPos);
     yPos += 13;
   });
 
-  // 2- Équipements
   yPos += 8;
-  yPos = checkAndAddPage(doc, yPos, 20 + (prestation.equipementsUtilises.length * 13), data);
-  
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
@@ -423,16 +502,13 @@ function renderServiceSectionWithPagination(
   doc.setFontSize(9);
   setColor(doc, TEXT_DARK);
   prestation.equipementsUtilises.forEach((item) => {
-    yPos = checkAndAddPage(doc, yPos, 13, data);
     doc.text(`• ${item}`, MARGIN_LEFT + 10, yPos);
     yPos += 13;
   });
 
-  // 3- Produits spécifiques
+  // 3. Produits spécifiques (NEW - based on materials)
   if (prestation.produitsSpecifiques && prestation.produitsSpecifiques.length > 0) {
     yPos += 8;
-    yPos = checkAndAddPage(doc, yPos, 20 + (prestation.produitsSpecifiques.length * 26), data);
-    
     doc.setFont('Poppins', 'bold');
     doc.setFontSize(10);
     setColor(doc, BLUE_PRIMARY);
@@ -444,9 +520,6 @@ function renderServiceSectionWithPagination(
     setColor(doc, TEXT_DARK);
     prestation.produitsSpecifiques.forEach((item) => {
       const lines = doc.splitTextToSize(`• ${item}`, CONTENT_WIDTH - 20);
-      const linesHeight = lines.length * 13;
-      yPos = checkAndAddPage(doc, yPos, linesHeight, data);
-      
       lines.forEach((line: string) => {
         doc.text(line, MARGIN_LEFT + 10, yPos);
         yPos += 13;
@@ -454,14 +527,12 @@ function renderServiceSectionWithPagination(
     });
   }
 
-  // 4- Prestations
+  // 4. Prestations (renumbered)
   yPos += 8;
-  const prestationNumber = prestation.produitsSpecifiques ? '4' : '3';
-  yPos = checkAndAddPage(doc, yPos, 20 + (prestation.prestationsIncluses.length * 26), data);
-  
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
+  const prestationNumber = prestation.produitsSpecifiques ? '4' : '3';
   doc.text(`${prestationNumber}- Détail des prestations:`, MARGIN_LEFT, yPos);
   yPos += 14;
   
@@ -470,23 +541,18 @@ function renderServiceSectionWithPagination(
   setColor(doc, TEXT_DARK);
   prestation.prestationsIncluses.forEach((item) => {
     const lines = doc.splitTextToSize(`• ${item}`, CONTENT_WIDTH - 20);
-    const linesHeight = lines.length * 13;
-    yPos = checkAndAddPage(doc, yPos, linesHeight, data);
-    
     lines.forEach((line: string) => {
       doc.text(line, MARGIN_LEFT + 10, yPos);
       yPos += 13;
     });
   });
 
-  // 5- Délai
+  // 5. Délai (renumbered)
   yPos += 8;
-  const delaiNumber = prestation.produitsSpecifiques ? '5' : '4';
-  yPos = checkAndAddPage(doc, yPos, 30, data);
-  
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
+  const delaiNumber = prestation.produitsSpecifiques ? '5' : '4';
   doc.text(`${delaiNumber}- Délai prévu de la prestation:`, MARGIN_LEFT, yPos);
   yPos += 14;
   
@@ -499,23 +565,26 @@ function renderServiceSectionWithPagination(
   return yPos;
 }
 
-function renderProductTableWithPagination(
+function renderProductTable(
   doc: jsPDF,
   lineItems: QuotePDFData['lineItems'],
   startY: number,
-  data: QuotePDFData
+  serviceType: string | null
 ): number {
   let yPos = startY;
 
-  const isLinearMeter = data.project.serviceType === 'NETTOYAGE_CANAPES';
+  const isLinearMeter = serviceType === 'NETTOYAGE_CANAPES';
+
   const tableStartY = yPos;
   const headerHeight = 45;
   const rowHeight = 35;
   const tableRadius = 8;
   
-  // Header
+  // Header avec gradient et border radius (coins arrondis en haut)
   doc.setFillColor(30, 58, 138);
   doc.roundedRect(MARGIN_LEFT, tableStartY, CONTENT_WIDTH, headerHeight, tableRadius, tableRadius, 'F');
+  
+  // Couvrir les coins arrondis du bas pour les rendre carrés
   doc.rect(MARGIN_LEFT, tableStartY + headerHeight - tableRadius, CONTENT_WIDTH, tableRadius, 'F');
   
   doc.setTextColor(255, 255, 255);
@@ -543,11 +612,9 @@ function renderProductTableWithPagination(
 
   if (lineItems) {
     lineItems.forEach((item, index) => {
-      // Check if row fits, if not add new page
-      yPos = checkAndAddPage(doc, yPos, rowHeight, data);
+      const rowY = yPos + (index * rowHeight);
       
-      const rowY = yPos;
-      
+      // Alternance de couleurs pour les lignes
       if (index % 2 === 0) {
         doc.setFillColor(250, 250, 250);
         doc.rect(MARGIN_LEFT, rowY, CONTENT_WIDTH, rowHeight, 'F');
@@ -578,126 +645,27 @@ function renderProductTableWithPagination(
         doc.text(formatCurrency(item.totalPrice), MARGIN_LEFT + CONTENT_WIDTH - 15, verticalCenter, { align: 'right' });
       }
 
+      // Bordure de ligne
       doc.setDrawColor(220, 220, 220);
       doc.setLineWidth(0.5);
       if (index < lineItems.length - 1) {
         doc.line(MARGIN_LEFT, rowY + rowHeight, MARGIN_LEFT + CONTENT_WIDTH, rowY + rowHeight);
       }
-      
-      yPos += rowHeight;
     });
+
+    yPos += (lineItems.length * rowHeight);
   }
 
+  // Bordure extérieure du tableau avec border radius
   doc.setDrawColor(30, 58, 138);
   doc.setLineWidth(1.5);
   const totalTableHeight = headerHeight + (lineItems ? lineItems.length * rowHeight : 0);
   doc.roundedRect(MARGIN_LEFT, tableStartY, CONTENT_WIDTH, totalTableHeight, tableRadius, tableRadius, 'S');
+  
+  // Ligne séparatrice entre header et contenu
   doc.line(MARGIN_LEFT, tableStartY + headerHeight, MARGIN_LEFT + CONTENT_WIDTH, tableStartY + headerHeight);
 
   return yPos + 10;
-}
-
-function renderPricingSection(doc: jsPDF, data: QuotePDFData, startY: number): number {
-  let yPos = startY;
-  const pricingY = yPos;
-  
-  doc.setDrawColor(30, 58, 138);
-  doc.setLineWidth(1.5);
-  doc.line(MARGIN_LEFT, pricingY, MARGIN_LEFT + CONTENT_WIDTH, pricingY);
-
-  yPos = pricingY + 15;
-
-  const leftSectionWidth = CONTENT_WIDTH * 0.50;
-  const separatorX = MARGIN_LEFT + leftSectionWidth;
-
-  const amountInWordsLower = data.pricing.amountInWords.toLowerCase();
-  const priceText = data.docType === 'DEVIS'
-    ? `veuillez arrêter le présent devis à la somme de ${amountInWordsLower}.`
-    : `veuillez arrêter la présente facture au montant de ${amountInWordsLower}, toutes taxes comprises.`;
-
-  doc.setFont('Poppins', 'normal');
-  doc.setFontSize(10);
-  setColor(doc, BLUE_PRIMARY);
-  const priceLines = doc.splitTextToSize(priceText, leftSectionWidth - 20);
-  priceLines.forEach((line: string, index: number) => {
-    doc.text(line, MARGIN_LEFT, yPos + (index * 11));
-  });
-
-  doc.setDrawColor(30, 58, 138);
-  doc.setLineWidth(2.5);
-  const separatorHeight = data.docType === 'FACTURE' ? 50 : 32;
-  doc.line(separatorX, pricingY + 5, separatorX, yPos + separatorHeight);
-
-  const priceBoxX = separatorX + 25;
-
-  if (data.docType === 'FACTURE') {
-    doc.setFont('Poppins', 'bold');
-    doc.setFontSize(10);
-    setColor(doc, TEXT_DARK);
-    doc.text('MONTANT TOTAL HT', priceBoxX, yPos + 10);
-    doc.text(':', priceBoxX + 125, yPos + 10);
-    doc.text(formatCurrency(data.pricing.subTotalHT), priceBoxX + 135, yPos + 10);
-    
-    doc.text('TVA (20%)', priceBoxX, yPos + 26);
-    doc.text(':', priceBoxX + 125, yPos + 26);
-    doc.text(formatCurrency(data.pricing.vatAmount), priceBoxX + 135, yPos + 26);
-    
-    doc.setFontSize(12);
-    doc.text('TOTAL TTC', priceBoxX, yPos + 45);
-    doc.text(':', priceBoxX + 125, yPos + 45);
-    doc.text(formatCurrency(data.pricing.totalTTC), priceBoxX + 135, yPos + 45);
-  } else {
-    doc.setFont('Poppins', 'bold');
-    doc.setFontSize(12);
-    setColor(doc, TEXT_DARK);
-    
-    doc.text('MONTANT TOTAL HT', priceBoxX, yPos + 20);
-    doc.text(':', priceBoxX + 135, yPos + 20);
-    doc.text(formatCurrency(data.pricing.subTotalHT), priceBoxX + 145, yPos + 20);
-  }
-
-  yPos += data.docType === 'FACTURE' ? 58 : 42;
-  doc.setDrawColor(30, 58, 138);
-  doc.setLineWidth(1.5);
-  doc.line(MARGIN_LEFT, yPos, MARGIN_LEFT + CONTENT_WIDTH, yPos);
-
-  yPos += 18;
-  return yPos;
-}
-
-function renderPaymentConditions(doc: jsPDF, data: QuotePDFData, startY: number): number {
-  let yPos = startY;
-
-  doc.setFont('Poppins', 'bold');
-  doc.setFontSize(10);
-  setColor(doc, BLUE_PRIMARY);
-  doc.text(data.payment.title, MARGIN_LEFT, yPos);
-  
-  yPos += 16;
-  doc.setFont('Poppins', 'normal');
-  doc.setFontSize(9);
-  setColor(doc, TEXT_DARK);
-
-  const bulletIndent = 10;
-  const textIndent = 18;
-  const conditionsMaxWidth = CONTENT_WIDTH - textIndent;
-
-  data.payment.conditions.forEach((condition) => {
-    const lines = doc.splitTextToSize(condition, conditionsMaxWidth);
-    const linesHeight = lines.length * 14;
-    
-    // Check if all lines fit, if not start on new page
-    yPos = checkAndAddPage(doc, yPos, linesHeight, data);
-
-    doc.text('•', MARGIN_LEFT + bulletIndent, yPos);
-
-    lines.forEach((line: string) => {
-      doc.text(line, MARGIN_LEFT + textIndent, yPos);
-      yPos += 14;
-    });
-  });
-
-  return yPos;
 }
 
 export function prepareQuotePDFData(
@@ -766,12 +734,10 @@ export function prepareQuotePDFData(
       `Agent${teamSize > 1 ? 's' : ''} de nettoyage (${teamSize} personne${teamSize > 1 ? 's' : ''})`
     ];
 
-    // Get material-specific products - CHECK BOTH QUOTE AND LEAD
+    // Get material-specific products
     let produitsSpecifiques: string[] = [];
-    const materialsSource = quote.materials || quote.lead?.materials;
-    
-    if (materialsSource) {
-      const materialMap = mapLeadMaterialsToProductKeys(materialsSource);
+    if (quote.lead && quote.lead.materials) {
+      const materialMap = mapLeadMaterialsToProductKeys(quote.lead.materials);
       const materialProducts = getProductsForMaterials(materialMap);
       produitsSpecifiques = materialProducts.map(product => 
         product.description ? `${product.name} - ${product.description}` : product.name
@@ -795,28 +761,35 @@ export function prepareQuotePDFData(
     }));
   }
 
+  // Calculate payment percentages
   const subTotalHT = Number(quote.subTotalHT) || Number(quote.finalPrice);
   const vatAmount = Number(quote.vatAmount) || (subTotalHT * 0.20);
   const totalTTC = docType === 'FACTURE' ? (subTotalHT + vatAmount) : subTotalHT;
 
+  // Calculate deposit amount (30% for B2C, 40% for B2B)
   const depositPercentage = isB2B ? 40 : 30;
   const depositAmount = (subTotalHT * depositPercentage) / 100;
 
+  // Payment configuration with dynamic deposit calculation
   let paymentConfig;
   if (docType === 'FACTURE') {
     paymentConfig = quote.businessType === 'SERVICE' 
       ? pdfContent.paymentConditions.FACTURE_SERVICE
       : (pdfContent.paymentConditions.FACTURE_PRODUIT || pdfContent.paymentConditions.FACTURE_SERVICE);
   } else {
+    // For DEVIS, create dynamic payment conditions with deposit amount
     const baseConditions = isB2B
       ? pdfContent.paymentConditions.DEVIS_SERVICE_PRO || pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER
       : pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER;
 
+    // Create dynamic deposit text
     const depositText = isB2B
       ? `Un acompte de ${depositPercentage}% du montant total, soit la somme de ${formatCurrency(depositAmount)}, exigible à la signature pour début des prestations.`
       : `Un acompte de ${depositPercentage}% du montant total, soit la somme de ${formatCurrency(depositAmount)}, payable à la signature pour validation de commande.`;
 
+    // Replace the generic deposit condition with the specific one
     const dynamicConditions = baseConditions.conditions.map((condition: string) => {
+      // Replace any existing deposit condition with our dynamic one
       if (condition.includes('acompte') || condition.includes('%')) {
         return depositText;
       }
