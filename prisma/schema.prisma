@@ -176,6 +176,7 @@ model Quote {
   propertyType      PropertyType?
   surface           Int?
   levels            Int?                 @default(1)
+  materials         Json?
   productCategory   ProductQuoteCategory?
   productDetails    Json?
   deliveryType      DeliveryType?
