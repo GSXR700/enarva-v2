@@ -164,10 +164,8 @@ export function loadPDFContent(): any {
           "Nettoyage complet des vitres et encadrements, et traitement spécifique de tous les types de sols"
         ],
         equipementsUtilises: [
-          "Aspirateurs professionnels haute puissance",
-          "Monobrosse pour sols durs et nettoyeur vapeur industriel",
-          "Échelles et équipements d'accès en hauteur",
-          "Matériel général de ménage et de désinfection"
+          "Aspirateurs professionnels eau et poussière, monobrosse TASKI multi-vitesses pour sols durs et nettoyeur vapeur EMILIO-RA Plus",
+          "Matériel général de ménage et de désinfection, échelles et équipements d'accès en hauteur"
         ],
         personnelSuggestions: { baseTeamSize: 2, perSquareMeter: 50 }
       },
