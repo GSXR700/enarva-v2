@@ -1,4 +1,4 @@
-// app/(administration)/billing/page.tsx - COMPLETE VERSION WITH F-NUM/YEAR FORMAT
+// app/(administration)/billing/page.tsx - COMPLETE VERSION WITH DOWNLOAD
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -11,6 +11,7 @@ import { Invoice, Lead, Mission } from '@prisma/client'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton'
 import { Input } from '@/components/ui/input'
+import { toast } from 'sonner'
 
 type InvoiceWithRelations = Invoice & { 
   lead: Lead;
@@ -24,6 +25,7 @@ export default function BillingPage() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -65,6 +67,31 @@ export default function BillingPage() {
 
     setFilteredInvoices(filtered);
   };
+
+  const handleDownload = async (invoiceId: string, invoiceNumber: string) => {
+    setDownloadingId(invoiceId)
+    
+    try {
+      const response = await fetch(`/api/invoices/${invoiceId}/download`)
+      if (!response.ok) throw new Error('Erreur lors du téléchargement')
+      
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Facture_${invoiceNumber.replace(/\//g, '-')}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast.success('PDF téléchargé avec succès')
+    } catch (error) {
+      console.error('Error downloading PDF:', error)
+      toast.error('Erreur lors du téléchargement du PDF')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -131,7 +158,6 @@ export default function BillingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -149,7 +175,6 @@ export default function BillingPage() {
           </Link>
         </div>
 
-        {/* Stats Cards with Power BI style */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="border-l-4 border-l-blue-500 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
             <CardContent className="p-4">
@@ -236,7 +261,6 @@ export default function BillingPage() {
           </Card>
         </div>
 
-        {/* Invoices Table */}
         <Card className="shadow-lg border-t-4 border-t-blue-500">
           <CardHeader className="border-b bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/20 dark:to-purple-950/20">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -339,19 +363,27 @@ export default function BillingPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
+                          <Link href={`/billing/${invoice.id}`}>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </Link>
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            className="hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
+                            onClick={() => handleDownload(invoice.id, invoice.invoiceNumber)}
+                            disabled={downloadingId === invoice.id}
                             className="hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600"
                           >
-                            <Download className="w-4 h-4" />
+                            {downloadingId === invoice.id ? (
+                              <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600" />
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
                           </Button>
                         </div>
                       </td>
