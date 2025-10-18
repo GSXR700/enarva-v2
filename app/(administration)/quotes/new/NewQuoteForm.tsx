@@ -173,7 +173,6 @@ const NewQuoteForm = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Materials Selection State - ADDED
   const [selectedMaterials, setSelectedMaterials] = useState<{
     marble: boolean;
     parquet: boolean;
@@ -220,7 +219,6 @@ const NewQuoteForm = () => {
             }
             setSelectedLead(processedLead)
             
-            // ADDED: Load materials from lead if available
             if (leadData.materials && typeof leadData.materials === 'object') {
               setSelectedMaterials({
                 marble: leadData.materials.marble || false,
@@ -646,28 +644,27 @@ const NewQuoteForm = () => {
     try {
       const quoteNumber = `DV-${businessType.substring(0, 3)}-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
 
-      // Check if any materials are selected - ADDED
-    const hasMaterials = Object.entries(selectedMaterials).some(([key, value]) => 
-      key !== 'other' ? value === true : value !== ''
-    );
+      const hasMaterials = businessType === 'SERVICE' && Object.entries(selectedMaterials).some(([key, value]) => 
+        key !== 'other' ? value === true : value !== ''
+      );
 
-    const quotePayload: any = {
-      quoteNumber,
-      businessType,
-      lineItems: finalQuote.lineItems.map(item => ({
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-        serviceType: item.serviceType
-      })),
-      subTotalHT: finalQuote.subTotalHT,
-      vatAmount: finalQuote.vatAmount,
-      totalTTC: finalQuote.totalTTC,
-      finalPrice: finalQuote.finalPrice,
-      expiresAt: expiresAt ? new Date(expiresAt).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      materials: hasMaterials ? selectedMaterials : null, // ADDED
-    }
+      const quotePayload: any = {
+        quoteNumber,
+        businessType,
+        lineItems: finalQuote.lineItems.map(item => ({
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          serviceType: item.serviceType
+        })),
+        subTotalHT: finalQuote.subTotalHT,
+        vatAmount: finalQuote.vatAmount,
+        totalTTC: finalQuote.totalTTC,
+        finalPrice: finalQuote.finalPrice,
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        materials: hasMaterials ? selectedMaterials : null,
+      }
 
       if (selectedLead && selectedLead.id) {
         quotePayload.leadId = selectedLead.id
@@ -750,6 +747,7 @@ const NewQuoteForm = () => {
         if (enablePurchaseOrder) {
           quotePayload.purchaseOrderNumber = purchaseOrderNumber.trim()
           quotePayload.orderedBy = orderedBy.trim()
+          console.log('📄 Adding purchase order info:', { purchaseOrderNumber: purchaseOrderNumber.trim(), orderedBy: orderedBy.trim() })
         }
       }
 
@@ -1350,7 +1348,7 @@ const NewQuoteForm = () => {
             </Card>
           )}
 
-{businessType === 'PRODUCT' && (
+          {businessType === 'PRODUCT' && (
             <Card>
               <CardHeader className="pb-3 md:pb-6">
                 <CardTitle className="text-base md:text-lg">Configuration des Produits</CardTitle>
@@ -1405,7 +1403,7 @@ const NewQuoteForm = () => {
                             placeholder="Nom du produit"
                             className="text-sm"
                           />
-                          </div>
+                        </div>
 
                         <div>
                           <Label className="text-sm">Quantité</Label>
@@ -1668,68 +1666,71 @@ const NewQuoteForm = () => {
               </Button>
             </CardContent>
           </Card>
-           {/* Materials Selection Card - ADDED */}
-          <Card>
-            <CardHeader className="pb-3 md:pb-6">
-              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                <Package className="h-4 w-4 md:h-5 md:w-5" />
-                Sélection des Matériaux
-              </CardTitle>
-              <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                Sélectionnez les matériaux présents pour adapter les produits et services
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  { key: 'marble', label: 'Marbre', icon: '💎' },
-                  { key: 'parquet', label: 'Parquet', icon: '🪵' },
-                  { key: 'tiles', label: 'Carrelage', icon: '🧱' },
-                  { key: 'carpet', label: 'Moquette', icon: '🧵' },
-                  { key: 'concrete', label: 'Béton', icon: '🏗️' },
-                  { key: 'porcelain', label: 'Porcelaine', icon: '🏺' },
-                  { key: 'cladding', label: 'Bardage', icon: '🏠' },
-                  { key: 'composite_wood', label: 'Bois composite', icon: '🌳' },
-                  { key: 'pvc', label: 'PVC', icon: '📦' }
-                ].map(({ key, label, icon }) => (
-                  <div 
-                    key={key} 
-                    className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${
-                      selectedMaterials[key as keyof typeof selectedMaterials] 
-                        ? 'border-primary bg-primary/5' 
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                    onClick={() => handleMaterialChange(key, !selectedMaterials[key as keyof typeof selectedMaterials])}
-                  >
-                    <span className="text-xl">{icon}</span>
-                    <span className="text-sm font-medium flex-1">{label}</span>
-                    {selectedMaterials[key as keyof typeof selectedMaterials] && (
-                      <span className="text-primary">✓</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-              
-              <div>
-                <Label htmlFor="other-materials" className="text-sm">Autres matériaux</Label>
-                <Input
-                  id="other-materials"
-                  placeholder="Spécifiez d'autres matériaux..."
-                  value={selectedMaterials.other}
-                  onChange={(e) => handleMaterialChange('other', e.target.value)}
-                  className="mt-1 text-sm"
-                />
-              </div>
 
-              {(Object.values(selectedMaterials).some((v, i) => i < 9 ? v === true : v !== '')) && (
-                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <p className="text-xs text-blue-800 dark:text-blue-200">
-                    ℹ️ Les produits adaptés à ces matériaux seront automatiquement suggérés dans le PDF du devis
-                  </p>
+          {businessType === 'SERVICE' && (
+            <Card>
+              <CardHeader className="pb-3 md:pb-6">
+                <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                  <Package className="h-4 w-4 md:h-5 md:w-5" />
+                  Sélection des Matériaux
+                </CardTitle>
+                <p className="text-xs md:text-sm text-muted-foreground mt-1">
+                  Sélectionnez les matériaux présents pour adapter les produits et services
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    { key: 'marble', label: 'Marbre', icon: '💎' },
+                    { key: 'parquet', label: 'Parquet', icon: '🪵' },
+                    { key: 'tiles', label: 'Carrelage', icon: '🧱' },
+                    { key: 'carpet', label: 'Moquette', icon: '🧵' },
+                    { key: 'concrete', label: 'Béton', icon: '🏗️' },
+                    { key: 'porcelain', label: 'Porcelaine', icon: '🏺' },
+                    { key: 'cladding', label: 'Bardage', icon: '🏠' },
+                    { key: 'composite_wood', label: 'Bois composite', icon: '🌳' },
+                    { key: 'pvc', label: 'PVC', icon: '📦' }
+                  ].map(({ key, label, icon }) => (
+                    <div 
+                      key={key} 
+                      className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${
+                        selectedMaterials[key as keyof typeof selectedMaterials] 
+                          ? 'border-primary bg-primary/5' 
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={() => handleMaterialChange(key, !selectedMaterials[key as keyof typeof selectedMaterials])}
+                    >
+                      <span className="text-xl">{icon}</span>
+                      <span className="text-sm font-medium flex-1">{label}</span>
+                      {selectedMaterials[key as keyof typeof selectedMaterials] && (
+                        <span className="text-primary">✓</span>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                
+                <div>
+                  <Label htmlFor="other-materials" className="text-sm">Autres matériaux</Label>
+                  <Input
+                    id="other-materials"
+                    placeholder="Spécifiez d'autres matériaux..."
+                    value={selectedMaterials.other}
+                    onChange={(e) => handleMaterialChange('other', e.target.value)}
+                    className="mt-1 text-sm"
+                  />
+                </div>
+
+                {(Object.values(selectedMaterials).some((v, i) => i < 9 ? v === true : v !== '')) && (
+                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      ℹ️ Les produits adaptés à ces matériaux seront automatiquement suggérés dans le PDF du devis
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader className="pb-3 md:pb-6">
               <CardTitle className="text-base md:text-lg">Récapitulatif du Devis</CardTitle>
