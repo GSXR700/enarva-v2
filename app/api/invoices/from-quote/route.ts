@@ -1,4 +1,4 @@
-// app/api/invoices/from-quote/route.ts - FIXED WITH PROPER ERROR HANDLING
+// app/api/invoices/from-quote/route.ts - FIXED: Correct MissionType
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -25,6 +25,42 @@ async function generateInvoiceNumber(): Promise<string> {
     return `F-${nextNumber}/${year}`;
   } catch (error) {
     console.error('Error generating invoice number:', error);
+    throw error;
+  }
+}
+
+// Helper function to create a billing mission for quote-only invoices
+async function createBillingMission(quoteId: string, leadId: string, invoiceNumber: string) {
+  try {
+    const quote = await prisma.quote.findUnique({
+      where: { id: quoteId },
+      include: { lead: true }
+    });
+
+    if (!quote) {
+      throw new Error('Quote not found');
+    }
+
+    const mission = await prisma.mission.create({
+      data: {
+        missionNumber: `BILLING-${invoiceNumber}`,
+        status: 'COMPLETED',
+        priority: 'NORMAL',
+        type: 'RECURRING', // Valid MissionType for billing
+        scheduledDate: new Date(),
+        estimatedDuration: 1,
+        address: quote.lead.address || 'Facturation directe depuis devis',
+        leadId: leadId,
+        quoteId: quoteId,
+        actualStartTime: new Date(),
+        actualEndTime: new Date()
+      }
+    });
+
+    console.log('✅ Billing mission created:', mission.missionNumber);
+    return mission;
+  } catch (error) {
+    console.error('Error creating billing mission:', error);
     throw error;
   }
 }
@@ -93,23 +129,29 @@ export async function POST(request: Request) {
       }, { status: 409 });
     }
 
-    // Find associated mission if exists
-    const mission = quote.missions.find(m => 
-      m.status === 'COMPLETED' || m.status === 'QUALITY_CHECK'
-    );
-
     // Generate invoice number in F-NUM/YEAR format
     const invoiceNumber = await generateInvoiceNumber();
     const amount = new Decimal(quote.finalPrice.toString());
 
     console.log('📄 Generating invoice:', invoiceNumber, 'for amount:', amount.toString());
 
-    // Create invoice
+    // Find associated mission if exists, otherwise create a billing mission
+    let mission = quote.missions.find(m => 
+      m.status === 'COMPLETED' || m.status === 'QUALITY_CHECK'
+    );
+
+    // If no mission exists, create a billing mission (required by schema)
+    if (!mission) {
+      console.log('📦 No existing mission found, creating billing mission...');
+      mission = await createBillingMission(quoteId, quote.leadId, invoiceNumber);
+    }
+
+    // Create invoice with required missionId
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
         leadId: quote.leadId,
-        ...(mission && { missionId: mission.id }),
+        missionId: mission.id, // Now always present
         amount: amount,
         status: 'SENT',
         issueDate: new Date(),
@@ -143,17 +185,15 @@ export async function POST(request: Request) {
       }
     });
 
-    // Update mission if exists
-    if (mission) {
-      await prisma.mission.update({
-        where: { id: mission.id },
-        data: {
-          invoiceGenerated: true,
-          invoiceId: invoice.id,
-          updatedAt: new Date()
-        }
-      });
-    }
+    // Update mission invoice flag
+    await prisma.mission.update({
+      where: { id: mission.id },
+      data: {
+        invoiceGenerated: true,
+        invoiceId: invoice.id,
+        updatedAt: new Date()
+      }
+    });
 
     // Update lead status
     await prisma.lead.update({
