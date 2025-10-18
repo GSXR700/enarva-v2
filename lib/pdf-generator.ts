@@ -185,8 +185,8 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
 
   yPos = Math.max(yPos, clientYPos) + 20;
 
-  // 3. PURCHASE ORDER INFO (if applicable)
-  if (data.purchaseOrderNumber && data.orderedBy) {
+  // 3. PURCHASE ORDER INFO (if applicable) - ONLY FOR PRODUCT QUOTES
+  if (data.project.businessType === 'PRODUCT' && data.purchaseOrderNumber && data.orderedBy) {
     doc.setFont('Poppins', 'normal');
     doc.setFontSize(9);
     setColor(doc, BLUE_PRIMARY);
@@ -274,7 +274,7 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
     // Table border with rounded corners
     doc.setDrawColor(30, 58, 138);
     doc.setLineWidth(1.5);
-    doc.roundedRect(MARGIN_LEFT, tableStartY, CONTENT_WIDTH, headerRowHeight + dataRowHeight, tableRadius, tableRadius, 'S');
+    doc.roundedRect(MARGIN_LEFT, tableStartY, CONTENT_WIDTH, headerRowHeight + dataRowHeight, tableRadius, tableRadius,'S');
     doc.line(MARGIN_LEFT, tableStartY + headerRowHeight, MARGIN_LEFT + CONTENT_WIDTH, tableStartY + headerRowHeight);
 
     yPos += dataRowHeight + 25;
@@ -491,33 +491,26 @@ function renderServiceSection(
     yPos += 13;
   });
 
+  // ✅ COMBINED SECTION: Équipements + Produits spécifiques
   yPos += 8;
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
-  doc.text('2- Équipements utilisés:', MARGIN_LEFT, yPos);
+  doc.text('2- Équipements et produits spécifiques utilisés:', MARGIN_LEFT, yPos);
   yPos += 14;
   
   doc.setFont('Poppins', 'normal');
   doc.setFontSize(9);
   setColor(doc, TEXT_DARK);
+  
+  // First, render equipment
   prestation.equipementsUtilises.forEach((item) => {
     doc.text(`• ${item}`, MARGIN_LEFT + 10, yPos);
     yPos += 13;
   });
-
-  // 3. Produits spécifiques (NEW - based on materials)
+  
+  // Then, render material-specific products if they exist
   if (prestation.produitsSpecifiques && prestation.produitsSpecifiques.length > 0) {
-    yPos += 8;
-    doc.setFont('Poppins', 'bold');
-    doc.setFontSize(10);
-    setColor(doc, BLUE_PRIMARY);
-    doc.text('3- Produits spécifiques aux matériaux:', MARGIN_LEFT, yPos);
-    yPos += 14;
-    
-    doc.setFont('Poppins', 'normal');
-    doc.setFontSize(9);
-    setColor(doc, TEXT_DARK);
     prestation.produitsSpecifiques.forEach((item) => {
       const lines = doc.splitTextToSize(`• ${item}`, CONTENT_WIDTH - 20);
       lines.forEach((line: string) => {
@@ -527,13 +520,12 @@ function renderServiceSection(
     });
   }
 
-  // 4. Prestations (renumbered)
+  // 3. Prestations (renumbered to 3)
   yPos += 8;
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
-  const prestationNumber = prestation.produitsSpecifiques && prestation.produitsSpecifiques.length > 0 ? '4' : '3';
-  doc.text(`${prestationNumber}- Détail des prestations:`, MARGIN_LEFT, yPos);
+  doc.text('3- Détail des prestations:', MARGIN_LEFT, yPos);
   yPos += 14;
   
   doc.setFont('Poppins', 'normal');
@@ -547,13 +539,12 @@ function renderServiceSection(
     });
   });
 
-  // 5. Délai (renumbered)
+  // 4. Délai (renumbered to 4)
   yPos += 8;
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
   setColor(doc, BLUE_PRIMARY);
-  const delaiNumber = prestation.produitsSpecifiques && prestation.produitsSpecifiques.length > 0 ? '5' : '4';
-  doc.text(`${delaiNumber}- Délai prévu de la prestation:`, MARGIN_LEFT, yPos);
+  doc.text('4- Délai prévu de la prestation:', MARGIN_LEFT, yPos);
   yPos += 14;
   
   doc.setFont('Poppins', 'normal');
@@ -790,29 +781,40 @@ export function prepareQuotePDFData(
   const vatAmount = Number(quote.vatAmount) || (subTotalHT * 0.20);
   const totalTTC = docType === 'FACTURE' ? (subTotalHT + vatAmount) : subTotalHT;
 
-  // Calculate deposit amount (30% for B2C, 40% for B2B)
-  const depositPercentage = isB2B ? 40 : 30;
+  // ✅ FIXED: Acompte unifié à 30% pour TOUS les cas
+  const depositPercentage = 30; // TOUJOURS 30% (SERVICE/PRODUCT, B2B/B2C)
   const depositAmount = (subTotalHT * depositPercentage) / 100;
 
-  // Payment configuration with dynamic deposit calculation
+  // ✅ FIXED: Proper payment conditions logic based on businessType and isB2B
   let paymentConfig;
   if (docType === 'FACTURE') {
     paymentConfig = quote.businessType === 'SERVICE' 
       ? pdfContent.paymentConditions.FACTURE_SERVICE
       : (pdfContent.paymentConditions.FACTURE_PRODUIT || pdfContent.paymentConditions.FACTURE_SERVICE);
   } else {
-    // For DEVIS, create dynamic payment conditions with deposit amount
-    const baseConditions = isB2B
-      ? pdfContent.paymentConditions.DEVIS_SERVICE_PRO || pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER
-      : pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER;
+    // For DEVIS, choose based on businessType AND isB2B
+    if (quote.businessType === 'SERVICE') {
+      paymentConfig = isB2B
+        ? (pdfContent.paymentConditions.DEVIS_SERVICE_PRO || pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER)
+        : pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER;
+    } else {
+      // PRODUCT
+      paymentConfig = isB2B
+        ? (pdfContent.paymentConditions.DEVIS_PRODUIT_PRO || pdfContent.paymentConditions.DEVIS_PRODUIT_PARTICULIER)
+        : (pdfContent.paymentConditions.DEVIS_PRODUIT_PARTICULIER || pdfContent.paymentConditions.DEVIS_SERVICE_PARTICULIER);
+    }
 
-    // Create dynamic deposit text
-    const depositText = isB2B
-      ? `Un acompte de ${depositPercentage}% du montant total, soit la somme de ${formatCurrency(depositAmount)}, exigible à la signature pour début des prestations.`
-      : `Un acompte de ${depositPercentage}% du montant total, soit la somme de ${formatCurrency(depositAmount)}, payable à la signature pour validation de commande.`;
+    // ✅ Create dynamic deposit text with 30% for all cases
+    let depositText = '';
+    if (quote.businessType === 'SERVICE') {
+      depositText = `Un acompte de ${depositPercentage}% du montant total, soit la somme de ${formatCurrency(depositAmount)}, exigible à la signature pour début des prestations.`;
+    } else {
+      // PRODUCT
+      depositText = `Un acompte de ${depositPercentage}% du montant total, soit la somme de ${formatCurrency(depositAmount)}, exigible à la commande.`;
+    }
 
     // Replace the generic deposit condition with the specific one
-    const dynamicConditions = baseConditions.conditions.map((condition: string) => {
+    const dynamicConditions = paymentConfig.conditions.map((condition: string) => {
       // Replace any existing deposit condition with our dynamic one
       if (condition.includes('acompte') || condition.includes('%')) {
         return depositText;
@@ -821,16 +823,13 @@ export function prepareQuotePDFData(
     });
 
     paymentConfig = {
-      title: baseConditions.title,
+      title: paymentConfig.title,
       conditions: dynamicConditions
     };
   }
 
+  // ✅ FIXED: Remove purchase order duplication - DO NOT add to payment conditions
   const paymentConditions = [...paymentConfig.conditions];
-  if (quote.purchaseOrderNumber && quote.orderedBy) {
-    paymentConditions.unshift(`Commandé par: ${quote.orderedBy}`);
-    paymentConditions.unshift(`Bon de commande: ${quote.purchaseOrderNumber}`);
-  }
 
   const result: QuotePDFData = {
     docType,

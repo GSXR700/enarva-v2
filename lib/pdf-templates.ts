@@ -132,8 +132,8 @@ export interface ServiceTemplate {
   defaultPrestations: string[];
   defaultEquipments: string[];
   teamSizeCalculation: (surface: number) => number;
-  priceCalculation?: (surface: number, difficulty: string) => number;
-  displayType: 'DETAILED' | 'TABLE' | 'MIXED';
+  priceCalculation?: (surface: number) => number;
+  displayType: 'TABLE' | 'DETAILED';
 }
 
 export const SERVICE_TEMPLATES: Record<string, ServiceTemplate> = {
@@ -141,93 +141,79 @@ export const SERVICE_TEMPLATES: Record<string, ServiceTemplate> = {
     serviceType: 'FIN_DE_CHANTIER',
     label: 'Nettoyage Fin de chantier',
     defaultPrestations: [
-      'Nettoyage et dépoussiérage des plafonds, placards, façades, rideaux et embrasures',
-      'Nettoyage ciblé des résidus sur toutes les surfaces (murs, sols, vitres, plinthes)',
-      'Nettoyage des interrupteurs, prises, poignées et rampes',
-      'Détartrage et désinfection des sanitaires (lavabos, douches, WC, baignoires)',
-      'Nettoyage de cuisine : placards, plan de travail, crédences, électroménagers encastrés',
-      'Nettoyage complet des vitres et encadrement avec enlèvement des traces de chantier',
-      'Entretien et traitement des sols en fonction de leur type'
+      'Dépoussiérage complet (plafonds, menuiseries, façades, rideaux), élimination des résidus de chantier',
+      'Détartrage et désinfection des sanitaires et de la cuisine, nettoyage des vitres et encadrements'
     ],
     defaultEquipments: [
-      'Aspirateur professionnel haute puissance',
-      'Monobrosse pour sols durs',
-      'Nettoyeur vapeur industriel',
-      'Échafaudages et échelles télescopiques',
-      'Produits décapants écologiques',
-      'Désinfectants professionnels certifiés'
+      'Aspirateurs professionnels eau et poussière, monobrosse TASKI multi-vitesses et nettoyeur vapeur EMILIO-RA',
+      'Matériel général de ménage et de désinfection, échelles et équipements d\'accès en hauteur'
     ],
-    teamSizeCalculation: (_surface: number) => Math.ceil(_surface / 50),
+    teamSizeCalculation: (surface: number) => Math.ceil(surface / 80),
     displayType: 'DETAILED'
   },
-  GRAND_MENAGE: {
-    serviceType: 'GRAND_MENAGE',
-    label: 'Grand Ménage',
+  REMISE_EN_ETAT: {
+    serviceType: 'REMISE_EN_ETAT',
+    label: 'Remise en état',
     defaultPrestations: [
-      'Dépoussiérage approfondi de toutes les surfaces',
-      'Nettoyage complet des vitres intérieures et extérieures',
-      'Désinfection complète de la cuisine et des sanitaires',
-      'Aspiration et nettoyage de tous les sols',
-      'Nettoyage des placards intérieurs',
-      'Élimination des toiles d\'araignées',
-      'Nettoyage des luminaires'
+      'Nettoyage en profondeur de toutes les surfaces',
+      'Décapage et traitement des sols',
+      'Désinfection complète',
+      'Élimination des taches tenaces'
     ],
     defaultEquipments: [
-      'Aspirateur professionnel',
-      'Nettoyeur vapeur',
-      'Produits de nettoyage multi-surfaces',
-      'Matériel de nettoyage vitres',
-      'Désinfectants pour sanitaires'
+      'Mono-brosse professionnelle',
+      'Autolaveuse industrielle',
+      'Équipement de décapage',
+      'Produits professionnels adaptés'
     ],
-    teamSizeCalculation: (_surface: number) => Math.ceil(_surface / 70),
+    teamSizeCalculation: (surface: number) => Math.ceil(surface / 70),
     displayType: 'DETAILED'
   },
-  NETTOYAGE_STANDARD: {
-    serviceType: 'NETTOYAGE_STANDARD',
-    label: 'Nettoyage Standard',
+  NETTOYAGE_CANAPES: {
+    serviceType: 'NETTOYAGE_CANAPES',
+    label: 'Nettoyage de canapés',
     defaultPrestations: [
-      'Dépoussiérage des surfaces',
-      'Aspiration des sols',
-      'Lavage des sols',
-      'Nettoyage des sanitaires',
-      'Vider les poubelles'
+      'Aspiration et dépoussiérage complet',
+      'Détachage ciblé des taches',
+      'Nettoyage en profondeur à la vapeur',
+      'Désodorisation et protection textile'
     ],
     defaultEquipments: [
-      'Aspirateur standard',
-      'Matériel de lavage sols',
-      'Produits de nettoyage basiques'
+      'Nettoyeur vapeur professionnel',
+      'Injecteur-extracteur textile',
+      'Produits spécialisés tissus',
+      'Matériel de détachage professionnel'
     ],
-    teamSizeCalculation: (_surface: number) => Math.ceil(_surface / 100),
+    teamSizeCalculation: (_surface: number) => 2,
     displayType: 'TABLE'
   },
-  NETTOYAGE_BUREAUX: {
-    serviceType: 'NETTOYAGE_BUREAUX',
-    label: 'Nettoyage Bureaux',
+  NETTOYAGE_MOQUETTES: {
+    serviceType: 'NETTOYAGE_MOQUETTES',
+    label: 'Nettoyage de moquettes',
     defaultPrestations: [
-      'Dépoussiérage des postes de travail',
-      'Aspiration des sols et moquettes',
-      'Nettoyage des sanitaires',
-      'Vider les corbeilles',
-      'Nettoyage des espaces communs'
+      'Aspiration haute puissance',
+      'Pré-traitement des taches',
+      'Injection-extraction profonde',
+      'Séchage et brossage final'
     ],
     defaultEquipments: [
-      'Aspirateur professionnel',
-      'Matériel de dépoussiérage',
-      'Produits de nettoyage bureaux',
-      'Matériel désinfection'
+      'Aspirateur industriel',
+      'Injecteur-extracteur professionnel',
+      'Produits spécialisés moquettes',
+      'Ventilateurs de séchage'
     ],
-    teamSizeCalculation: (_surface: number) => Math.ceil(_surface / 80),
+    teamSizeCalculation: (surface: number) => Math.ceil(surface / 100),
     displayType: 'TABLE'
   },
-  CRISTALLISATION_MARBRE: {
-    serviceType: 'CRISTALLISATION_MARBRE',
-    label: 'Cristallisation de marbre',
+  DECAPAGE_CRISTALLISATION: {
+    serviceType: 'DECAPAGE_CRISTALLISATION',
+    label: 'Décapage et cristallisation',
     defaultPrestations: [
-      'Préparation et nettoyage initial du marbre',
-      'Ponçage et polissage professionnel',
+      'Décapage complet du revêtement',
+      'Nettoyage en profondeur',
       'Application de cristallisant',
-      'Lustrage haute brillance',
-      'Protection finale'
+      'Polissage haute brillance',
+      'Protection longue durée'
     ],
     defaultEquipments: [
       'Monobrosse professionnelle',
@@ -283,27 +269,39 @@ export interface PaymentConditionTemplate {
 }
 
 export const PAYMENT_CONDITIONS: Record<string, PaymentConditionTemplate> = {
+  // ========== DEVIS SERVICE ==========
   DEVIS_SERVICE_PARTICULIER: {
     title: "Conditions de paiement :",
     conditions: [
       "Les règlements peuvent être effectués par virement bancaire, par chèque ou en espèces.",
-      "Un acompte de 30% est demandé à l'initiation du travail."
+      "Un acompte de 30% du montant total est exigible à la signature pour début des prestations."
     ]
   },
   DEVIS_SERVICE_PRO: {
     title: "Conditions de paiement :",
     conditions: [
       "Paiement à 30 jours fin de mois.",
-      "Un acompte de 40% est demandé à la signature du contrat."
+      "Un acompte de 30% du montant total est exigible à la signature pour début des prestations."
+    ]
+  },
+
+  // ========== DEVIS PRODUIT ==========
+  DEVIS_PRODUIT_PARTICULIER: {
+    title: "Conditions de paiement :",
+    conditions: [
+      "Les règlements peuvent être effectués par virement bancaire, par chèque ou en espèces.",
+      "Un acompte de 30% du montant total est exigible à la commande."
     ]
   },
   DEVIS_PRODUIT_PRO: {
     title: "Conditions de paiement :",
     conditions: [
       "Paiement à 30 jours fin de mois.",
-      "Un acompte de 50% est demandé à la commande."
+      "Un acompte de 30% du montant total est exigible à la commande."
     ]
   },
+
+  // ========== FACTURE SERVICE ==========
   FACTURE_SERVICE: {
     title: "Observations générales :",
     conditions: [
@@ -311,14 +309,18 @@ export const PAYMENT_CONDITIONS: Record<string, PaymentConditionTemplate> = {
       "La présente facture vaut titre exécutoire en cas de non-paiement."
     ]
   },
+
+  // ========== FACTURE PRODUIT ==========
   FACTURE_PRODUIT: {
     title: "Observations générales :",
     conditions: [
-      "Toute réclamation doit être signalée sous 48h après réception.",
-      "La présente facture vaut titre exécutoire en cas de non-paiement.",
-      "Aucun retour de marchandise ne sera accepté sans accord préalable."
+      "Toute réclamation doit être signalée sous 48h après la livraison.",
+      "Les marchandises voyagent aux risques et périls du destinataire.",
+      "La présente facture vaut titre exécutoire en cas de non-paiement."
     ]
   },
+
+  // ========== BON DE LIVRAISON ==========
   BON_LIVRAISON: {
     title: "Observations générales :",
     conditions: [
@@ -396,21 +398,24 @@ export function getPaymentConditions(
     if (businessType === 'SERVICE') {
       return PAYMENT_CONDITIONS['FACTURE_SERVICE'] ?? defaultConditions;
     }
-    return PAYMENT_CONDITIONS['FACTURE_PRODUIT'] ?? PAYMENT_CONDITIONS['FACTURE_SERVICE'] ?? defaultConditions;
+    return PAYMENT_CONDITIONS['FACTURE_PRODUIT'] ?? defaultConditions;
   }
   
   if (docType === 'BON_LIVRAISON') {
     return PAYMENT_CONDITIONS['BON_LIVRAISON'] ?? defaultConditions;
   }
   
-  if (isB2B) {
-    if (businessType === 'SERVICE') {
-      return PAYMENT_CONDITIONS['DEVIS_SERVICE_PRO'] ?? PAYMENT_CONDITIONS['DEVIS_SERVICE_PARTICULIER'] ?? defaultConditions;
-    }
-    return PAYMENT_CONDITIONS['DEVIS_PRODUIT_PRO'] ?? PAYMENT_CONDITIONS['DEVIS_SERVICE_PARTICULIER'] ?? defaultConditions;
+  // DEVIS
+  if (businessType === 'SERVICE') {
+    return isB2B 
+      ? (PAYMENT_CONDITIONS['DEVIS_SERVICE_PRO'] ?? defaultConditions)
+      : (PAYMENT_CONDITIONS['DEVIS_SERVICE_PARTICULIER'] ?? defaultConditions);
   }
   
-  return PAYMENT_CONDITIONS['DEVIS_SERVICE_PARTICULIER'] ?? defaultConditions;
+  // PRODUCT
+  return isB2B 
+    ? (PAYMENT_CONDITIONS['DEVIS_PRODUIT_PRO'] ?? defaultConditions)
+    : (PAYMENT_CONDITIONS['DEVIS_PRODUIT_PARTICULIER'] ?? defaultConditions);
 }
 
 export function getPropertyTypeLabel(propertyType: string | null): string {
