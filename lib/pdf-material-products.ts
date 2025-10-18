@@ -73,7 +73,7 @@ export const MATERIAL_PRODUCTS: Record<string, MaterialProduct[]> = {
   // Carrelage (Tiles)
   tiles: [
     {
-      name: "Détergent dégraissant sols - Anti-calcaire sanitaires",
+      name: "Détergent dégraissant sols carrelés",
       description: "Nettoyant puissant pour carrelage",
       unit: "L",
       category: "CLEANING_PRODUCTS"

@@ -162,7 +162,7 @@ export function loadPDFContent(): any {
           "Détartrage et désinfection des sanitaires et de la cuisine, nettoyage des vitres et encadrements"
         ],
         equipementsUtilises: [
-          "Aspirateurs professionnels eau et poussière, monobrosse TASKI multi-vitesses et nettoyeur vapeur EMILIO-RA Plus",
+          "Aspirateurs professionnels eau et poussière, monobrosse TASKI multi-vitesses et nettoyeur vapeur EMILIO-RA",
           "Matériel général de ménage et de désinfection, échelles et équipements d'accès en hauteur"
         ],
         personnelSuggestions: { baseTeamSize: 2, perSquareMeter: 50 }
