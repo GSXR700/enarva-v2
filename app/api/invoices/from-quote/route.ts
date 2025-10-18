@@ -1,4 +1,4 @@
-// app/api/invoices/from-quote/route.ts - COMPLETE VERSION WITH F-NUM/YEAR FORMAT
+// app/api/invoices/from-quote/route.ts - FIXED WITH PROPER ERROR HANDLING
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -11,31 +11,36 @@ const prisma = new PrismaClient();
 async function generateInvoiceNumber(): Promise<string> {
   const year = new Date().getFullYear();
   
-  // Get the count of invoices created this year
-  const invoiceCount = await prisma.invoice.count({
-    where: {
-      invoiceNumber: {
-        endsWith: `/${year}`
+  try {
+    // Get the count of invoices created this year
+    const invoiceCount = await prisma.invoice.count({
+      where: {
+        invoiceNumber: {
+          endsWith: `/${year}`
+        }
       }
-    }
-  });
-  
-  const nextNumber = invoiceCount + 1;
-  return `F-${nextNumber}/${year}`;
+    });
+    
+    const nextNumber = invoiceCount + 1;
+    return `F-${nextNumber}/${year}`;
+  } catch (error) {
+    console.error('Error generating invoice number:', error);
+    throw error;
+  }
 }
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return new NextResponse('Unauthorized', { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const { quoteId } = body;
 
     if (!quoteId) {
-      return new NextResponse('Quote ID is required', { status: 400 });
+      return NextResponse.json({ error: 'Quote ID is required' }, { status: 400 });
     }
 
     console.log('📝 Creating invoice from quote:', quoteId);
@@ -65,7 +70,7 @@ export async function POST(request: Request) {
     });
 
     if (!quote) {
-      return new NextResponse('Quote not found', { status: 404 });
+      return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
     }
 
     // Check if invoice already exists for this quote
@@ -96,6 +101,8 @@ export async function POST(request: Request) {
     // Generate invoice number in F-NUM/YEAR format
     const invoiceNumber = await generateInvoiceNumber();
     const amount = new Decimal(quote.finalPrice.toString());
+
+    console.log('📄 Generating invoice:', invoiceNumber, 'for amount:', amount.toString());
 
     // Create invoice
     const invoice = await prisma.invoice.create({
@@ -184,7 +191,14 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('❌ Failed to create invoice from quote:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    
+    // Return proper JSON error response
+    return NextResponse.json({ 
+      error: 'Internal Server Error',
+      message: error instanceof Error ? error.message : 'Une erreur est survenue',
+      details: process.env.NODE_ENV === 'development' ? error : undefined
+    }, { status: 500 });
+    
   } finally {
     await prisma.$disconnect();
   }
