@@ -283,20 +283,42 @@ export function loadPDFContent(): any {
         title: "Conditions de paiement :",
         conditions: [
           "Les règlements peuvent être effectués par virement bancaire, par chèque ou en espèces.",
-          "Un acompte de 30% est demandé à l'initiation du travail."
+          "Un acompte de 30% du montant total est exigible à la signature pour début des prestations."
         ]
       },
       DEVIS_SERVICE_PRO: {
         title: "Conditions de paiement :",
         conditions: [
           "Paiement à 30 jours fin de mois.",
-          "Un acompte de 40% est demandé à la signature du contrat."
+          "Un acompte de 30% du montant total est exigible à la signature pour début des prestations."
+        ]
+      },
+      DEVIS_PRODUIT_PARTICULIER: {
+        title: "Conditions de paiement :",
+        conditions: [
+          "Les règlements peuvent être effectués par virement bancaire, par chèque ou en espèces.",
+          "Un acompte de 30% du montant total est exigible à la commande."
+        ]
+      },
+      DEVIS_PRODUIT_PRO: {
+        title: "Conditions de paiement :",
+        conditions: [
+          "Paiement à 30 jours fin de mois.",
+          "Un acompte de 30% du montant total est exigible à la commande."
         ]
       },
       FACTURE_SERVICE: {
         title: "Observations générales :",
         conditions: [
           "Toute réclamation doit être signalée sous 24 heures après la fin de l'intervention.",
+          "La présente facture vaut titre exécutoire en cas de non-paiement."
+        ]
+      },
+      FACTURE_PRODUIT: {
+        title: "Observations générales :",
+        conditions: [
+          "Toute réclamation doit être signalée sous 48h après la livraison.",
+          "Les marchandises voyagent aux risques et périls du destinataire.",
           "La présente facture vaut titre exécutoire en cas de non-paiement."
         ]
       }
