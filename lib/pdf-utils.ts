@@ -158,13 +158,11 @@ export function loadPDFContent(): any {
       FIN_DE_CHANTIER: {
         label: "Nettoyage Fin de chantier",
         prestationsIncluses: [
-          "Dépoussiérage complet (plafonds, placards, façades, rideaux) et nettoyage des points de contact",
-          "Nettoyage ciblé des résidus de chantier sur toutes les surfaces (murs, sols, plinthes)",
-          "Détartrage et désinfection approfondis des sanitaires et de la cuisine (placards, plans de travail)",
-          "Nettoyage complet des vitres et encadrements, et traitement spécifique de tous les types de sols"
+          "Dépoussiérage complet (plafonds, menuiseries, façades, rideaux), élimination des résidus de chantier",
+          "Détartrage et désinfection des sanitaires et de la cuisine, nettoyage des vitres et encadrements"
         ],
         equipementsUtilises: [
-          "Aspirateurs professionnels eau et poussière, monobrosse TASKI multi-vitesses pour sols durs et nettoyeur vapeur EMILIO-RA Plus",
+          "Aspirateurs professionnels eau et poussière, monobrosse TASKI multi-vitesses et nettoyeur vapeur EMILIO-RA Plus",
           "Matériel général de ménage et de désinfection, échelles et équipements d'accès en hauteur"
         ],
         personnelSuggestions: { baseTeamSize: 2, perSquareMeter: 50 }
