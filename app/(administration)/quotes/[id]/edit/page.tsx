@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, FileText, Save, AlertCircle, Search, Plus, Package } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/Switch'
+import { ArrowLeft, FileText, Save, AlertCircle, Search, Plus, Package, X } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-//import { validateCompleteQuoteInput  } from '@/lib/validations'
-import { Quote, Lead, QuoteStatus, QuoteType, PropertyType, UrgencyLevel } from '@prisma/client'
+import { Quote, Lead, QuoteStatus, QuoteType, PropertyType, UrgencyLevel, QuoteBusinessType } from '@prisma/client'
 import { toast } from 'sonner'
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton'
 
@@ -29,7 +30,15 @@ interface EditableLineItem {
   serviceType?: string;
 }
 
-// Services prédéfinis avec "Fin de chantier"
+interface ProductItem {
+  id: string;
+  name: string;
+  qty: number;
+  unitPrice: number;
+  description?: string;
+  reference?: string;
+}
+
 const PREDEFINED_SERVICES = [
   'Grand Ménage',
   'Nettoyage Standard',
@@ -39,7 +48,8 @@ const PREDEFINED_SERVICES = [
   'Fin de chantier',
   'Nettoyage Bureaux',
   'Nettoyage Commercial',
-  'Entretien Régulier'
+  'Entretien Régulier',
+  'Cristallisation Marbre'
 ];
 
 export default function EditQuotePage() {
@@ -48,13 +58,14 @@ export default function EditQuotePage() {
   const quoteId = params.id as string;
 
   const [quote, setQuote] = useState<QuoteWithLead | null>(null);
+  const [businessType, setBusinessType] = useState<QuoteBusinessType>('SERVICE');
   const [editableLineItems, setEditableLineItems] = useState<EditableLineItem[]>([]);
+  const [productItems, setProductItems] = useState<ProductItem[]>([]);
   const [status, setStatus] = useState<QuoteStatus>('DRAFT');
   const [type, setType] = useState<QuoteType>('STANDARD');
   const [expiresAt, setExpiresAt] = useState('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   
-  // Unified fields - NO MORE REDUNDANCY
   const [quoteFields, setQuoteFields] = useState({
     serviceType: '',
     propertyType: '' as PropertyType | '',
@@ -62,10 +73,13 @@ export default function EditQuotePage() {
     levels: '1',
     address: '',
     urgencyLevel: '' as UrgencyLevel | '',
-    budgetRange: ''
+    budgetRange: '',
+    productCategory: '',
+    deliveryType: 'STANDARD_DELIVERY',
+    deliveryAddress: '',
+    deliveryNotes: ''
   });
 
-  // Materials Selection State - ADDED
   const [selectedMaterials, setSelectedMaterials] = useState<{
     marble: boolean;
     parquet: boolean;
@@ -90,7 +104,10 @@ export default function EditQuotePage() {
     other: ''
   });
 
-  // Service search functionality
+  const [enablePurchaseOrder, setEnablePurchaseOrder] = useState(false);
+  const [purchaseOrderNumber, setPurchaseOrderNumber] = useState('');
+  const [orderedBy, setOrderedBy] = useState('');
+
   const [serviceSearch, setServiceSearch] = useState('');
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
   const [filteredServices, setFilteredServices] = useState(PREDEFINED_SERVICES);
@@ -98,7 +115,13 @@ export default function EditQuotePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Filter services based on search
+  const isB2BClient = useMemo(() => {
+    if (quote?.lead) {
+      return quote.lead.leadType !== 'PARTICULIER'
+    }
+    return false
+  }, [quote]);
+
   useEffect(() => {
     if (serviceSearch) {
       const filtered = PREDEFINED_SERVICES.filter(service =>
@@ -133,6 +156,26 @@ export default function EditQuotePage() {
     }
   };
 
+  const parseProductItems = (items: any): ProductItem[] => {
+    if (!items) return [];
+    
+    try {
+      let parsedItems = Array.isArray(items) ? items : JSON.parse(items);
+      
+      return parsedItems.map((item: any, index: number) => ({
+        id: item.id || `product-${index}`,
+        name: item.designation || item.description || item.name || `Produit ${index + 1}`,
+        qty: parseFloat(item.quantity || item.qty || 1),
+        unitPrice: parseFloat(item.unitPrice || 0),
+        description: item.detail || item.description || '',
+        reference: item.reference || ''
+      }));
+    } catch (error) {
+      console.error('Error parsing product items:', error);
+      return [];
+    }
+  };
+
   const fetchQuote = useCallback(async () => {
     try {
       const response = await fetch(`/api/quotes/${quoteId}`);
@@ -140,14 +183,37 @@ export default function EditQuotePage() {
       const data = await response.json();
       setQuote(data);
 
-      const parsedLineItems = parseQuoteLineItems(data.lineItems);
-      setEditableLineItems(parsedLineItems);
+      setBusinessType(data.businessType || 'SERVICE');
+
+      if (data.businessType === 'PRODUCT') {
+        const parsedProducts = data.productDetails?.items 
+          ? parseProductItems(data.productDetails.items)
+          : parseProductItems(data.lineItems);
+        setProductItems(parsedProducts);
+        
+        setQuoteFields(prev => ({
+          ...prev,
+          productCategory: data.productCategory || '',
+          deliveryType: data.deliveryType || 'STANDARD_DELIVERY',
+          deliveryAddress: data.deliveryAddress || '',
+          deliveryNotes: data.deliveryNotes || ''
+        }));
+
+        if (data.purchaseOrderNumber) {
+          setEnablePurchaseOrder(true);
+          setPurchaseOrderNumber(data.purchaseOrderNumber);
+          setOrderedBy(data.orderedBy || '');
+        }
+      } else {
+        const parsedLineItems = parseQuoteLineItems(data.lineItems);
+        setEditableLineItems(parsedLineItems);
+      }
       
       setStatus(data.status);
       setType(data.type || 'STANDARD');
       
-      // OPTIMIZED: Single unified fields object (no more redundancy)
-      setQuoteFields({
+      setQuoteFields(prev => ({
+        ...prev,
         serviceType: data.serviceType || '',
         propertyType: data.propertyType || data.lead.propertyType || '',
         surface: data.surface?.toString() || data.lead.estimatedSurface?.toString() || '',
@@ -155,9 +221,8 @@ export default function EditQuotePage() {
         address: data.lead.address || '',
         urgencyLevel: data.lead.urgencyLevel || '',
         budgetRange: data.lead.budgetRange || ''
-      });
+      }));
 
-      // ADDED: Load materials from quote or lead
       if (data.materials && typeof data.materials === 'object') {
         setSelectedMaterials({
           marble: data.materials.marble || false,
@@ -172,7 +237,6 @@ export default function EditQuotePage() {
           other: data.materials.other || ''
         });
       } else if (data.lead.materials && typeof data.lead.materials === 'object') {
-        // Fallback to lead materials if quote doesn't have any
         setSelectedMaterials({
           marble: data.lead.materials.marble || false,
           parquet: data.lead.materials.parquet || false,
@@ -187,7 +251,6 @@ export default function EditQuotePage() {
         });
       }
 
-      // Set expiration date
       if (data.expiresAt) {
         const expirationDate = new Date(data.expiresAt);
         const isoString = expirationDate.toISOString();
@@ -209,7 +272,6 @@ export default function EditQuotePage() {
     fetchQuote();
   }, [fetchQuote]);
 
-  // OPTIMIZED: Single handler for all fields
   const handleFieldChange = (field: keyof typeof quoteFields, value: string) => {
     setQuoteFields(prev => ({ 
       ...prev, 
@@ -217,7 +279,6 @@ export default function EditQuotePage() {
     }));
   };
 
-  // ADDED: Material change handler
   const handleMaterialChange = (material: string, value: boolean | string) => {
     setSelectedMaterials(prev => ({
       ...prev,
@@ -257,6 +318,32 @@ export default function EditQuotePage() {
     );
   };
 
+  const updateProduct = (id: string, field: keyof ProductItem, value: any) => {
+    setProductItems(current =>
+      current.map(item =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    )
+  };
+
+  const addProduct = () => {
+    const newProduct: ProductItem = {
+      id: Date.now().toString(),
+      name: '',
+      qty: 1,
+      unitPrice: 0,
+      description: '',
+      reference: ''
+    }
+    setProductItems(current => [...current, newProduct])
+  };
+
+  const removeProduct = (id: string) => {
+    if (productItems.length > 1) {
+      setProductItems(current => current.filter(item => item.id !== id))
+    }
+  };
+
   const addNewService = () => {
     const newService = {
       id: `new-${Date.now()}`,
@@ -276,15 +363,22 @@ export default function EditQuotePage() {
   };
 
   const removeLineItem = (id: string) => {
-    setEditableLineItems(prev => prev.filter(item => item.id !== id));
+    if (editableLineItems.length > 1) {
+      setEditableLineItems(prev => prev.filter(item => item.id !== id));
+    }
   };
 
   const finalQuote = useMemo(() => {
-    if (editableLineItems.length === 0) {
-      return { lineItems: [], subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 };
+    let items = businessType === 'SERVICE' ? editableLineItems : productItems.map(p => ({
+      ...p,
+      totalPrice: p.qty * p.unitPrice
+    }));
+    
+    if (items.length === 0) {
+      return { lineItems: items, subTotalHT: 0, vatAmount: 0, totalTTC: 0, finalPrice: 0 };
     }
     
-    const subTotalHT = editableLineItems.reduce((acc, item) => acc + item.totalPrice, 0);
+    const subTotalHT = items.reduce((acc, item) => acc + (item.totalPrice || 0), 0);
     const vatAmount = subTotalHT * 0.20;
     let totalTTC = subTotalHT + vatAmount;
     
@@ -293,13 +387,13 @@ export default function EditQuotePage() {
     const finalPrice = Math.round(totalTTC / 10) * 10;
     
     return { 
-      lineItems: editableLineItems, 
+      lineItems: items, 
       subTotalHT, 
       vatAmount, 
       totalTTC, 
       finalPrice 
     };
-  }, [editableLineItems]);
+  }, [editableLineItems, productItems, businessType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -308,14 +402,22 @@ export default function EditQuotePage() {
     
     try {
       const surfaceValue = parseFloat(quoteFields.surface) || undefined;
-
-      // Check if any materials are selected
-      const hasMaterials = Object.entries(selectedMaterials).some(([key, value]) => 
+      const hasMaterials = businessType === 'SERVICE' && Object.entries(selectedMaterials).some(([key, value]) => 
         key !== 'other' ? value === true : value !== ''
       );
 
-      const quotePayload = {
-        lineItems: editableLineItems.map(item => ({
+      let quotePayload: any = {
+        subTotalHT: finalQuote.subTotalHT,
+        vatAmount: finalQuote.vatAmount,
+        totalTTC: finalQuote.totalTTC,
+        finalPrice: finalQuote.finalPrice,
+        status,
+        type,
+        expiresAt: new Date(expiresAt).toISOString()
+      };
+
+      if (businessType === 'SERVICE') {
+        quotePayload.lineItems = editableLineItems.map(item => ({
           id: item.id,
           designation: item.description,
           description: item.detail,
@@ -323,32 +425,54 @@ export default function EditQuotePage() {
           unitPrice: item.unitPrice || 0,
           totalPrice: item.totalPrice || 0,
           serviceType: item.serviceType
-        })),
-        subTotalHT: finalQuote.subTotalHT,
-        vatAmount: finalQuote.vatAmount,
-        totalTTC: finalQuote.totalTTC,
-        finalPrice: finalQuote.finalPrice,
-        status,
-        type,
-        surface: surfaceValue,
-        levels: parseInt(quoteFields.levels) || 1,
-        serviceType: quoteFields.serviceType || undefined,
-        propertyType: quoteFields.propertyType || undefined,
-        materials: hasMaterials ? selectedMaterials : null,
-        expiresAt: new Date(expiresAt).toISOString()
-      };
+        }));
+        quotePayload.surface = surfaceValue;
+        quotePayload.levels = parseInt(quoteFields.levels) || 1;
+        quotePayload.serviceType = quoteFields.serviceType || undefined;
+        quotePayload.propertyType = quoteFields.propertyType || undefined;
+        quotePayload.materials = hasMaterials ? selectedMaterials : null;
+      } else {
+        quotePayload.lineItems = productItems
+          .filter(item => item.name.trim())
+          .map(item => ({
+            id: item.id,
+            designation: item.name,
+            description: item.description,
+            quantity: item.qty,
+            unitPrice: item.unitPrice,
+            totalPrice: item.qty * item.unitPrice,
+            reference: item.reference
+          }));
+        quotePayload.productCategory = quoteFields.productCategory || 'OTHER';
+        quotePayload.productDetails = {
+          items: productItems.filter(item => item.name.trim()),
+          category: quoteFields.productCategory
+        };
+        quotePayload.deliveryType = quoteFields.deliveryType || 'STANDARD_DELIVERY';
+        quotePayload.deliveryAddress = quoteFields.deliveryAddress || null;
+        quotePayload.deliveryNotes = quoteFields.deliveryNotes || null;
 
-      // OPTIMIZED: Lead payload with unified fields
-      const leadPayload = {
+        if (enablePurchaseOrder && isB2BClient) {
+          quotePayload.purchaseOrderNumber = purchaseOrderNumber.trim() || null;
+          quotePayload.orderedBy = orderedBy.trim() || null;
+        } else {
+          quotePayload.purchaseOrderNumber = null;
+          quotePayload.orderedBy = null;
+        }
+      }
+
+      const leadPayload: any = {
         estimatedSurface: parseInt(quoteFields.surface) || undefined,
         propertyType: quoteFields.propertyType || undefined,
         address: quoteFields.address || undefined,
         urgencyLevel: quoteFields.urgencyLevel || undefined,
-        budgetRange: quoteFields.budgetRange || undefined,
-        materials: hasMaterials ? selectedMaterials : undefined
+        budgetRange: quoteFields.budgetRange || undefined
       };
 
-      // Update quote
+      if (businessType === 'SERVICE' && hasMaterials) {
+        leadPayload.materials = selectedMaterials;
+      }
+
       const response = await fetch(`/api/quotes/${quoteId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -360,7 +484,6 @@ export default function EditQuotePage() {
         throw new Error(errorData.message || 'Échec de la mise à jour du devis.');
       }
 
-      // Update lead if there are changes
       const hasLeadChanges = Object.values(leadPayload).some(value => value !== undefined);
       if (hasLeadChanges && quote?.leadId) {
         const leadResponse = await fetch(`/api/leads/${quote.leadId}`, {
@@ -428,7 +551,7 @@ export default function EditQuotePage() {
             </Link>
             
             <div className="flex-1 mx-4 text-center">
-              <h1 className="text-lg font-bold text-foreground truncate">Modifier le devis</h1>
+              <h1 className="text-lg font-bold text-foreground truncate">Modifier</h1>
               <p className="text-sm text-muted-foreground truncate">{quote.quoteNumber}</p>
             </div>
             
@@ -436,10 +559,9 @@ export default function EditQuotePage() {
               type="submit" 
               disabled={isSaving}
               size="sm"
-              className="h-10 px-4 rounded-full bg-primary hover:bg-primary/90"
+              className="h-10 w-10 p-0 rounded-full bg-primary hover:bg-primary/90"
             >
-              <Save className="h-4 w-4 mr-2" />
-              {isSaving ? '...' : 'Sauvegarder'}
+              <Save className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -494,7 +616,7 @@ export default function EditQuotePage() {
             </Card>
           )}
 
-          {/* Client Information (read-only) */}
+          {/* Client Information */}
           <Card className="transition-colors duration-300">
             <CardHeader>
               <CardTitle className="text-lg">Informations client</CardTitle>
@@ -509,6 +631,7 @@ export default function EditQuotePage() {
                 <div className="text-sm">
                   {quote.lead.company && <p><strong>Société:</strong> {quote.lead.company}</p>}
                   {quote.lead.leadType && <p><strong>Type:</strong> {quote.lead.leadType}</p>}
+                  {quote.lead.iceNumber && <p><strong>ICE:</strong> {quote.lead.iceNumber}</p>}
                 </div>
               </div>
             </CardContent>
@@ -564,471 +687,699 @@ export default function EditQuotePage() {
             </CardContent>
           </Card>
 
-          {/* OPTIMIZED: Single Unified Details Section (no more redundancy!) */}
-          <Card className="transition-colors duration-300">
-            <CardHeader>
-              <CardTitle className="text-lg">Détails du Devis & Lead</CardTitle>
-              <CardDescription className="text-sm">
-                Ces informations seront mises à jour dans le devis ET le lead
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Row 1 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="serviceType" className="text-sm">Type de Service</Label>
-                  <Select
-                    value={quoteFields.serviceType}
-                    onValueChange={(value) => handleFieldChange('serviceType', value)}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Sélectionner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="FIN_DE_CHANTIER">Fin de chantier</SelectItem>
-                      <SelectItem value="GRAND_MENAGE">Grand Ménage</SelectItem>
-                      <SelectItem value="NETTOYAGE_STANDARD">Nettoyage Standard</SelectItem>
-                      <SelectItem value="NETTOYAGE_BUREAUX">Nettoyage Bureaux</SelectItem>
-                      <SelectItem value="ENTRETIEN_REGULIER">Entretien Régulier</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+          {businessType === 'SERVICE' ? (
+            <>
+              {/* Service Details */}
+              <Card className="transition-colors duration-300">
+                <CardHeader>
+                  <CardTitle className="text-lg">Détails du Service</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="serviceType" className="text-sm">Type de Service</Label>
+                      <Select
+                        value={quoteFields.serviceType}
+                        onValueChange={(value) => handleFieldChange('serviceType', value)}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Sélectionner" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="FIN_DE_CHANTIER">Fin de chantier</SelectItem>
+                          <SelectItem value="GRAND_MENAGE">Grand Ménage</SelectItem>
+                          <SelectItem value="NETTOYAGE_STANDARD">Nettoyage Standard</SelectItem>
+                          <SelectItem value="NETTOYAGE_BUREAUX">Nettoyage Bureaux</SelectItem>
+                          <SelectItem value="ENTRETIEN_REGULIER">Entretien Régulier</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <div>
-                  <Label htmlFor="propertyType" className="text-sm">Type de Bien</Label>
-                  <Select
-                    value={quoteFields.propertyType}
-                    onValueChange={(value) => handleFieldChange('propertyType', value)}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Sélectionner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="VILLA_SMALL">Villa Petite</SelectItem>
-                      <SelectItem value="VILLA_MEDIUM">Villa Moyenne</SelectItem>
-                      <SelectItem value="VILLA_LARGE">Villa Grande</SelectItem>
-                      <SelectItem value="APARTMENT_SMALL">Appartement Petit</SelectItem>
-                      <SelectItem value="APARTMENT_MEDIUM">Appartement Moyen</SelectItem>
-                      <SelectItem value="APARTMENT_LARGE">Appartement Grand</SelectItem>
-                      <SelectItem value="OFFICE">Bureau</SelectItem>
-                      <SelectItem value="COMMERCIAL">Commercial</SelectItem>
-                      <SelectItem value="OTHER">Autre</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Row 2 */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="surface" className="text-sm">Surface (m²)</Label>
-                  <Input
-                    id="surface"
-                    type="number"
-                    value={quoteFields.surface}
-                    onChange={(e) => handleFieldChange('surface', e.target.value)}
-                    placeholder="150"
-                    className="mt-1 bg-background border-input"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="levels" className="text-sm">Niveaux</Label>
-                  <Input
-                    id="levels"
-                    type="number"
-                    min="1"
-                    value={quoteFields.levels}
-                    onChange={(e) => handleFieldChange('levels', e.target.value)}
-                    placeholder="1"
-                    className="mt-1 bg-background border-input"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="urgencyLevel" className="text-sm">Urgence</Label>
-                  <Select
-                    value={quoteFields.urgencyLevel}
-                    onValueChange={(value) => handleFieldChange('urgencyLevel', value)}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Sélectionner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="LOW">Faible</SelectItem>
-                      <SelectItem value="NORMAL">Normal</SelectItem>
-                      <SelectItem value="URGENT">Urgent</SelectItem>
-                      <SelectItem value="HIGH_URGENT">Très Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Row 3 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="budgetRange" className="text-sm">Budget</Label>
-                  <Input
-                    id="budgetRange"
-                    value={quoteFields.budgetRange}
-                    onChange={(e) => handleFieldChange('budgetRange', e.target.value)}
-                    placeholder="1000-5000 MAD"
-                    className="mt-1 bg-background border-input"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="address" className="text-sm">Adresse</Label>
-                  <Input
-                    id="address"
-                    value={quoteFields.address}
-                    onChange={(e) => handleFieldChange('address', e.target.value)}
-                    placeholder="Adresse complète"
-                    className="mt-1 bg-background border-input"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Materials Selection Card - ADDED */}
-          <Card className="transition-colors duration-300">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Package className="h-5 w-5" />
-                Sélection des Matériaux
-              </CardTitle>
-              <CardDescription className="text-sm">
-                Sélectionnez les matériaux présents pour adapter les produits
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {[
-                  { key: 'marble', label: 'Marbre', icon: '💎' },
-                  { key: 'parquet', label: 'Parquet', icon: '🪵' },
-                  { key: 'tiles', label: 'Carrelage', icon: '🧱' },
-                  { key: 'carpet', label: 'Moquette', icon: '🧵' },
-                  { key: 'concrete', label: 'Béton', icon: '🏗️' },
-                  { key: 'porcelain', label: 'Porcelaine', icon: '🏺' },
-                  { key: 'cladding', label: 'Bardage', icon: '🏠' },
-                  { key: 'composite_wood', label: 'Bois composite', icon: '🌳' },
-                  { key: 'pvc', label: 'PVC', icon: '📦' }
-                ].map(({ key, label, icon }) => (
-                  <div 
-                    key={key} 
-                    className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${
-                      selectedMaterials[key as keyof typeof selectedMaterials] 
-                        ? 'border-primary bg-primary/5' 
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                    onClick={() => handleMaterialChange(key, !selectedMaterials[key as keyof typeof selectedMaterials])}
-                  >
-                    <span className="text-xl">{icon}</span>
-                    <span className="text-sm font-medium flex-1">{label}</span>
-                    {selectedMaterials[key as keyof typeof selectedMaterials] && (
-                      <span className="text-primary">✓</span>
-                    )}
+                    <div>
+                      <Label htmlFor="propertyType" className="text-sm">Type de Bien</Label>
+                      <Select
+                        value={quoteFields.propertyType}
+                        onValueChange={(value) => handleFieldChange('propertyType', value)}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Sélectionner" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="VILLA_SMALL">Villa Petite</SelectItem>
+                          <SelectItem value="VILLA_MEDIUM">Villa Moyenne</SelectItem>
+                          <SelectItem value="VILLA_LARGE">Villa Grande</SelectItem>
+                          <SelectItem value="APARTMENT_SMALL">Appartement Petit</SelectItem>
+                          <SelectItem value="APARTMENT_MEDIUM">Appartement Moyen</SelectItem>
+                          <SelectItem value="APARTMENT_LARGE">Appartement Grand</SelectItem>
+                          <SelectItem value="OFFICE">Bureau</SelectItem>
+                          <SelectItem value="COMMERCIAL">Commercial</SelectItem>
+                          <SelectItem value="OTHER">Autre</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                ))}
-              </div>
-              
-              <div>
-                <Label htmlFor="other-materials" className="text-sm">Autres matériaux</Label>
-                <Input
-                  id="other-materials"
-                  placeholder="Spécifiez d'autres matériaux..."
-                  value={selectedMaterials.other}
-                  onChange={(e) => handleMaterialChange('other', e.target.value)}
-                  className="mt-1 text-sm bg-background border-input"
-                />
-              </div>
 
-              {(Object.values(selectedMaterials).some((v, i) => i < 9 ? v === true : v !== '')) && (
-                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <p className="text-xs text-blue-800 dark:text-blue-200">
-                    ℹ️ Les produits adaptés à ces matériaux seront automatiquement suggérés dans le PDF
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="surface" className="text-sm">Surface (m²)</Label>
+                      <Input
+                        id="surface"
+                        type="number"
+                        value={quoteFields.surface}
+                        onChange={(e) => handleFieldChange('surface', e.target.value)}
+                        placeholder="150"
+                        className="mt-1 bg-background border-input"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="levels" className="text-sm">Niveaux</Label>
+                      <Input
+                        id="levels"
+                        type="number"
+                        min="1"
+                        value={quoteFields.levels}
+                        onChange={(e) => handleFieldChange('levels', e.target.value)}
+                        placeholder="1"
+                        className="mt-1 bg-background border-input"
+                      />
+                    </div>
 
-          {/* Services Management */}
-          <Card className="transition-colors duration-300">
-            <CardHeader>
-              <CardTitle className="text-lg">Services du devis</CardTitle>
-              <CardDescription className="text-sm">
-                Gérez les services et leurs tarifs
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Service Search/Add */}
-              <div className="mb-6">
-                <Label htmlFor="serviceSearch" className="text-sm">Ajouter un service</Label>
-                <div className="relative">
-                  <div className="flex gap-2 mt-1">
-                    <Input
-                      id="serviceSearch"
-                      value={serviceSearch}
-                      onChange={(e) => {
-                        setServiceSearch(e.target.value);
-                        setShowServiceDropdown(true);
-                      }}
-                      onFocus={() => setShowServiceDropdown(true)}
-                      placeholder="Rechercher ou créer un service..."
-                      className="flex-1 bg-background border-input"
-                    />
-                    <Button
-                      type="button"
-                      onClick={addNewService}
-                      disabled={!serviceSearch.trim()}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Ajouter
-                    </Button>
+                    <div>
+                      <Label htmlFor="urgencyLevel" className="text-sm">Urgence</Label>
+                      <Select
+                        value={quoteFields.urgencyLevel}
+                        onValueChange={(value) => handleFieldChange('urgencyLevel', value)}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Sélectionner" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="LOW">Faible</SelectItem>
+                          <SelectItem value="NORMAL">Normal</SelectItem>
+                          <SelectItem value="URGENT">Urgent</SelectItem>
+                          <SelectItem value="HIGH_URGENT">Très Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="budgetRange" className="text-sm">Budget</Label>
+                      <Input
+                        id="budgetRange"
+                        value={quoteFields.budgetRange}
+                        onChange={(e) => handleFieldChange('budgetRange', e.target.value)}
+                        placeholder="1000-5000 MAD"
+                        className="mt-1 bg-background border-input"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="address" className="text-sm">Adresse</Label>
+                      <Input
+                        id="address"
+                        value={quoteFields.address}
+                        onChange={(e) => handleFieldChange('address', e.target.value)}
+                        placeholder="Adresse complète"
+                        className="mt-1 bg-background border-input"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Materials Selection */}
+              <Card className="transition-colors duration-300">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Package className="h-5 w-5" />
+                    Sélection des Matériaux
+                  </CardTitle>
+                  <CardDescription className="text-sm">
+                    Sélectionnez les matériaux présents pour adapter les produits
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {[
+                      { key: 'marble', label: 'Marbre', icon: '💎' },
+                      { key: 'parquet', label: 'Parquet', icon: '🪵' },
+                      { key: 'tiles', label: 'Carrelage', icon: '🧱' },
+                      { key: 'carpet', label: 'Moquette', icon: '🧵' },
+                      { key: 'concrete', label: 'Béton', icon: '🏗️' },
+                      { key: 'porcelain', label: 'Porcelaine', icon: '🏺' },
+                      { key: 'cladding', label: 'Bardage', icon: '🏠' },
+                      { key: 'composite_wood', label: 'Bois composite', icon: '🌳' },
+                      { key: 'pvc', label: 'PVC', icon: '📦' }
+                    ].map(({ key, label, icon }) => (
+                      <div 
+                        key={key} 
+                        className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${
+                          selectedMaterials[key as keyof typeof selectedMaterials] 
+                            ? 'border-primary bg-primary/5' 
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                        onClick={() => handleMaterialChange(key, !selectedMaterials[key as keyof typeof selectedMaterials])}
+                      >
+                        <span className="text-xl">{icon}</span>
+                        <span className="text-sm font-medium flex-1">{label}</span>
+                        {selectedMaterials[key as keyof typeof selectedMaterials] && (
+                          <span className="text-primary">✓</span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                   
-                  {/* Service Dropdown */}
-                  {showServiceDropdown && serviceSearch && (
-                    <div className="absolute top-full left-0 right-0 z-10 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto mt-1 transition-colors duration-300">
-                      {filteredServices.map((service, index) => (
-                        <button
-                          key={index}
-                          type="button"
-                          className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors text-sm"
-                          onClick={() => {
-                            setServiceSearch(service);
-                            setShowServiceDropdown(false);
-                          }}
-                        >
-                          <Search className="h-4 w-4 text-muted-foreground" />
-                          {service}
-                        </button>
-                      ))}
-                      
-                      {/* Create new service option */}
-                      {!PREDEFINED_SERVICES.includes(serviceSearch) && (
-                        <button
-                          type="button"
-                          className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground flex items-center gap-2 border-t border-border text-primary transition-colors text-sm"
-                          onClick={addNewService}
-                        >
-                          <Plus className="h-4 w-4" />
-                          Créer "{serviceSearch}"
-                        </button>
-                      )}
+                  <div>
+                    <Label htmlFor="other-materials" className="text-sm">Autres matériaux</Label>
+                    <Input
+                      id="other-materials"
+                      placeholder="Spécifiez d'autres matériaux..."
+                      value={selectedMaterials.other}
+                      onChange={(e) => handleMaterialChange('other', e.target.value)}
+                      className="mt-1 text-sm bg-background border-input"
+                    />
+                  </div>
+
+                  {(Object.values(selectedMaterials).some((v, i) => i < 9 ? v === true : v !== '')) && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <p className="text-xs text-blue-800 dark:text-blue-200">
+                        ℹ️ Les produits adaptés à ces matériaux seront automatiquement suggérés dans le PDF
+                      </p>
                     </div>
                   )}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              {/* Existing Services */}
-              <div className="space-y-4">
-                {editableLineItems.length > 0 ? (
-                  editableLineItems.map((item) => (
-                    <div key={item.id} className="border border-border rounded-lg p-4 bg-muted/30 dark:bg-muted/20 transition-colors duration-300">
-                      {/* Mobile Layout */}
-                      <div className="lg:hidden space-y-3">
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Service</Label>
-                          <Input
-                            value={item.serviceType || item.description}
-                            onChange={(e) => handleLineItemChange(item.id, 'serviceType', e.target.value)}
-                            placeholder="Type de service..."
-                            className="mt-1 bg-background border-input"
-                            list={`services-${item.id}`}
-                          />
-                          <datalist id={`services-${item.id}`}>
-                            {PREDEFINED_SERVICES.map((service, idx) => (
-                              <option key={idx} value={service} />
-                            ))}
-                          </datalist>
+              {/* Services Management */}
+              <Card className="transition-colors duration-300">
+                <CardHeader>
+                  <CardTitle className="text-lg">Services du devis</CardTitle>
+                  <CardDescription className="text-sm">
+                    Gérez les services et leurs tarifs
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-6">
+                    <Label htmlFor="serviceSearch" className="text-sm">Ajouter un service</Label>
+                    <div className="relative">
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          id="serviceSearch"
+                          value={serviceSearch}
+                          onChange={(e) => {
+                            setServiceSearch(e.target.value);
+                            setShowServiceDropdown(true);
+                          }}
+                          onFocus={() => setShowServiceDropdown(true)}
+                          placeholder="Rechercher ou créer un service..."
+                          className="flex-1 bg-background border-input"
+                        />
+                        <Button
+                          type="button"
+                          onClick={addNewService}
+                          disabled={!serviceSearch.trim()}
+                          variant="outline"
+                          size="sm"
+                          className="lg:px-4"
+                        >
+                          <Plus className="h-4 w-4 lg:mr-2" />
+                          <span className="hidden lg:inline">Ajouter</span>
+                        </Button>
+                      </div>
+                      
+                      {showServiceDropdown && serviceSearch && (
+                        <div className="absolute top-full left-0 right-0 z-10 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto mt-1 transition-colors duration-300">
+                          {filteredServices.map((service, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground flex items-center gap-2 transition-colors text-sm"
+                              onClick={() => {
+                                setServiceSearch(service);
+                                setShowServiceDropdown(false);
+                              }}
+                            >
+                              <Search className="h-4 w-4 text-muted-foreground" />
+                              {service}
+                            </button>
+                          ))}
+                          
+                          {!PREDEFINED_SERVICES.includes(serviceSearch) && (
+                            <button
+                              type="button"
+                              className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground flex items-center gap-2 border-t border-border text-primary transition-colors text-sm"
+                              onClick={addNewService}
+                            >
+                              <Plus className="h-4 w-4" />
+                              Créer "{serviceSearch}"
+                            </button>
+                          )}
                         </div>
+                      )}
+                    </div>
+                  </div>
 
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Qté</Label>
-                            <Input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => handleLineItemChange(item.id, 'quantity', parseFloat(e.target.value))}
-                              min="1"
-                              className="mt-1 bg-background border-input"
-                            />
+                  <div className="space-y-4">
+                    {editableLineItems.length > 0 ? (
+                      editableLineItems.map((item) => (
+                        <div key={item.id} className="border border-border rounded-lg p-4 bg-muted/30 dark:bg-muted/20 transition-colors duration-300">
+                          {/* Mobile Layout */}
+                          <div className="lg:hidden space-y-3">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Service</Label>
+                              <Input
+                                value={item.serviceType || item.description}
+                                onChange={(e) => handleLineItemChange(item.id, 'serviceType', e.target.value)}
+                                placeholder="Type de service..."
+                                className="mt-1 bg-background border-input"
+                                list={`services-${item.id}`}
+                              />
+                              <datalist id={`services-${item.id}`}>
+                                {PREDEFINED_SERVICES.map((service, idx) => (
+                                  <option key={idx} value={service} />
+                                ))}
+                              </datalist>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <Label className="text-xs text-muted-foreground">Qté</Label>
+                                <Input
+                                  type="number"
+                                  value={item.quantity}
+                                  onChange={(e) => handleLineItemChange(item.id, 'quantity', parseFloat(e.target.value))}
+                                  min="1"
+                                  className="mt-1 bg-background border-input"
+                                />
+                              </div>
+
+                              <div>
+                                <Label className="text-xs text-muted-foreground">Prix U.</Label>
+                                <Input
+                                  type="number"
+                                  value={item.unitPrice}
+                                  onChange={(e) => handleLineItemChange(item.id, 'unitPrice', parseFloat(e.target.value))}
+                                  min="0"
+                                  step="0.01"
+                                  className="mt-1 bg-background border-input"
+                                />
+                              </div>
+
+                              <div>
+                                <Label className="text-xs text-muted-foreground">Total</Label>
+                                <Input
+                                  type="number"
+                                  value={item.totalPrice}
+                                  onChange={(e) => handleLineItemChange(item.id, 'amount', parseFloat(e.target.value))}
+                                  min="0"
+                                  step="0.01"
+                                  className="mt-1 font-semibold bg-background border-input"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleLineItemChange(item.id, 'unitPrice', item.unitPrice * 1.1)}
+                                className="flex-1 text-xs"
+                              >
+                                +10%
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleLineItemChange(item.id, 'unitPrice', item.unitPrice * 0.9)}
+                                className="flex-1 text-xs"
+                              >
+                                -10%
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => removeLineItem(item.id)}
+                                className="text-destructive hover:bg-destructive/10"
+                                disabled={editableLineItems.length === 1}
+                              >
+                                🗑️
+                              </Button>
+                            </div>
                           </div>
 
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Prix U.</Label>
-                            <Input
-                              type="number"
-                              value={item.unitPrice}
-                              onChange={(e) => handleLineItemChange(item.id, 'unitPrice', parseFloat(e.target.value))}
-                              min="0"
-                              step="0.01"
-                              className="mt-1 bg-background border-input"
-                            />
-                          </div>
+                          {/* Desktop Layout */}
+                          <div className="hidden lg:grid lg:grid-cols-7 gap-4 items-start">
+                            <div className="lg:col-span-2">
+                              <Label className="text-sm font-medium">Service</Label>
+                              <Input
+                                value={item.serviceType || item.description}
+                                onChange={(e) => handleLineItemChange(item.id, 'serviceType', e.target.value)}
+                                placeholder="Type de service..."
+                                className="mt-1 bg-background border-input"
+                                list={`services-${item.id}`}
+                              />
+                              <datalist id={`services-${item.id}`}>
+                                {PREDEFINED_SERVICES.map((service, idx) => (
+                                  <option key={idx} value={service} />
+                                ))}
+                              </datalist>
+                            </div>
 
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Total</Label>
-                            <Input
-                              type="number"
-                              value={item.totalPrice}
-                              onChange={(e) => handleLineItemChange(item.id, 'amount', parseFloat(e.target.value))}
-                              min="0"
-                              step="0.01"
-                              className="mt-1 font-semibold bg-background border-input"
-                            />
+                            <div>
+                              <Label className="text-sm font-medium">Quantité</Label>
+                              <Input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => handleLineItemChange(item.id, 'quantity', parseFloat(e.target.value))}
+                                min="1"
+                                step="1"
+                                className="mt-1 bg-background border-input"
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-sm font-medium">Prix U.</Label>
+                              <Input
+                                type="number"
+                                value={item.unitPrice}
+                                onChange={(e) => handleLineItemChange(item.id, 'unitPrice', parseFloat(e.target.value))}
+                                min="0"
+                                step="0.01"
+                                className="mt-1 bg-background border-input"
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">MAD</p>
+                            </div>
+
+                            <div>
+                              <Label className="text-sm font-medium">Total</Label>
+                              <Input
+                                type="number"
+                                value={item.totalPrice}
+                                onChange={(e) => handleLineItemChange(item.id, 'amount', parseFloat(e.target.value))}
+                                min="0"
+                                step="0.01"
+                                className="mt-1 font-semibold bg-background border-input"
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">MAD</p>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                              <Label className="text-sm font-medium">Ajustements</Label>
+                              <div className="flex gap-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleLineItemChange(item.id, 'unitPrice', item.unitPrice * 1.1)}
+                                  className="text-xs px-2"
+                                >
+                                  +10%
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleLineItemChange(item.id, 'unitPrice', item.unitPrice * 0.9)}
+                                  className="text-xs px-2"
+                                >
+                                  -10%
+                                </Button>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                              <Label className="text-sm font-medium">Action</Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => removeLineItem(item.id)}
+                                className="text-destructive hover:bg-destructive/10"
+                                disabled={editableLineItems.length === 1}
+                              >
+                                Supprimer
+                              </Button>
+                            </div>
                           </div>
                         </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <FileText className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
+                        <p>Aucun service dans ce devis</p>
+                        <p className="text-sm">Ajoutez des services ci-dessus</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              {/* Product Details */}
+              <Card className="transition-colors duration-300">
+                <CardHeader>
+                  <CardTitle className="text-lg">Détails des Produits</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="productCategory" className="text-sm">Catégorie de Produit</Label>
+                    <Select value={quoteFields.productCategory} onValueChange={(value) => handleFieldChange('productCategory', value)}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Sélectionner une catégorie" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EQUIPMENT">Équipement</SelectItem>
+                        <SelectItem value="CONSUMABLES">Consommables</SelectItem>
+                        <SelectItem value="FURNITURE">Mobilier</SelectItem>
+                        <SelectItem value="ELECTRONICS">Électronique</SelectItem>
+                        <SelectItem value="DECORATION">Décoration</SelectItem>
+                        <SelectItem value="TEXTILES">Textiles</SelectItem>
+                        <SelectItem value="LIGHTING">Éclairage</SelectItem>
+                        <SelectItem value="STORAGE">Rangement</SelectItem>
+                        <SelectItem value="KITCHEN_ITEMS">Articles de cuisine</SelectItem>
+                        <SelectItem value="BATHROOM_ITEMS">Articles de salle de bain</SelectItem>
+                        <SelectItem value="OFFICE_SUPPLIES">Fournitures de bureau</SelectItem>
+                        <SelectItem value="OTHER">Autre</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
 
-                        <div className="flex gap-2">
+              {/* Products Management */}
+              <Card className="transition-colors duration-300">
+                <CardHeader>
+                  <CardTitle className="text-lg">Produits du devis</CardTitle>
+                  <CardDescription className="text-sm">
+                    Gérez les produits et leurs tarifs
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {productItems.map((product, index) => (
+                    <div key={product.id} className="p-3 md:p-4 border border-border rounded-lg bg-muted/30">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-sm md:text-base text-foreground">Produit {index + 1}</h4>
+                        {productItems.length > 1 && (
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            onClick={() => handleLineItemChange(item.id, 'unitPrice', item.unitPrice * 1.1)}
-                            className="flex-1 text-xs"
+                            onClick={() => removeProduct(product.id)}
+                            className="h-8 w-8 p-0"
                           >
-                            +10%
+                            <X className="h-4 w-4" />
                           </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleLineItemChange(item.id, 'unitPrice', item.unitPrice * 0.9)}
-                            className="flex-1 text-xs"
-                          >
-                            -10%
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeLineItem(item.id)}
-                            className="text-destructive hover:bg-destructive/10"
-                            disabled={editableLineItems.length === 1}
-                          >
-                            🗑️
-                          </Button>
-                        </div>
+                        )}
                       </div>
 
-                      {/* Desktop Layout */}
-                      <div className="hidden lg:grid lg:grid-cols-7 gap-4 items-start">
-                        {/* Service Type */}
-                        <div className="lg:col-span-2">
-                          <Label className="text-sm font-medium">Service</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="md:col-span-2 lg:col-span-3">
+                          <Label className="text-sm">Nom du Produit</Label>
                           <Input
-                            value={item.serviceType || item.description}
-                            onChange={(e) => handleLineItemChange(item.id, 'serviceType', e.target.value)}
-                            placeholder="Type de service..."
-                            className="mt-1 bg-background border-input"
-                            list={`services-${item.id}`}
-                          />
-                          <datalist id={`services-${item.id}`}>
-                            {PREDEFINED_SERVICES.map((service, idx) => (
-                              <option key={idx} value={service} />
-                            ))}
-                          </datalist>
-                        </div>
-
-                        {/* Quantity */}
-                        <div>
-                          <Label className="text-sm font-medium">Quantité</Label>
-                          <Input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => handleLineItemChange(item.id, 'quantity', parseFloat(e.target.value))}
-                            min="1"
-                            step="1"
-                            className="mt-1 bg-background border-input"
+                            value={product.name}
+                            onChange={(e) => updateProduct(product.id, 'name', e.target.value)}
+                            placeholder="Nom du produit"
+                            className="text-sm bg-background"
                           />
                         </div>
 
-                        {/* Unit Price */}
                         <div>
-                          <Label className="text-sm font-medium">Prix U.</Label>
+                          <Label className="text-sm">Quantité</Label>
                           <Input
                             type="number"
-                            value={item.unitPrice}
-                            onChange={(e) => handleLineItemChange(item.id, 'unitPrice', parseFloat(e.target.value))}
+                            value={product.qty}
+                            onChange={(e) => updateProduct(product.id, 'qty', parseFloat(e.target.value) || 0)}
+                            min="0"
+                            step="0.1"
+                            className="text-sm bg-background"
+                          />
+                        </div>
+
+                        <div>
+                          <Label className="text-sm">Prix Unitaire (MAD)</Label>
+                          <Input
+                            type="number"
+                            value={product.unitPrice}
+                            onChange={(e) => updateProduct(product.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                             min="0"
                             step="0.01"
-                            className="mt-1 bg-background border-input"
+                            className="text-sm bg-background"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">MAD</p>
                         </div>
 
-                        {/* Total Price */}
                         <div>
-                          <Label className="text-sm font-medium">Total</Label>
+                          <Label className="text-sm">Total</Label>
                           <Input
-                            type="number"
-                            value={item.totalPrice}
-                            onChange={(e) => handleLineItemChange(item.id, 'amount', parseFloat(e.target.value))}
-                            min="0"
-                            step="0.01"
-                            className="mt-1 font-semibold bg-background border-input"
+                            value={`${(product.qty * product.unitPrice).toFixed(2)} MAD`}
+                            disabled
+                            className="bg-muted text-sm"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">MAD</p>
                         </div>
 
-                        {/* Quick Actions */}
-                        <div className="flex flex-col gap-2">
-                          <Label className="text-sm font-medium">Ajustements</Label>
-                          <div className="flex gap-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleLineItemChange(item.id, 'unitPrice', item.unitPrice * 1.1)}
-                              className="text-xs px-2"
-                            >
-                              +10%
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleLineItemChange(item.id, 'unitPrice', item.unitPrice * 0.9)}
-                              className="text-xs px-2"
-                            >
-                              -10%
-                            </Button>
-                          </div>
+                        <div className="md:col-span-2 lg:col-span-2">
+                          <Label className="text-sm">Description</Label>
+                          <Input
+                            value={product.description || ''}
+                            onChange={(e) => updateProduct(product.id, 'description', e.target.value)}
+                            placeholder="Description du produit"
+                            className="text-sm bg-background"
+                          />
                         </div>
 
-                        {/* Remove Button */}
-                        <div className="flex flex-col gap-2">
-                          <Label className="text-sm font-medium">Action</Label>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeLineItem(item.id)}
-                            className="text-destructive hover:bg-destructive/10"
-                            disabled={editableLineItems.length === 1}
-                          >
-                            Supprimer
-                          </Button>
+                        <div>
+                          <Label className="text-sm">Référence</Label>
+                          <Input
+                            value={product.reference || ''}
+                            onChange={(e) => updateProduct(product.id, 'reference', e.target.value)}
+                            placeholder="REF-001"
+                            className="text-sm bg-background"
+                          />
                         </div>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <FileText className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                    <p>Aucun service dans ce devis</p>
-                    <p className="text-sm">Ajoutez des services ci-dessus</p>
+                  ))}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addProduct}
+                    className="w-full text-sm"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter un Produit
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Purchase Order for B2B */}
+              {isB2BClient && (
+                <Card className="transition-colors duration-300">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        <CardTitle className="text-lg">Bon de Commande</CardTitle>
+                      </div>
+                      <Switch
+                        id="enable-purchase-order"
+                        checked={enablePurchaseOrder}
+                        onCheckedChange={setEnablePurchaseOrder}
+                      />
+                    </div>
+                    <CardDescription className="text-sm">
+                      Informations optionnelles pour clients B2B
+                    </CardDescription>
+                  </CardHeader>
+                  {enablePurchaseOrder && (
+                    <CardContent>
+                      <div className="p-3 md:p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-3">
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          Ces informations apparaîtront sur le devis et la facture
+                        </p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="purchaseOrderNumber" className="text-sm">N° Bon de Commande</Label>
+                            <Input
+                              id="purchaseOrderNumber"
+                              value={purchaseOrderNumber}
+                              onChange={(e) => setPurchaseOrderNumber(e.target.value)}
+                              placeholder="BC-2025-001"
+                              className="text-sm bg-background"
+                            />
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="orderedBy" className="text-sm">Commandé par</Label>
+                            <Input
+                              id="orderedBy"
+                              value={orderedBy}
+                              onChange={(e) => setOrderedBy(e.target.value)}
+                              placeholder="Nom du responsable"
+                              className="text-sm bg-background"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              )}
+
+              {/* Delivery Information */}
+              <Card className="transition-colors duration-300">
+                <CardHeader>
+                  <CardTitle className="text-lg">Informations de Livraison</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-sm">Type de Livraison</Label>
+                      <Select value={quoteFields.deliveryType} onValueChange={(value) => handleFieldChange('deliveryType', value)}>
+                        <SelectTrigger className="text-sm mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="STANDARD_DELIVERY">Livraison standard</SelectItem>
+                          <SelectItem value="EXPRESS_DELIVERY">Livraison express</SelectItem>
+                          <SelectItem value="PICKUP">Retrait sur site</SelectItem>
+                          <SelectItem value="SCHEDULED_DELIVERY">Livraison planifiée</SelectItem>
+                          <SelectItem value="WHITE_GLOVE">Service premium</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm">Adresse de Livraison</Label>
+                      <Input
+                        value={quoteFields.deliveryAddress}
+                        onChange={(e) => handleFieldChange('deliveryAddress', e.target.value)}
+                        placeholder="Adresse de livraison"
+                        className="text-sm mt-1 bg-background"
+                      />
+                    </div>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+
+                  <div>
+                    <Label className="text-sm">Notes de Livraison</Label>
+                    <Textarea
+                      value={quoteFields.deliveryNotes}
+                      onChange={(e) => handleFieldChange('deliveryNotes', e.target.value)}
+                      placeholder="Instructions spéciales pour la livraison..."
+                      rows={3}
+                      className="text-sm mt-1 bg-background"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
           
           {/* Totals */}
           <Card className="transition-colors duration-300">
@@ -1063,41 +1414,42 @@ export default function EditQuotePage() {
                   </div>
                 )}
 
-                {/* Summary Info */}
                 <div className="mt-4 p-3 sm:p-4 bg-primary/10 dark:bg-primary/20 rounded-lg border border-primary/20 transition-colors duration-300">
                   <h4 className="font-medium text-primary mb-3 text-sm sm:text-base">Résumé du devis</h4>
                   <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
                     <div>
-                      <span className="text-primary/80">Service:</span>
-                      <span className="ml-2 font-medium text-foreground block sm:inline truncate">
-                        {quoteFields.serviceType || 'Non défini'}
+                      <span className="text-primary/80">Type:</span>
+                      <span className="ml-2 font-medium text-foreground">{businessType === 'SERVICE' ? 'Service' : 'Produit'}</span>
+                    </div>
+                    <div>
+                      <span className="text-primary/80">Catégorie:</span>
+                      <span className="ml-2 font-medium text-foreground">
+                        {businessType === 'SERVICE' ? (quoteFields.serviceType || 'Non défini') : (quoteFields.productCategory || 'Non défini')}
                       </span>
+                    </div>
+                    {businessType === 'SERVICE' && (
+                      <>
+                        <div>
+                          <span className="text-primary/80">Bien:</span>
+                          <span className="ml-2 font-medium text-foreground block sm:inline truncate">
+                            {quoteFields.propertyType || 'Non défini'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-primary/80">Surface:</span>
+                          <span className="ml-2 font-medium text-foreground">
+                            {quoteFields.surface || 'N/A'} m²
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    <div>
+                      <span className="text-primary/80">Statut:</span>
+                      <span className="ml2 font-medium text-foreground">{status}</span>
                     </div>
                     <div>
                       <span className="text-primary/80">Type:</span>
                       <span className="ml-2 font-medium text-foreground">{type}</span>
-                    </div>
-                    <div>
-                      <span className="text-primary/80">Bien:</span>
-                      <span className="ml-2 font-medium text-foreground block sm:inline truncate">
-                        {quoteFields.propertyType || 'Non défini'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-primary/80">Surface:</span>
-                      <span className="ml-2 font-medium text-foreground">
-                        {quoteFields.surface || 'N/A'} m²
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-primary/80">Niveaux:</span>
-                      <span className="ml-2 font-medium text-foreground">{quoteFields.levels}</span>
-                    </div>
-                    <div>
-                      <span className="text-primary/80">Urgence:</span>
-                      <span className="ml-2 font-medium text-foreground">
-                        {quoteFields.urgencyLevel || 'Normal'}
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -1107,6 +1459,29 @@ export default function EditQuotePage() {
 
           {/* Mobile Bottom Spacing */}
           <div className="lg:hidden h-20"></div>
+        </div>
+
+        {/* Mobile Fixed Bottom Bar */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4 shadow-lg z-10">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push(`/quotes/${quoteId}`)}
+              className="flex-1"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Annuler
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSaving}
+              className="flex-1 bg-primary hover:bg-primary/90"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+            </Button>
+          </div>
         </div>
       </form>
     </div>
