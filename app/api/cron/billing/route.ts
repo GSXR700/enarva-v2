@@ -1,7 +1,7 @@
-// app/api/cron/billing/route.ts - FIXED VERSION
+// app/api/cron/billing/route.ts - UPDATED WITH ADVANCE SYSTEM
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-//import { Decimal } from '@prisma/client/runtime/library'
+import { Decimal } from '@prisma/client/runtime/library'
 
 const prisma = new PrismaClient()
 
@@ -70,10 +70,12 @@ export async function POST(request: Request) {
           data: {
             invoiceNumber,
             amount: finalAmount,
+            advanceAmount: new Decimal(0),
+            remainingAmount: finalAmount,
             status: 'SENT',
             issueDate: new Date(),
             dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            missionId: mission.id, // Fix: Add required missionId
+            missionId: mission.id,
             leadId: subscription.leadId,
             description: `Abonnement ${subscription.type} - Facturation mensuelle`,
           }

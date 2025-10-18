@@ -1,8 +1,9 @@
-// app/api/subscriptions/[id]/manual-billing/route.ts - FIXED VERSION
+// app/api/subscriptions/[id]/manual-billing/route.ts - UPDATED WITH ADVANCE SYSTEM
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { Decimal } from '@prisma/client/runtime/library'
 
 const prisma = new PrismaClient()
 
@@ -63,10 +64,12 @@ export async function POST(
       data: {
         invoiceNumber,
         amount: finalAmount,
+        advanceAmount: new Decimal(0),
+        remainingAmount: finalAmount,
         status: 'SENT',
         issueDate: new Date(),
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        missionId: mission.id, // Fix: Add required missionId
+        missionId: mission.id,
         leadId: subscription.leadId,
         description: `Abonnement ${subscription.type} - Facturation manuelle`,
       }
@@ -90,14 +93,14 @@ export async function POST(
         type: 'SUBSCRIPTION_CREATED',
         title: 'Facture d\'abonnement générée manuellement',
         description: `Facture ${invoiceNumber} créée manuellement pour l'abonnement ${subscription.type}`,
-        userId: session.user.id, // Used session user ID
+        userId: session.user.id,
         leadId: subscription.leadId,
         metadata: {
           subscriptionId: subscription.id,
           invoiceId: invoice.id,
           amount: finalAmount.toString(),
           manualBilling: true,
-          billedByIp: request.headers.get('x-forwarded-for') ?? 'IP Not Found' // Used request object
+          billedByIp: request.headers.get('x-forwarded-for') ?? 'IP Not Found'
         }
       }
     })

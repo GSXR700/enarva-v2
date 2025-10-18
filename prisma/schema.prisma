@@ -484,6 +484,8 @@ model Invoice {
   id            String        @id @default(cuid())
   invoiceNumber String        @unique
   amount        Decimal       @db.Decimal(10, 2)
+  advanceAmount Decimal       @default(0) @db.Decimal(10, 2)  // NEW: Montant de l'avance
+  remainingAmount Decimal     @default(0) @db.Decimal(10, 2)  // NEW: Reste à payer
   status        InvoiceStatus @default(DRAFT)
   issueDate     DateTime      @default(now())
   dueDate       DateTime

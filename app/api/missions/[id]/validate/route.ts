@@ -1,10 +1,11 @@
-// app/api/missions/[id]/validate/route.ts - UPDATED WITH F-NUM/YEAR FORMAT
+// app/api/missions/[id]/validate/route.ts - COMPLETE WITH ADVANCE SYSTEM
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import Pusher from 'pusher';
 import { ExtendedUser } from '@/types/next-auth';
+import { Decimal } from '@prisma/client/runtime/library';
 
 const prisma = new PrismaClient();
 
@@ -297,6 +298,8 @@ async function generateInvoiceForMission(missionId: string) {
         leadId: mission.leadId,
         // quoteId removed - not in schema
         amount: amount,
+        advanceAmount: new Decimal(0),
+        remainingAmount: amount,
         status: 'SENT',
         issueDate: new Date(),
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days

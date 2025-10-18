@@ -153,6 +153,8 @@ export async function POST(request: Request) {
         leadId: quote.leadId,
         missionId: mission.id, // Now always present
         amount: amount,
+        advanceAmount: new Decimal(0),  // ADD THIS
+        remainingAmount: amount,    
         status: 'SENT',
         issueDate: new Date(),
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days

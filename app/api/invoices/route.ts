@@ -1,4 +1,4 @@
-// app/api/invoices/route.ts - UPDATED WITH F-NUM/YEAR FORMAT
+// app/api/invoices/route.ts - UPDATED WITH ADVANCE SYSTEM
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -11,7 +11,6 @@ const prisma = new PrismaClient();
 async function generateInvoiceNumber(): Promise<string> {
   const year = new Date().getFullYear();
   
-  // Get the count of invoices created this year
   const invoiceCount = await prisma.invoice.count({
     where: {
       invoiceNumber: {
@@ -114,15 +113,17 @@ export async function POST(request: Request) {
       return new NextResponse('Invoice already exists for this mission', { status: 409 });
     }
 
-    // Generate invoice number in F-NUM/YEAR format
     const invoiceNumber = await generateInvoiceNumber();
+    const totalAmount = new Decimal(amount);
 
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
         leadId,
         missionId,
-        amount: new Decimal(amount),
+        amount: totalAmount,
+        advanceAmount: new Decimal(0),
+        remainingAmount: totalAmount,
         status: 'SENT',
         issueDate: new Date(),
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),

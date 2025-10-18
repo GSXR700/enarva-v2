@@ -1,4 +1,4 @@
-// app/api/invoices/[id]/route.ts - FIXED with proper error handling and validation
+// app/api/invoices/[id]/route.ts - COMPLETE WITH ADVANCE PAYMENT SYSTEM
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -71,7 +71,16 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
     
-    const { status, amount, dueDate, description } = body;
+    const { status, amount, dueDate, description, advanceAmount } = body;
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { id },
+      include: { lead: true, mission: true }
+    });
+
+    if (!invoice) {
+      return new NextResponse('Invoice not found', { status: 404 });
+    }
 
     const dataToUpdate: any = {};
 
@@ -87,7 +96,36 @@ export async function PATCH(
       if (isNaN(amountValue) || amountValue < 0) {
         return new NextResponse('Invalid amount value', { status: 400 });
       }
-      dataToUpdate.amount = new Decimal(amountValue);
+      const newAmount = new Decimal(amountValue);
+      dataToUpdate.amount = newAmount;
+      
+      const currentAdvance = invoice.advanceAmount;
+      dataToUpdate.remainingAmount = newAmount.minus(currentAdvance);
+    }
+
+    if (advanceAmount !== undefined) {
+      const advanceValue = Number(advanceAmount);
+      if (isNaN(advanceValue) || advanceValue < 0) {
+        return new NextResponse('Invalid advance amount', { status: 400 });
+      }
+      
+      const newAdvance = new Decimal(advanceValue);
+      const totalAmount = dataToUpdate.amount || invoice.amount;
+      
+      if (newAdvance.greaterThan(totalAmount)) {
+        return new NextResponse('Advance cannot exceed total amount', { status: 400 });
+      }
+
+      const remaining = totalAmount.minus(newAdvance);
+      
+      dataToUpdate.advanceAmount = newAdvance;
+      dataToUpdate.remainingAmount = remaining;
+      
+      if (remaining.equals(0)) {
+        dataToUpdate.status = 'PAID';
+      } else if (newAdvance.greaterThan(0)) {
+        dataToUpdate.status = 'SENT';
+      }
     }
 
     if (dueDate) {
@@ -108,15 +146,6 @@ export async function PATCH(
       return new NextResponse('No update data provided', { status: 400 });
     }
 
-    const invoice = await prisma.invoice.findUnique({
-      where: { id },
-      include: { lead: true, mission: true }
-    });
-
-    if (!invoice) {
-      return new NextResponse('Invoice not found', { status: 404 });
-    }
-
     const updatedInvoice = await prisma.invoice.update({
       where: { id },
       data: dataToUpdate,
@@ -125,6 +154,29 @@ export async function PATCH(
         mission: true
       }
     });
+
+    if (advanceAmount !== undefined) {
+      const advanceValue = new Decimal(advanceAmount);
+      const remaining = updatedInvoice.remainingAmount;
+      
+      await prisma.activity.create({
+        data: {
+          type: 'PAYMENT_RECEIVED',
+          title: remaining.equals(0) ? 'Facture payée intégralement' : 'Avance reçue',
+          description: remaining.equals(0) 
+            ? `Facture ${invoice.invoiceNumber} payée intégralement - ${updatedInvoice.amount}€`
+            : `Avance de ${advanceValue}€ reçue sur facture ${invoice.invoiceNumber} - Reste: ${remaining}€`,
+          userId: session.user.id,
+          leadId: invoice.leadId,
+          metadata: {
+            invoiceId: invoice.id,
+            advanceAmount: advanceValue.toString(),
+            remainingAmount: remaining.toString(),
+            totalAmount: updatedInvoice.amount.toString()
+          }
+        }
+      });
+    }
 
     if (status === 'PAID' && invoice.status !== 'PAID') {
       await prisma.lead.update({
