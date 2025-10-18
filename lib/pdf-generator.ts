@@ -722,7 +722,7 @@ export function prepareQuotePDFData(
     const teamSize = Math.ceil((quote.surface || 170) / serviceConfig.personnelSuggestions.perSquareMeter);
     const personnelMobilise = [
       'Chef d\'équipe : supervision et contrôle qualité',
-      `Agent${teamSize > 1 ? 's' : ''} de nettoyage (${teamSize} personne${teamSize > 1 ? 's' : ''})`
+      `Agent${teamSize > 1 ? 's' : ''} de nettoyage (${teamSize} personne${teamSize > 1 ? 's' : ''}) et un technicien spécialisé si nécessaire vitrier`
     ];
 
     // Get material-specific products
