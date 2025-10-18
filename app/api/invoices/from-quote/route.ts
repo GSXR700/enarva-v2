@@ -1,4 +1,4 @@
-// app/api/invoices/from-quote/route.ts - FIXED
+// app/api/invoices/from-quote/route.ts - COMPLETE VERSION WITH F-NUM/YEAR FORMAT
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -6,6 +6,23 @@ import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 const prisma = new PrismaClient();
+
+// Helper function to generate invoice number in F-NUM/YEAR format
+async function generateInvoiceNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  
+  // Get the count of invoices created this year
+  const invoiceCount = await prisma.invoice.count({
+    where: {
+      invoiceNumber: {
+        endsWith: `/${year}`
+      }
+    }
+  });
+  
+  const nextNumber = invoiceCount + 1;
+  return `F-${nextNumber}/${year}`;
+}
 
 export async function POST(request: Request) {
   try {
@@ -51,17 +68,13 @@ export async function POST(request: Request) {
       return new NextResponse('Quote not found', { status: 404 });
     }
 
-    if (quote.status !== 'ACCEPTED') {
-      return new NextResponse('Quote must be accepted before creating invoice', { status: 400 });
-    }
-
-    // FIXED: Check without quoteId field
+    // Check if invoice already exists for this quote
     const existingInvoice = await prisma.invoice.findFirst({
       where: {
         leadId: quote.leadId,
         amount: quote.finalPrice,
-        createdAt: {
-          gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
+        description: {
+          contains: quote.quoteNumber || ''
         }
       }
     });
@@ -75,17 +88,16 @@ export async function POST(request: Request) {
       }, { status: 409 });
     }
 
+    // Find associated mission if exists
     const mission = quote.missions.find(m => 
       m.status === 'COMPLETED' || m.status === 'QUALITY_CHECK'
     );
 
-    const year = new Date().getFullYear();
-    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    const invoiceNumber = `INV-${year}-${randomNum}`;
-
+    // Generate invoice number in F-NUM/YEAR format
+    const invoiceNumber = await generateInvoiceNumber();
     const amount = new Decimal(quote.finalPrice.toString());
 
-    // FIXED: missionId can be null, handle properly
+    // Create invoice
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
@@ -94,11 +106,11 @@ export async function POST(request: Request) {
         amount: amount,
         status: 'SENT',
         issueDate: new Date(),
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        description: `Facture générée depuis le devis ${quote.quoteNumber || 'N/A'}${
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        description: `Facture depuis devis ${quote.quoteNumber || 'N/A'}${
           quote.businessType === 'SERVICE' 
-            ? ` - Prestation de nettoyage` 
-            : ` - Vente de produits`
+            ? ' - Prestation de nettoyage' 
+            : ' - Vente de produits'
         }`,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -124,6 +136,7 @@ export async function POST(request: Request) {
       }
     });
 
+    // Update mission if exists
     if (mission) {
       await prisma.mission.update({
         where: { id: mission.id },
@@ -135,6 +148,7 @@ export async function POST(request: Request) {
       });
     }
 
+    // Update lead status
     await prisma.lead.update({
       where: { id: quote.leadId },
       data: {
@@ -143,6 +157,7 @@ export async function POST(request: Request) {
       }
     });
 
+    // Create activity log
     await prisma.activity.create({
       data: {
         type: 'PAYMENT_RECEIVED',

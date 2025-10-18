@@ -1,4 +1,4 @@
-// app/api/missions/[id]/validate/route.ts - FIXED WITH CORRECT TYPES
+// app/api/missions/[id]/validate/route.ts - UPDATED WITH F-NUM/YEAR FORMAT
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
@@ -15,6 +15,23 @@ const pusher = new Pusher({
   cluster: process.env.PUSHER_CLUSTER!,
   useTLS: true
 });
+
+// Helper function to generate invoice number in F-NUM/YEAR format
+async function generateInvoiceNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  
+  // Get the count of invoices created this year
+  const invoiceCount = await prisma.invoice.count({
+    where: {
+      invoiceNumber: {
+        endsWith: `/${year}`
+      }
+    }
+  });
+  
+  const nextNumber = invoiceCount + 1;
+  return `F-${nextNumber}/${year}`;
+}
 
 export async function POST(
   request: Request,
@@ -266,10 +283,8 @@ async function generateInvoiceForMission(missionId: string) {
       throw new Error('Mission or quote not found for invoice generation');
     }
 
-    // Generate unique invoice number
-    const year = new Date().getFullYear();
-    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    const invoiceNumber = `INV-${year}-${randomNum}`;
+    // Generate invoice number in F-NUM/YEAR format
+    const invoiceNumber = await generateInvoiceNumber();
 
     // FIXED: Proper TTC amount from quote
     const amount = mission.quote.finalPrice;
