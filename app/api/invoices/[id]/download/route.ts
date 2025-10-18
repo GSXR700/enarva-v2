@@ -1,47 +1,41 @@
-// app/api/invoices/[id]/download/route.ts - NEW FILE
-import { NextRequest, NextResponse } from 'next/server';
+// app/api/invoices/[id]/download/route.ts - FIXED
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { PrismaClient } from '@prisma/client';
-import { generateQuotePDF, prepareQuotePDFData } from '@/lib/pdf-generator';
+import { generateInvoicePDF } from '@/lib/invoice-pdf-generator';
 
 const prisma = new PrismaClient();
 
 export async function GET(
-  _request: NextRequest,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
     const { id } = await params;
 
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
         lead: true,
-        mission: {
-          include: {
-            quote: true
-          }
-        }
-      },
+        mission: true
+      }
     });
 
     if (!invoice) {
       return new NextResponse('Invoice not found', { status: 404 });
     }
 
-    if (!invoice.mission || !invoice.mission.quote) {
-      return new NextResponse('Invoice mission or quote not found', { status: 404 });
-    }
+    const pdfBuffer = await generateInvoicePDF(invoice);
 
-    // Prepare the data for PDF generation as FACTURE
-    const pdfData = prepareQuotePDFData(invoice.mission.quote, 'FACTURE');
-
-    // Generate the PDF
-    const pdfBuffer = generateQuotePDF(pdfData);
-
-    // Ensure it's a Buffer
+    // Ensure it's a Buffer for NextResponse
     const buffer = pdfBuffer instanceof Uint8Array ? Buffer.from(pdfBuffer) : pdfBuffer;
 
-    // Return the PDF as a download
     return new NextResponse(buffer, {
       status: 200,
       headers: {
@@ -50,9 +44,10 @@ export async function GET(
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     });
+
   } catch (error) {
     console.error('Failed to generate invoice PDF:', error);
-    return new NextResponse('Failed to generate PDF', { status: 500 });
+    return new NextResponse('Internal Server Error', { status: 500 });
   } finally {
     await prisma.$disconnect();
   }
