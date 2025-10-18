@@ -134,7 +134,13 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
   doc.setTextColor(255, 255, 255);
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(36);
-  doc.text(data.docType, MARGIN_LEFT, 55);
+  doc.text(data.docType, MARGIN_LEFT, 50);
+
+  // Date and number below DEVIS (smaller and closer)
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  doc.text(`Date: ${data.date}`, MARGIN_LEFT, 70);
+  doc.text(`N ° ${data.number}`, MARGIN_LEFT, 85);
 
   // BIG Enarva logo TEXT (right side - aligned)
   doc.setFont('Poppins', 'bold');
@@ -144,16 +150,19 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
 
   yPos = 120;
 
-  // 2. DOCUMENT INFO (left) AND CLIENT INFO (right) - TWO COLUMNS
-  
-  // LEFT SIDE: Date and Document Number
+  // 2. COMPANY AND CLIENT INFO (TWO COLUMNS)
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(10);
+  setColor(doc, TEXT_DARK);
+  doc.text(data.company.name, MARGIN_LEFT, yPos);
+
+  yPos += 14;
   doc.setFont('Poppins', 'normal');
   doc.setFontSize(9);
-  setColor(doc, TEXT_DARK);
-  doc.text(`Date: ${data.date}`, MARGIN_LEFT, yPos);
-  yPos += 14;
-  doc.text(`N ° ${data.number}`, MARGIN_LEFT, yPos);
-  yPos += 6;
+  data.company.address.forEach((line) => {
+    doc.text(line, MARGIN_LEFT, yPos);
+    yPos += 12;
+  });
 
   // Client info (right aligned)
   let clientYPos = 120;
@@ -176,19 +185,16 @@ export function generateQuotePDF(data: QuotePDFData): Uint8Array {
 
   yPos = Math.max(yPos, clientYPos) + 20;
 
-  // 3. PURCHASE ORDER INFO (if applicable) - ALIGNED WITH LEFT COLUMN
-  if (data.purchaseOrderNumber && data.orderedBy) {
-    doc.setFont('Poppins', 'bold');
+  // 3. PURCHASE ORDER INFO (if applicable) - ONLY FOR PRODUCT QUOTES
+  if (data.project.businessType === 'PRODUCT' && data.purchaseOrderNumber && data.orderedBy) {
+    doc.setFont('Poppins', 'normal');
     doc.setFontSize(9);
-    setColor(doc, TEXT_DARK);
+    setColor(doc, BLUE_PRIMARY);
     doc.text(`N° Bon de Commande: ${data.purchaseOrderNumber}`, MARGIN_LEFT, yPos);
-    yPos += 14;
+    yPos += 15;
     doc.text(`Commandé par: ${data.orderedBy}`, MARGIN_LEFT, yPos);
-    yPos += 6;
+    yPos += 20;
   }
-
-  // Reset yPos to align with client info section
-  yPos = Math.max(yPos, clientYPos) + 20;
 
   // 4. OBJET SECTION - UNIQUEMENT POUR LES SERVICES
   if (data.project.businessType === 'SERVICE') {
