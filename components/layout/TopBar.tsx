@@ -1,4 +1,4 @@
-// components/layout/TopBar.tsx
+// components/layout/TopBar.tsx - CORRECTED (REMOVED UNUSED IMPORT)
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
-import { Bell, Search, Menu, MessageSquare, User, Settings, LogOut, X, CheckCircle, Moon, Sun } from 'lucide-react'
+import { Bell, Search, Menu, MessageSquare, User, Settings, LogOut, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -21,97 +21,95 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Activity } from '@prisma/client'
 import { getRelativeTime } from '@/lib/utils'
-import { useTheme } from '@/hooks/useTheme'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 interface TopBarProps {
-  onMenuClick: () => void;
+  onMenuClick: () => void
 }
 
-type ActivityWithUser = Activity & { user: { name: string | null; image: string | null }};
+type ActivityWithUser = Activity & { user: { name: string | null; image: string | null } }
 
 export function TopBar({ onMenuClick }: TopBarProps) {
-  const { data: session } = useSession();
-  const pathname = usePathname();
-  const [isMobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const [activities, setActivities] = useState<ActivityWithUser[]>([]);
-  const [showNotificationDot, setShowNotificationDot] = useState(true);
-  const { theme, setTheme } = useTheme();
+  const { data: session } = useSession()
+  const pathname = usePathname()
+  const [isMobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const [activities, setActivities] = useState<ActivityWithUser[]>([])
+  const [showNotificationDot, setShowNotificationDot] = useState(true)
 
-  // Check if current route is a field route (dashboard or missions execution)
   const isFieldRoute = pathname === '/dashboard' || 
-                       (pathname?.startsWith('/missions/') && pathname?.includes('/execute'));
+                       (pathname?.startsWith('/missions/') && pathname?.includes('/execute'))
 
-  // Lazy load LanguageSwitcher only on field routes
-  const [LanguageSwitcher, setLanguageSwitcher] = useState<React.ComponentType | null>(null);
+  const [LanguageSwitcher, setLanguageSwitcher] = useState<React.ComponentType | null>(null)
 
   useEffect(() => {
     if (isFieldRoute) {
       import('@/components/field/LanguageSwitcher').then((mod) => {
-        setLanguageSwitcher(() => mod.LanguageSwitcher);
-      }).catch(() => {
-        // Silently fail if component doesn't exist
-      });
+        setLanguageSwitcher(() => mod.LanguageSwitcher)
+      }).catch(() => {})
     }
-  }, [isFieldRoute]);
+  }, [isFieldRoute])
 
   useEffect(() => {
     const fetchActivities = async () => {
       try {
-        const response = await fetch('/api/activities');
+        const response = await fetch('/api/activities')
         if (response.ok) {
-          setActivities(await response.json());
+          setActivities(await response.json())
         }
       } catch (error) {
-        console.error("Failed to fetch activities", error);
+        console.error('Failed to fetch activities', error)
       }
-    };
-    fetchActivities();
-  }, []);
-
-  // Toggle between light and dark (no system option in topbar for simplicity)
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
-  };
+    }
+    fetchActivities()
+  }, [])
 
   return (
-    <header className="h-16 border-b border-border bg-card px-4 md:px-6 flex items-center justify-between sticky top-0 z-20">
-      {/* --- Section Gauche --- */}
+    <header className="h-16 border-b border-border/50 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 shadow-sm">
       <div className="flex items-center gap-4">
         <div className="lg:hidden flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={onMenuClick}>
-              <Menu className="w-6 h-6" />
-            </Button>
-            <Image src="/images/light-mobile.PNG" alt="Enarva" width={32} height={32} />
+          <Button variant="ghost" size="icon" onClick={onMenuClick} className="hover:bg-accent/50">
+            <Menu className="w-6 h-6" />
+          </Button>
+          <Image src="/images/light-mobile.PNG" alt="Enarva" width={32} height={32} />
         </div>
         <div className="hidden lg:block relative max-w-lg w-full">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input placeholder="Rechercher leads, missions, clients..." className="pl-11 bg-secondary border-none rounded-full h-10"/>
+          <Input
+            placeholder="Rechercher leads, missions, clients..."
+            className="pl-11 bg-accent/30 border-none rounded-full h-10 focus:bg-accent/50 transition-colors"
+          />
         </div>
       </div>
 
-      {/* --- Section Droite --- */}
-      <div className="flex items-center gap-1 md:gap-2">
-        <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileSearchOpen(true)}>
-            <Search className="w-5 h-5" />
+      <div className="flex items-center gap-2 md:gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden hover:bg-accent/50"
+          onClick={() => setMobileSearchOpen(true)}
+        >
+          <Search className="w-5 h-5" />
         </Button>
-        <Link href="/chat"><Button variant="ghost" size="icon"><MessageSquare className="w-5 h-5" /></Button></Link>
         
-        {/* Theme Toggle Button - Icon Only */}
-        <Button variant="ghost" size="icon" onClick={toggleTheme} title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}>
-          <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-        </Button>
+        <Link href="/chat">
+          <Button variant="ghost" size="icon" className="hover:bg-accent/50">
+            <MessageSquare className="w-5 h-5" />
+          </Button>
+        </Link>
 
-        {/* Language Switcher - Only visible on field routes */}
+        <div className="hidden sm:flex items-center">
+          <ThemeToggle />
+        </div>
+
         {isFieldRoute && LanguageSwitcher && (
           <div className="hidden sm:block">
             <LanguageSwitcher />
           </div>
         )}
-        
+
         <DropdownMenu onOpenChange={(open) => !open && setShowNotificationDot(false)}>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
+            <Button variant="ghost" size="icon" className="relative hover:bg-accent/50">
               <Bell className="w-5 h-5" />
               {showNotificationDot && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />}
             </Button>
@@ -119,90 +117,87 @@ export function TopBar({ onMenuClick }: TopBarProps) {
           <DropdownMenuContent className="w-80" align="end">
             <DropdownMenuLabel>Notifications</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {activities.length > 0 ? activities.map(activity => (
-              <DropdownMenuItem key={activity.id} className="flex items-start gap-3">
-                 <CheckCircle className="w-5 h-5 mt-1 text-green-500"/>
-                 <div className='flex-1'>
-                    <p className="text-sm font-medium">{activity.title}</p>
-                    <p className="text-xs text-muted-foreground">{activity.description}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{getRelativeTime(activity.createdAt)}</p>
-                 </div>
-              </DropdownMenuItem>
-            )) : <p className="p-4 text-sm text-muted-foreground text-center">Aucune nouvelle notification.</p>}
+            {activities.length > 0 ? (
+              activities.slice(0, 5).map((activity) => (
+                <DropdownMenuItem key={activity.id} className="flex items-start gap-3 py-3">
+                  <Avatar className="h-8 w-8 flex-shrink-0">
+                    <AvatarImage src={activity.user.image || undefined} />
+                    <AvatarFallback>{activity.user.name?.[0] || 'U'}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{activity.description}</p>
+                    <p className="text-xs text-muted-foreground">{getRelativeTime(activity.createdAt)}</p>
+                  </div>
+                </DropdownMenuItem>
+              ))
+            ) : (
+              <div className="py-6 text-center text-sm text-muted-foreground">Aucune notification</div>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/activities" className="w-full text-center cursor-pointer">
+                Voir toutes les activités
+              </Link>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="h-6 w-px bg-border mx-2 hidden sm:block" />
-
-        {session?.user && (
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <div className="p-0.5 rounded-full bg-enarva-gradient cursor-pointer">
-                         <Avatar className="h-9 w-9">
-                            <AvatarImage src={session.user.image || ''} alt={session.user.name || 'Utilisateur'} />
-                            <AvatarFallback>{session.user.name ? session.user.name.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
-                        </Avatar>
-                    </div>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuLabel>
-                        <div className="flex flex-col">
-                            <span className="text-sm font-medium">{session.user.name || 'Utilisateur'}</span>
-                            <span className="text-xs text-muted-foreground">{session.user.email}</span>
-                        </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    
-                    {/* Mobile Language Switcher - Only on field routes */}
-                    {isFieldRoute && LanguageSwitcher && (
-                      <>
-                        <div className="sm:hidden px-2 py-2">
-                          <LanguageSwitcher />
-                        </div>
-                        <DropdownMenuSeparator className="sm:hidden" />
-                      </>
-                    )}
-                    
-                    <DropdownMenuItem asChild>
-                        <Link href="/profile" className="flex items-center gap-2 cursor-pointer">
-                            <User className="w-4 h-4" />
-                            Profil
-                        </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                        <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
-                            <Settings className="w-4 h-4" />
-                            Paramètres
-                        </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })} className="flex items-center gap-2 cursor-pointer text-red-600">
-                        <LogOut className="w-4 h-4" />
-                        Se déconnecter
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="rounded-full hover:bg-accent/50">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={session?.user?.image || undefined} />
+                <AvatarFallback>{session?.user?.name?.[0] || 'U'}</AvatarFallback>
+              </Avatar>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium">{session?.user?.name}</p>
+                <p className="text-xs text-muted-foreground">{session?.user?.email}</p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/profile" className="cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
+                <span>Profil</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/settings" className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Paramètres</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Déconnexion</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      {/* Mobile Search Overlay */}
       <AnimatePresence>
         {isMobileSearchOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-background z-10 flex items-center gap-2 p-4 lg:hidden"
+            className="fixed inset-0 bg-background z-50 p-4"
           >
-            <Search className="w-5 h-5 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher..."
-              className="flex-1 border-none focus-visible:ring-0"
-              autoFocus
-            />
-            <Button variant="ghost" size="icon" onClick={() => setMobileSearchOpen(false)}>
-              <X className="w-5 h-5" />
-            </Button>
+            <div className="flex items-center gap-2 mb-4">
+              <Button variant="ghost" size="icon" onClick={() => setMobileSearchOpen(false)}>
+                <X className="w-6 h-6" />
+              </Button>
+              <Input
+                autoFocus
+                placeholder="Rechercher..."
+                className="flex-1 bg-accent/30 border-none rounded-full"
+              />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

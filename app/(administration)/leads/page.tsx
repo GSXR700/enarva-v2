@@ -1,4 +1,4 @@
-// app/(administration)/leads/page.tsx
+// app/(administration)/leads/page.tsx - ENHANCED WITH APPLE DESIGN
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -19,8 +19,9 @@ import { Plus, Search, Eye, Edit, Trash2, Download, Phone, Mail, Building2, MapP
 import { formatDate, translate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CardGridSkeleton } from '@/components/skeletons/CardGridSkeleton';
+import { PageSkeleton } from '@/components/skeletons/PageSkeleton';
 import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type LeadWithRelations = Lead & { assignedTo?: User | null };
 
@@ -36,7 +37,7 @@ export default function LeadsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards');
   const [page, setPage] = useState(1);
   const [users, setUsers] = useState<Array<{id: string, name: string}>>([]);
   const limit = 20;
@@ -262,7 +263,7 @@ export default function LeadsPage() {
 
   const getScoreBadge = (score: number) => {
     return (
-      <Badge variant="outline" className={`font-semibold ${score >= 80 ? 'text-green-600 bg-green-100 dark:bg-green-900 dark:text-green-200' : score >= 60 ? 'text-blue-600 bg-blue-100 dark:bg-blue-900 dark:text-blue-200' : score >= 40 ? 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-200' : 'text-red-600 bg-red-100 dark:bg-red-900 dark:text-red-200'}`}>
+      <Badge variant="outline" className={`font-semibold ${score >= 80 ? 'text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400 border-green-300 dark:border-green-600' : score >= 60 ? 'text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 border-blue-300 dark:border-blue-600' : score >= 40 ? 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-300 dark:border-yellow-600' : 'text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400 border-red-300 dark:border-red-600'}`}>
         {score}%
       </Badge>
     );
@@ -270,14 +271,14 @@ export default function LeadsPage() {
 
   const getStatusColor = (status: LeadStatus) => {
     const colors: Record<string, string> = {
-      NEW: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200',
-      QUALIFIED: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200',
-      QUOTE_SENT: 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200',
-      QUOTE_ACCEPTED: 'bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200',
-      COMPLETED: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200',
-      CANCELLED: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
+      NEW: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 border-blue-300 dark:border-blue-600',
+      QUALIFIED: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 border-green-300 dark:border-green-600',
+      QUOTE_SENT: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 border-yellow-300 dark:border-yellow-600',
+      QUOTE_ACCEPTED: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 border-emerald-300 dark:border-emerald-600',
+      COMPLETED: 'bg-gray-100 dark:bg-gray-800/30 text-gray-800 dark:text-gray-400 border-gray-300 dark:border-gray-600',
+      CANCELLED: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 border-red-300 dark:border-red-600',
     };
-    return colors[status] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+    return colors[status] || 'bg-gray-100 dark:bg-gray-800/30 text-gray-800 dark:text-gray-400';
   };
 
   const getStatusIcon = (status: LeadStatus) => {
@@ -292,11 +293,14 @@ export default function LeadsPage() {
   const LeadDetailsModal = ({ lead }: { lead: Lead }) => (
     <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
       <DialogContent className="max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Détails du Lead</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="text-xl font-semibold">Détails du Lead</DialogTitle></DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div>
-              <h3 className="font-semibold text-lg mb-2">Informations personnelles</h3>
+              <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" />
+                Informations personnelles
+              </h3>
               <div className="space-y-2 text-sm">
                 <p><strong>Nom:</strong> {lead.firstName} {lead.lastName}</p>
                 <p><strong>Téléphone:</strong> {lead.phone}</p>
@@ -306,7 +310,10 @@ export default function LeadsPage() {
             </div>
             {lead.company && (
               <div>
-                <h3 className="font-semibold text-lg mb-2">Informations entreprise</h3>
+                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-primary" />
+                  Informations entreprise
+                </h3>
                 <div className="space-y-2 text-sm">
                   <p><strong>Société:</strong> {lead.company}</p>
                   <p><strong>ICE:</strong> {lead.iceNumber || 'Non renseigné'}</p>
@@ -317,7 +324,10 @@ export default function LeadsPage() {
           </div>
           <div className="space-y-4">
             <div>
-              <h3 className="font-semibold text-lg mb-2">Détails du projet</h3>
+              <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                Détails du projet
+              </h3>
               <div className="space-y-2 text-sm">
                 <p><strong>Type:</strong> {translate(lead.leadType)}</p>
                 <p><strong>Statut:</strong> {translate(lead.status)}</p>
@@ -327,7 +337,10 @@ export default function LeadsPage() {
               </div>
             </div>
             <div>
-              <h3 className="font-semibold text-lg mb-2">Source et timing</h3>
+              <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                <Star className="w-5 h-5 text-primary" />
+                Source et timing
+              </h3>
               <div className="space-y-2 text-sm">
                 <p><strong>Canal:</strong> {translate(lead.channel)}</p>
                 <p><strong>Urgence:</strong> {translate(lead.urgencyLevel || 'NORMAL')}</p>
@@ -338,8 +351,8 @@ export default function LeadsPage() {
         </div>
         {lead.originalMessage && (
           <div className="mt-6">
-            <h3 className="font-semibold text-lg mb-2">Message original</h3>
-            <p className="bg-muted p-3 rounded-lg text-sm">{lead.originalMessage}</p>
+            <h3 className="font-semibold text-lg mb-3">Message original</h3>
+            <p className="bg-muted/50 p-4 rounded-lg text-sm">{lead.originalMessage}</p>
           </div>
         )}
       </DialogContent>
@@ -348,8 +361,8 @@ export default function LeadsPage() {
 
   if (error) {
     return (
-      <div className="main-content p-4 md:p-6">
-        <div className="text-center py-10">
+      <div className="main-content">
+        <div className="apple-card p-8 text-center">
           <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Erreur de chargement</h2>
           <p className="text-muted-foreground mb-4">Erreur lors du chargement des leads.</p>
@@ -359,177 +372,297 @@ export default function LeadsPage() {
     );
   }
 
+  if (isLoading) {
+    return <PageSkeleton showHeader showStats statsCount={4} showCards cardsCount={9} />;
+  }
+
   return (
-    <div className="main-content p-3 md:p-6 space-y-4 md:space-y-6 pb-20">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
+    <div className="main-content space-y-6 animate-fade-in">
+      {/* Page Header - Apple Style */}
+      <div className="page-header">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Leads</h1>
-            <p className="text-sm text-muted-foreground hidden md:block">Gérez vos prospects et opportunités</p>
+            <h1 className="page-title">Leads</h1>
+            <p className="page-subtitle">
+              Gérez et suivez vos prospects et opportunités
+            </p>
           </div>
-          <Button onClick={() => setIsFormOpen(true)} size="sm" className="md:hidden">
+          <Button onClick={() => setIsFormOpen(true)} className="btn-mobile-icon gap-2 shadow-lg shadow-primary/20">
             <Plus className="w-4 h-4" />
-          </Button>
-          <Button onClick={() => setIsFormOpen(true)} className="hidden md:flex">
-            <Plus className="w-4 h-4 mr-2" />
-            Nouveau Lead
+            <span>Nouveau Lead</span>
           </Button>
         </div>
+      </div>
 
-        <Card className="border-none shadow-sm">
-          <CardContent className="p-3 md:p-4">
-            <div className="flex flex-col gap-3">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    placeholder="Rechercher..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 h-9 md:h-10"
-                  />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[110px] md:w-[140px] h-9 md:h-10">
-                    <Filter className="w-4 h-4 mr-1 md:mr-2" />
-                    <span className="hidden md:inline"><SelectValue /></span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Tous</SelectItem>
-                    <SelectItem value="NEW">Nouveaux</SelectItem>
-                    <SelectItem value="QUALIFIED">Qualifiés</SelectItem>
-                    <SelectItem value="QUOTE_SENT">Devis envoyés</SelectItem>
-                    <SelectItem value="QUOTE_ACCEPTED">Acceptés</SelectItem>
-                    <SelectItem value="COMPLETED">Terminés</SelectItem>
-                    <SelectItem value="CANCELLED">Annulés</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex gap-1 border rounded-lg p-0.5">
-                  <Button
-                    variant={viewMode === 'table' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setViewMode('table')}
-                    className="h-7 px-2"
-                  >
-                    <List className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === 'cards' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setViewMode('cards')}
-                    className="h-7 px-2"
-                  >
-                    <Grid3x3 className="w-4 h-4" />
-                  </Button>
-                </div>
-                <Button variant="outline" size="sm" onClick={exportToCSV} className="h-7">
-                  <Download className="w-3 h-3 mr-1" />
-                  <span className="hidden md:inline">Export</span>
+      {/* Search and Filter Bar - Apple Style */}
+      <Card className="apple-card">
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Rechercher un lead..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-accent/30 border-none rounded-full"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[140px] bg-accent/30 border-none rounded-full">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Tous</SelectItem>
+                  <SelectItem value="NEW">Nouveaux</SelectItem>
+                  <SelectItem value="QUALIFIED">Qualifiés</SelectItem>
+                  <SelectItem value="QUOTE_SENT">Devis envoyés</SelectItem>
+                  <SelectItem value="QUOTE_ACCEPTED">Acceptés</SelectItem>
+                  <SelectItem value="COMPLETED">Terminés</SelectItem>
+                  <SelectItem value="CANCELLED">Annulés</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex gap-1 border border-border/50 rounded-full p-1">
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className="h-8 px-3 rounded-full"
+                >
+                  <List className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('cards')}
+                  className="h-8 px-3 rounded-full"
+                >
+                  <Grid3x3 className="w-4 h-4" />
                 </Button>
               </div>
+              <Button variant="outline" size="sm" onClick={exportToCSV} className="btn-mobile-icon gap-2">
+                <Download className="w-4 h-4" />
+                <span>Export</span>
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stats Cards - Apple Style */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          {
+            label: 'Total',
+            value: totalLeads,
+            icon: Users,
+            color: 'text-blue-500',
+            bgColor: 'bg-blue-500/10'
+          },
+          {
+            label: 'Nouveaux',
+            value: leads.filter(l => l.status === 'NEW').length,
+            icon: Star,
+            color: 'text-yellow-500',
+            bgColor: 'bg-yellow-500/10'
+          },
+          {
+            label: 'Qualifiés',
+            value: leads.filter(l => l.status === 'QUALIFIED').length,
+            icon: CheckCircle,
+            color: 'text-green-500',
+            bgColor: 'bg-green-500/10'
+          },
+          {
+            label: 'Taux',
+            value: totalLeads > 0 ? `${Math.round((leads.filter(l => l.status === 'COMPLETED').length / totalLeads) * 100)}%` : '0%',
+            icon: TrendingUp,
+            color: 'text-purple-500',
+            bgColor: 'bg-purple-500/10'
+          }
+        ].map((stat, index) => {
+          const Icon = stat.icon;
+          return (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Card className="apple-card">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-muted-foreground mb-1">
+                        {stat.label}
+                      </p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {stat.value}
+                      </p>
+                    </div>
+                    <div className={`w-11 h-11 ${stat.bgColor} rounded-xl flex items-center justify-center`}>
+                      <Icon className={`w-5 h-5 ${stat.color}`} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
-        <Card className="border-none shadow-sm">
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Total</p>
-                <p className="text-xl md:text-2xl font-bold">{totalLeads}</p>
+      {/* Leads Content */}
+      <AnimatePresence mode="wait">
+        {viewMode === 'table' ? (
+          <motion.div
+            key="table"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Card className="apple-card overflow-hidden">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent border-b border-border/50">
+                      <TableHead className="text-xs md:text-sm font-semibold">Contact</TableHead>
+                      <TableHead className="hidden lg:table-cell text-xs md:text-sm font-semibold">Société</TableHead>
+                      <TableHead className="text-xs md:text-sm font-semibold">Statut</TableHead>
+                      <TableHead className="text-xs md:text-sm font-semibold">Score</TableHead>
+                      <TableHead className="hidden md:table-cell text-xs md:text-sm font-semibold">Date</TableHead>
+                      <TableHead className="text-xs md:text-sm font-semibold">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredLeads.map((lead, index) => (
+                      <motion.tr
+                        key={lead.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="hover:bg-accent/30 border-b border-border/30 transition-colors"
+                      >
+                        <TableCell className="py-3">
+                          <div className="cursor-pointer" onClick={() => { setSelectedLead(lead); setIsDetailsOpen(true); }}>
+                            <p className="font-medium text-sm hover:text-primary transition-colors">{lead.firstName} {lead.lastName}</p>
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                              <Phone className="w-3 h-3" />
+                              <span className="truncate max-w-[120px]">{lead.phone}</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell py-3">
+                          {lead.company ? (
+                            <div>
+                              <p className="font-medium text-sm truncate max-w-[150px]">{lead.company}</p>
+                              <p className="text-xs text-muted-foreground">{lead.iceNumber}</p>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Particulier</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Select value={lead.status} onValueChange={(value) => handleStatusChange(lead.id, value as LeadStatus)}>
+                              <SelectTrigger className={`${getStatusColor(lead.status)} text-xs h-8 w-auto border-0 rounded-full`}>
+                                <span className="flex items-center gap-1">
+                                  {getStatusIcon(lead.status)}
+                                  <span className="hidden md:inline">{translate(lead.status)}</span>
+                                </span>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="NEW">Nouveau</SelectItem>
+                                <SelectItem value="QUALIFIED">Qualifié</SelectItem>
+                                <SelectItem value="QUOTE_SENT">Devis envoyé</SelectItem>
+                                <SelectItem value="QUOTE_ACCEPTED">Accepté</SelectItem>
+                                <SelectItem value="COMPLETED">Terminé</SelectItem>
+                                <SelectItem value="CANCELLED">Annulé</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          {getScoreBadge(lead.score || 0)}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell py-3">
+                          <span className="text-xs text-muted-foreground">{formatDate(lead.createdAt)}</span>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-accent/50">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => router.push(`/leads/${lead.id}`)} className="text-xs cursor-pointer">
+                                <Eye className="w-3 h-3 mr-2" />Voir
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild className="text-xs cursor-pointer">
+                                <Link href={`/leads/${lead.id}/edit`}><Edit className="w-3 h-3 mr-2" />Modifier</Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleDelete(lead.id)} className="text-red-600 text-xs cursor-pointer">
+                                <Trash2 className="w-3 h-3 mr-2" />Supprimer
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </motion.tr>
+                    ))}
+                  </TableBody>
+                </Table>
+                {filteredLeads.length === 0 && (
+                  <div className="text-center py-12">
+                    <Users className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Aucun lead trouvé</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {searchTerm || statusFilter !== 'ALL' ? 'Aucun résultat pour ces critères.' : 'Créez votre premier lead pour commencer.'}
+                    </p>
+                  </div>
+                )}
               </div>
-              <Users className="w-6 h-6 md:w-8 md:h-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm">
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Nouveaux</p>
-                <p className="text-xl md:text-2xl font-bold">{leads.filter(l => l.status === 'NEW').length}</p>
-              </div>
-              <Star className="w-6 h-6 md:w-8 md:h-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm">
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Qualifiés</p>
-                <p className="text-xl md:text-2xl font-bold">{leads.filter(l => l.status === 'QUALIFIED').length}</p>
-              </div>
-              <CheckCircle className="w-6 h-6 md:w-8 md:h-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-sm">
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Taux</p>
-                <p className="text-xl md:text-2xl font-bold">
-                  {totalLeads > 0 ? Math.round((leads.filter(l => l.status === 'COMPLETED').length / totalLeads) * 100) : 0}%
-                </p>
-              </div>
-              <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {isLoading ? (
-        <CardGridSkeleton title="Chargement..." description="Chargement des données" />
-      ) : viewMode === 'table' ? (
-        <Card className="border-none shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-xs md:text-sm">Contact</TableHead>
-                  <TableHead className="hidden lg:table-cell text-xs md:text-sm">Société</TableHead>
-                  <TableHead className="text-xs md:text-sm">Statut</TableHead>
-                  <TableHead className="text-xs md:text-sm">Score</TableHead>
-                  <TableHead className="hidden md:table-cell text-xs md:text-sm">Date</TableHead>
-                  <TableHead className="text-xs md:text-sm">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLeads.map((lead) => (
-                  <TableRow key={lead.id} className="hover:bg-muted/50">
-                    <TableCell className="py-2 md:py-3">
-                      <div className="cursor-pointer" onClick={() => { setSelectedLead(lead); setIsDetailsOpen(true); }}>
-                        <p className="font-medium text-xs md:text-sm hover:text-primary">{lead.firstName} {lead.lastName}</p>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                          <Phone className="w-3 h-3" />
-                          <span className="truncate max-w-[120px]">{lead.phone}</span>
+            </Card>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="cards"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          >
+            {filteredLeads.map((lead, index) => (
+              <motion.div
+                key={lead.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <Card 
+                  className="apple-card group hover:scale-[1.02] transition-all cursor-pointer" 
+                  onClick={() => { setSelectedLead(lead); setIsDetailsOpen(true); }}
+                >
+                  <CardHeader className="pb-3 p-5">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base truncate hover:text-primary transition-colors">
+                          {lead.firstName} {lead.lastName}
+                        </CardTitle>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                          <Phone className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{lead.phone}</span>
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell py-2 md:py-3">
-                      {lead.company ? (
-                        <div>
-                          <p className="font-medium text-xs md:text-sm truncate max-w-[150px]">{lead.company}</p>
-                          <p className="text-xs text-muted-foreground">{lead.iceNumber}</p>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Particulier</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="py-2 md:py-3">
                       <div onClick={(e) => e.stopPropagation()}>
                         <Select value={lead.status} onValueChange={(value) => handleStatusChange(lead.id, value as LeadStatus)}>
-                          <SelectTrigger className={`${getStatusColor(lead.status)} text-[10px] md:text-xs h-7 w-auto border-0`}>
-                            <span className="flex items-center gap-1">
-                              {getStatusIcon(lead.status)}
-                              <span className="hidden md:inline">{translate(lead.status)}</span>
-                            </span>
+                          <SelectTrigger className={`${getStatusColor(lead.status)} text-[10px] px-2 py-1 h-7 w-auto border-0 rounded-full shrink-0`}>
+                            <SelectValue>{translate(lead.status)}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="NEW">Nouveau</SelectItem>
@@ -541,142 +674,113 @@ export default function LeadsPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                    </TableCell>
-                    <TableCell className="py-2 md:py-3">
-                      {getScoreBadge(lead.score || 0)}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell py-2 md:py-3">
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3 p-5 pt-0">
+                    {lead.company && (
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm truncate">{lead.company}</span>
+                      </div>
+                    )}
+                    {lead.address && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm truncate">{lead.address}</span>
+                      </div>
+                    )}
+                    {lead.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm truncate">{lead.email}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center pt-2">
+                      <span className="text-xs text-muted-foreground font-medium">Score</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 bg-muted rounded-full h-2 overflow-hidden">
+                          <motion.div 
+                            className={`${getScoreColor(lead.score || 0)} h-2 rounded-full`}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${lead.score || 0}%` }}
+                            transition={{ duration: 0.5, delay: index * 0.1 }}
+                          />
+                        </div>
+                        <span className="text-xs font-semibold">{lead.score || 0}%</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center pt-3 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
                       <span className="text-xs text-muted-foreground">{formatDate(lead.createdAt)}</span>
-                    </TableCell>
-                    <TableCell className="py-2 md:py-3">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                            <MoreVertical className="w-3.5 h-3.5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => router.push(`/leads/${lead.id}`)} className="text-xs">
-                            <Eye className="w-3 h-3 mr-2" />Voir
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild className="text-xs">
-                            <Link href={`/leads/${lead.id}/edit`}><Edit className="w-3 h-3 mr-2" />Modifier</Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleDelete(lead.id)} className="text-red-600 text-xs">
-                            <Trash2 className="w-3 h-3 mr-2" />Supprimer
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={(e) => { e.stopPropagation(); router.push(`/leads/${lead.id}`); }} 
+                          className="h-8 w-8 p-0 hover:bg-accent/50"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          asChild 
+                          className="h-8 w-8 p-0 hover:bg-accent/50"
+                        >
+                          <Link href={`/leads/${lead.id}/edit`} onClick={(e) => e.stopPropagation()}>
+                            <Edit className="w-3.5 h-3.5" />
+                          </Link>
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={(e) => { e.stopPropagation(); handleDelete(lead.id); }} 
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
             {filteredLeads.length === 0 && (
-              <div className="text-center py-10">
-                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-sm md:text-lg font-medium mb-2">Aucun lead trouvé</h3>
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  {searchTerm || statusFilter !== 'ALL' ? 'Aucun résultat.' : 'Créez votre premier lead.'}
-                </p>
+              <div className="col-span-full">
+                <Card className="apple-card">
+                  <CardContent className="text-center py-12">
+                    <Users className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Aucun lead trouvé</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {searchTerm || statusFilter !== 'ALL' ? 'Aucun résultat pour ces critères.' : 'Créez votre premier lead pour commencer.'}
+                    </p>
+                    <Button onClick={() => setIsFormOpen(true)} className="gap-2">
+                      <Plus className="w-4 h-4" />
+                      Créer un lead
+                    </Button>
+                  </CardContent>
+                </Card>
               </div>
             )}
-          </div>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-          {filteredLeads.map((lead) => (
-            <Card key={lead.id} className="hover:shadow-lg transition-shadow border-none cursor-pointer" onClick={() => { setSelectedLead(lead); setIsDetailsOpen(true); }}>
-              <CardHeader className="pb-2 md:pb-3 p-3 md:p-4">
-                <div className="flex justify-between items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-sm md:text-base truncate hover:text-primary">{lead.firstName} {lead.lastName}</CardTitle>
-                    <p className="text-xs text-muted-foreground truncate">{lead.phone}</p>
-                  </div>
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Select value={lead.status} onValueChange={(value) => handleStatusChange(lead.id, value as LeadStatus)}>
-                      <SelectTrigger className={`${getStatusColor(lead.status)} text-[10px] px-1.5 py-0.5 h-6 w-auto border-0 shrink-0`}>
-                        <SelectValue>{translate(lead.status)}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NEW">Nouveau</SelectItem>
-                        <SelectItem value="QUALIFIED">Qualifié</SelectItem>
-                        <SelectItem value="QUOTE_SENT">Devis envoyé</SelectItem>
-                        <SelectItem value="QUOTE_ACCEPTED">Accepté</SelectItem>
-                        <SelectItem value="COMPLETED">Terminé</SelectItem>
-                        <SelectItem value="CANCELLED">Annulé</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                </CardHeader>
-              <CardContent className="space-y-2 md:space-y-3 p-3 md:p-4 pt-0">
-                {lead.company && (
-                  <div className="flex items-center gap-2">
-                    <Building2 className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground shrink-0" />
-                    <span className="text-xs md:text-sm truncate">{lead.company}</span>
-                  </div>
-                )}
-                {lead.address && (
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground shrink-0" />
-                    <span className="text-xs md:text-sm truncate">{lead.address}</span>
-                  </div>
-                )}
-                {lead.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-3 h-3 md:w-4 md:h-4 text-muted-foreground shrink-0" />
-                    <span className="text-xs md:text-sm truncate">{lead.email}</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center pt-1">
-                  <span className="text-xs text-muted-foreground">Score</span>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-12 md:w-16 bg-muted rounded-full h-1.5">
-                      <div 
-                        className={`${getScoreColor(lead.score || 0)} h-1.5 rounded-full transition-all`}
-                        style={{ width: `${lead.score || 0}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-medium">{lead.score || 0}%</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center pt-2 border-t" onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[10px] md:text-xs text-muted-foreground">{formatDate(lead.createdAt)}</span>
-                  <div className="flex gap-1">
-                    <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); router.push(`/leads/${lead.id}`); }} className="h-7 w-7 p-0">
-                      <Eye className="w-3 h-3" />
-                    </Button>
-                    <Button variant="outline" size="sm" asChild className="h-7 w-7 p-0">
-                      <Link href={`/leads/${lead.id}/edit`} onClick={(e) => e.stopPropagation()}><Edit className="w-3 h-3" /></Link>
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleDelete(lead.id); }} className="h-7 w-7 p-0 text-red-600 hover:text-red-700">
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {filteredLeads.length === 0 && (
-            <div className="col-span-full text-center py-10">
-              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-sm md:text-lg font-medium mb-2">Aucun lead trouvé</h3>
-              <p className="text-xs md:text-sm text-muted-foreground">
-                {searchTerm || statusFilter !== 'ALL' ? 'Aucun résultat.' : 'Créez votre premier lead.'}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
+      {/* Pagination - Apple Style */}
       {totalLeads > limit && (
-        <div className="flex justify-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="h-8">
-            Préc
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="flex justify-center items-center gap-2 flex-wrap"
+        >
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setPage(p => Math.max(1, p - 1))} 
+            disabled={page === 1} 
+            className="h-9 px-4 rounded-full"
+          >
+            Précédent
           </Button>
           <div className="flex items-center gap-1">
             {Array.from({ length: Math.ceil(totalLeads / limit) }, (_, i) => i + 1)
@@ -684,32 +788,50 @@ export default function LeadsPage() {
               .map((p, index, array) => (
                 <React.Fragment key={p}>
                   {index > 0 && array[index - 1] !== p - 1 && (
-                    <span className="px-1 text-xs text-muted-foreground">...</span>
+                    <span className="px-2 text-sm text-muted-foreground">...</span>
                   )}
                   <Button
                     variant={page === p ? "default" : "outline"}
                     size="sm"
                     onClick={() => setPage(p)}
-                    className="h-8 w-8 p-0 text-xs"
+                    className={`h-9 w-9 p-0 rounded-full ${page === p ? 'shadow-lg shadow-primary/20' : ''}`}
                   >
                     {p}
                   </Button>
                 </React.Fragment>
               ))}
           </div>
-          <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(Math.ceil(totalLeads / limit), p + 1))} disabled={page >= Math.ceil(totalLeads / limit)} className="h-8">
-            Suiv
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setPage(p => Math.min(Math.ceil(totalLeads / limit), p + 1))} 
+            disabled={page >= Math.ceil(totalLeads / limit)} 
+            className="h-9 px-4 rounded-full"
+          >
+            Suivant
           </Button>
-        </div>
+        </motion.div>
       )}
 
+      {/* Create Lead Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Créer un nouveau lead</DialogTitle></DialogHeader>
-          <LeadForm users={users} onSuccess={() => { setIsFormOpen(false); refetch(); }} onCancel={() => setIsFormOpen(false)} />
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">Créer un nouveau lead</DialogTitle>
+          </DialogHeader>
+          <LeadForm 
+            users={users} 
+            onSuccess={() => { 
+              setIsFormOpen(false); 
+              refetch(); 
+              toast.success('Lead créé avec succès!');
+            }} 
+            onCancel={() => setIsFormOpen(false)} 
+          />
         </DialogContent>
       </Dialog>
 
+      {/* Lead Details Modal */}
       {selectedLead && <LeadDetailsModal lead={selectedLead} />}
     </div>
   );

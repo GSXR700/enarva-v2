@@ -1,4 +1,4 @@
-// components/layout/Sidebar.tsx - UPDATED WITH QUALITY CHECKS
+// components/layout/Sidebar.tsx - CORRECTED (REMOVED DUPLICATES)
 'use client'
 
 import Link from 'next/link'
@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from '@/hooks/useTheme'
 import { cn } from '@/lib/utils'
 import { useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users,
   FileText,
@@ -23,7 +24,8 @@ import {
   AlertTriangle,
   FileBarChart,
   CalendarDays,
-  UserCheck
+  UserCheck,
+  TrendingUp
 } from 'lucide-react'
 import { Dispatch, SetStateAction } from 'react'
 
@@ -32,116 +34,147 @@ const navigation = [
     name: 'Tableau de Bord',
     href: '/dashboard',
     icon: BarChart3,
+    category: 'principal'
+  },
+  {
+    name: 'Analytics',
+    href: '/analytics',
+    icon: TrendingUp,
+    category: 'principal'
   },
   {
     name: 'Leads',
     href: '/leads',
     icon: Users,
+    category: 'ventes'
   },
   {
     name: 'Devis',
     href: '/quotes',
     icon: FileText,
+    category: 'ventes'
   },
   {
     name: 'Missions',
     href: '/missions',
     icon: Calendar,
+    category: 'operations'
   },
   {
     name: 'Planning',
     href: '/planning',
     icon: CalendarDays,
+    category: 'operations'
   },
   {
     name: 'Équipes',
     href: '/teams',
     icon: Users,
+    category: 'operations'
   },
   {
     name: 'Contrôles Qualité',
     href: '/quality-checks',
     icon: ClipboardCheck,
+    category: 'qualite'
   },
   {
     name: 'Validation Missions',
     href: '/missions/validation',
     icon: UserCheck,
-  },
-  {
-    name: 'Facturation',
-    href: '/billing',
-    icon: DollarSign,
-  },
-  {
-    name: 'Dépenses',
-    href: '/expenses',
-    icon: DollarSign,
-  },
-  {
-    name: 'Inventaire',
-    href: '/inventory',
-    icon: Package,
-  },
-  {
-    name: 'Utilisation Inventaire',
-    href: '/inventory-usage',
-    icon: TrendingDown,
-  },
-  {
-    name: 'Abonnements',
-    href: '/subscriptions',
-    icon: CreditCard,
+    category: 'qualite'
   },
   {
     name: 'Rapports Terrain',
     href: '/field-reports',
     icon: FileBarChart,
+    category: 'qualite'
+  },
+  {
+    name: 'Facturation',
+    href: '/billing',
+    icon: DollarSign,
+    category: 'finance'
+  },
+  {
+    name: 'Dépenses',
+    href: '/expenses',
+    icon: DollarSign,
+    category: 'finance'
+  },
+  {
+    name: 'Abonnements',
+    href: '/subscriptions',
+    icon: CreditCard,
+    category: 'finance'
+  },
+  {
+    name: 'Inventaire',
+    href: '/inventory',
+    icon: Package,
+    category: 'ressources'
+  },
+  {
+    name: 'Utilisation Inventaire',
+    href: '/inventory-usage',
+    icon: TrendingDown,
+    category: 'ressources'
   },
   {
     name: 'Messages',
     href: '/chat',
     icon: MessageSquare,
+    category: 'communication'
   },
   {
     name: 'Activités',
     href: '/activities',
     icon: Activity,
+    category: 'systeme'
   },
   {
     name: 'Logs Système',
     href: '/system-logs',
     icon: AlertTriangle,
+    category: 'systeme'
   },
   {
     name: 'Paramètres',
     href: '/settings',
     icon: Settings,
+    category: 'systeme'
   },
 ]
 
+const categories: Record<string, string> = {
+  principal: 'Principal',
+  ventes: 'Ventes & Leads',
+  operations: 'Opérations',
+  qualite: 'Qualité',
+  finance: 'Finance',
+  ressources: 'Ressources',
+  communication: 'Communication',
+  systeme: 'Système'
+}
+
 interface SidebarProps {
-  isOpen: boolean;
-  setOpen: Dispatch<SetStateAction<boolean>>;
+  isOpen: boolean
+  setOpen: Dispatch<SetStateAction<boolean>>
 }
 
 export function Sidebar({ isOpen, setOpen }: SidebarProps) {
   const pathname = usePathname()
   const { theme } = useTheme()
 
-  // Close sidebar on route change (mobile)
   useEffect(() => {
     setOpen(false)
   }, [pathname, setOpen])
 
-  // Close sidebar on window resize if mobile
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 768) {
-        // Desktop - keep open
-        setOpen(false) // Actually, let's keep it closed by default on desktop too
+        setOpen(false)
       } else {
-        // Mobile - close
         setOpen(false)
       }
     }
@@ -150,99 +183,152 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
     return () => window.removeEventListener('resize', handleResize)
   }, [setOpen])
 
-  // Determine which logo to use based on current theme
   const logoSrc = theme === 'dark' ? '/images/dark-logo.png' : '/images/light-logo.png'
 
   const handleLinkClick = () => {
-    // Always close sidebar when clicking a link (both mobile and desktop)
     setOpen(false)
   }
 
+  const groupedNav = navigation.reduce((acc, item) => {
+    const category = item.category || 'autres'
+    if (!acc[category]) acc[category] = []
+    acc[category].push(item)
+    return acc
+  }, {} as Record<string, typeof navigation>)
+
   return (
     <>
-      {/* Mobile overlay - only show on mobile when sidebar is open */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
-          onClick={() => setOpen(false)}
-          style={{ touchAction: 'none' }}
-        />
-      )}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 md:hidden"
+            onClick={() => setOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Sidebar */}
-      <aside
+      <motion.aside
+        initial={false}
+        animate={{
+          x: isOpen ? 0 : '-100%',
+        }}
+        transition={{
+          type: 'spring',
+          stiffness: 300,
+          damping: 30,
+        }}
         className={cn(
-          // Base positioning and styling
-          'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border',
-          'md:relative md:z-auto',
-          // Flexbox layout
+          'fixed inset-y-0 left-0 z-50 w-72',
+          'bg-background/95 backdrop-blur-xl',
+          'border-r border-border/50',
+          'shadow-2xl shadow-black/5',
+          'md:relative md:z-auto md:translate-x-0',
           'flex flex-col',
-          // Smooth transitions
-          'transition-transform duration-300 ease-in-out',
-          // Transform logic - hide by default, show when open
-          isOpen ? 'translate-x-0' : '-translate-x-full',
-          // On desktop, override the transform to always show
-          'md:translate-x-0',
-          // Dark mode
-          'dark:bg-card dark:border-border'
+          'dark:bg-black/95 dark:border-border/30',
+          'supports-[backdrop-filter]:bg-background/80'
         )}
       >
-        {/* Header with Logo */}
-        <div className="h-16 flex items-center justify-center px-4 border-b border-border flex-shrink-0">
-          <Image
-            src={logoSrc}
-            alt="Enarva OS"
-            width={120}
-            height={40}
-            className="object-contain"
-            priority
-          />
+        <div className="h-16 flex items-center justify-center px-6 border-b border-border/50 flex-shrink-0 backdrop-blur-xl">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Image
+              src={logoSrc}
+              alt="Enarva OS"
+              width={130}
+              height={42}
+              className="object-contain"
+              priority
+            />
+          </motion.div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto">
-          <div className="space-y-1">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-              
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={handleLinkClick}
-                  className={cn(
-                    // Base styles
-                    'group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200',
-                    // Active state
-                    isActive
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                    // Interactive
-                    'cursor-pointer'
-                  )}
-                >
-                  <item.icon
-                    className={cn(
-                      'mr-3 h-5 w-5 flex-shrink-0 transition-colors duration-200',
-                      isActive
-                        ? 'text-primary-foreground'
-                        : 'text-muted-foreground group-hover:text-accent-foreground'
-                    )}
-                  />
-                  <span className="truncate">{item.name}</span>
-                </Link>
-              )
-            })}
+        <nav className="flex-1 px-4 py-4 overflow-y-auto custom-scrollbar">
+          <div className="space-y-6">
+            {Object.entries(groupedNav).map(([categoryKey, items]) => (
+              <div key={categoryKey}>
+                <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">
+                  {categories[categoryKey] || categoryKey}
+                </h3>
+                
+                <div className="space-y-0.5">
+                  {items.map((item) => {
+                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                    
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        onClick={handleLinkClick}
+                      >
+                        <motion.div
+                          whileHover={{ scale: 1.02, x: 2 }}
+                          whileTap={{ scale: 0.98 }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                          className={cn(
+                            'group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl',
+                            'transition-all duration-200 ease-out',
+                            'relative overflow-hidden',
+                            isActive
+                              ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/20'
+                              : 'text-foreground/70 hover:text-foreground hover:bg-accent/50',
+                            'cursor-pointer',
+                            isActive && 'ring-1 ring-primary/20'
+                          )}
+                        >
+                          {!isActive && (
+                            <motion.div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                              initial={{ x: '-100%' }}
+                              whileHover={{ x: '100%' }}
+                              transition={{ duration: 0.6 }}
+                            />
+                          )}
+                          
+                          <item.icon
+                            className={cn(
+                              'mr-3 h-5 w-5 flex-shrink-0 transition-all duration-200',
+                              isActive
+                                ? 'text-primary-foreground drop-shadow-sm'
+                                : 'text-foreground/60 group-hover:text-foreground group-hover:scale-110'
+                            )}
+                          />
+                          <span className={cn(
+                            'truncate transition-all duration-200',
+                            isActive ? 'font-semibold' : 'font-medium'
+                          )}>
+                            {item.name}
+                          </span>
+
+                          {isActive && (
+                            <motion.div
+                              layoutId="activeIndicator"
+                              className="absolute right-2 w-1.5 h-1.5 bg-primary-foreground rounded-full"
+                              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                            />
+                          )}
+                        </motion.div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </nav>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-border flex-shrink-0">
-          <div className="text-xs text-muted-foreground text-center">
+        <div className="p-4 border-t border-border/50 flex-shrink-0 backdrop-blur-xl">
+          <div className="text-xs text-muted-foreground/60 text-center font-medium">
             © 2025 Enarva OS
           </div>
         </div>
-      </aside>
+      </motion.aside>
     </>
   )
 }

@@ -1,7 +1,6 @@
-// app/(administration)/page.tsx
+// app/(administration)/page.tsx - ENHANCED ADMIN DASHBOARD WITH APPLE DESIGN
 'use client'
 
-// Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
@@ -27,13 +26,16 @@ import {
   Building2,
   Calendar,
   ExternalLink,
-  CheckCircle2
+  CheckCircle2,
+  ArrowRight,
+  Activity
 } from 'lucide-react'
 import { Lead, Mission, User, LeadStatus } from '@prisma/client'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
 import { toast } from 'sonner'
 import { usePusherChannel } from '@/hooks/usePusherClient'
 import ClientOnly from '@/components/providers/ClientOnly'
+import { motion } from 'framer-motion'
 
 type LeadWithAssignee = Lead & { assignedTo?: User | null };
 
@@ -55,21 +57,20 @@ type DashboardData = {
 
 const getStatusColor = (status: LeadStatus) => {
   const colors: Record<string, string> = {
-    NEW: 'bg-blue-100 text-blue-800',
-    CONTACTED: 'bg-blue-300 text-blue-900',
-    QUALIFIED: 'bg-green-100 text-green-800',
-    VISIT_PLANNED: 'bg-indigo-200 text-indigo-900',
-    QUOTE_SENT: 'bg-cyan-300 text-cyan-900',
-    QUOTE_ACCEPTED: 'bg-emerald-100 text-emerald-800',
-    MISSION_SCHEDULED: 'bg-sky-100 text-sky-800',
-    LEAD_LOST: 'bg-red-400 text-white',
-    COMPLETED: 'bg-green-500 text-white',
+    NEW: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 border-blue-300 dark:border-blue-600',
+    CONTACTED: 'bg-blue-200 dark:bg-blue-800/30 text-blue-900 dark:text-blue-300 border-blue-400 dark:border-blue-500',
+    QUALIFIED: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 border-green-300 dark:border-green-600',
+    VISIT_PLANNED: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-400 border-indigo-300 dark:border-indigo-600',
+    QUOTE_SENT: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-900 dark:text-cyan-400 border-cyan-300 dark:border-cyan-600',
+    QUOTE_ACCEPTED: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 border-emerald-300 dark:border-emerald-600',
+    MISSION_SCHEDULED: 'bg-sky-100 dark:bg-sky-900/30 text-sky-800 dark:text-sky-400 border-sky-300 dark:border-sky-600',
+    LEAD_LOST: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 border-red-300 dark:border-red-600',
+    COMPLETED: 'bg-gray-100 dark:bg-gray-800/30 text-gray-800 dark:text-gray-400 border-gray-300 dark:border-gray-600',
   };
-  return colors[status] || 'bg-gray-100 text-gray-800';
+  return colors[status] || 'bg-gray-100 dark:bg-gray-800/30 text-gray-800 dark:text-gray-400';
 };
 
 export default function Dashboard() {
-  //const router = useRouter()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [selectedLead, setSelectedLead] = useState<LeadWithAssignee | null>(null);
   const [selectedMission, setSelectedMission] = useState<ActiveMission | null>(null);
@@ -94,7 +95,6 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
-  // Real-time updates with Pusher using centralized hook
   usePusherChannel('leads-channel', {
     'new-lead': (newLead: Lead) => {
       console.log('Dashboard: New lead received via Pusher:', newLead);
@@ -128,177 +128,319 @@ export default function Dashboard() {
   }
 
   if (error) {
-    return <div className="main-content text-center p-10 text-red-500">Erreur: {error}</div>;
+    return (
+      <div className="main-content">
+        <div className="apple-card p-8 text-center">
+          <div className="text-destructive font-medium">Erreur: {error}</div>
+        </div>
+      </div>
+    );
   }
   
   const statsCards = [
-    { title: 'Leads Actifs', value: dashboardData?.stats.totalLeads.toString() || '0', icon: Users, href: '/leads' },
-    { title: 'Missions en Cours', value: dashboardData?.stats.activeMissions.toString() || '0', icon: Clock, href: '/missions' },
-    { title: 'CA du Mois (Terminé)', value: formatCurrency(dashboardData?.stats.totalRevenue || 0), icon: DollarSign, href: '/billing' },
-    { title: 'Taux de Conversion', value: `${dashboardData?.stats.conversionRate || '0'}%`, icon: TrendingUp, href: '/analytics' },
+    {
+      title: 'Leads Actifs',
+      value: dashboardData?.stats.totalLeads.toString() || '0',
+      icon: Users,
+      href: '/leads',
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-500/10',
+      trend: '+12%'
+    },
+    {
+      title: 'Missions en Cours',
+      value: dashboardData?.stats.activeMissions.toString() || '0',
+      icon: Clock,
+      href: '/missions',
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-500/10',
+      trend: '+8%'
+    },
+    {
+      title: 'CA du Mois',
+      value: formatCurrency(dashboardData?.stats.totalRevenue || 0),
+      icon: DollarSign,
+      href: '/billing',
+      color: 'text-emerald-500',
+      bgColor: 'bg-emerald-500/10',
+      trend: '+23%'
+    },
+    {
+      title: 'Taux de Conversion',
+      value: `${dashboardData?.stats.conversionRate || '0'}%`,
+      icon: TrendingUp,
+      href: '/analytics',
+      color: 'text-indigo-500',
+      bgColor: 'bg-indigo-500/10',
+      trend: '+3%'
+    },
   ];
 
   return (
-    <div className="main-content space-y-4 sm:space-y-6 pb-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Tableau de Bord</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            Vue d'ensemble de votre activité Enarva
-          </p>
-        </div>
-        <ClientOnly>
-          <div className="text-xs sm:text-sm text-muted-foreground self-start sm:self-center">
-            {new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+    <div className="main-content space-y-6 animate-fade-in">
+      <div className="page-header">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="page-title">Tableau de Bord</h1>
+            <p className="page-subtitle">
+              Vue d'ensemble de votre activité Enarva
+            </p>
           </div>
-        </ClientOnly>
+          <ClientOnly>
+            <div className="text-sm text-muted-foreground">
+              {new Date().toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </div>
+          </ClientOnly>
+        </div>
       </div>
 
-      {/* Stats Cards - Mobile Optimized */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {statsCards.map((stat) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {statsCards.map((stat, index) => {
           const Icon = stat.icon
           return (
-            <Link href={stat.href} key={stat.title}>
-              <Card className="thread-card hover:border-primary/50 h-full transition-all active:scale-95">
-                <CardContent className="p-3 sm:p-6 h-full flex flex-col justify-between min-h-[100px] sm:min-h-[120px]">
-                  <div className="flex flex-col sm:flex-row items-start justify-between w-full gap-2">
-                    <div className="flex-1 min-w-0 w-full">
-                      <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1 sm:mb-2 leading-tight">{stat.title}</p>
-                      <p className="text-lg sm:text-2xl font-bold text-foreground leading-tight break-words">{stat.value}</p>
+            <motion.div
+              key={stat.title}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                delay: index * 0.1,
+                type: 'spring',
+                stiffness: 300,
+                damping: 24
+              }}
+            >
+              <Link href={stat.href}>
+                <Card className="apple-card group hover:scale-[1.02] transition-transform cursor-pointer h-full">
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className={`w-11 h-11 ${stat.bgColor} rounded-xl flex items-center justify-center transition-transform group-hover:scale-110`}>
+                        <Icon className={`w-5 h-5 ${stat.color}`} />
+                      </div>
+                      <span className="text-xs font-semibold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
+                        {stat.trend}
+                      </span>
                     </div>
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-enarva-start/10 rounded-xl flex items-center justify-center flex-shrink-0 self-end sm:self-start sm:ml-4">
-                      <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-enarva-start" />
+                    <div>
+                      <p className="text-2xl font-bold text-foreground leading-none mb-1">
+                        {stat.value}
+                      </p>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        {stat.title}
+                      </p>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
           )
         })}
       </div>
 
-      {/* Recent Leads and Active Missions - Mobile Optimized */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* Recent Leads */}
-        <Card className="thread-card">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base sm:text-lg font-semibold">Leads Récents</h3>
-              <Link href="/leads">
-                <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
-                  Voir tout
-                  <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4 ml-1" />
-                </Button>
-              </Link>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+      >
+        <Card className="apple-card">
+          <CardContent className="p-6">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary" />
+              Actions Rapides
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: 'Nouveau Lead', href: '/leads/new', icon: Users },
+                { label: 'Créer Devis', href: '/quotes/new', icon: Clock },
+                { label: 'Planifier Mission', href: '/missions/new', icon: Calendar },
+                { label: 'Voir Analytics', href: '/analytics', icon: TrendingUp },
+              ].map((action, index) => {
+                const ActionIcon = action.icon
+                return (
+                  <Link key={action.label} href={action.href}>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.6 + index * 0.1 }}
+                    >
+                      <Button
+                        variant="outline"
+                        className="w-full h-auto py-4 flex-col gap-2 hover:bg-accent/50 hover:border-primary/50 transition-all"
+                      >
+                        <ActionIcon className="w-5 h-5" />
+                        <span className="text-xs">{action.label}</span>
+                      </Button>
+                    </motion.div>
+                  </Link>
+                )
+              })}
             </div>
-            <div className="space-y-3">
-              {dashboardData?.recentLeads && dashboardData.recentLeads.length > 0 ? (
-                dashboardData.recentLeads.map((lead) => (
-                  <div 
-                    key={lead.id} 
-                    onClick={() => setSelectedLead(lead)} 
-                    className="flex items-start gap-3 p-3 sm:p-4 rounded-xl bg-background hover:bg-secondary/50 transition-all cursor-pointer active:scale-98 border border-transparent hover:border-primary/20"
-                  >
-                    <Avatar className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0">
-                      <AvatarFallback className="text-xs sm:text-sm">{lead.firstName[0]}{lead.lastName[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-sm sm:text-base text-foreground truncate">{lead.firstName} {lead.lastName}</p>
-                          <p className="text-xs sm:text-sm text-muted-foreground truncate">{lead.company || 'Aucune entreprise'}</p>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <Card className="apple-card h-full">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Users className="w-5 h-5 text-primary" />
+                  Leads Récents
+                </h3>
+                <Link href="/leads">
+                  <Button variant="ghost" size="sm" className="text-xs gap-1">
+                    Voir tout
+                    <ArrowRight className="w-3 h-3" />
+                  </Button>
+                </Link>
+              </div>
+              <div className="space-y-3">
+                {dashboardData?.recentLeads && dashboardData.recentLeads.length > 0 ? (
+                  dashboardData.recentLeads.map((lead, index) => (
+                    <motion.div
+                      key={lead.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.8 + index * 0.1 }}
+                      onClick={() => setSelectedLead(lead)}
+                      className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/50 transition-colors border border-border/50 cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-semibold text-primary">
+                            {lead.firstName[0]}{lead.lastName[0]}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {getChannelIcon(lead.channel)}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">
+                            {lead.firstName} {lead.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {lead.company || 'Particulier'}
+                          </p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <Badge className={`text-[10px] sm:text-xs ${getStatusColor(lead.status)} whitespace-nowrap`}>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {getChannelIcon(lead.channel)}
+                        <Badge className={`${getStatusColor(lead.status)} text-[10px] border-0`}>
                           {translate(lead.status)}
                         </Badge>
-                        <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">{formatDate(lead.createdAt)}</span>
                       </div>
-                    </div>
+                    </motion.div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Aucun lead récent
                   </div>
-                ))
-              ) : (
-                <p className="text-center text-sm text-muted-foreground py-8">Aucun lead récent</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        {/* Active Missions */}
-        <Card className="thread-card">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base sm:text-lg font-semibold">Missions Actives</h3>
-              <Link href="/missions">
-                <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
-                  Voir tout
-                  <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4 ml-1" />
-                </Button>
-              </Link>
-            </div>
-            <div className="space-y-3">
-              {dashboardData?.activeMissions && dashboardData.activeMissions.length > 0 ? (
-                dashboardData.activeMissions.map((mission) => {
-                  const tasks = mission.tasks || [];
-                  const completedTasks = tasks.filter(task => task.status === 'COMPLETED' || task.status === 'VALIDATED').length;
-                  const progress = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <Card className="apple-card h-full">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-primary" />
+                  Missions Actives
+                </h3>
+                <Link href="/missions">
+                  <Button variant="ghost" size="sm" className="text-xs gap-1">
+                    Voir tout
+                    <ArrowRight className="w-3 h-3" />
+                  </Button>
+                </Link>
+              </div>
+              <div className="space-y-3">
+                {dashboardData?.activeMissions && dashboardData.activeMissions.length > 0 ? (
+                  dashboardData.activeMissions.map((mission, index) => {
+                    const tasks = mission.tasks || [];
+                    const completedTasks = tasks.filter(task => task.status === 'COMPLETED' || task.status === 'VALIDATED').length;
+                    const progress = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
 
-                  return (
-                    <div
-                      key={mission.id}
-                      onClick={() => setSelectedMission(mission)}
-                      className="p-3 sm:p-4 rounded-xl border hover:bg-secondary/50 transition-all cursor-pointer active:scale-98 hover:border-primary/20 space-y-3"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <h4 className="font-medium text-sm sm:text-base text-foreground truncate">{mission.lead.firstName} {mission.lead.lastName}</h4>
-                        <Badge variant="outline" className="text-[10px] sm:text-xs whitespace-nowrap">
-                          {translate(mission.status)}
-                        </Badge>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs sm:text-sm">
-                          <span className="text-muted-foreground">Progression</span>
-                          <span className="text-foreground font-medium">{completedTasks}/{tasks.length} tâches • {progress}%</span>
+                    return (
+                      <motion.div
+                        key={mission.id}
+                        initial={{ opacity: 0, x: 10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.8 + index * 0.1 }}
+                        onClick={() => setSelectedMission(mission)}
+                        className="p-3 rounded-lg border border-border/50 hover:bg-accent/50 transition-colors cursor-pointer space-y-3 group"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-10 h-10 bg-purple-500/10 rounded-full flex items-center justify-center flex-shrink-0">
+                              <Calendar className="w-5 h-5 text-purple-500" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm truncate group-hover:text-primary transition-colors">
+                                {mission.lead.firstName} {mission.lead.lastName}
+                              </h4>
+                              <p className="text-xs text-muted-foreground">
+                                {completedTasks}/{tasks.length} tâches
+                              </p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] whitespace-nowrap">
+                            {translate(mission.status)}
+                          </Badge>
                         </div>
-                        <Progress value={progress} className="h-1.5 sm:h-2" />
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-center text-sm text-muted-foreground py-8">Aucune mission active</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Progression</span>
+                            <span className="font-medium">{progress}%</span>
+                          </div>
+                          <Progress value={progress} className="h-2" />
+                        </div>
+                      </motion.div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Aucune mission active
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
 
-      {/* Lead Detail Dialog - Mobile Optimized */}
       <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Détails du Lead</DialogTitle>
-            <DialogDescription className="text-sm">
+            <DialogTitle className="text-xl font-semibold">Détails du Lead</DialogTitle>
+            <DialogDescription>
               Informations complètes sur {selectedLead?.firstName} {selectedLead?.lastName}
             </DialogDescription>
           </DialogHeader>
           {selectedLead && (
-            <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-6">
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-lg sm:text-xl font-bold text-primary">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-xl font-bold text-primary">
                       {selectedLead.firstName[0]}{selectedLead.lastName[0]}
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-base sm:text-lg truncate">{selectedLead.firstName} {selectedLead.lastName}</h3>
-                    <Badge className={`${getStatusColor(selectedLead.status)} text-xs mt-1`}>
+                    <h3 className="font-semibold text-lg truncate">{selectedLead.firstName} {selectedLead.lastName}</h3>
+                    <Badge className={`${getStatusColor(selectedLead.status)} text-xs mt-1 border-0`}>
                       {translate(selectedLead.status)}
                     </Badge>
                   </div>
@@ -308,8 +450,8 @@ export default function Dashboard() {
               <Separator />
 
               <div className="space-y-3">
-                <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
-                  <Phone className="w-4 h-4" />
+                <h4 className="font-semibold flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-primary" />
                   Contact
                 </h4>
                 <div className="space-y-2 pl-6">
@@ -338,8 +480,8 @@ export default function Dashboard() {
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
-                      <Building2 className="w-4 h-4" />
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-primary" />
                       Informations supplémentaires
                     </h4>
                     <div className="space-y-2 pl-6">
@@ -366,8 +508,8 @@ export default function Dashboard() {
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
-                      <Users className="w-4 h-4" />
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <Users className="w-4 h-4 text-primary" />
                       Assigné à
                     </h4>
                     <div className="pl-6">
@@ -387,7 +529,7 @@ export default function Dashboard() {
               <Separator />
 
               <Link href={`/leads/${selectedLead.id}`}>
-                <Button className="w-full" size="lg">
+                <Button className="w-full shadow-lg shadow-primary/20" size="lg">
                   Voir la fiche complète
                   <ExternalLink className="w-4 h-4 ml-2" />
                 </Button>
@@ -397,21 +539,20 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Mission Detail Dialog */}
       <Dialog open={!!selectedMission} onOpenChange={() => setSelectedMission(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Détails de la Mission</DialogTitle>
-            <DialogDescription className="text-sm">
+            <DialogTitle className="text-xl font-semibold">Détails de la Mission</DialogTitle>
+            <DialogDescription>
               Mission pour {selectedMission?.lead.firstName} {selectedMission?.lead.lastName}
             </DialogDescription>
           </DialogHeader>
           {selectedMission && (
-            <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-6">
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-base sm:text-lg">Mission #{selectedMission.id.slice(0, 8)}</h3>
+                    <h3 className="font-semibold text-lg">Mission #{selectedMission.id.slice(0, 8)}</h3>
                     <p className="text-sm text-muted-foreground mt-1">
                       {selectedMission.lead.firstName} {selectedMission.lead.lastName}
                     </p>
@@ -425,8 +566,8 @@ export default function Dashboard() {
               <Separator />
 
               <div className="space-y-3">
-                <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
-                  <Users className="w-4 h-4" />
+                <h4 className="font-semibold flex items-center gap-2">
+                  <Users className="w-4 h-4 text-primary" />
                   Informations client
                 </h4>
                 <div className="space-y-2 pl-6">
@@ -444,8 +585,8 @@ export default function Dashboard() {
               <Separator />
 
               <div className="space-y-3">
-                <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
+                <h4 className="font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-primary" />
                   Progression des tâches
                 </h4>
                 <div className="space-y-3 pl-6">
@@ -474,8 +615,8 @@ export default function Dashboard() {
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-primary" />
                       Dates
                     </h4>
                     <div className="space-y-2 pl-6 text-sm">
@@ -497,7 +638,7 @@ export default function Dashboard() {
               <Separator />
 
               <Link href={`/missions/${selectedMission.id}`}>
-                <Button className="w-full" size="lg">
+                <Button className="w-full shadow-lg shadow-primary/20" size="lg">
                   Voir la mission complète
                   <ExternalLink className="w-4 h-4 ml-2" />
                 </Button>

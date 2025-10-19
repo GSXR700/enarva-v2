@@ -1,65 +1,101 @@
-// components/skeletons/TableSkeleton.tsx
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+// components/skeletons/TableSkeleton.tsx - CORRECTED WITH TITLE PROP
+'use client'
+
+import { motion } from 'framer-motion'
+import { Card, CardContent } from '@/components/ui/card'
 
 interface TableSkeletonProps {
-  title?: string;
-  description?: string;
-  rows?: number;
+  rows?: number
+  columns?: number
+  showHeader?: boolean
+  showActions?: boolean
+  title?: string
+  description?: string
 }
 
-export function TableSkeleton({ 
-  title = "Chargement...", 
-  description = "Veuillez patienter pendant le chargement des données.",
-  rows = 5 
+export function TableSkeleton({
+  rows = 5,
+  columns = 5,
+  showHeader = true,
+  showActions = true,
+  title,
+  description
 }: TableSkeletonProps) {
   return (
-    <div className="main-content space-y-6">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-80" />
-        </div>
-        <Skeleton className="h-10 w-40 rounded-lg" />
-      </div>
-
-      {/* Main Content Card */}
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-48" />
-        </CardHeader>
-        <CardContent className="space-y-4 pt-6">
-          {/* Table Header */}
-          <div className="flex justify-between items-center text-xs text-muted-foreground uppercase border-b pb-2">
-            <Skeleton className="h-4 w-1/4" />
-            <Skeleton className="h-4 w-1/5" />
-            <Skeleton className="h-4 w-1/5" />
-            <Skeleton className="h-4 w-1/6" />
+    <div className="main-content space-y-6 animate-fade-in">
+      {/* Header */}
+      {(showHeader || title) && (
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            {title ? (
+              <>
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground">{title}</h1>
+                {description && (
+                  <p className="text-sm md:text-base text-muted-foreground">{description}</p>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="h-8 w-48 skeleton rounded-lg" />
+                <div className="h-4 w-64 skeleton rounded-lg" />
+              </>
+            )}
           </div>
-          
-          {/* Table Rows */}
-          {Array.from({ length: rows }).map((_, i) => (
-            <div key={i} className="flex justify-between items-center py-3 border-b last:border-b-0">
-              <Skeleton className="h-5 w-1/4" />
-              <Skeleton className="h-5 w-1/5" />
-              <Skeleton className="h-5 w-1/5" />
-              <Skeleton className="h-5 w-1/6" />
-            </div>
-          ))}
+          <div className="h-10 w-32 skeleton rounded-lg" />
+        </div>
+      )}
+
+      {/* Search Bar */}
+      <Card className="apple-card">
+        <CardContent className="p-4">
+          <div className="flex gap-3">
+            <div className="h-10 flex-1 skeleton rounded-full" />
+            <div className="h-10 w-32 skeleton rounded-full" />
+            <div className="h-10 w-24 skeleton rounded-full" />
+          </div>
         </CardContent>
       </Card>
 
-      {/* Loading Message with theme-aware animation */}
-      <div className="text-center py-8">
-        <div className="inline-flex items-center space-x-2 mb-3">
-          <div className="w-3 h-3 bg-primary rounded-full animate-bounce"></div>
-          <div className="w-3 h-3 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-          <div className="w-3 h-3 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+      {/* Table */}
+      <Card className="apple-card overflow-hidden">
+        <div className="overflow-x-auto">
+          {/* Table Header */}
+          <div className="border-b border-border/50 p-4">
+            <div className="flex gap-4">
+              {Array.from({ length: columns }).map((_, i) => (
+                <div key={i} className="h-4 w-24 skeleton rounded flex-1" />
+              ))}
+              {showActions && <div className="h-4 w-20 skeleton rounded" />}
+            </div>
+          </div>
+
+          {/* Table Body */}
+          <div className="divide-y divide-border/30">
+            {Array.from({ length: rows }).map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: i * 0.1 }}
+                className="p-4"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 skeleton rounded-full" />
+                  {Array.from({ length: columns - 1 }).map((_, j) => (
+                    <div key={j} className="h-4 flex-1 skeleton rounded" />
+                  ))}
+                  {showActions && (
+                    <div className="flex gap-2">
+                      <div className="h-8 w-8 skeleton rounded-lg" />
+                      <div className="h-8 w-8 skeleton rounded-lg" />
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground mt-1">{description}</p>
-      </div>
+      </Card>
     </div>
   )
 }

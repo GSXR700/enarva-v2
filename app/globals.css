@@ -1,4 +1,4 @@
-/* app/globals.css - FULL UPDATED FILE */
+/* app/globals.css - ENHANCED WITH APPLE-STYLE DESIGN */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -25,7 +25,7 @@
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
     --ring: 217 91% 60%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
   }
 
   .dark {
@@ -56,11 +56,12 @@
 
   body {
     @apply bg-background text-foreground font-poppins;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+                color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   html {
-    transition: background-color 0.3s ease;
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     scroll-behavior: smooth;
     height: 100%;
     height: -webkit-fill-available;
@@ -71,8 +72,53 @@
     min-height: -webkit-fill-available;
   }
 
-  .dark ::-webkit-scrollbar {
+  /* Apple-style custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.2);
+    border-radius: 10px;
+    transition: background 0.2s;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.3);
+  }
+
+  /* Dark mode scrollbar */
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(0 0% 30% / 0.4);
+  }
+  
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(0 0% 40% / 0.5);
+  }
+
+  /* General scrollbar styling */
+  ::-webkit-scrollbar {
     width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 10px;
+    border: 2px solid hsl(var(--background));
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.4);
   }
   
   .dark ::-webkit-scrollbar-track {
@@ -81,7 +127,7 @@
   
   .dark ::-webkit-scrollbar-thumb {
     background: hsl(0 0% 20%);
-    border-radius: 4px;
+    border-color: hsl(0 0% 5%);
   }
   
   .dark ::-webkit-scrollbar-thumb:hover {
@@ -97,8 +143,11 @@
     outline-color: hsl(217 91% 60%);
   }
 
+  /* Smooth transitions for all theme changes */
   * {
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   img,
@@ -107,9 +156,19 @@
     height: auto;
   }
 
+  /* Apple-style focus rings */
   *:focus-visible {
     outline: 2px solid hsl(var(--primary));
     outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+
+  /* Backdrop blur support */
+  @supports (backdrop-filter: blur(20px)) {
+    .backdrop-blur-apple {
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+    }
   }
 }
 
@@ -118,41 +177,52 @@
     @apply bg-gradient-to-r from-enarva-start to-enarva-end text-white;
   }
   
+  /* Page title pattern - consistent across all pages */
+  .page-header {
+    @apply mb-6 space-y-2;
+  }
+
+  .page-title {
+    @apply text-2xl md:text-3xl font-bold text-foreground tracking-tight;
+  }
+
+  .page-subtitle {
+    @apply text-sm md:text-base text-muted-foreground;
+  }
+
+  /* Mobile-optimized page content */
+  .main-content {
+    @apply p-4 md:p-6 lg:p-8;
+  }
+
+  /* Apple-style card */
+  .apple-card {
+    @apply bg-card/50 backdrop-blur-xl border border-border/50 rounded-2xl shadow-sm;
+    @apply hover:shadow-md hover:border-border/80 transition-all duration-300;
+  }
+
+  /* Thread card for consistent styling */
   .thread-card {
-    @apply bg-card border border-border rounded-20px shadow-sm hover:shadow-md transition-all duration-200;
+    @apply bg-card border border-border/50 rounded-xl shadow-sm;
+    @apply hover:shadow-md hover:border-border transition-all duration-200;
   }
   
   .dark .thread-card {
     @apply shadow-gray-900/50 hover:shadow-gray-900/70;
   }
-
-  .main-content {
-    @apply p-2 sm:p-4 md:p-6;
-  }
   
+  /* Responsive grid */
   .responsive-grid {
-    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6;
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
   }
-  
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
+
+  /* Button mobile optimization */
+  .btn-mobile-icon {
+    @apply sm:w-auto w-10 h-10 p-0 sm:px-4 sm:py-2;
   }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted));
-    border-radius: 20px;
-  }
-  
-  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: hsl(0 0% 20%);
-  }
-  
-  .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(0 0% 30%);
+
+  .btn-mobile-icon span {
+    @apply hidden sm:inline;
   }
 
   .animate-shine {
@@ -192,29 +262,20 @@
     }
   }
 
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-  .animate-spin {
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .animate-fade-in {
-    animation: fadeIn 0.3s ease-out;
-  }
-  
   .skeleton {
-    @apply animate-pulse bg-muted rounded;
+    @apply bg-gradient-to-r from-muted via-muted/50 to-muted;
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite linear;
   }
   
   .dark .skeleton {
-    background-color: hsl(0 0% 15%);
+    background: linear-gradient(
+      90deg,
+      hsl(0 0% 15%) 0%,
+      hsl(0 0% 20%) 50%,
+      hsl(0 0% 15%) 100%
+    );
+    background-size: 1000px 100%;
   }
 
   .rounded-full {
@@ -282,31 +343,54 @@
     object-fit: contain;
     object-position: center;
   }
+}
 
-  .dark .custom-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+/* Skeleton loading animations */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
   }
-
-  .dark .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .dark .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.2);
-    border-radius: 20px;
-    border: none;
-  }
-
-  .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.3);
+  100% {
+    background-position: 1000px 0;
   }
 }
 
+/* Apple-style loading spinner */
+@keyframes spin-smooth {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-smooth {
+  animation: spin-smooth 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Fade in animation for page loads */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mobile optimizations */
 @media (max-width: 768px) {
   button,
   a,
@@ -357,6 +441,21 @@
     .sidebar-container {
       transition: none !important;
     }
+  }
+
+  .main-content {
+    padding: 1rem;
+  }
+}
+
+/* Mobile touch optimization */
+@media (hover: none) {
+  .hover\:scale-105:hover {
+    transform: none;
+  }
+  
+  .hover\:shadow-lg:hover {
+    box-shadow: none;
   }
 }
 
@@ -410,48 +509,9 @@ body {
   overscroll-behavior-x: none;
 }
 
-/* Main content area spacing for megatopbar */
+/* Main content area spacing */
 .main-content {
   min-height: calc(100vh - 5rem);
-  padding: 1.5rem;
-}
-
-@media (max-width: 768px) {
-  .main-content {
-    padding: 1rem;
-  }
-}
-
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
 }
 
 /* Touch feedback */
@@ -475,7 +535,17 @@ canvas {
   user-select: none;
 }
 
-/* Add at the END of your globals.css file */
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}
 
 /* ============================================
    RTL SUPPORT FOR ARABIC - COMPREHENSIVE FIX
@@ -518,11 +588,6 @@ canvas {
 [dir="rtl"] .space-x-4 > * + * {
   margin-left: 0;
   margin-right: 1rem;
-}
-
-[dir="rtl"] .gap-2,
-[dir="rtl"] .gap-4 {
-  /* Gap works fine in RTL, no changes needed */
 }
 
 /* Fix margin utilities */
@@ -573,24 +638,16 @@ canvas {
 }
 
 /* Only flip specific directional icons */
-[dir="rtl"] .lucide-arrow-left {
-  transform: scaleX(-1);
-}
-
-[dir="rtl"] .lucide-arrow-right {
-  transform: scaleX(-1);
-}
-
-[dir="rtl"] .lucide-chevron-left {
-  transform: scaleX(-1);
-}
-
+[dir="rtl"] .lucide-arrow-left,
+[dir="rtl"] .lucide-arrow-right,
+[dir="rtl"] .lucide-chevron-left,
 [dir="rtl"] .lucide-chevron-right {
   transform: scaleX(-1);
 }
 
 /* Fix card layouts in RTL */
-[dir="rtl"] .thread-card {
+[dir="rtl"] .thread-card,
+[dir="rtl"] .apple-card {
   text-align: right;
 }
 
@@ -674,7 +731,7 @@ canvas {
 }
 
 /* Fix stats cards layout */
-[dir="rtl"] .grid.grid-cols-1.md\\:grid-cols-4 {
+[dir="rtl"] .grid.grid-cols-1.md\:grid-cols-4 {
   direction: rtl;
 }
 

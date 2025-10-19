@@ -1,4 +1,4 @@
-// tailwind.config.js
+// tailwind.config.js - ENHANCED WITH APPLE-STYLE UTILITIES
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
@@ -13,8 +13,7 @@ module.exports = {
       center: true,
       padding: "2rem",
       screens: {
-        "2xl": "1400px",
-      },
+        "2xl": "1400px",},
     },
     extend: {
       colors: {
@@ -51,53 +50,60 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Enarva brand colors for gradient
-        enarva: {
-          start: '#267df4',
-          end: '#2155c9',
-        },
+        // Enarva brand colors
+        'enarva-start': '#4A90E2',
+        'enarva-end': '#50C878',
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
-        '20px': '20px', // Custom radius for cards
+      },
+      fontFamily: {
+        poppins: ['var(--font-poppins)', 'system-ui', 'sans-serif'],
       },
       keyframes: {
         "accordion-down": {
-          from: { height: "0" },
+          from: { height: 0 },
           to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
           from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
+          to: { height: 0 },
         },
-        "fade-in": {
-          from: { opacity: "0" },
-          toto: { opacity: "1" },
+        shimmer: {
+          '0%': { backgroundPosition: '-1000px 0' },
+          '100%': { backgroundPosition: '1000px 0' },
         },
-        "slide-in-from-top": {
-          from: { transform: "translateY(-100%)" },
-          to: { transform: "translateY(0)" },
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
-        "wave-rise": {
-          "0%": { transform: "translateY(100%)" },
-          "50%": { transform: "translateY(-10%)" },
-          "100%": { transform: "translateY(100%)" },
+        slideIn: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(0)' },
+        },
+        scaleIn: {
+          '0%': { transform: 'scale(0.9)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in": "fade-in 0.3s ease-out",
-        "slide-in-from-top": "slide-in-from-top 0.3s ease-out",
-        "wave-rise": "wave-rise 3s ease-in-out infinite",
+        shimmer: "shimmer 2s infinite linear",
+        fadeIn: "fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+        slideIn: "slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        scaleIn: "scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
       },
-      fontFamily: {
-        poppins: ['var(--font-poppins)', 'Poppins', 'system-ui', 'sans-serif'],
+      backdropBlur: {
+        xs: '2px',
+        apple: '20px',
       },
-      transitionProperty: {
-        'colors-transform': 'color, background-color, border-color, text-decoration-color, fill, stroke, transform',
+      boxShadow: {
+        'apple': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+        'apple-lg': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+        'apple-xl': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
       },
     },
   },

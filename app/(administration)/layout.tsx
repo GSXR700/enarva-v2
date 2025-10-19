@@ -1,3 +1,4 @@
+// app/(administration)/layout.tsx - ENHANCED WITH APPLE-STYLE TRANSITIONS
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -6,14 +7,14 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { TopBar } from '@/components/layout/TopBar'
 import { Toaster } from '@/components/ui/sonner'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
+import { motion, AnimatePresence } from 'framer-motion'
+import { usePathname } from 'next/navigation'
 
-// Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5,
       retry: (failureCount, error: any) => {
-        // Don't retry on 4xx errors
         if (error?.status && typeof error.status === 'number') {
           return error.status >= 500 && failureCount < 3;
         }
@@ -22,7 +23,6 @@ const queryClient = new QueryClient({
     },
     mutations: {
       retry: (failureCount, error: any) => {
-        // Don't retry mutations on 4xx errors
         if (error?.status && typeof error.status === 'number') {
           return error.status >= 500 && failureCount < 2;
         }
@@ -37,13 +37,11 @@ export default function AdministrationLayout({
 }: {
   children: React.ReactNode
 }) {
-  // Start with sidebar closed
   const [isSidebarOpen, setSidebarOpen] = useState(false)
+  const pathname = usePathname()
 
-  // Initialize push notification logic
   usePushNotifications()
 
-  // Handle escape key to close sidebar
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isSidebarOpen) {
@@ -57,7 +55,7 @@ export default function AdministrationLayout({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex h-screen bg-background">
+      <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar 
           isOpen={isSidebarOpen} 
           setOpen={setSidebarOpen} 
@@ -66,10 +64,22 @@ export default function AdministrationLayout({
         <div className="flex-1 flex flex-col overflow-hidden">
           <TopBar onMenuClick={() => setSidebarOpen(true)} />
           
-          <main className="flex-1 overflow-y-auto">
-            <div className="h-full">
-              {children}
-            </div>
+          <main className="flex-1 overflow-y-auto bg-background custom-scrollbar">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={pathname}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{
+                  duration: 0.3,
+                  ease: [0.4, 0, 0.2, 1]
+                }}
+                className="h-full"
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
           </main>
         </div>
         
