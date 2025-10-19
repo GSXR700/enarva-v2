@@ -1,4 +1,4 @@
-// app/(administration)/billing/[id]/page.tsx - COMPLETE CORRECTED VERSION
+// app/(administration)/billing/[id]/page.tsx - VERSION AVEC TTC
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -110,12 +110,12 @@ export default function InvoiceDetailPage() {
       if (!response.ok) throw new Error('Erreur lors du chargement');
       const data = await response.json();
       setInvoice(data);
-      // Set default payment amount to remaining amount
-      setPaymentAmount(data.remainingAmount.toString());
+      // ✅ Set default payment amount to remaining amount TTC
+      setPaymentAmount((data.remainingAmount * 1.20).toFixed(2));
     } catch (error) {
       console.error('Error fetching invoice:', error);
       toast.error('Erreur lors du chargement de la facture');
-      } finally {
+    } finally {
       setIsLoading(false);
     }
   };
@@ -158,7 +158,10 @@ export default function InvoiceDetailPage() {
       return;
     }
 
-    if (amount > invoice.remainingAmount) {
+    // ✅ Compare with remaining TTC
+    const remainingTTC = invoice.remainingAmount * 1.20;
+    
+    if (amount > remainingTTC) {
       toast.error('Le montant dépasse le reste à payer');
       return;
     }
@@ -166,11 +169,14 @@ export default function InvoiceDetailPage() {
     try {
       setIsProcessingPayment(true);
 
+      // ✅ Convert TTC to HT before sending to API
+      const paymentAmountHT = amount / 1.20;
+
       const response = await fetch(`/api/invoices/${invoice.id}/payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          paymentAmount: amount,
+          paymentAmount: paymentAmountHT,
           paymentType
         })
       });
@@ -382,17 +388,17 @@ export default function InvoiceDetailPage() {
 
                   <div className="border-t-2 border-gray-200 dark:border-gray-700 my-4"></div>
 
-                  {/* Avances payées */}
+                  {/* Avances payées TTC */}
                   <div className="flex justify-between items-center p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
                     <span className="text-sm font-medium text-green-700 dark:text-green-300">
                       Avances payées
                     </span>
                     <span className="text-xl font-bold text-green-600 dark:text-green-400">
-                      {formatCurrency(invoice.advanceAmount)}
+                      {formatCurrency(invoice.advanceAmount * 1.20)}
                     </span>
                   </div>
 
-                  {/* Reste à payer */}
+                  {/* Reste à payer TTC */}
                   <div className={`flex justify-between items-center p-4 rounded-lg border-2 ${
                     isFullyPaid
                       ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800'
@@ -410,7 +416,7 @@ export default function InvoiceDetailPage() {
                         ? 'text-green-600 dark:text-green-400'
                         : 'text-orange-600 dark:text-orange-400'
                     }`}>
-                      {formatCurrency(invoice.remainingAmount)}
+                      {formatCurrency(invoice.remainingAmount * 1.20)}
                     </span>
                   </div>
 
@@ -451,14 +457,14 @@ export default function InvoiceDetailPage() {
                         </DialogHeader>
                         
                         <div className="space-y-6 py-4">
-                          {/* Reste à payer info */}
+                          {/* Reste à payer info TTC */}
                           <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
                             <div className="flex justify-between items-center">
                               <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                                Reste à payer
+                                Reste à payer (TTC)
                               </span>
                               <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                                {formatCurrency(invoice.remainingAmount)}
+                                {formatCurrency(invoice.remainingAmount * 1.20)}
                               </span>
                             </div>
                           </div>
@@ -466,14 +472,14 @@ export default function InvoiceDetailPage() {
                           {/* Montant du paiement */}
                           <div className="space-y-2">
                             <Label htmlFor="paymentAmount" className="text-base font-semibold">
-                              Montant du paiement (MAD)
+                              Montant du paiement TTC (MAD)
                             </Label>
                             <Input
                               id="paymentAmount"
                               type="number"
                               step="0.01"
                               min="0"
-                              max={invoice.remainingAmount}
+                              max={invoice.remainingAmount * 1.20}
                               value={paymentAmount}
                               onChange={(e) => setPaymentAmount(e.target.value)}
                               placeholder="0.00"
@@ -484,7 +490,7 @@ export default function InvoiceDetailPage() {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setPaymentAmount((invoice.remainingAmount / 2).toFixed(2))}
+                                onClick={() => setPaymentAmount(((invoice.remainingAmount * 1.20) / 2).toFixed(2))}
                               >
                                 50%
                               </Button>
@@ -492,7 +498,7 @@ export default function InvoiceDetailPage() {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setPaymentAmount(invoice.remainingAmount.toString())}
+                                onClick={() => setPaymentAmount((invoice.remainingAmount * 1.20).toFixed(2))}
                               >
                                 100%
                               </Button>

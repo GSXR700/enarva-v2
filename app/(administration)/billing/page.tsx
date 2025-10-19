@@ -144,10 +144,10 @@ export default function BillingPage() {
     );
   }
 
-  const totalAmount = invoices.reduce((sum, inv) => sum + Number(inv.amount), 0);
-  const paidAmount = invoices.filter(inv => inv.status === 'PAID').reduce((sum, inv) => sum + Number(inv.amount), 0);
-  const pendingAmount = invoices.filter(inv => inv.status === 'SENT').reduce((sum, inv) => sum + Number(inv.amount), 0);
-  const overdueAmount = invoices.filter(inv => inv.status === 'OVERDUE').reduce((sum, inv) => sum + Number(inv.amount), 0);
+  const totalAmount = invoices.reduce((sum, inv) => sum + (Number(inv.amount) * 1.20), 0);
+const paidAmount = invoices.filter(inv => inv.status === 'PAID').reduce((sum, inv) => sum + (Number(inv.amount) * 1.20), 0);
+const pendingAmount = invoices.filter(inv => inv.status === 'SENT').reduce((sum, inv) => sum + (Number(inv.amount) * 1.20), 0);
+const overdueAmount = invoices.filter(inv => inv.status === 'OVERDUE').reduce((sum, inv) => sum + (Number(inv.amount) * 1.20), 0);
 
   const paidCount = invoices.filter(inv => inv.status === 'PAID').length;
   const pendingCount = invoices.filter(inv => inv.status === 'SENT').length;
@@ -353,7 +353,7 @@ export default function BillingPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="font-bold text-blue-600 dark:text-blue-400">
-                          {formatCurrency(Number(invoice.amount))}
+                          {formatCurrency(Number(invoice.amount) * 1.20)}
                         </span>
                       </td>
                       <td className="px-4 py-3">
