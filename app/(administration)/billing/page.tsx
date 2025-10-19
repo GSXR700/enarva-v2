@@ -361,7 +361,7 @@ export default function BillingPage() {
                           {getStatusLabel(invoice.status)}
                         </Badge>
                       </td>
-                      // app/(administration)/billing/page.tsx - AJOUTER CE BOUTON DANS LE TABLEAU
+                      
 // Trouver la section des actions dans le tableau et remplacer par :
 
 <td className="px-4 py-3">
@@ -398,7 +398,7 @@ export default function BillingPage() {
           className="hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600"
           title="Enregistrer un paiement"
         >
-          <CreditCard className="w-4 h-4" />
+         <CreditCard className="w-4 h-4" />
         </Button>
       </Link>
     )}
