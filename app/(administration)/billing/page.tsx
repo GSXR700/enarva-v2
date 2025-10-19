@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, FileText, Download, Eye, TrendingUp, TrendingDown, DollarSign, Search } from 'lucide-react'
+import { Plus, FileText, Download, Eye, TrendingUp, TrendingDown, DollarSign, Search, CreditCard } from 'lucide-react'
 import { Invoice, Lead, Mission } from '@prisma/client'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton'
@@ -361,32 +361,49 @@ export default function BillingPage() {
                           {getStatusLabel(invoice.status)}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <Link href={`/billing/${invoice.id}`}>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              className="hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          </Link>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleDownload(invoice.id, invoice.invoiceNumber)}
-                            disabled={downloadingId === invoice.id}
-                            className="hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600"
-                          >
-                            {downloadingId === invoice.id ? (
-                              <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600" />
-                            ) : (
-                              <Download className="w-4 h-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </td>
+                      // app/(administration)/billing/page.tsx - AJOUTER CE BOUTON DANS LE TABLEAU
+// Trouver la section des actions dans le tableau et remplacer par :
+
+<td className="px-4 py-3">
+  <div className="flex gap-2">
+    <Link href={`/billing/${invoice.id}`}>
+      <Button 
+        variant="ghost" 
+        size="sm"
+        className="hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600"
+        title="Voir détails et gérer paiements"
+      >
+        <Eye className="w-4 h-4" />
+      </Button>
+    </Link>
+    <Button 
+      variant="ghost" 
+      size="sm"
+      onClick={() => handleDownload(invoice.id, invoice.invoiceNumber)}
+      disabled={downloadingId === invoice.id}
+      className="hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600"
+      title="Télécharger PDF"
+    >
+      {downloadingId === invoice.id ? (
+        <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+      ) : (
+        <Download className="w-4 h-4" />
+      )}
+    </Button>
+    {invoice.status !== 'PAID' && (
+      <Link href={`/billing/${invoice.id}`}>
+        <Button 
+          variant="ghost" 
+          size="sm"
+          className="hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600"
+          title="Enregistrer un paiement"
+        >
+          <CreditCard className="w-4 h-4" />
+        </Button>
+      </Link>
+    )}
+  </div>
+</td>
                     </tr>
                   ))}
                 </tbody>

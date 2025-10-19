@@ -1,4 +1,4 @@
-// app/api/invoices/[id]/route.ts - COMPLETE WITH ADVANCE PAYMENT SYSTEM
+// app/api/invoices/[id]/route.ts - MISE À JOUR POUR INCLURE QUOTE
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -21,6 +21,7 @@ export async function GET(
     
     const invoice = await prisma.invoice.findUnique({ 
       where: { id },
+      // Dans la fonction GET, remplacez l'include par :
       include: { 
         lead: {
           select: {
@@ -30,7 +31,10 @@ export async function GET(
             email: true,
             phone: true,
             company: true,
-            address: true
+            address: true,
+            leadType: true,
+            iceNumber: true,
+            materials: true
           }
         },
         mission: {
@@ -39,7 +43,29 @@ export async function GET(
             missionNumber: true,
             status: true,
             scheduledDate: true,
-            actualEndTime: true
+            actualEndTime: true,
+            quote: {
+              select: {
+                id: true,
+                quoteNumber: true,
+                businessType: true,
+                serviceType: true,
+                propertyType: true,
+                surface: true,
+                levels: true,
+                lineItems: true,
+                subTotalHT: true,
+                vatAmount: true,
+                totalTTC: true,
+                finalPrice: true,
+                deliveryType: true,
+                lead: {
+                  select: {
+                    materials: true
+                  }
+                }
+              }
+            }
           }
         }
       }

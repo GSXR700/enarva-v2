@@ -1,6 +1,6 @@
-// lib/invoice-pdf-generator.ts - FINAL CORRECTED VERSION
+// lib/invoice-pdf-generator-enhanced.ts - CORRECTED VERSION
 import jsPDF from 'jspdf';
-import { Invoice, Lead, Mission, InvoiceStatus } from '@prisma/client';
+import { Invoice, Lead, Mission, Quote } from '@prisma/client';
 import { poppinsNormal, poppinsBold } from './fonts';
 import { PDF_IMAGES } from './pdf-assets';
 import {
@@ -12,15 +12,19 @@ import {
   MARGIN_RIGHT,
   CONTENT_WIDTH,
   setColor,
-  formatCurrency
+  formatCurrency,
+  numberToFrenchWords
 } from './pdf-utils';
 
 type InvoiceWithRelations = Invoice & {
   lead: Lead;
-  mission: Mission | null;
+  mission: (Mission & {
+    quote: Quote | null;
+  }) | null;
 };
 
 export function generateInvoicePDF(invoice: InvoiceWithRelations): Uint8Array {
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'pt',
@@ -31,7 +35,6 @@ export function generateInvoicePDF(invoice: InvoiceWithRelations): Uint8Array {
   try {
     doc.addFileToVFS('Poppins-Regular.ttf', poppinsNormal);
     doc.addFont('Poppins-Regular.ttf', 'Poppins', 'normal');
-    // [FIXED] Corrected the typo from 'addFileToVfs' to 'addFileToVFS'
     doc.addFileToVFS('Poppins-Bold.ttf', poppinsBold);
     doc.addFont('Poppins-Bold.ttf', 'Poppins', 'bold');
   } catch (e) {
@@ -135,29 +138,169 @@ export function generateInvoicePDF(invoice: InvoiceWithRelations): Uint8Array {
 
   yPos = Math.max(yPos, clientYPos) + 20;
 
-  // DESCRIPTION SECTION
-  doc.setFont('Poppins', 'bold');
-  doc.setFontSize(11);
-  setColor(doc, BLUE_PRIMARY);
-  doc.text('DESCRIPTION', MARGIN_LEFT, yPos);
-  yPos += 14;
+  // Get quote data if available
+  const quote = invoice.mission?.quote;
+  const businessType = quote?.businessType || 'SERVICE';
+  
+  // OBJET SECTION (for services only)
+  if (businessType === 'SERVICE' && quote) {
+    const objetBoxHeight = 32;
+    const objetBoxY = yPos;
+    
+    doc.setFillColor(59, 130, 246);
+    doc.roundedRect(MARGIN_LEFT, objetBoxY, CONTENT_WIDTH, objetBoxHeight, 8, 8, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(11);
+    
+    const objetText = `OBJET : ${invoice.description || 'Prestation de nettoyage'}`;
+    const objetTextWidth = doc.getTextWidth(objetText);
+    const objetTextX = MARGIN_LEFT + (CONTENT_WIDTH - objetTextWidth) / 2;
+    doc.text(objetText, objetTextX, objetBoxY + 20);
 
+    yPos = objetBoxY + objetBoxHeight + 25;
+  }
+
+  // CONTENT SECTION
+  if (businessType === 'SERVICE' && quote) {
+    yPos = renderServiceSectionForInvoice(doc, quote, yPos);
+    yPos = renderForfaitTable(doc, invoice.description || 'Prestation de nettoyage', Number(invoice.amount), yPos);
+  } else if (quote && quote.lineItems) {
+    yPos = renderProductTableForInvoice(doc, quote.lineItems as any, yPos);
+  }
+
+  // PRICING SECTION WITH AMOUNT IN WORDS
+  yPos = renderInvoicePricingSection(doc, invoice, yPos);
+
+  // PAYMENT CONDITIONS
+  yPos = renderPaymentConditions(doc, invoice, yPos, businessType);
+
+  // FOOTER
+  renderFooter(doc);
+
+  const buffer = doc.output('arraybuffer');
+  return new Uint8Array(buffer);
+}
+
+function renderServiceSectionForInvoice(doc: jsPDF, quote: any, startY: number): number {
+  let yPos = startY;
+
+  const surface = quote.surface || 170;
+  
+  // 1. PERSONNEL
+  yPos += 8;
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(10);
+  setColor(doc, BLUE_PRIMARY);
+  doc.text('1- Personnel mobilisé:', MARGIN_LEFT, yPos);
+  yPos += 14;
+  
   doc.setFont('Poppins', 'normal');
   doc.setFontSize(9);
   setColor(doc, TEXT_DARK);
-  const description = invoice.description || 'Prestation de nettoyage';
-  const splitDescription = doc.splitTextToSize(description, CONTENT_WIDTH - 40);
-  splitDescription.forEach((line: string) => {
-    doc.text(line, MARGIN_LEFT, yPos);
-    yPos += 12;
+  
+  const teamSize = Math.ceil(surface / 50);
+  const personnelItems = [
+    'Chef d\'équipe : supervision et contrôle qualité',
+    `Agent${teamSize > 1 ? 's' : ''} de nettoyage (${teamSize} personne${teamSize > 1 ? 's' : ''})`
+  ];
+  
+  personnelItems.forEach((item) => {
+    doc.text(`• ${item}`, MARGIN_LEFT + 10, yPos);
+    yPos += 13;
+  });
+
+  // 2. ÉQUIPEMENTS
+  yPos += 8;
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(10);
+  setColor(doc, BLUE_PRIMARY);
+  doc.text('2- Équipements utilisés:', MARGIN_LEFT, yPos);
+  yPos += 14;
+  
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  setColor(doc, TEXT_DARK);
+  
+  const equipements = [
+    'Aspirateurs professionnels',
+    'Nettoyeurs vapeur',
+    'Matériel de lavage professionnel'
+  ];
+  
+  equipements.forEach((item) => {
+    doc.text(`• ${item}`, MARGIN_LEFT + 10, yPos);
+    yPos += 13;
+  });
+
+  // 3. PRODUITS (if materials specified)
+  if (quote.lead?.materials) {
+    yPos += 8;
+    doc.setFont('Poppins', 'bold');
+    doc.setFontSize(10);
+    setColor(doc, BLUE_PRIMARY);
+    doc.text('3- Produits spécifiques utilisés:', MARGIN_LEFT, yPos);
+    yPos += 14;
+    
+    doc.setFont('Poppins', 'normal');
+    doc.setFontSize(9);
+    setColor(doc, TEXT_DARK);
+    
+    try {
+      const materials = typeof quote.lead.materials === 'string' 
+        ? JSON.parse(quote.lead.materials) 
+        : quote.lead.materials;
+      
+      const materialNames: string[] = [];
+      if (materials.marble) materialNames.push('Nettoyant pour marbre');
+      if (materials.parquet) materialNames.push('Produit spécial bois');
+      if (materials.tiles) materialNames.push('Dégraissant carrelage');
+      if (materials.carpet) materialNames.push('Shampoing moquette');
+      
+      materialNames.forEach((name) => {
+        doc.text(`• ${name}`, MARGIN_LEFT + 10, yPos);
+        yPos += 13;
+      });
+    } catch (e) {
+      console.warn('Error parsing materials:', e);
+    }
+  }
+
+  // 4. PRESTATIONS
+  yPos += 8;
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(10);
+  setColor(doc, BLUE_PRIMARY);
+  doc.text('4- Détail des prestations:', MARGIN_LEFT, yPos);
+  yPos += 14;
+  
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  setColor(doc, TEXT_DARK);
+  
+  const prestations = [
+    'Nettoyage complet des surfaces',
+    'Dépoussiérage et désinfection',
+    'Lavage des vitres',
+    'Traitement des sols'
+  ];
+  
+  prestations.forEach((item) => {
+    doc.text(`• ${item}`, MARGIN_LEFT + 10, yPos);
+    yPos += 13;
   });
 
   yPos += 20;
+  return yPos;
+}
 
-  // PAYMENT DETAILS TABLE
+function renderForfaitTable(doc: jsPDF, description: string, amount: number, startY: number): number {
+  let yPos = startY;
+
   const tableStartY = yPos;
   const headerRowHeight = 45;
-  const dataRowHeight = 35;
+  const dataRowHeight = 50;
   const tableRadius = 8;
 
   // Table header
@@ -168,105 +311,226 @@ export function generateInvoicePDF(invoice: InvoiceWithRelations): Uint8Array {
   doc.setTextColor(255, 255, 255);
   doc.setFont('Poppins', 'bold');
   doc.setFontSize(10);
-  doc.text('DÉTAIL DU PAIEMENT', MARGIN_LEFT + 15, tableStartY + 28);
+  doc.text('Désignation', MARGIN_LEFT + 15, tableStartY + 28);
+  doc.text('Quantité', MARGIN_LEFT + 300, tableStartY + 28, { align: 'center' });
+  doc.text('Prix unit. HT', MARGIN_LEFT + 395, tableStartY + 28, { align: 'center' });
+  doc.text('Total HT', MARGIN_LEFT + CONTENT_WIDTH - 15, tableStartY + 28, { align: 'right' });
 
+  // Data row
   yPos = tableStartY + headerRowHeight;
+  doc.setFillColor(255, 255, 255);
+  doc.rect(MARGIN_LEFT, yPos, CONTENT_WIDTH, dataRowHeight, 'F');
 
-  // Payment rows
-  const amount = Number(invoice.amount);
-  const advanceAmount = Number(invoice.advanceAmount);
-  const remainingAmount = Number(invoice.remainingAmount);
-  const isPaid = remainingAmount === 0;
+  setColor(doc, TEXT_DARK);
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  
+  const designationLines = doc.splitTextToSize(description, 220);
+  const designationHeight = designationLines.length * 12;
+  const designationStartY = yPos + (dataRowHeight - designationHeight) / 2 + 10;
+  
+  designationLines.forEach((line: string, index: number) => {
+    doc.text(line, MARGIN_LEFT + 15, designationStartY + (index * 12));
+  });
+  
+  doc.text('Forfait', MARGIN_LEFT + 300, yPos + 28, { align: 'center' });
+  doc.text(formatCurrency(amount), MARGIN_LEFT + 395, yPos + 28, { align: 'center' });
+  doc.text(formatCurrency(amount), MARGIN_LEFT + CONTENT_WIDTH - 15, yPos + 28, { align: 'right' });
 
-  const paymentRows = [
-    { label: 'Montant Total HT', value: formatCurrency(amount), bold: true },
-    { label: 'TVA (20%)', value: formatCurrency(amount * 0.20), normal: true },
-    { label: 'Total TTC', value: formatCurrency(amount * 1.20), bold: true, big: true },
-    { label: 'Avance Payée', value: formatCurrency(advanceAmount), color: '#10b981' },
-    { label: 'Reste à Payer', value: formatCurrency(remainingAmount), bold: true, color: isPaid ? '#10b981' : '#ef4444' }
-  ];
+  // Table border
+  doc.setDrawColor(30, 58, 138);
+  doc.setLineWidth(1.5);
+  doc.roundedRect(MARGIN_LEFT, tableStartY, CONTENT_WIDTH, headerRowHeight + dataRowHeight, tableRadius, tableRadius, 'S');
+  doc.line(MARGIN_LEFT, tableStartY + headerRowHeight, MARGIN_LEFT + CONTENT_WIDTH, tableStartY + headerRowHeight);
 
-  paymentRows.forEach((row, index) => {
-    const rowY = yPos + (index * dataRowHeight);
-    
+  return yPos + dataRowHeight + 25;
+}
+
+function renderProductTableForInvoice(doc: jsPDF, lineItems: any[], startY: number): number {
+  let yPos = startY;
+
+  const tableStartY = yPos;
+  const headerHeight = 45;
+  const rowHeight = 35;
+  const tableRadius = 8;
+  
+  // Header
+  doc.setFillColor(30, 58, 138);
+  doc.roundedRect(MARGIN_LEFT, tableStartY, CONTENT_WIDTH, headerHeight, tableRadius, tableRadius, 'F');
+  doc.rect(MARGIN_LEFT, tableStartY + headerHeight - tableRadius, CONTENT_WIDTH, tableRadius, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(10);
+  doc.text('Désignation', MARGIN_LEFT + 15, tableStartY + 28);
+  doc.text('Qté', MARGIN_LEFT + 280, tableStartY + 28, { align: 'center' });
+  doc.text('Prix U. HT', MARGIN_LEFT + 370, tableStartY + 28, { align: 'center' });
+  doc.text('Total HT', MARGIN_LEFT + CONTENT_WIDTH - 15, tableStartY + 28, { align: 'right' });
+
+  yPos = tableStartY + headerHeight;
+
+  // Parse line items
+  const items = Array.isArray(lineItems) ? lineItems : JSON.parse(lineItems as any);
+
+  items.forEach((item: any, index: number) => {
     if (index % 2 === 0) {
       doc.setFillColor(250, 250, 250);
-      doc.rect(MARGIN_LEFT, rowY, CONTENT_WIDTH, dataRowHeight, 'F');
     } else {
       doc.setFillColor(255, 255, 255);
-      doc.rect(MARGIN_LEFT, rowY, CONTENT_WIDTH, dataRowHeight, 'F');
     }
+    doc.rect(MARGIN_LEFT, yPos, CONTENT_WIDTH, rowHeight, 'F');
 
-    const verticalCenter = rowY + (dataRowHeight / 2) + 3;
+    setColor(doc, TEXT_DARK);
+    doc.setFont('Poppins', 'normal');
+    doc.setFontSize(9);
 
-    doc.setFont('Poppins', row.bold ? 'bold' : 'normal');
-    doc.setFontSize(row.big ? 12 : 10);
-    
-    if (row.color) {
-      const rgb = hexToRgb(row.color);
-      doc.setTextColor(rgb.r, rgb.g, rgb.b);
-    } else {
-      setColor(doc, TEXT_DARK);
-    }
-    
-    doc.text(row.label, MARGIN_LEFT + 15, verticalCenter);
-    doc.text(row.value, MARGIN_LEFT + CONTENT_WIDTH - 15, verticalCenter, { align: 'right' });
-    
-    doc.setTextColor(0, 0, 0);
+    const desc = item.designation || item.description || 'Article';
+    doc.text(desc, MARGIN_LEFT + 15, yPos + 22);
+    doc.text(String(item.quantity || 1), MARGIN_LEFT + 280, yPos + 22, { align: 'center' });
+    doc.text(formatCurrency(item.unitPrice || 0), MARGIN_LEFT + 370, yPos + 22, { align: 'center' });
+    doc.text(formatCurrency(item.totalPrice || 0), MARGIN_LEFT + CONTENT_WIDTH - 15, yPos + 22, { align: 'right' });
 
-    if (index < paymentRows.length - 1) {
+    if (index < items.length - 1) {
       doc.setDrawColor(220, 220, 220);
       doc.setLineWidth(0.5);
-      doc.line(MARGIN_LEFT, rowY + dataRowHeight, MARGIN_LEFT + CONTENT_WIDTH, rowY + dataRowHeight);
+      doc.line(MARGIN_LEFT, yPos + rowHeight, MARGIN_LEFT + CONTENT_WIDTH, yPos + rowHeight);
     }
+
+    yPos += rowHeight;
   });
 
-  const totalTableHeight = headerRowHeight + (paymentRows.length * dataRowHeight);
+  const totalTableHeight = headerHeight + (items.length * rowHeight);
   doc.setDrawColor(30, 58, 138);
   doc.setLineWidth(1.5);
   doc.roundedRect(MARGIN_LEFT, tableStartY, CONTENT_WIDTH, totalTableHeight, tableRadius, tableRadius, 'S');
-  doc.line(MARGIN_LEFT, tableStartY + headerRowHeight, MARGIN_LEFT + CONTENT_WIDTH, tableStartY + headerRowHeight);
+  doc.line(MARGIN_LEFT, tableStartY + headerHeight, MARGIN_LEFT + CONTENT_WIDTH, tableStartY + headerHeight);
 
-  yPos += (paymentRows.length * dataRowHeight) + 30;
+  return yPos + 10;
+}
 
-  // STATUS BADGE
-  const statusConfig = getInvoiceStatusConfig(invoice.status);
-  const statusRgb = hexToRgb(statusConfig.color);
-  doc.setFillColor(statusRgb.r, statusRgb.g, statusRgb.b, 0.2);
-  doc.roundedRect(MARGIN_LEFT, yPos - 5, 80, 20, 5, 5, 'F');
+function renderInvoicePricingSection(
+  doc: jsPDF, 
+  invoice: InvoiceWithRelations, 
+  startY: number
+): number {
+  let yPos = startY;
+
+  const amount = Number(invoice.amount);
+  const vatAmount = amount * 0.20;
+  const totalTTC = amount + vatAmount;
+  const amountInWords = numberToFrenchWords(totalTTC);
+
+  const pricingY = yPos;
   
-  doc.setTextColor(statusRgb.r, statusRgb.g, statusRgb.b);
-  doc.setFont('Poppins', 'bold');
+  // Ligne bleue supérieure
+  doc.setDrawColor(30, 58, 138);
+  doc.setLineWidth(1.5);
+  doc.line(MARGIN_LEFT, pricingY, MARGIN_LEFT + CONTENT_WIDTH, pricingY);
+
+  yPos = pricingY + 15;
+
+  // 50% / 50% split
+  const leftSectionWidth = CONTENT_WIDTH * 0.50;
+  const separatorX = MARGIN_LEFT + leftSectionWidth;
+
+  // Left side - Prix en lettres
+  const priceText = `veuillez arrêter la présente facture au montant de ${amountInWords.toLowerCase()}, toutes taxes comprises.`;
+
+  doc.setFont('Poppins', 'normal');
   doc.setFontSize(10);
-  doc.text(statusConfig.label.toUpperCase(), MARGIN_LEFT + 40, yPos + 8, { align: 'center' });
+  setColor(doc, BLUE_PRIMARY);
+  const priceLines = doc.splitTextToSize(priceText, leftSectionWidth - 20);
+  priceLines.forEach((line: string, index: number) => {
+    doc.text(line, MARGIN_LEFT, yPos + (index * 11));
+  });
 
-  yPos += 40;
+  // Vertical separator
+  doc.setDrawColor(30, 58, 138);
+  doc.setLineWidth(2.5);
+  const separatorHeight = 90;
+  doc.line(separatorX, pricingY + 10, separatorX, pricingY + 10 + separatorHeight);
 
-  // PAYMENT INSTRUCTIONS
-  if (!isPaid) {
-    doc.setTextColor(100, 100, 100);
-    doc.setFont('Poppins', 'normal');
-    doc.setFontSize(9);
-    
-    const dueDate = new Date(invoice.dueDate).toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric'
+  // Right side - Prix détaillés
+  const rightStartX = separatorX + 20;
+  const rightWidth = (CONTENT_WIDTH * 0.50) - 40;
+
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(9);
+  setColor(doc, TEXT_DARK);
+
+  let rightY = pricingY + 20;
+  
+  // Total HT
+  doc.text('Total HT:', rightStartX, rightY);
+  doc.text(formatCurrency(amount), rightStartX + rightWidth, rightY, { align: 'right' });
+  rightY += 15;
+
+  // TVA
+  doc.text('TVA (20%):', rightStartX, rightY);
+  doc.text(formatCurrency(vatAmount), rightStartX + rightWidth, rightY, { align: 'right' });
+  rightY += 15;
+
+  // Total TTC
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(11);
+  setColor(doc, BLUE_PRIMARY);
+  doc.text('Total TTC:', rightStartX, rightY);
+  doc.text(formatCurrency(totalTTC), rightStartX + rightWidth, rightY, { align: 'right' });
+
+  // Ligne bleue inférieure
+  doc.setDrawColor(30, 58, 138);
+  doc.setLineWidth(1.5);
+  const bottomLineY = pricingY + 10 + separatorHeight + 5;
+  doc.line(MARGIN_LEFT, bottomLineY, MARGIN_LEFT + CONTENT_WIDTH, bottomLineY);
+
+  return bottomLineY + 20;
+}
+
+function renderPaymentConditions(
+  doc: jsPDF,
+  invoice: InvoiceWithRelations,
+  startY: number,
+  businessType: string
+): number {
+  let yPos = startY;
+
+  doc.setFont('Poppins', 'bold');
+  doc.setFontSize(11);
+  setColor(doc, BLUE_PRIMARY);
+  doc.text('CONDITIONS DE PAIEMENT', MARGIN_LEFT, yPos);
+  yPos += 18;
+
+  doc.setFont('Poppins', 'normal');
+  doc.setFontSize(9);
+  setColor(doc, TEXT_DARK);
+
+  const conditions = businessType === 'SERVICE' 
+    ? [
+        'Paiement exigible à réception de la facture',
+        'Modes de paiement acceptés : Virement bancaire, Chèque, Espèces',
+        `Échéance : ${new Date(invoice.dueDate).toLocaleDateString('fr-FR')}`,
+        'RIB : 0508 1002 5011 4358 9520 0174',
+        'Tout retard de paiement entraînera l\'application de pénalités de retard'
+      ]
+    : [
+        'Paiement à la livraison ou selon modalités convenues',
+        'Modes de paiement : Virement, Chèque, Espèces',
+        `Date d'échéance : ${new Date(invoice.dueDate).toLocaleDateString('fr-FR')}`,
+        'RIB : 0508 1002 5011 4358 9520 0174'
+      ];
+
+  conditions.forEach(condition => {
+    const lines = doc.splitTextToSize(`• ${condition}`, CONTENT_WIDTH - 20);
+    lines.forEach((line: string) => {
+      doc.text(line, MARGIN_LEFT + 10, yPos);
+      yPos += 13;
     });
-    
-    doc.text(`Merci de régler cette facture avant le ${dueDate}.`, MARGIN_LEFT, yPos);
-    yPos += 14;
-    doc.text('Mode de paiement: Virement bancaire, Chèque ou Espèces', MARGIN_LEFT, yPos);
-    yPos += 14;
-    doc.text('RIB: 0508 1002 5011 4358 9520 0174', MARGIN_LEFT, yPos);
-  } else {
-    doc.setTextColor(16, 185, 129);
-    doc.setFont('Poppins', 'bold');
-    doc.setFontSize(10);
-    doc.text('✓ Facture payée intégralement', MARGIN_LEFT, yPos);
-  }
+  });
 
-  // FOOTER
+  return yPos + 20;
+}
+
+function renderFooter(doc: jsPDF): void {
   const footerHeight = 85;
   const footerY = PAGE_HEIGHT - footerHeight;
   const footerRadius = 12;
@@ -319,43 +583,4 @@ export function generateInvoicePDF(invoice: InvoiceWithRelations): Uint8Array {
   } catch (e) {
     console.warn("QR code error:", e);
   }
-
-  const buffer = doc.output('arraybuffer');
-  return new Uint8Array(buffer);
-}
-
-/**
- * Converts a hex color string to an RGB object.
- * This version safely handles invalid hex codes by returning a default
- * value (black) if the input string doesn't match the expected format.
- */
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  
-  if (result && result[1] && result[2] && result[3]) {
-    return {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16)
-    };
-  }
-  
-  return { r: 0, g: 0, b: 0 };
-}
-
-/**
- * Returns a configuration object for a given invoice status.
- * This version ensures it always returns a valid config object, even if
- * the status is unknown, by falling back to the 'DRAFT' configuration.
- */
-function getInvoiceStatusConfig(status: InvoiceStatus): { label: string; color: string } {
-  const configs: Record<InvoiceStatus, { label: string; color: string }> = {
-    DRAFT: { label: 'Brouillon', color: '#64748b' },
-    SENT: { label: 'Envoyée', color: '#3b82f6' },
-    PAID: { label: 'Payée', color: '#10b981' },
-    OVERDUE: { label: 'En retard', color: '#ef4444' },
-    CANCELLED: { label: 'Annulée', color: '#64748b' }
-  };
-
-  return configs[status] || configs.DRAFT;
 }
