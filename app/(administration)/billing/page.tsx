@@ -361,8 +361,6 @@ export default function BillingPage() {
                           {getStatusLabel(invoice.status)}
                         </Badge>
                       </td>
-                      
-// Trouver la section des actions dans le tableau et remplacer par :
 
 <td className="px-4 py-3">
   <div className="flex gap-2">
