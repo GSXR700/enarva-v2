@@ -1,4 +1,4 @@
-// components/ThemeToggle.tsx - WORKS WITH YOUR CUSTOM PROVIDER
+// components/ThemeToggle.tsx - FIXED: Perfect containment and positioning
 "use client";
 
 import { useContext, useEffect, useState } from "react";
@@ -46,48 +46,50 @@ export default function ThemeToggle() {
     <button
       onClick={handleToggle}
       type="button"
-      className="relative w-14 h-7 sm:w-16 sm:h-8 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-full p-1 transition-all duration-300 ease-in-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+      className="relative w-14 h-7 sm:w-16 sm:h-8 rounded-full overflow-hidden transition-all duration-300 ease-in-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
       aria-label="Toggle theme"
       aria-pressed={isDark}
+      style={{ padding: 0 }}
     >
-      {/* Background with stars effect for dark mode */}
-      <div className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
-        {isDark && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900"
-          >
-            {/* Animated stars */}
-            {[...Array(5)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-0.5 h-0.5 bg-white rounded-full"
-                style={{
-                  top: `${20 + Math.random() * 60}%`,
-                  left: `${20 + Math.random() * 60}%`,
-                }}
-                animate={{
-                  opacity: [0.2, 1, 0.2],
-                  scale: [0.8, 1.2, 0.8],
-                }}
-                transition={{
-                  duration: 2 + Math.random() * 2,
-                  repeat: Infinity,
-                  delay: Math.random() * 2,
-                }}
-              />
-            ))}
-          </motion.div>
-        )}
-      </div>
+      {/* Background layer */}
+      <div className="absolute inset-0 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600" />
+      
+      {/* Stars background for dark mode - CONTAINED */}
+      {isDark && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900"
+        >
+          {/* Animated stars */}
+          {[...Array(5)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-0.5 h-0.5 bg-white rounded-full"
+              style={{
+                top: `${20 + Math.random() * 60}%`,
+                left: `${20 + Math.random() * 60}%`,
+              }}
+              animate={{
+                opacity: [0.2, 1, 0.2],
+                scale: [0.8, 1.2, 0.8],
+              }}
+              transition={{
+                duration: 2 + Math.random() * 2,
+                repeat: Infinity,
+                delay: Math.random() * 2,
+              }}
+            />
+          ))}
+        </motion.div>
+      )}
 
-      {/* Toggle circle with icon */}
+      {/* Toggle circle with icon - PROPERLY POSITIONED */}
       <motion.div
-        className="relative w-5 h-5 sm:w-6 sm:h-6 bg-white dark:bg-gray-800 rounded-full shadow-md flex items-center justify-center z-10"
+        className="absolute top-0.5 left-0.5 w-6 h-6 sm:top-1 sm:left-1 sm:w-6 sm:h-6 bg-white dark:bg-gray-800 rounded-full shadow-md flex items-center justify-center z-10"
         animate={{
-          x: isDark ? "1.75rem" : "0rem",
+          x: isDark ? "calc(100% + 0.25rem)" : "0rem",
         }}
         transition={{
           type: "spring",

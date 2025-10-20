@@ -143,11 +143,36 @@
     outline-color: hsl(217 91% 60%);
   }
 
-  /* Smooth transitions for all theme changes */
-  * {
+  /* Smooth transitions for theme changes - SCOPED to prevent breaking UI components */
+  html,
+  body,
+  .apple-card,
+  .page-header,
+  nav,
+  aside,
+  header,
+  main {
     transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
                 border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
                 color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Prevent transition interference with UI components */
+  button,
+  input,
+  select,
+  textarea,
+  [role="checkbox"],
+  [role="radio"],
+  [role="switch"],
+  [role="progressbar"],
+  [data-radix-collection-item] {
+    transition: none !important;
+  }
+
+  /* Allow specific transitions for interactive elements */
+  button:not([role="checkbox"]):not([role="radio"]):not([role="switch"]) {
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
   }
 
   img,
