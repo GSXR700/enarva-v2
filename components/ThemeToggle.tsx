@@ -1,4 +1,4 @@
-// components/ThemeToggle.tsx
+// components/ThemeToggle.tsx - FIXED WITHOUT WARNINGS
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,7 +7,7 @@ import { Moon, Sun } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme(); // Removed unused 'theme'
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -16,20 +16,27 @@ export default function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <div className="w-14 h-7 sm:w-16 sm:h-8 bg-gray-200 dark:bg-gray-700 rounded-full" />
+      <div className="w-14 h-7 sm:w-16 sm:h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
     );
   }
 
-  const isDark = theme === "dark";
+  // Use resolvedTheme to get the actual current theme
+  const isDark = resolvedTheme === "dark";
+
+  const handleToggle = () => {
+    const newTheme = isDark ? "light" : "dark";
+    setTheme(newTheme);
+  };
 
   return (
     <button
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      onClick={handleToggle}
       className="relative w-14 h-7 sm:w-16 sm:h-8 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-full p-1 transition-all duration-300 ease-in-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
       aria-label="Toggle theme"
+      aria-pressed={isDark}
     >
       {/* Background with stars effect for dark mode */}
-      <div className="absolute inset-0 rounded-full overflow-hidden">
+      <div className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
         {isDark && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -65,7 +72,7 @@ export default function ThemeToggle() {
       <motion.div
         className="relative w-5 h-5 sm:w-6 sm:h-6 bg-white dark:bg-gray-800 rounded-full shadow-md flex items-center justify-center z-10"
         animate={{
-          x: isDark ? "100%" : "0%",
+          x: isDark ? "calc(100% + 0.25rem)" : "0%",
         }}
         transition={{
           type: "spring",
@@ -74,7 +81,7 @@ export default function ThemeToggle() {
         }}
       >
         <motion.div
-          key={theme}
+          key={isDark ? "dark" : "light"}
           initial={{ opacity: 0, rotate: -30, scale: 0.8 }}
           animate={{ opacity: 1, rotate: 0, scale: 1 }}
           exit={{ opacity: 0, rotate: 30, scale: 0.8 }}
