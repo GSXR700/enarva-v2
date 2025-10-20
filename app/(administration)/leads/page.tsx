@@ -708,19 +708,6 @@ export default function LeadsPage() {
                         </div>
                         <span className="text-xs font-semibold min-w-[2.5rem] text-right">{lead.score || 0}%</span>
                       </div>
-                    </div><div className="flex justify-between items-center pt-2">
-                      <span className="text-xs text-muted-foreground font-medium">Score</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-20 bg-muted/50 rounded-full h-2 overflow-hidden">
-                          <motion.div 
-                            className={`h-2 rounded-full ${getScoreColor(lead.score || 0)}`}
-                            initial={{ width: 0 }}
-                            animate={{ width: `${lead.score || 0}%` }}
-                            transition={{ duration: 0.5, delay: index * 0.1 }}
-                          />
-                        </div>
-                        <span className="text-xs font-semibold min-w-[2.5rem] text-right">{lead.score || 0}%</span>
-                      </div>
                     </div>
                     <div className="flex justify-between items-center pt-3 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
                       <span className="text-xs text-muted-foreground">{formatDate(lead.createdAt)}</span>
