@@ -177,17 +177,17 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="main-content space-y-6 animate-fade-in">
+    <div className="main-content space-y-4 md:space-y-6 animate-fade-in">
       <div className="page-header">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="page-title">Tableau de Bord</h1>
-            <p className="page-subtitle">
+            <h1 className="page-title text-xl sm:text-2xl md:text-3xl">Tableau de Bord</h1>
+            <p className="page-subtitle text-xs sm:text-sm">
               Vue d'ensemble de votre activité Enarva
             </p>
           </div>
           <ClientOnly>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-xs sm:text-sm text-muted-foreground">
               {new Date().toLocaleDateString('fr-FR', {
                 weekday: 'long',
                 year: 'numeric',
@@ -199,7 +199,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* FIXED: 2 cards per row on mobile */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statsCards.map((stat, index) => {
           const Icon = stat.icon
           return (
@@ -216,20 +217,20 @@ export default function Dashboard() {
             >
               <Link href={stat.href}>
                 <Card className="apple-card group hover:scale-[1.02] transition-transform cursor-pointer h-full">
-                  <CardContent className="p-5 space-y-3">
+                  <CardContent className="p-3 sm:p-5 space-y-2 sm:space-y-3">
                     <div className="flex items-start justify-between">
-                      <div className={`w-11 h-11 ${stat.bgColor} rounded-xl flex items-center justify-center transition-transform group-hover:scale-110`}>
-                        <Icon className={`w-5 h-5 ${stat.color}`} />
+                      <div className={`w-8 h-8 sm:w-11 sm:h-11 ${stat.bgColor} rounded-lg sm:rounded-xl flex items-center justify-center transition-transform group-hover:scale-110`}>
+                        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color}`} />
                       </div>
-                      <span className="text-xs font-semibold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] sm:text-xs font-semibold text-green-500 bg-green-500/10 px-1.5 sm:px-2 py-0.5 rounded-full">
                         {stat.trend}
                       </span>
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-foreground leading-none mb-1">
+                      <p className="text-lg sm:text-2xl font-bold text-foreground leading-none mb-0.5 sm:mb-1 truncate">
                         {stat.value}
                       </p>
-                      <p className="text-sm font-medium text-muted-foreground">
+                      <p className="text-[11px] sm:text-sm font-medium text-muted-foreground truncate">
                         {stat.title}
                       </p>
                     </div>
@@ -247,12 +248,12 @@ export default function Dashboard() {
         transition={{ delay: 0.5 }}
       >
         <Card className="apple-card">
-          <CardContent className="p-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-primary" />
+          <CardContent className="p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+              <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
               Actions Rapides
             </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
               {[
                 { label: 'Nouveau Lead', href: '/leads/new', icon: Users },
                 { label: 'Créer Devis', href: '/quotes/new', icon: Clock },
@@ -269,10 +270,10 @@ export default function Dashboard() {
                     >
                       <Button
                         variant="outline"
-                        className="w-full h-auto py-4 flex-col gap-2 hover:bg-accent/50 hover:border-primary/50 transition-all"
+                        className="w-full h-auto py-3 sm:py-4 flex-col gap-1.5 sm:gap-2 hover:bg-accent/50 hover:border-primary/50 transition-all text-xs sm:text-sm"
                       >
-                        <ActionIcon className="w-5 h-5" />
-                        <span className="text-xs">{action.label}</span>
+                        <ActionIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span className="text-[10px] sm:text-xs leading-tight">{action.label}</span>
                       </Button>
                     </motion.div>
                   </Link>
@@ -283,27 +284,27 @@ export default function Dashboard() {
         </Card>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.7 }}
         >
           <Card className="apple-card h-full">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Users className="w-5 h-5 text-primary" />
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
+                  <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                   Leads Récents
                 </h3>
                 <Link href="/leads">
-                  <Button variant="ghost" size="sm" className="text-xs gap-1">
+                  <Button variant="ghost" size="sm" className="text-[10px] sm:text-xs gap-1 h-7 sm:h-8 px-2 sm:px-3">
                     Voir tout
                     <ArrowRight className="w-3 h-3" />
                   </Button>
                 </Link>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {dashboardData?.recentLeads && dashboardData.recentLeads.length > 0 ? (
                   dashboardData.recentLeads.map((lead, index) => (
                     <motion.div
@@ -312,33 +313,33 @@ export default function Dashboard() {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.8 + index * 0.1 }}
                       onClick={() => setSelectedLead(lead)}
-                      className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/50 transition-colors border border-border/50 cursor-pointer group"
+                      className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg hover:bg-accent/50 transition-colors border border-border/50 cursor-pointer group"
                     >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-semibold text-primary">
+                      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs sm:text-sm font-semibold text-primary">
                             {lead.firstName[0]}{lead.lastName[0]}
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">
+                          <p className="font-medium text-xs sm:text-sm truncate group-hover:text-primary transition-colors">
                             {lead.firstName} {lead.lastName}
                           </p>
-                          <p className="text-xs text-muted-foreground truncate">
+                          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
                             {lead.company || 'Particulier'}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                         {getChannelIcon(lead.channel)}
-                        <Badge className={`${getStatusColor(lead.status)} text-[10px] border-0`}>
+                        <Badge className={`${getStatusColor(lead.status)} text-[9px] sm:text-[10px] border-0 px-1.5 sm:px-2 py-0.5`}>
                           {translate(lead.status)}
                         </Badge>
                       </div>
                     </motion.div>
                   ))
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
+                  <div className="text-center py-6 sm:py-8 text-muted-foreground text-xs sm:text-sm">
                     Aucun lead récent
                   </div>
                 )}
@@ -353,20 +354,20 @@ export default function Dashboard() {
           transition={{ delay: 0.7 }}
         >
           <Card className="apple-card h-full">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-primary" />
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                   Missions Actives
                 </h3>
                 <Link href="/missions">
-                  <Button variant="ghost" size="sm" className="text-xs gap-1">
+                  <Button variant="ghost" size="sm" className="text-[10px] sm:text-xs gap-1 h-7 sm:h-8 px-2 sm:px-3">
                     Voir tout
                     <ArrowRight className="w-3 h-3" />
                   </Button>
                 </Link>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {dashboardData?.activeMissions && dashboardData.activeMissions.length > 0 ? (
                   dashboardData.activeMissions.map((mission, index) => {
                     const tasks = mission.tasks || [];
@@ -380,38 +381,38 @@ export default function Dashboard() {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.8 + index * 0.1 }}
                         onClick={() => setSelectedMission(mission)}
-                        className="p-3 rounded-lg border border-border/50 hover:bg-accent/50 transition-colors cursor-pointer space-y-3 group"
+                        className="p-2.5 sm:p-3 rounded-lg border border-border/50 hover:bg-accent/50 transition-colors cursor-pointer space-y-2 sm:space-y-3 group"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="w-10 h-10 bg-purple-500/10 rounded-full flex items-center justify-center flex-shrink-0">
-                              <Calendar className="w-5 h-5 text-purple-500" />
+                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-500/10 rounded-full flex items-center justify-center flex-shrink-0">
+                              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-sm truncate group-hover:text-primary transition-colors">
+                              <h4 className="font-medium text-xs sm:text-sm truncate group-hover:text-primary transition-colors">
                                 {mission.lead.firstName} {mission.lead.lastName}
                               </h4>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-[10px] sm:text-xs text-muted-foreground">
                                 {completedTasks}/{tasks.length} tâches
                               </p>
                             </div>
                           </div>
-                          <Badge variant="outline" className="text-[10px] whitespace-nowrap">
+                          <Badge variant="outline" className="text-[9px] sm:text-[10px] whitespace-nowrap px-1.5 sm:px-2 py-0.5">
                             {translate(mission.status)}
                           </Badge>
                         </div>
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between text-xs">
+                        <div className="space-y-1 sm:space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] sm:text-xs">
                             <span className="text-muted-foreground">Progression</span>
                             <span className="font-medium">{progress}%</span>
                           </div>
-                          <Progress value={progress} className="h-2" />
+                          <Progress value={progress} className="h-1.5 sm:h-2" />
                         </div>
                       </motion.div>
                     );
                   })
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
+                  <div className="text-center py-6 sm:py-8 text-muted-foreground text-xs sm:text-sm">
                     Aucune mission active
                   </div>
                 )}
@@ -424,22 +425,22 @@ export default function Dashboard() {
       <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">Détails du Lead</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl font-semibold">Détails du Lead</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               Informations complètes sur {selectedLead?.firstName} {selectedLead?.lastName}
             </DialogDescription>
           </DialogHeader>
           {selectedLead && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-xl font-bold text-primary">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-lg sm:text-xl font-bold text-primary">
                       {selectedLead.firstName[0]}{selectedLead.lastName[0]}
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-lg truncate">{selectedLead.firstName} {selectedLead.lastName}</h3>
+                    <h3 className="font-semibold text-base sm:text-lg truncate">{selectedLead.firstName} {selectedLead.lastName}</h3>
                     <Badge className={`${getStatusColor(selectedLead.status)} text-xs mt-1 border-0`}>
                       {translate(selectedLead.status)}
                     </Badge>
@@ -450,26 +451,26 @@ export default function Dashboard() {
               <Separator />
 
               <div className="space-y-3">
-                <h4 className="font-semibold flex items-center gap-2">
+                <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
                   <Phone className="w-4 h-4 text-primary" />
                   Contact
                 </h4>
                 <div className="space-y-2 pl-6">
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm">
                     <Phone className="w-3.5 h-3.5 text-muted-foreground" />
                     <a href={`tel:${selectedLead.phone}`} className="text-primary hover:underline">
                       {selectedLead.phone}
                     </a>
                   </div>
                   {selectedLead.email && (
-                    <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-2 text-xs sm:text-sm">
                       <Mail className="w-3.5 h-3.5 text-muted-foreground" />
                       <a href={`mailto:${selectedLead.email}`} className="text-primary hover:underline truncate">
                         {selectedLead.email}
                       </a>
                     </div>
                   )}
-                  <div className="flex items-start gap-2 text-sm">
+                  <div className="flex items-start gap-2 text-xs sm:text-sm">
                     <MapPin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <span className="text-muted-foreground">{selectedLead.address}</span>
                   </div>
@@ -480,22 +481,22 @@ export default function Dashboard() {
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2">
+                    <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-primary" />
                       Informations supplémentaires
                     </h4>
                     <div className="space-y-2 pl-6">
                       {selectedLead.company && (
-                        <div className="flex items-center gap-2 text-sm">
+                        <div className="flex items-center gap-2 text-xs sm:text-sm">
                           <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
                           <span>{selectedLead.company}</span>
                         </div>
                       )}
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
                         {getChannelIcon(selectedLead.channel)}
                         <span className="text-muted-foreground">Canal: {translate(selectedLead.channel)}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
                         <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
                         <span className="text-muted-foreground">Créé le {formatDate(selectedLead.createdAt)}</span>
                       </div>
@@ -508,12 +509,12 @@ export default function Dashboard() {
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2">
+                    <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
                       <Users className="w-4 h-4 text-primary" />
                       Assigné à
                     </h4>
                     <div className="pl-6">
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
                         <Avatar className="w-6 h-6">
                           <AvatarFallback className="text-xs">
                             {selectedLead.assignedTo.name?.[0] || 'A'}
@@ -542,18 +543,18 @@ export default function Dashboard() {
       <Dialog open={!!selectedMission} onOpenChange={() => setSelectedMission(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">Détails de la Mission</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl font-semibold">Détails de la Mission</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               Mission pour {selectedMission?.lead.firstName} {selectedMission?.lead.lastName}
             </DialogDescription>
           </DialogHeader>
           {selectedMission && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-lg">Mission #{selectedMission.id.slice(0, 8)}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <h3 className="font-semibold text-base sm:text-lg truncate">Mission #{selectedMission.id.slice(0, 8)}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
                       {selectedMission.lead.firstName} {selectedMission.lead.lastName}
                     </p>
                   </div>
@@ -566,16 +567,16 @@ export default function Dashboard() {
               <Separator />
 
               <div className="space-y-3">
-                <h4 className="font-semibold flex items-center gap-2">
+                <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
                   <Users className="w-4 h-4 text-primary" />
                   Informations client
                 </h4>
                 <div className="space-y-2 pl-6">
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm">
                     <Users className="w-3.5 h-3.5 text-muted-foreground" />
                     <span>{selectedMission.lead.firstName} {selectedMission.lead.lastName}</span>
                   </div>
-                  <div className="flex items-start gap-2 text-sm">
+                  <div className="flex items-start gap-2 text-xs sm:text-sm">
                     <MapPin className="w-3.5 h-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <span className="text-muted-foreground">{selectedMission.lead.address}</span>
                   </div>
@@ -585,7 +586,7 @@ export default function Dashboard() {
               <Separator />
 
               <div className="space-y-3">
-                <h4 className="font-semibold flex items-center gap-2">
+                <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-primary" />
                   Progression des tâches
                 </h4>
@@ -597,7 +598,7 @@ export default function Dashboard() {
 
                     return (
                       <>
-                        <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
                           <span className="text-muted-foreground">Tâches complétées</span>
                           <span className="font-medium">{completedTasks} / {tasks.length}</span>
                         </div>
@@ -615,11 +616,11 @@ export default function Dashboard() {
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <h4 className="font-semibold flex items-center gap-2">
+                    <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-primary" />
                       Dates
                     </h4>
-                    <div className="space-y-2 pl-6 text-sm">
+                    <div className="space-y-2 pl-6 text-xs sm:text-sm">
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Date de création</span>
                         <span>{formatDate(selectedMission.createdAt)}</span>

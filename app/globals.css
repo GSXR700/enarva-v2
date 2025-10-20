@@ -746,3 +746,27 @@ canvas {
 [dir="rtl"] .space-y-4 {
   direction: rtl;
 }
+
+/* globals.css - Add mobile-specific optimizations */
+
+@layer utilities {
+  /* Ensure smooth transitions on mobile */
+  @media (max-width: 640px) {
+    .apple-card {
+      @apply text-sm;
+    }
+    
+    .page-title {
+      @apply text-xl;
+    }
+    
+    .page-subtitle {
+      @apply text-xs;
+    }
+  }
+}
+
+/* Prevent content shift when toggle animates */
+[data-theme-toggle] {
+  will-change: transform;
+}
