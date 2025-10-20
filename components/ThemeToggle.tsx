@@ -1,4 +1,4 @@
-// components/ThemeToggle.tsx - FIXED: Perfect containment and positioning
+// components/ThemeToggle.tsx - MOBILE-OPTIMIZED: Perfect containment on all screen sizes
 "use client";
 
 import { useContext, useEffect, useState } from "react";
@@ -9,10 +9,21 @@ import { motion } from "framer-motion";
 export default function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const { theme, setTheme } = useContext(ThemeProviderContext);
 
   useEffect(() => {
     setMounted(true);
+    
+    // Detect mobile screen size
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Recalculate isDark whenever theme changes
@@ -34,7 +45,7 @@ export default function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <div className="w-14 h-7 sm:w-16 sm:h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+      <div className="w-12 h-6 sm:w-16 sm:h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
     );
   }
 
@@ -42,11 +53,22 @@ export default function ThemeToggle() {
     setTheme(isDark ? "light" : "dark");
   };
 
+  // Calculate the travel distance based on screen size
+  const getToggleDistance = () => {
+    if (isMobile) {
+      // Mobile: 48px width - 20px circle - 4px padding = 24px
+      return isDark ? "24px" : "0px";
+    } else {
+      // Desktop: 64px width - 24px circle - 8px padding = 32px
+      return isDark ? "32px" : "0px";
+    }
+  };
+
   return (
     <button
       onClick={handleToggle}
       type="button"
-      className="relative w-14 h-7 sm:w-16 sm:h-8 rounded-full overflow-hidden transition-all duration-300 ease-in-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+      className="relative w-12 h-6 sm:w-16 sm:h-8 rounded-full overflow-hidden transition-all duration-300 ease-in-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 dark:focus:ring-offset-gray-900 flex-shrink-0"
       aria-label="Toggle theme"
       aria-pressed={isDark}
       style={{ padding: 0 }}
@@ -60,9 +82,9 @@ export default function ThemeToggle() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}
-          className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900"
+          className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 overflow-hidden"
         >
-          {/* Animated stars */}
+          {/* Animated stars - MOBILE OPTIMIZED */}
           {[...Array(5)].map((_, i) => (
             <motion.div
               key={i}
@@ -85,11 +107,11 @@ export default function ThemeToggle() {
         </motion.div>
       )}
 
-      {/* Toggle circle with icon - PROPERLY POSITIONED */}
+      {/* Toggle circle with icon - MOBILE OPTIMIZED POSITIONING */}
       <motion.div
-        className="absolute top-0.5 left-0.5 w-6 h-6 sm:top-1 sm:left-1 sm:w-6 sm:h-6 bg-white dark:bg-gray-800 rounded-full shadow-md flex items-center justify-center z-10"
+        className="absolute top-0.5 left-0.5 w-5 h-5 sm:top-1 sm:left-1 sm:w-6 sm:h-6 bg-white dark:bg-gray-800 rounded-full shadow-md flex items-center justify-center z-10"
         animate={{
-          x: isDark ? "calc(100% + 0.25rem)" : "0rem",
+          x: getToggleDistance(),
         }}
         transition={{
           type: "spring",
