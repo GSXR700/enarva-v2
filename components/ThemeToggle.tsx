@@ -1,14 +1,14 @@
-// components/ThemeToggle.tsx - FIXED WITHOUT WARNINGS
+// components/ThemeToggle.tsx - WORKS WITH YOUR CUSTOM PROVIDER
 "use client";
 
-import { useState, useEffect } from "react";
-import { useTheme } from "next-themes";
+import { useContext, useEffect, useState } from "react";
+import { ThemeProviderContext } from "@/components/providers/Providers";
 import { Moon, Sun } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function ThemeToggle() {
-  const { setTheme, resolvedTheme } = useTheme(); // Removed unused 'theme'
   const [mounted, setMounted] = useState(false);
+  const { theme, setTheme } = useContext(ThemeProviderContext);
 
   useEffect(() => {
     setMounted(true);
@@ -20,17 +20,19 @@ export default function ThemeToggle() {
     );
   }
 
-  // Use resolvedTheme to get the actual current theme
-  const isDark = resolvedTheme === "dark";
+  // Determine if dark mode is active
+  const isDark = 
+    theme === "dark" || 
+    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   const handleToggle = () => {
-    const newTheme = isDark ? "light" : "dark";
-    setTheme(newTheme);
+    setTheme(isDark ? "light" : "dark");
   };
 
   return (
     <button
       onClick={handleToggle}
+      type="button"
       className="relative w-14 h-7 sm:w-16 sm:h-8 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-full p-1 transition-all duration-300 ease-in-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
       aria-label="Toggle theme"
       aria-pressed={isDark}
@@ -50,8 +52,8 @@ export default function ThemeToggle() {
                 key={i}
                 className="absolute w-0.5 h-0.5 bg-white rounded-full"
                 style={{
-                  top: `${Math.random() * 100}%`,
-                  left: `${Math.random() * 100}%`,
+                  top: `${20 + Math.random() * 60}%`,
+                  left: `${20 + Math.random() * 60}%`,
                 }}
                 animate={{
                   opacity: [0.2, 1, 0.2],
@@ -72,7 +74,7 @@ export default function ThemeToggle() {
       <motion.div
         className="relative w-5 h-5 sm:w-6 sm:h-6 bg-white dark:bg-gray-800 rounded-full shadow-md flex items-center justify-center z-10"
         animate={{
-          x: isDark ? "calc(100% + 0.25rem)" : "0%",
+          x: isDark ? "1.75rem" : "0rem",
         }}
         transition={{
           type: "spring",
