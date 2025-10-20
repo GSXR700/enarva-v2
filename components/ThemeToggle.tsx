@@ -8,22 +8,35 @@ import { motion } from "framer-motion";
 
 export default function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const { theme, setTheme } = useContext(ThemeProviderContext);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Recalculate isDark whenever theme changes
+  useEffect(() => {
+    if (!mounted) return;
+    
+    const checkDarkMode = () => {
+      if (theme === "dark") {
+        return true;
+      }
+      if (theme === "system") {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches;
+      }
+      return false;
+    };
+
+    setIsDark(checkDarkMode());
+  }, [theme, mounted]);
+
   if (!mounted) {
     return (
       <div className="w-14 h-7 sm:w-16 sm:h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
     );
   }
-
-  // Determine if dark mode is active
-  const isDark = 
-    theme === "dark" || 
-    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   const handleToggle = () => {
     setTheme(isDark ? "light" : "dark");
