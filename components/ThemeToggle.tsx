@@ -1,4 +1,4 @@
-// components/ThemeToggle.tsx - MOBILE-OPTIMIZED: iOS-style compact design
+// components/ThemeToggle.tsx - PERFECT MOBILE DESIGN: Pill-shaped with contained toggle
 "use client";
 
 import { useContext, useEffect, useState } from "react";
@@ -15,7 +15,6 @@ export default function ThemeToggle() {
     setMounted(true);
   }, []);
 
-  // Recalculate isDark whenever theme changes
   useEffect(() => {
     if (!mounted) return;
     
@@ -34,7 +33,7 @@ export default function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <div className="w-[52px] h-7 sm:w-16 sm:h-8 bg-muted rounded-full animate-pulse" />
+      <div className="w-14 h-7 sm:w-16 sm:h-8 bg-muted rounded-full animate-pulse" />
     );
   }
 
@@ -59,50 +58,48 @@ export default function ThemeToggle() {
       onClick={handleToggle}
       onKeyDown={handleKeyDown}
       className={cn(
-        "relative inline-flex h-7 w-[52px] sm:h-8 sm:w-16 shrink-0 cursor-pointer items-center rounded-full transition-all duration-300 ease-in-out",
+        "relative inline-flex h-7 w-14 sm:h-8 sm:w-16 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-all duration-300 ease-in-out",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        "hover:shadow-md active:scale-95",
+        "hover:opacity-90 active:scale-95",
         isDark 
           ? "bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700" 
-          : "bg-gradient-to-br from-amber-300 via-orange-300 to-amber-400"
+          : "bg-gradient-to-br from-gray-200 via-gray-300 to-gray-200"
       )}
     >
-      {/* Toggle circle with icon */}
+      {/* Toggle circle with icon - PERFECTLY CONTAINED */}
       <span
         className={cn(
           "pointer-events-none relative flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-white shadow-lg transition-all duration-300 ease-in-out",
           isDark 
-            ? "translate-x-[26px] sm:translate-x-[34px]" 
-            : "translate-x-0.5 sm:translate-x-1"
+            ? "translate-x-7 sm:translate-x-8" 
+            : "translate-x-0"
         )}
       >
-        {/* Icon with smooth transition */}
-        <span className="relative flex items-center justify-center w-full h-full">
-          <Sun 
-            className={cn(
-              "absolute h-3 w-3 sm:h-4 sm:w-4 text-amber-500 transition-all duration-300",
-              isDark 
-                ? "rotate-90 scale-0 opacity-0" 
-                : "rotate-0 scale-100 opacity-100"
-            )}
-          />
-          <Moon 
-            className={cn(
-              "absolute h-3 w-3 sm:h-4 sm:w-4 text-indigo-600 transition-all duration-300",
-              isDark 
-                ? "rotate-0 scale-100 opacity-100" 
-                : "-rotate-90 scale-0 opacity-0"
-            )}
-          />
-        </span>
+        {/* Icon with smooth cross-fade */}
+        <Sun 
+          className={cn(
+            "absolute h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500 transition-all duration-300",
+            isDark 
+              ? "rotate-90 scale-0 opacity-0" 
+              : "rotate-0 scale-100 opacity-100"
+          )}
+        />
+        <Moon 
+          className={cn(
+            "absolute h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-600 transition-all duration-300",
+            isDark 
+              ? "rotate-0 scale-100 opacity-100" 
+              : "-rotate-90 scale-0 opacity-0"
+          )}
+        />
       </span>
 
-      {/* Optional: Subtle sparkle effect for dark mode */}
+      {/* Subtle stars for dark mode - CONTAINED INSIDE */}
       {isDark && (
         <>
-          <span className="absolute top-1 right-2 h-0.5 w-0.5 rounded-full bg-white/60 animate-pulse" />
-          <span className="absolute top-3 right-4 h-0.5 w-0.5 rounded-full bg-white/40 animate-pulse" style={{ animationDelay: '0.3s' }} />
-          <span className="absolute bottom-2 right-3 h-0.5 w-0.5 rounded-full bg-white/50 animate-pulse" style={{ animationDelay: '0.6s' }} />
+          <span className="absolute top-2 left-2 h-0.5 w-0.5 rounded-full bg-white/60 animate-pulse" />
+          <span className="absolute top-3.5 left-3.5 h-0.5 w-0.5 rounded-full bg-white/40 animate-pulse" style={{ animationDelay: '0.3s' }} />
+          <span className="absolute bottom-2 left-2.5 h-0.5 w-0.5 rounded-full bg-white/50 animate-pulse" style={{ animationDelay: '0.6s' }} />
         </>
       )}
     </button>
