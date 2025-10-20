@@ -795,3 +795,17 @@ canvas {
 [data-theme-toggle] {
   will-change: transform;
 }
+
+/* Smooth theme toggle animations */
+[role="switch"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  will-change: transform;
+}
+
+/* Prevent layout shift during theme toggle animation */
+[data-theme-toggle-container] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

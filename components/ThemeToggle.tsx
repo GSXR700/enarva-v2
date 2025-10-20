@@ -1,29 +1,18 @@
-// components/ThemeToggle.tsx - MOBILE-OPTIMIZED: Perfect containment on all screen sizes
+// components/ThemeToggle.tsx - MOBILE-OPTIMIZED: iOS-style compact design
 "use client";
 
 import { useContext, useEffect, useState } from "react";
 import { ThemeProviderContext } from "@/components/providers/Providers";
 import { Moon, Sun } from "lucide-react";
-import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 export default function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
   const [isDark, setIsDark] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const { theme, setTheme } = useContext(ThemeProviderContext);
 
   useEffect(() => {
     setMounted(true);
-    
-    // Detect mobile screen size
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 640);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Recalculate isDark whenever theme changes
@@ -45,7 +34,7 @@ export default function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <div className="w-12 h-6 sm:w-16 sm:h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+      <div className="w-[52px] h-7 sm:w-16 sm:h-8 bg-muted rounded-full animate-pulse" />
     );
   }
 
@@ -53,86 +42,69 @@ export default function ThemeToggle() {
     setTheme(isDark ? "light" : "dark");
   };
 
-  // Calculate the travel distance based on screen size
-  const getToggleDistance = () => {
-    if (isMobile) {
-      // Mobile: 48px width - 20px circle - 4px padding = 24px
-      return isDark ? "24px" : "0px";
-    } else {
-      // Desktop: 64px width - 24px circle - 8px padding = 32px
-      return isDark ? "32px" : "0px";
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      handleToggle();
     }
   };
 
   return (
     <button
-      onClick={handleToggle}
       type="button"
-      className="relative w-12 h-6 sm:w-16 sm:h-8 rounded-full overflow-hidden transition-all duration-300 ease-in-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 dark:focus:ring-offset-gray-900 flex-shrink-0"
+      role="switch"
+      aria-checked={isDark}
       aria-label="Toggle theme"
-      aria-pressed={isDark}
-      style={{ padding: 0 }}
-    >
-      {/* Background layer */}
-      <div className="absolute inset-0 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600" />
-      
-      {/* Stars background for dark mode - CONTAINED */}
-      {isDark && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 overflow-hidden"
-        >
-          {/* Animated stars - MOBILE OPTIMIZED */}
-          {[...Array(5)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-0.5 h-0.5 bg-white rounded-full"
-              style={{
-                top: `${20 + Math.random() * 60}%`,
-                left: `${20 + Math.random() * 60}%`,
-              }}
-              animate={{
-                opacity: [0.2, 1, 0.2],
-                scale: [0.8, 1.2, 0.8],
-              }}
-              transition={{
-                duration: 2 + Math.random() * 2,
-                repeat: Infinity,
-                delay: Math.random() * 2,
-              }}
-            />
-          ))}
-        </motion.div>
+      data-state={isDark ? "checked" : "unchecked"}
+      onClick={handleToggle}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        "relative inline-flex h-7 w-[52px] sm:h-8 sm:w-16 shrink-0 cursor-pointer items-center rounded-full transition-all duration-300 ease-in-out",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "hover:shadow-md active:scale-95",
+        isDark 
+          ? "bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700" 
+          : "bg-gradient-to-br from-amber-300 via-orange-300 to-amber-400"
       )}
-
-      {/* Toggle circle with icon - MOBILE OPTIMIZED POSITIONING */}
-      <motion.div
-        className="absolute top-0.5 left-0.5 w-5 h-5 sm:top-1 sm:left-1 sm:w-6 sm:h-6 bg-white dark:bg-gray-800 rounded-full shadow-md flex items-center justify-center z-10"
-        animate={{
-          x: getToggleDistance(),
-        }}
-        transition={{
-          type: "spring",
-          stiffness: 500,
-          damping: 30,
-        }}
+    >
+      {/* Toggle circle with icon */}
+      <span
+        className={cn(
+          "pointer-events-none relative flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-white shadow-lg transition-all duration-300 ease-in-out",
+          isDark 
+            ? "translate-x-[26px] sm:translate-x-[34px]" 
+            : "translate-x-0.5 sm:translate-x-1"
+        )}
       >
-        <motion.div
-          key={isDark ? "dark" : "light"}
-          initial={{ opacity: 0, rotate: -30, scale: 0.8 }}
-          animate={{ opacity: 1, rotate: 0, scale: 1 }}
-          exit={{ opacity: 0, rotate: 30, scale: 0.8 }}
-          transition={{ duration: 0.2 }}
-        >
-          {isDark ? (
-            <Moon className="w-3 h-3 sm:w-4 sm:h-4 text-indigo-600" />
-          ) : (
-            <Sun className="w-3 h-3 sm:w-4 sm:h-4 text-amber-500" />
-          )}
-        </motion.div>
-      </motion.div>
+        {/* Icon with smooth transition */}
+        <span className="relative flex items-center justify-center w-full h-full">
+          <Sun 
+            className={cn(
+              "absolute h-3 w-3 sm:h-4 sm:w-4 text-amber-500 transition-all duration-300",
+              isDark 
+                ? "rotate-90 scale-0 opacity-0" 
+                : "rotate-0 scale-100 opacity-100"
+            )}
+          />
+          <Moon 
+            className={cn(
+              "absolute h-3 w-3 sm:h-4 sm:w-4 text-indigo-600 transition-all duration-300",
+              isDark 
+                ? "rotate-0 scale-100 opacity-100" 
+                : "-rotate-90 scale-0 opacity-0"
+            )}
+          />
+        </span>
+      </span>
+
+      {/* Optional: Subtle sparkle effect for dark mode */}
+      {isDark && (
+        <>
+          <span className="absolute top-1 right-2 h-0.5 w-0.5 rounded-full bg-white/60 animate-pulse" />
+          <span className="absolute top-3 right-4 h-0.5 w-0.5 rounded-full bg-white/40 animate-pulse" style={{ animationDelay: '0.3s' }} />
+          <span className="absolute bottom-2 right-3 h-0.5 w-0.5 rounded-full bg-white/50 animate-pulse" style={{ animationDelay: '0.6s' }} />
+        </>
+      )}
     </button>
   );
 }
