@@ -1,4 +1,4 @@
-// components/layout/Sidebar.tsx - CORRECTED (REMOVED DUPLICATES)
+// components/layout/Sidebar.tsx - FIXED DESKTOP VISIBILITY
 'use client'
 
 import Link from 'next/link'
@@ -174,8 +174,6 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
     const handleResize = () => {
       if (window.innerWidth >= 768) {
         setOpen(false)
-      } else {
-        setOpen(false)
       }
     }
 
@@ -211,25 +209,18 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
         )}
       </AnimatePresence>
 
-      <motion.aside
-        initial={false}
-        animate={{
-          x: isOpen ? 0 : '-100%',
-        }}
-        transition={{
-          type: 'spring',
-          stiffness: 300,
-          damping: 30,
-        }}
+      <aside
         className={cn(
           'fixed inset-y-0 left-0 z-50 w-72',
           'bg-background/95 backdrop-blur-xl',
           'border-r border-border/50',
           'shadow-2xl shadow-black/5',
-          'md:relative md:z-auto md:translate-x-0',
           'flex flex-col',
           'dark:bg-black/95 dark:border-border/30',
-          'supports-[backdrop-filter]:bg-background/80'
+          'supports-[backdrop-filter]:bg-background/80',
+          'transition-transform duration-300 ease-in-out',
+          isOpen ? 'translate-x-0' : '-translate-x-full',
+          'md:translate-x-0 md:static'
         )}
       >
         <div className="h-16 flex items-center justify-center px-6 border-b border-border/50 flex-shrink-0 backdrop-blur-xl">
@@ -328,7 +319,7 @@ export function Sidebar({ isOpen, setOpen }: SidebarProps) {
             © 2025 Enarva OS
           </div>
         </div>
-      </motion.aside>
+      </aside>
     </>
   )
 }

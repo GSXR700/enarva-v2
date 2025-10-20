@@ -1,4 +1,4 @@
-// components/layout/TopBar.tsx - CORRECTED (REMOVED UNUSED IMPORT)
+// components/layout/TopBar.tsx - SHOW THEME TOGGLE ON MOBILE
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -97,7 +97,8 @@ export function TopBar({ onMenuClick }: TopBarProps) {
           </Button>
         </Link>
 
-        <div className="hidden sm:flex items-center">
+        {/* Theme Toggle - Visible on all screen sizes */}
+        <div className="flex items-center">
           <ThemeToggle />
         </div>
 
