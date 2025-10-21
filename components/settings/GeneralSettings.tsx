@@ -135,7 +135,7 @@ export function GeneralSettings() {
                     placeholder="0.00"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                    €
+                    MAD
                   </span>
                 </div>
               </div>

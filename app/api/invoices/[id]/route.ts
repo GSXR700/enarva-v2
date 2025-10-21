@@ -190,8 +190,8 @@ export async function PATCH(
           type: 'PAYMENT_RECEIVED',
           title: remaining.equals(0) ? 'Facture payée intégralement' : 'Avance reçue',
           description: remaining.equals(0) 
-            ? `Facture ${invoice.invoiceNumber} payée intégralement - ${updatedInvoice.amount}€`
-            : `Avance de ${advanceValue}€ reçue sur facture ${invoice.invoiceNumber} - Reste: ${remaining}€`,
+            ? `Facture ${invoice.invoiceNumber} payée intégralement - ${updatedInvoice.amount}MAD`
+            : `Avance de ${advanceValue}MAD reçue sur facture ${invoice.invoiceNumber} - Reste: ${remaining}MAD`,
           userId: session.user.id,
           leadId: invoice.leadId,
           metadata: {
@@ -214,7 +214,7 @@ export async function PATCH(
         data: {
           type: 'PAYMENT_RECEIVED',
           title: 'Facture payée',
-          description: `Facture ${invoice.invoiceNumber} marquée comme payée - ${invoice.amount}€`,
+          description: `Facture ${invoice.invoiceNumber} marquée comme payée - ${invoice.amount}MAD`,
           userId: session.user.id,
           leadId: invoice.leadId,
           metadata: {

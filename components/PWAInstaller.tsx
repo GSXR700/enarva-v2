@@ -1,4 +1,4 @@
-// components/PWAInstaller.tsx - MOBILE-ONLY NATIVE INSTALL
+// components/PWAInstaller.tsx - MOBILE-ONLY NATIVE INSTALL (FIXED)
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -160,11 +160,11 @@ export default function PWAInstaller() {
                 <div className="flex-shrink-0">
                   <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-enarva-start to-enarva-end flex items-center justify-center">
                     <Image 
-                      src="images/dark-mobile.png" 
+                      src="/icon-192x192.png"
                       alt="Enarva" 
                       width={48} 
                       height={48}
-                      className="w-6 h-6 brightness-0 invert"
+                      className="w-8 h-8 rounded-md"
                     />
                   </div>
                 </div>

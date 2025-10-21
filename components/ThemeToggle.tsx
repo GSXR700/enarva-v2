@@ -1,4 +1,4 @@
-// components/ThemeToggle.tsx - PERFECT MOBILE DESIGN: Pill-shaped with contained toggle
+// components/ThemeToggle.tsx
 "use client";
 
 import { useContext, useEffect, useState } from "react";
@@ -54,31 +54,23 @@ export default function ThemeToggle() {
       role="switch"
       aria-checked={isDark}
       aria-label="Toggle theme"
-      data-state={isDark ? "checked" : "unchecked"}
       onClick={handleToggle}
       onKeyDown={handleKeyDown}
       className={cn(
-        "relative inline-flex h-7 w-14 sm:h-8 sm:w-16 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-all duration-300 ease-in-out",
+        "relative inline-flex h-7 w-14 sm:h-9 sm:w-16 shrink-0 cursor-pointer items-center rounded-full p-1 transition-all duration-300 ease-in-out",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "hover:opacity-90 active:scale-95",
         isDark 
-          ? "bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700" 
-          : "bg-gradient-to-br from-gray-200 via-gray-300 to-gray-200"
+          ? "bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 justify-end" 
+          : "bg-gradient-to-br from-sky-400 via-sky-300 to-sky-400 justify-start"
       )}
     >
-      {/* Toggle circle with icon - PERFECTLY CONTAINED */}
       <span
-        className={cn(
-          "pointer-events-none relative flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-white shadow-lg transition-all duration-300 ease-in-out",
-          isDark 
-            ? "translate-x-7 sm:translate-x-8" 
-            : "translate-x-0"
-        )}
+        className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-white shadow-lg transition-all duration-300 ease-in-out"
       >
-        {/* Icon with smooth cross-fade */}
         <Sun 
           className={cn(
-            "absolute h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500 transition-all duration-300",
+            "absolute h-3 w-3 sm:h-4 sm:w-4 text-amber-500 transition-all duration-300 ease-in-out",
             isDark 
               ? "rotate-90 scale-0 opacity-0" 
               : "rotate-0 scale-100 opacity-100"
@@ -86,20 +78,19 @@ export default function ThemeToggle() {
         />
         <Moon 
           className={cn(
-            "absolute h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-600 transition-all duration-300",
+            "absolute h-3 w-3 sm:h-4 sm:w-4 text-indigo-900 transition-all duration-300 ease-in-out",
             isDark 
               ? "rotate-0 scale-100 opacity-100" 
               : "-rotate-90 scale-0 opacity-0"
           )}
         />
       </span>
-
-      {/* Subtle stars for dark mode - CONTAINED INSIDE */}
+      
       {isDark && (
         <>
-          <span className="absolute top-2 left-2 h-0.5 w-0.5 rounded-full bg-white/60 animate-pulse" />
-          <span className="absolute top-3.5 left-3.5 h-0.5 w-0.5 rounded-full bg-white/40 animate-pulse" style={{ animationDelay: '0.3s' }} />
-          <span className="absolute bottom-2 left-2.5 h-0.5 w-0.5 rounded-full bg-white/50 animate-pulse" style={{ animationDelay: '0.6s' }} />
+          <span className="absolute left-3 top-2 sm:top-2.5 h-1 w-1 rounded-full bg-white/80 animate-pulse" />
+          <span className="absolute left-4 top-3.5 sm:top-4 h-0.5 w-0.5 rounded-full bg-white/60 animate-pulse" style={{ animationDelay: '0.3s' }} />
+          <span className="absolute left-2.5 bottom-2 sm:bottom-2.5 h-0.5 w-0.5 rounded-full bg-white/70 animate-pulse" style={{ animationDelay: '0.6s' }} />
         </>
       )}
     </button>

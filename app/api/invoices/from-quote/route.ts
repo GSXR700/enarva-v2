@@ -211,7 +211,7 @@ export async function POST(request: Request) {
       data: {
         type: 'PAYMENT_RECEIVED',
         title: 'Facture créée depuis devis',
-        description: `Facture ${invoiceNumber} créée depuis le devis ${quote.quoteNumber || 'N/A'} pour ${quote.lead.firstName} ${quote.lead.lastName} - Montant: ${amount}€`,
+        description: `Facture ${invoiceNumber} créée depuis le devis ${quote.quoteNumber || 'N/A'} pour ${quote.lead.firstName} ${quote.lead.lastName} - Montant: ${amount}MAD`,
         userId: session.user.id,
         leadId: quote.leadId,
         metadata: {

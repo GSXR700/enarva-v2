@@ -298,7 +298,7 @@ export default function NewTeamPage() {
                     />
                   </div>
                   <div>
-                    <Label>Taux horaire (€)</Label>
+                    <Label>Taux horaire (MAD)</Label>
                     <Input
                       type="number"
                       step="0.01"

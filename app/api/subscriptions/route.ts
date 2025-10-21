@@ -140,7 +140,7 @@ export async function POST(request: Request) {
       data: {
         type: 'SUBSCRIPTION_CREATED',
         title: 'Nouvel abonnement créé',
-        description: `Abonnement ${type} créé pour ${lead.firstName} ${lead.lastName} - ${monthlyPrice}€/mois`,
+        description: `Abonnement ${type} créé pour ${lead.firstName} ${lead.lastName} - ${monthlyPrice}MAD/mois`,
         userId: session.user.id,
         leadId: leadId,
         metadata: {

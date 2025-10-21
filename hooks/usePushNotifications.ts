@@ -1,4 +1,4 @@
-// hooks/usePushNotifications.ts - COMPLETE PUSH NOTIFICATION HOOK
+// hooks/usePushNotifications.ts - COMPLETE PUSH NOTIFICATION HOOK (FIXED)
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -79,7 +79,18 @@ export function usePushNotifications() {
         setIsSubscribed(true)
         toast.success('Notifications activées avec succès!')
       } else {
-        throw new Error('Failed to save subscription')
+        // FIX: Better error handling for 404 (user not found)
+        if (response.status === 404) {
+          toast.error('Erreur: Utilisateur introuvable. Veuillez vous reconnecter.')
+          // Unsubscribe locally since server can't save it
+          await subscription.unsubscribe()
+        } else {
+          const errorText = await response.text()
+          console.error('Failed to save subscription:', errorText)
+          toast.error('Erreur lors de l\'activation des notifications')
+          // Unsubscribe locally since server couldn't save it
+          await subscription.unsubscribe()
+        }
       }
     } catch (error) {
       console.error('Failed to subscribe to push notifications:', error)

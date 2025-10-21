@@ -75,8 +75,8 @@ export async function POST(
         type: 'PAYMENT_RECEIVED',
         title: isPaid ? 'Facture payée intégralement' : 'Paiement reçu',
         description: isPaid
-          ? `Facture ${invoice.invoiceNumber} payée intégralement - ${invoice.amount}€`
-          : `Paiement de ${payment}€ reçu sur facture ${invoice.invoiceNumber} - Reste: ${remaining}€`,
+          ? `Facture ${invoice.invoiceNumber} payée intégralement - ${invoice.amount} MAD`
+          : `Paiement de ${payment} MAD reçu sur facture ${invoice.invoiceNumber} - Reste: ${remaining} MAD`,
         userId: session.user.id,
         leadId: invoice.leadId,
         metadata: {

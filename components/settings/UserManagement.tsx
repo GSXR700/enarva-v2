@@ -343,7 +343,7 @@ export function UserManagement() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="user-hourly-rate">Taux horaire (€)</Label>
+                  <Label htmlFor="user-hourly-rate">Taux horaire (MAD)</Label>
                   <Input
                     id="user-hourly-rate"
                     type="number"
@@ -491,7 +491,7 @@ export function UserManagement() {
                         </td>
                         <td className="p-4">
                           {user.hourlyRate ? (
-                            <span className="text-sm font-medium">{user.hourlyRate}€</span>
+                            <span className="text-sm font-medium">{user.hourlyRate}MAD</span>
                           ) : (
                             <span className="text-sm text-muted-foreground">-</span>
                           )}

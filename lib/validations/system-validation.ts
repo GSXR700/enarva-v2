@@ -127,7 +127,7 @@ export const completeSubscriptionValidationSchema = z.object({
     .default('ACTIVE'),
 
   monthlyPrice: z.union([
-    z.number().min(0.01, 'Prix mensuel minimum: 0.01€').max(10000, 'Prix mensuel maximum: 10000€'),
+    z.number().min(0.01, 'Prix mensuel minimum: 0.01MAD').max(10000, 'Prix mensuel maximum: 10000MAD'),
     z.string().transform(val => {
       const num = parseFloat(val);
       if (isNaN(num) || num < 0.01 || num > 10000) {
