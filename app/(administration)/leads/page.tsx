@@ -379,16 +379,29 @@ export default function LeadsPage() {
   return (
     <div className="main-content space-y-6 animate-fade-in">
       {/* Page Header - Apple Style */}
-      <div className="page-header">
+      <div className="page-header mb-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="page-title">Leads</h1>
-            <p className="page-subtitle">
-              Gérez et suivez vos prospects et opportunités
-            </p>
+          <div className="flex items-center gap-4">
+            {/* Big Icon - Matches title + subtitle height */}
+            <div className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-2xl flex items-center justify-center">
+              <Users className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
+            </div>
+            
+            {/* Title and Subtitle */}
+            <div>
+              <h1 className="page-title">Leads</h1>
+              <p className="page-subtitle">
+                Gérez et suivez vos prospects et opportunités
+              </p>
+            </div>
           </div>
-          <Button onClick={() => setIsFormOpen(true)} className="btn-mobile-icon gap-2 shadow-lg shadow-primary/20">
-            <Plus className="w-4 h-4" />
+          
+          {/* Desktop Only Add Button - Pill Shaped */}
+          <Button 
+            onClick={() => setIsFormOpen(true)} 
+            className="hidden sm:flex items-center gap-2 rounded-full px-6 h-11 shadow-lg shadow-primary/20 font-medium"
+          >
+            <Plus className="w-5 h-5" />
             <span>Nouveau Lead</span>
           </Button>
         </div>
@@ -397,21 +410,81 @@ export default function LeadsPage() {
       {/* Search and Filter Bar - Apple Style */}
       <Card className="apple-card">
         <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
+          {/* Desktop Layout - Fixed */}
+<div className="hidden sm:flex flex-row gap-3">
+  <div className="relative flex-1">
+    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4 z-10" />
+    <Input
+      placeholder="Rechercher un lead..."
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+      className="pl-10 bg-accent/30 border-none rounded-full h-10"
+    />
+  </div>
+  <div className="flex gap-2">
+    <Select value={statusFilter} onValueChange={setStatusFilter}>
+      <SelectTrigger className="w-[140px] bg-accent/30 border-none rounded-full h-10">
+        <Filter className="w-4 h-4 mr-2" />
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="ALL">Tous</SelectItem>
+        <SelectItem value="NEW">Nouveaux</SelectItem>
+        <SelectItem value="QUALIFIED">Qualifiés</SelectItem>
+        <SelectItem value="QUOTE_SENT">Devis envoyés</SelectItem>
+        <SelectItem value="QUOTE_ACCEPTED">Acceptés</SelectItem>
+        <SelectItem value="COMPLETED">Terminés</SelectItem>
+        <SelectItem value="CANCELLED">Annulés</SelectItem>
+      </SelectContent>
+    </Select>
+    
+    {/* List/Grid Buttons - NO FRAME */}
+    <Button
+      variant={viewMode === 'table' ? 'default' : 'outline'}
+      size="sm"
+      onClick={() => setViewMode('table')}
+      className="h-10 w-10 p-0 rounded-full"
+    >
+      <List className="w-4 h-4" />
+    </Button>
+    <Button
+      variant={viewMode === 'cards' ? 'default' : 'outline'}
+      size="sm"
+      onClick={() => setViewMode('cards')}
+      className="h-10 w-10 p-0 rounded-full"
+    >
+      <Grid3x3 className="w-4 h-4" />
+    </Button>
+    
+    <Button variant="outline" size="sm" onClick={exportToCSV} className="gap-2 rounded-full h-10 px-4">
+      <Download className="w-4 h-4" />
+      <span>Export</span>
+    </Button>
+  </div>
+</div>
+
+          {/* Mobile Layout - New Design */}
+          <div className="flex sm:hidden flex-col gap-4">
+            {/* Search Bar */}
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
                 placeholder="Rechercher un lead..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-accent/30 border-none rounded-full"
+                className="pl-10 bg-accent/30 border-none rounded-2xl h-12"
               />
             </div>
-            <div className="flex gap-2">
+            
+            {/* Buttons Row - All Same Size & Shape */}
+            <div className="flex items-center gap-2">
+              {/* Filter Dropdown */}
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px] bg-accent/30 border-none rounded-full">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue />
+                <SelectTrigger className="flex-1 bg-background border border-border/50 rounded-2xl h-12">
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-4 h-4" />
+                    <SelectValue />
+                  </div>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Tous</SelectItem>
@@ -423,27 +496,35 @@ export default function LeadsPage() {
                   <SelectItem value="CANCELLED">Annulés</SelectItem>
                 </SelectContent>
               </Select>
-              <div className="flex gap-1 border border-border/50 rounded-full p-1">
-                <Button
-                  variant={viewMode === 'table' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('table')}
-                  className="h-8 px-3 rounded-full"
-                >
-                  <List className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'cards' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('cards')}
-                  className="h-8 px-3 rounded-full"
-                >
-                  <Grid3x3 className="w-4 h-4" />
-                </Button>
-              </div>
-              <Button variant="outline" size="sm" onClick={exportToCSV} className="btn-mobile-icon gap-2">
-                <Download className="w-4 h-4" />
-                <span>Export</span>
+              
+              {/* List View Button */}
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('table')}
+                className="h-12 w-12 p-0 rounded-2xl border border-border/50"
+              >
+                <List className="w-5 h-5" />
+              </Button>
+              
+              {/* Grid View Button */}
+              <Button
+                variant={viewMode === 'cards' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('cards')}
+                className="h-12 w-12 p-0 rounded-2xl border border-border/50"
+              >
+                <Grid3x3 className="w-5 h-5" />
+              </Button>
+              
+              {/* Export Button */}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={exportToCSV} 
+                className="h-12 w-12 p-0 rounded-2xl border border-border/50"
+              >
+                <Download className="w-5 h-5" />
               </Button>
             </div>
           </div>
@@ -812,6 +893,17 @@ export default function LeadsPage() {
           </Button>
         </motion.div>
       )}
+
+      {/* Floating Add Button - Mobile Only - FIXED */}
+      <div className="sm:hidden fixed bottom-6 right-6 z-50">
+        <Button 
+          onClick={() => setIsFormOpen(true)} 
+          size="icon"
+          className="h-16 w-16 rounded-full shadow-2xl shadow-primary/30 p-0"
+        >
+          <Plus className="w-7 h-7" />
+        </Button>
+      </div>
 
       {/* Create Lead Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
