@@ -1,4 +1,4 @@
-// app/(administration)/billing/page.tsx - APPLE DESIGN TEMPLATE
+// app/(administration)/billing/page.tsx - APPLE DESIGN TEMPLATE - MOBILE OPTIMIZED
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -6,11 +6,12 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, FileText, Download, Eye, TrendingUp, TrendingDown, DollarSign, Search, CreditCard, List, Grid3x3, MoreVertical } from 'lucide-react'
+import { Plus, FileText, Download, Eye, TrendingUp, DollarSign, Search, CreditCard, List, Grid3x3, MoreVertical } from 'lucide-react'
 import { Invoice, Lead, Mission } from '@prisma/client'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from '@/components/ui/dropdown-menu'
@@ -192,28 +193,29 @@ export default function BillingPage() {
           </Link>
         </motion.div>
 
-        {/* Stats Cards - Apple Style with Animations */}
+        {/* Stats Cards - Mobile Optimized (Minimized on Mobile like Leads Page) */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4"
         >
           <motion.div whileHover={{ scale: 1.02, y: -4 }} transition={{ duration: 0.2 }}>
             <Card className="apple-card group relative overflow-hidden border-l-4 border-l-blue-500">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <CardContent className="p-5 relative">
+              <CardContent className="p-3 md:p-5 relative">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider mb-2">Total Facturé</p>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">{formatCurrency(totalAmount)}</p>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <TrendingUp className="w-3 h-3" />
-                      <span>{invoices.length} facture{invoices.length > 1 ? 's' : ''}</span>
+                    <p className="text-[10px] md:text-xs text-muted-foreground uppercase font-semibold tracking-wider mb-1 md:mb-2">Total Facturé</p>
+                    <p className="text-lg md:text-2xl font-bold text-blue-600 dark:text-blue-400 mb-0.5 md:mb-1">{formatCurrency(totalAmount)}</p>
+                    <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
+                      <TrendingUp className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                      <span className="hidden md:inline">{invoices.length} facture{invoices.length > 1 ? 's' : ''}</span>
+                      <span className="md:hidden">{invoices.length}</span>
                     </div>
                   </div>
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 backdrop-blur-sm">
-                    <DollarSign className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 backdrop-blur-sm">
+                    <DollarSign className="w-4 h-4 md:w-6 md:h-6 text-blue-600 dark:text-blue-400" />
                   </div>
                 </div>
               </CardContent>
@@ -223,18 +225,19 @@ export default function BillingPage() {
           <motion.div whileHover={{ scale: 1.02, y: -4 }} transition={{ duration: 0.2 }}>
             <Card className="apple-card group relative overflow-hidden border-l-4 border-l-green-500">
               <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <CardContent className="p-5 relative">
+              <CardContent className="p-3 md:p-5 relative">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider mb-2">Factures Payées</p>
-                    <p className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">{formatCurrency(paidAmount)}</p>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <TrendingUp className="w-3 h-3" />
-                      <span>{paidCount} facture{paidCount > 1 ? 's' : ''}</span>
+                    <p className="text-[10px] md:text-xs text-muted-foreground uppercase font-semibold tracking-wider mb-1 md:mb-2">Payées</p>
+                    <p className="text-lg md:text-2xl font-bold text-green-600 dark:text-green-400 mb-0.5 md:mb-1">{formatCurrency(paidAmount)}</p>
+                    <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
+                      <TrendingUp className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                      <span className="hidden md:inline">{paidCount} facture{paidCount > 1 ? 's' : ''}</span>
+                      <span className="md:hidden">{paidCount}</span>
                     </div>
                   </div>
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-green-500/10 to-green-500/5 backdrop-blur-sm">
-                    <FileText className="w-6 h-6 text-green-600 dark:text-green-400" />
+                  <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-gradient-to-br from-green-500/10 to-green-500/5 backdrop-blur-sm">
+                    <FileText className="w-4 h-4 md:w-6 md:h-6 text-green-600 dark:text-green-400" />
                   </div>
                 </div>
               </CardContent>
@@ -244,18 +247,19 @@ export default function BillingPage() {
           <motion.div whileHover={{ scale: 1.02, y: -4 }} transition={{ duration: 0.2 }}>
             <Card className="apple-card group relative overflow-hidden border-l-4 border-l-yellow-500">
               <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <CardContent className="p-5 relative">
+              <CardContent className="p-3 md:p-5 relative">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider mb-2">En Attente</p>
-                    <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mb-1">{formatCurrency(pendingAmount)}</p>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <TrendingDown className="w-3 h-3" />
-                      <span>{pendingCount} facture{pendingCount > 1 ? 's' : ''}</span>
+                    <p className="text-[10px] md:text-xs text-muted-foreground uppercase font-semibold tracking-wider mb-1 md:mb-2">En Attente</p>
+                    <p className="text-lg md:text-2xl font-bold text-yellow-600 dark:text-yellow-400 mb-0.5 md:mb-1">{formatCurrency(pendingAmount)}</p>
+                    <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
+                      <FileText className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                      <span className="hidden md:inline">{pendingCount} facture{pendingCount > 1 ? 's' : ''}</span>
+                      <span className="md:hidden">{pendingCount}</span>
                     </div>
                   </div>
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 backdrop-blur-sm">
-                    <FileText className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                  <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 backdrop-blur-sm">
+                    <FileText className="w-4 h-4 md:w-6 md:h-6 text-yellow-600 dark:text-yellow-400" />
                   </div>
                 </div>
               </CardContent>
@@ -265,18 +269,19 @@ export default function BillingPage() {
           <motion.div whileHover={{ scale: 1.02, y: -4 }} transition={{ duration: 0.2 }}>
             <Card className="apple-card group relative overflow-hidden border-l-4 border-l-red-500">
               <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <CardContent className="p-5 relative">
+              <CardContent className="p-3 md:p-5 relative">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider mb-2">En Retard</p>
-                    <p className="text-2xl font-bold text-red-600 dark:text-red-400 mb-1">{formatCurrency(overdueAmount)}</p>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <TrendingDown className="w-3 h-3" />
-                      <span>{overdueCount} facture{overdueCount > 1 ? 's' : ''}</span>
+                    <p className="text-[10px] md:text-xs text-muted-foreground uppercase font-semibold tracking-wider mb-1 md:mb-2">En Retard</p>
+                    <p className="text-lg md:text-2xl font-bold text-red-600 dark:text-red-400 mb-0.5 md:mb-1">{formatCurrency(overdueAmount)}</p>
+                    <div className="flex items-center gap-1 text-[10px] md:text-xs text-muted-foreground">
+                      <FileText className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                      <span className="hidden md:inline">{overdueCount} facture{overdueCount > 1 ? 's' : ''}</span>
+                      <span className="md:hidden">{overdueCount}</span>
                     </div>
                   </div>
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-red-500/10 to-red-500/5 backdrop-blur-sm">
-                    <FileText className="w-6 h-6 text-red-600 dark:text-red-400" />
+                  <div className="p-2 md:p-3 rounded-lg md:rounded-xl bg-gradient-to-br from-red-500/10 to-red-500/5 backdrop-blur-sm">
+                    <FileText className="w-4 h-4 md:w-6 md:h-6 text-red-600 dark:text-red-400" />
                   </div>
                 </div>
               </CardContent>
@@ -284,7 +289,7 @@ export default function BillingPage() {
           </motion.div>
         </motion.div>
 
-        {/* Filters & View Toggle - Apple Style Sticky Bar */}
+        {/* Filters & View Toggle - Better Aligned with Select Dropdown */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -305,42 +310,22 @@ export default function BillingPage() {
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
-                    <Button
-                      variant={statusFilter === 'ALL' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setStatusFilter('ALL')}
-                      className="rounded-md h-9 px-4"
-                    >
-                      Tous
-                    </Button>
-                    <Button
-                      variant={statusFilter === 'SENT' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setStatusFilter('SENT')}
-                      className="rounded-md h-9 px-4"
-                    >
-                      Envoyées
-                    </Button>
-                    <Button
-                      variant={statusFilter === 'PAID' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setStatusFilter('PAID')}
-                      className="rounded-md h-9 px-4"
-                    >
-                      Payées
-                    </Button>
-                    <Button
-                      variant={statusFilter === 'OVERDUE' ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={() => setStatusFilter('OVERDUE')}
-                      className="rounded-md h-9 px-4"
-                    >
-                      En retard
-                    </Button>
-                  </div>
+                  {/* Status Filter - Now with Select Dropdown */}
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="h-11 w-[140px] rounded-xl">
+                      <SelectValue placeholder="Statut" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Tous</SelectItem>
+                      <SelectItem value="SENT">Envoyées</SelectItem>
+                      <SelectItem value="PAID">Payées</SelectItem>
+                      <SelectItem value="OVERDUE">En retard</SelectItem>
+                      <SelectItem value="DRAFT">Brouillons</SelectItem>
+                      <SelectItem value="CANCELLED">Annulées</SelectItem>
+                    </SelectContent>
+                  </Select>
 
-                  <div className="h-6 w-px bg-border" />
+                  <div className="h-6 w-px bg-border hidden md:block" />
 
                   <div className="flex gap-1 p-1 bg-muted/50 rounded-lg">
                     <Button
@@ -532,9 +517,10 @@ export default function BillingPage() {
                           </CardTitle>
                           <p className="text-xs text-muted-foreground truncate">{invoice.lead.company || 'Particulier'}</p>
                         </div>
+                        {/* 3-Dot Menu - Always Visible on Mobile, Hover on Desktop */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -582,7 +568,7 @@ export default function BillingPage() {
                       </div>
                       <div className="flex justify-between items-center pt-3 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
                         <span className="text-xs text-muted-foreground">{formatDate(invoice.createdAt)}</span>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="hidden md:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button 
                             variant="outline" 
                             size="sm" 

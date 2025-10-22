@@ -1,4 +1,4 @@
-// app/(administration)/page.tsx - ENHANCED ADMIN DASHBOARD WITH APPLE DESIGN
+// app/(administration)/page.tsx - APPLE DESIGN TEMPLATE DASHBOARD
 'use client'
 
 export const dynamic = 'force-dynamic'
@@ -16,7 +16,6 @@ import { Separator } from '@/components/ui/separator'
 import { formatCurrency, formatDate, translate } from '@/lib/utils' 
 import { 
   Users, 
-  Clock, 
   DollarSign, 
   TrendingUp, 
   MessageSquare, 
@@ -28,7 +27,8 @@ import {
   ExternalLink,
   CheckCircle2,
   ArrowRight,
-  Activity
+  Activity,
+  Briefcase
 } from 'lucide-react'
 import { Lead, Mission, User, LeadStatus } from '@prisma/client'
 import { DashboardSkeleton } from '@/components/skeletons/DashboardSkeleton'
@@ -57,17 +57,17 @@ type DashboardData = {
 
 const getStatusColor = (status: LeadStatus) => {
   const colors: Record<string, string> = {
-    NEW: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 border-blue-300 dark:border-blue-600',
-    CONTACTED: 'bg-blue-200 dark:bg-blue-800/30 text-blue-900 dark:text-blue-300 border-blue-400 dark:border-blue-500',
-    QUALIFIED: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 border-green-300 dark:border-green-600',
-    VISIT_PLANNED: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-400 border-indigo-300 dark:border-indigo-600',
-    QUOTE_SENT: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-900 dark:text-cyan-400 border-cyan-300 dark:border-cyan-600',
-    QUOTE_ACCEPTED: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 border-emerald-300 dark:border-emerald-600',
-    MISSION_SCHEDULED: 'bg-sky-100 dark:bg-sky-900/30 text-sky-800 dark:text-sky-400 border-sky-300 dark:border-sky-600',
-    LEAD_LOST: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 border-red-300 dark:border-red-600',
-    COMPLETED: 'bg-gray-100 dark:bg-gray-800/30 text-gray-800 dark:text-gray-400 border-gray-300 dark:border-gray-600',
+    NEW: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200',
+    CONTACTED: 'bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-300',
+    QUALIFIED: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200',
+    VISIT_PLANNED: 'bg-indigo-100 dark:bg-indigo-900 text-indigo-900 dark:text-indigo-200',
+    QUOTE_SENT: 'bg-cyan-100 dark:bg-cyan-900 text-cyan-900 dark:text-cyan-200',
+    QUOTE_ACCEPTED: 'bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200',
+    MISSION_SCHEDULED: 'bg-sky-100 dark:bg-sky-900 text-sky-800 dark:text-sky-200',
+    LEAD_LOST: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
+    COMPLETED: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200',
   };
-  return colors[status] || 'bg-gray-100 dark:bg-gray-800/30 text-gray-800 dark:text-gray-400';
+  return colors[status] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
 };
 
 export default function Dashboard() {
@@ -129,9 +129,24 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="main-content">
-        <div className="apple-card p-8 text-center">
-          <div className="text-destructive font-medium">Erreur: {error}</div>
+      <div className="min-h-screen p-4 md:p-6">
+        <div className="max-w-[95vw] md:max-w-[1400px] mx-auto">
+          <Card className="apple-card border-red-200 dark:border-red-800">
+            <CardContent className="p-12 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+                <Activity className="h-8 w-8 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-red-600 mb-2">Erreur de chargement</h3>
+              <p className="text-muted-foreground">{error}</p>
+              <Button 
+                onClick={() => window.location.reload()} 
+                className="mt-4"
+                variant="outline"
+              >
+                Réessayer
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -143,17 +158,19 @@ export default function Dashboard() {
       value: dashboardData?.stats.totalLeads.toString() || '0',
       icon: Users,
       href: '/leads',
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10',
+      color: 'text-blue-600 dark:text-blue-400',
+      bgColor: 'bg-gradient-to-br from-blue-500/10 to-blue-500/5',
+      borderColor: 'border-l-blue-500',
       trend: '+12%'
     },
     {
       title: 'Missions en Cours',
       value: dashboardData?.stats.activeMissions.toString() || '0',
-      icon: Clock,
+      icon: Briefcase,
       href: '/missions',
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-500/10',
+      color: 'text-purple-600 dark:text-purple-400',
+      bgColor: 'bg-gradient-to-br from-purple-500/10 to-purple-500/5',
+      borderColor: 'border-l-purple-500',
       trend: '+8%'
     },
     {
@@ -161,8 +178,9 @@ export default function Dashboard() {
       value: formatCurrency(dashboardData?.stats.totalRevenue || 0),
       icon: DollarSign,
       href: '/billing',
-      color: 'text-emerald-500',
-      bgColor: 'bg-emerald-500/10',
+      color: 'text-emerald-600 dark:text-emerald-400',
+      bgColor: 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5',
+      borderColor: 'border-l-emerald-500',
       trend: '+23%'
     },
     {
@@ -170,250 +188,254 @@ export default function Dashboard() {
       value: `${dashboardData?.stats.conversionRate || '0'}%`,
       icon: TrendingUp,
       href: '/analytics',
-      color: 'text-indigo-500',
-      bgColor: 'bg-indigo-500/10',
+      color: 'text-indigo-600 dark:text-indigo-400',
+      bgColor: 'bg-gradient-to-br from-indigo-500/10 to-indigo-500/5',
+      borderColor: 'border-l-indigo-500',
       trend: '+3%'
     },
   ];
 
   return (
-    <div className="main-content space-y-4 md:space-y-6 animate-fade-in">
-      <div className="page-header">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-          <div>
-            <h1 className="page-title text-xl sm:text-2xl md:text-3xl">Tableau de Bord</h1>
-            <p className="page-subtitle text-xs sm:text-sm">
-              Vue d'ensemble de votre activité Enarva
-            </p>
+    <div className="min-h-screen p-4 md:p-6">
+      <div className="max-w-[95vw] md:max-w-[1400px] mx-auto space-y-6">
+        
+        {/* Header - Apple Style */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-sm">
+              <Activity className="w-7 h-7 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+                Tableau de Bord
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Vue d'ensemble de votre activité Enarva
+              </p>
+            </div>
           </div>
           <ClientOnly>
-            <div className="text-xs sm:text-sm text-muted-foreground">
-              {new Date().toLocaleDateString('fr-FR', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
+            <div className="text-xs sm:text-sm text-muted-foreground flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              {new Date().toLocaleDateString('fr-FR', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
               })}
             </div>
           </ClientOnly>
-        </div>
-      </div>
+        </motion.div>
 
-      {/* FIXED: 2 cards per row on mobile */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {statsCards.map((stat, index) => {
-          const Icon = stat.icon
-          return (
-            <motion.div
-              key={stat.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                delay: index * 0.1,
-                type: 'spring',
-                stiffness: 300,
-                damping: 24
-              }}
-            >
-              <Link href={stat.href}>
-                <Card className="apple-card group hover:scale-[1.02] transition-transform cursor-pointer h-full">
-                  <CardContent className="p-3 sm:p-5 space-y-2 sm:space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className={`w-8 h-8 sm:w-11 sm:h-11 ${stat.bgColor} rounded-lg sm:rounded-xl flex items-center justify-center transition-transform group-hover:scale-110`}>
-                        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color}`} />
-                      </div>
-                      <span className="text-[10px] sm:text-xs font-semibold text-green-500 bg-green-500/10 px-1.5 sm:px-2 py-0.5 rounded-full">
-                        {stat.trend}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-lg sm:text-2xl font-bold text-foreground leading-none mb-0.5 sm:mb-1 truncate">
-                        {stat.value}
-                      </p>
-                      <p className="text-[11px] sm:text-sm font-medium text-muted-foreground truncate">
-                        {stat.title}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            </motion.div>
-          )
-        })}
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <Card className="apple-card">
-          <CardContent className="p-4 sm:p-6">
-            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-center gap-2">
-              <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-              Actions Rapides
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-              {[
-                { label: 'Nouveau Lead', href: '/leads/new', icon: Users },
-                { label: 'Créer Devis', href: '/quotes/new', icon: Clock },
-                { label: 'Planifier Mission', href: '/missions/new', icon: Calendar },
-                { label: 'Voir Analytics', href: '/analytics', icon: TrendingUp },
-              ].map((action, index) => {
-                const ActionIcon = action.icon
-                return (
-                  <Link key={action.label} href={action.href}>
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.6 + index * 0.1 }}
-                    >
-                      <Button
-                        variant="outline"
-                        className="w-full h-auto py-3 sm:py-4 flex-col gap-1.5 sm:gap-2 hover:bg-accent/50 hover:border-primary/50 transition-all text-xs sm:text-sm"
-                      >
-                        <ActionIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                        <span className="text-[10px] sm:text-xs leading-tight">{action.label}</span>
-                      </Button>
-                    </motion.div>
-                  </Link>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.7 }}
+        {/* Stats Cards - Mobile Optimized (2 columns on mobile, 4 on desktop) */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4"
         >
-          <Card className="apple-card h-full">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
-                  <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                  Leads Récents
-                </h3>
+          {statsCards.map((stat, index) => {
+            const Icon = stat.icon;
+            return (
+              <motion.div
+                key={stat.title}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.05 }}
+                whileHover={{ scale: 1.02, y: -4 }}
+              >
+                <Link href={stat.href}>
+                  <Card className={`apple-card group relative overflow-hidden border-l-4 ${stat.borderColor} cursor-pointer h-full`}>
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <CardContent className="p-3 md:p-5 relative">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-[10px] md:text-xs text-muted-foreground uppercase font-semibold tracking-wider mb-1 md:mb-2">
+                            {stat.title}
+                          </p>
+                          <p className={`text-lg md:text-2xl font-bold ${stat.color} mb-0.5 md:mb-1`}>
+                            {stat.value}
+                          </p>
+                          <div className="flex items-center gap-1 text-[10px] md:text-xs text-green-600 dark:text-green-400">
+                            <TrendingUp className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                            <span className="hidden sm:inline">{stat.trend} ce mois</span>
+                            <span className="sm:hidden">{stat.trend}</span>
+                          </div>
+                        </div>
+                        <div className={`p-2 md:p-3 rounded-lg md:rounded-xl ${stat.bgColor} backdrop-blur-sm`}>
+                          <Icon className={`w-4 h-4 md:w-6 md:h-6 ${stat.color}`} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </motion.div>
+            );
+          })}
+        </motion.div>
+
+        {/* Recent Leads & Active Missions */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6"
+        >
+          {/* Recent Leads Card */}
+          <Card className="apple-card">
+            <CardContent className="p-5 md:p-6">
+              <div className="flex items-center justify-between mb-4 md:mb-6">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/10 to-blue-500/5">
+                    <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h2 className="text-lg md:text-xl font-semibold">Leads Récents</h2>
+                </div>
                 <Link href="/leads">
-                  <Button variant="ghost" size="sm" className="text-[10px] sm:text-xs gap-1 h-7 sm:h-8 px-2 sm:px-3">
+                  <Button variant="ghost" size="sm" className="gap-1 text-xs md:text-sm rounded-xl">
                     Voir tout
-                    <ArrowRight className="w-3 h-3" />
+                    <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
                   </Button>
                 </Link>
               </div>
-              <div className="space-y-2 sm:space-y-3">
+
+              <div className="space-y-3">
                 {dashboardData?.recentLeads && dashboardData.recentLeads.length > 0 ? (
-                  dashboardData.recentLeads.map((lead, index) => (
+                  dashboardData.recentLeads.slice(0, 5).map((lead, index) => (
                     <motion.div
                       key={lead.id}
-                      initial={{ opacity: 0, x: -10 }}
+                      initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.8 + index * 0.1 }}
+                      transition={{ delay: index * 0.05 }}
                       onClick={() => setSelectedLead(lead)}
-                      className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg hover:bg-accent/50 transition-colors border border-border/50 cursor-pointer group"
+                      className="p-3 md:p-4 rounded-xl hover:bg-accent/50 transition-all duration-200 cursor-pointer border border-border/50 hover:border-border group"
                     >
-                      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs sm:text-sm font-semibold text-primary">
-                            {lead.firstName[0]}{lead.lastName[0]}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <Avatar className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
+                            <AvatarFallback className="text-sm md:text-base bg-gradient-to-br from-blue-500/10 to-purple-500/10">
+                              {lead.firstName[0]}{lead.lastName[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm md:text-base truncate">
+                              {lead.firstName} {lead.lastName}
+                            </p>
+                            <p className="text-xs md:text-sm text-muted-foreground truncate">
+                              {lead.company || 'Particulier'}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1 md:mt-2">
+                              {getChannelIcon(lead.channel)}
+                              <span className="text-xs text-muted-foreground hidden sm:inline">
+                                {translate(lead.channel)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                          <Badge className={`${getStatusColor(lead.status)} text-[10px] md:text-xs px-2 py-0.5`}>
+                            {translate(lead.status)}
+                          </Badge>
+                          <span className="text-[10px] md:text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDate(lead.createdAt)}
                           </span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-xs sm:text-sm truncate group-hover:text-primary transition-colors">
-                            {lead.firstName} {lead.lastName}
-                          </p>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                            {lead.company || 'Particulier'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                        {getChannelIcon(lead.channel)}
-                        <Badge className={`${getStatusColor(lead.status)} text-[9px] sm:text-[10px] border-0 px-1.5 sm:px-2 py-0.5`}>
-                          {translate(lead.status)}
-                        </Badge>
                       </div>
                     </motion.div>
                   ))
                 ) : (
-                  <div className="text-center py-6 sm:py-8 text-muted-foreground text-xs sm:text-sm">
-                    Aucun lead récent
+                  <div className="text-center py-8 md:py-12">
+                    <Users className="w-12 h-12 md:w-16 md:h-16 text-muted-foreground/50 mx-auto mb-3 md:mb-4" />
+                    <p className="text-sm md:text-base text-muted-foreground">Aucun lead récent</p>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
-        </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.7 }}
-        >
-          <Card className="apple-card h-full">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h3 className="text-base sm:text-lg font-semibold flex items-center gap-2">
-                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                  Missions Actives
-                </h3>
+          {/* Active Missions Card */}
+          <Card className="apple-card">
+            <CardContent className="p-5 md:p-6">
+              <div className="flex items-center justify-between mb-4 md:mb-6">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500/10 to-purple-500/5">
+                    <Briefcase className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <h2 className="text-lg md:text-xl font-semibold">Missions Actives</h2>
+                </div>
                 <Link href="/missions">
-                  <Button variant="ghost" size="sm" className="text-[10px] sm:text-xs gap-1 h-7 sm:h-8 px-2 sm:px-3">
+                  <Button variant="ghost" size="sm" className="gap-1 text-xs md:text-sm rounded-xl">
                     Voir tout
-                    <ArrowRight className="w-3 h-3" />
+                    <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
                   </Button>
                 </Link>
               </div>
-              <div className="space-y-2 sm:space-y-3">
+
+              <div className="space-y-3">
                 {dashboardData?.activeMissions && dashboardData.activeMissions.length > 0 ? (
-                  dashboardData.activeMissions.map((mission, index) => {
-                    const tasks = mission.tasks || [];
-                    const completedTasks = tasks.filter(task => task.status === 'COMPLETED' || task.status === 'VALIDATED').length;
-                    const progress = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+                  dashboardData.activeMissions.slice(0, 5).map((mission, index) => {
+                    const completedTasks = mission.tasks?.filter(t => t.status === 'COMPLETED' || t.status === 'VALIDATED').length || 0;
+                    const totalTasks = mission.tasks?.length || 0;
+                    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
                     return (
                       <motion.div
                         key={mission.id}
-                        initial={{ opacity: 0, x: 10 }}
+                        initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.8 + index * 0.1 }}
+                        transition={{ delay: index * 0.05 }}
                         onClick={() => setSelectedMission(mission)}
-                        className="p-2.5 sm:p-3 rounded-lg border border-border/50 hover:bg-accent/50 transition-colors cursor-pointer space-y-2 sm:space-y-3 group"
+                        className="p-3 md:p-4 rounded-xl hover:bg-accent/50 transition-all duration-200 cursor-pointer border border-border/50 hover:border-border group"
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-500/10 rounded-full flex items-center justify-center flex-shrink-0">
-                              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />
-                            </div>
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-xs sm:text-sm truncate group-hover:text-primary transition-colors">
+                              <p className="font-semibold text-sm md:text-base truncate">
                                 {mission.lead.firstName} {mission.lead.lastName}
-                              </h4>
-                              <p className="text-[10px] sm:text-xs text-muted-foreground">
-                                {completedTasks}/{tasks.length} tâches
+                              </p>
+                              <p className="text-xs md:text-sm text-muted-foreground truncate flex items-center gap-1">
+                                <MapPin className="w-3 h-3 flex-shrink-0" />
+                                {mission.lead.address}
                               </p>
                             </div>
+                            <Badge variant="outline" className="text-[10px] md:text-xs whitespace-nowrap">
+                              {translate(mission.status)}
+                            </Badge>
                           </div>
-                          <Badge variant="outline" className="text-[9px] sm:text-[10px] whitespace-nowrap px-1.5 sm:px-2 py-0.5">
-                            {translate(mission.status)}
-                          </Badge>
-                        </div>
-                        <div className="space-y-1 sm:space-y-1.5">
-                          <div className="flex items-center justify-between text-[10px] sm:text-xs">
-                            <span className="text-muted-foreground">Progression</span>
-                            <span className="font-medium">{progress}%</span>
+                          
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Progression</span>
+                              <span className="font-semibold">{progress}%</span>
+                            </div>
+                            <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
+                              <motion.div 
+                                className={`h-2 rounded-full ${
+                                  progress === 100 ? 'bg-green-500' :
+                                  progress >= 50 ? 'bg-blue-500' :
+                                  'bg-yellow-500'
+                                }`}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${progress}%` }}
+                                transition={{ duration: 0.5, delay: index * 0.1 }}
+                              />
+                            </div>
+                            <p className="text-[10px] md:text-xs text-muted-foreground">
+                              {completedTasks}/{totalTasks} tâches complétées
+                            </p>
                           </div>
-                          <Progress value={progress} className="h-1.5 sm:h-2" />
                         </div>
                       </motion.div>
                     );
                   })
                 ) : (
-                  <div className="text-center py-6 sm:py-8 text-muted-foreground text-xs sm:text-sm">
-                    Aucune mission active
+                  <div className="text-center py-8 md:py-12">
+                    <Briefcase className="w-12 h-12 md:w-16 md:h-16 text-muted-foreground/50 mx-auto mb-3 md:mb-4" />
+                    <p className="text-sm md:text-base text-muted-foreground">Aucune mission active</p>
                   </div>
                 )}
               </div>
@@ -422,26 +444,32 @@ export default function Dashboard() {
         </motion.div>
       </div>
 
+      {/* Lead Details Dialog */}
       <Dialog open={!!selectedLead} onOpenChange={() => setSelectedLead(null)}>
-        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto apple-card">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl font-semibold">Détails du Lead</DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
-              Informations complètes sur {selectedLead?.firstName} {selectedLead?.lastName}
+              Informations complètes sur ce lead
             </DialogDescription>
           </DialogHeader>
           {selectedLead && (
             <div className="space-y-4 sm:space-y-6">
               <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-lg sm:text-xl font-bold text-primary">
+                <div className="flex items-start gap-4">
+                  <Avatar className="w-16 h-16 flex-shrink-0">
+                    <AvatarFallback className="text-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10">
                       {selectedLead.firstName[0]}{selectedLead.lastName[0]}
-                    </span>
-                  </div>
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-base sm:text-lg truncate">{selectedLead.firstName} {selectedLead.lastName}</h3>
-                    <Badge className={`${getStatusColor(selectedLead.status)} text-xs mt-1 border-0`}>
+                    <h3 className="font-semibold text-base sm:text-lg">
+                      {selectedLead.firstName} {selectedLead.lastName}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      {selectedLead.company || 'Particulier'}
+                    </p>
+                    <Badge className={`${getStatusColor(selectedLead.status)} mt-2 text-xs`}>
                       {translate(selectedLead.status)}
                     </Badge>
                   </div>
@@ -530,7 +558,7 @@ export default function Dashboard() {
               <Separator />
 
               <Link href={`/leads/${selectedLead.id}`}>
-                <Button className="w-full shadow-lg shadow-primary/20" size="lg">
+                <Button className="w-full shadow-lg shadow-primary/20 rounded-xl" size="lg">
                   Voir la fiche complète
                   <ExternalLink className="w-4 h-4 ml-2" />
                 </Button>
@@ -540,8 +568,9 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* Mission Details Dialog */}
       <Dialog open={!!selectedMission} onOpenChange={() => setSelectedMission(null)}>
-        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto apple-card">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl font-semibold">Détails de la Mission</DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
@@ -639,7 +668,7 @@ export default function Dashboard() {
               <Separator />
 
               <Link href={`/missions/${selectedMission.id}`}>
-                <Button className="w-full shadow-lg shadow-primary/20" size="lg">
+                <Button className="w-full shadow-lg shadow-primary/20 rounded-xl" size="lg">
                   Voir la mission complète
                   <ExternalLink className="w-4 h-4 ml-2" />
                 </Button>
