@@ -1,3 +1,4 @@
+// app/(administration)/quotes/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -12,7 +13,6 @@ import {
   Trash2, 
   Plus, 
   FileText, 
-  User, 
   CheckCircle,
   Clock,
   XCircle,
@@ -42,9 +42,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import { WaveLoader } from '@/components/pdf/WaveLoader'
 import '@/components/pdf/WaveLoader.css'
+import { motion } from 'framer-motion'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 
 interface Quote {
   id: string
@@ -64,7 +68,6 @@ interface Quote {
   }
 }
 
-// Status configurations with dark mode support
 const getStatusConfig = (status: QuoteStatus) => {
   const configs: Record<QuoteStatus, {
     color: string;
@@ -73,7 +76,7 @@ const getStatusConfig = (status: QuoteStatus) => {
     priority: number;
   }> = {
     DRAFT: { 
-      color: 'bg-muted text-muted-foreground border-border', 
+      color: 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-600', 
       icon: FileText, 
       label: 'Brouillon',
       priority: 1
@@ -109,7 +112,7 @@ const getStatusConfig = (status: QuoteStatus) => {
       priority: 2
     },
     CANCELLED: { 
-      color: 'bg-muted text-muted-foreground border-border', 
+      color: 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-600', 
       icon: XCircle, 
       label: 'Annulé',
       priority: 6
@@ -127,8 +130,8 @@ export default function QuotesPage() {
   const [downloadingQuoteId, setDownloadingQuoteId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | 'ALL'>('ALL')
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
 
-  // Check if user is admin
   const isAdmin = session?.user && (session.user as any).role === 'ADMIN'
 
   const fetchQuotes = async () => {
@@ -153,16 +156,13 @@ export default function QuotesPage() {
     fetchQuotes()
   }, [])
 
-  // Filter and search functionality
   useEffect(() => {
     let filtered = quotes
 
-    // Filter by status
     if (statusFilter !== 'ALL') {
       filtered = filtered.filter(quote => quote.status === statusFilter)
     }
 
-    // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(quote => 
         quote.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -175,7 +175,6 @@ export default function QuotesPage() {
     setFilteredQuotes(filtered)
   }, [quotes, statusFilter, searchTerm])
 
-  // Handle PDF download
   const handleDownload = async (quoteId: string, quoteNumber: string) => {
     setDownloadingQuoteId(quoteId)
     
@@ -186,7 +185,7 @@ export default function QuotesPage() {
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `devis-${quoteNumber}.pdf`
+        a.download = `${quoteNumber}.pdf`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
@@ -196,354 +195,369 @@ export default function QuotesPage() {
         toast.error('Erreur lors du téléchargement du PDF')
       }
     } catch (error) {
-      console.error('Error downloading PDF:', error)
+      console.error('Error downloading quote:', error)
       toast.error('Erreur lors du téléchargement du PDF')
     } finally {
       setDownloadingQuoteId(null)
     }
   }
 
-  // Handle quote deletion
   const handleDelete = async (quoteId: string, quoteNumber: string) => {
     if (!isAdmin) {
-      toast.error('Seuls les administrateurs peuvent supprimer des devis')
+      toast.error('Action non autorisée')
       return
     }
 
     setDeletingQuoteId(quoteId)
-    
     try {
       const response = await fetch(`/api/quotes/${quoteId}`, {
         method: 'DELETE',
       })
 
       if (response.ok) {
-        setQuotes(current => current.filter(quote => quote.id !== quoteId))
         toast.success(`Devis ${quoteNumber} supprimé avec succès`)
+        setQuotes(quotes.filter(q => q.id !== quoteId))
       } else {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Erreur lors de la suppression')
+        const error = await response.json()
+        toast.error(error.error || 'Erreur lors de la suppression du devis')
       }
     } catch (error) {
       console.error('Error deleting quote:', error)
-      toast.error(error instanceof Error ? error.message : 'Erreur lors de la suppression du devis')
+      toast.error('Erreur lors de la suppression du devis')
     } finally {
       setDeletingQuoteId(null)
     }
   }
 
+  const handleStatusChange = async (quoteId: string, newStatus: QuoteStatus, quoteNumber: string) => {
+    setUpdatingStatusId(quoteId)
+    try {
+      const response = await fetch(`/api/quotes/${quoteId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (response.ok) {
+        await response.json()
+        toast.success(`Statut du devis ${quoteNumber} mis à jour`)
+        setQuotes(quotes.map(q => q.id === quoteId ? { ...q, status: newStatus } : q))
+      } else {
+        toast.error('Erreur lors de la mise à jour du statut')
+      }
+    } catch (error) {
+      console.error('Error updating quote status:', error)
+      toast.error('Erreur lors de la mise à jour du statut')
+    } finally {
+      setUpdatingStatusId(null)
+    }
+  }
+
+  const statusOptions: Array<{ value: QuoteStatus | 'ALL'; label: string }> = [
+    { value: 'ALL', label: 'Tous les statuts' },
+    { value: 'DRAFT', label: 'Brouillon' },
+    { value: 'SENT', label: 'Envoyé' },
+    { value: 'VIEWED', label: 'Consulté' },
+    { value: 'ACCEPTED', label: 'Accepté' },
+    { value: 'REJECTED', label: 'Refusé' },
+    { value: 'EXPIRED', label: 'Expiré' },
+    { value: 'CANCELLED', label: 'Annulé' },
+  ]
+
+  const availableStatusChanges: QuoteStatus[] = ['DRAFT', 'SENT', 'VIEWED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'CANCELLED']
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-muted rounded w-1/3"></div>
-            <div className="h-12 bg-muted rounded"></div>
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-24 bg-muted rounded"></div>
-              ))}
-            </div>
-          </div>
-        </div>
+      <div className="min-h-screen p-4 md:p-6 flex items-center justify-center">
+        <WaveLoader isLoading={isLoading} />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Wave Loader Modal */}
-      <WaveLoader 
-        isLoading={downloadingQuoteId !== null}
-        documentTitle="Télécharger votre document"
-      />
-
-      {/* Mobile Header */}
-      <div className="lg:hidden bg-card border-b border-border sticky top-0 z-10 px-4 py-3">
-        <div className="flex items-center justify-between mb-3">
+    <div className="min-h-screen p-4 md:p-6">
+      <div className="max-w-[95vw] md:max-w-[1400px] mx-auto space-y-4 md:space-y-6">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4"
+        >
           <div>
-            <h1 className="text-xl font-bold text-foreground">Devis</h1>
-            <p className="text-sm text-muted-foreground">{filteredQuotes.length} devis</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Devis</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">
+              Gérez et suivez tous vos devis
+            </p>
           </div>
           <Link href="/quotes/new">
-            <Button size="sm" className="bg-primary hover:bg-primary/90">
-              <Plus className="h-4 w-4 mr-1" />
-              Nouveau
+            <Button className="shadow-lg shadow-primary/20 rounded-xl w-full sm:w-auto">
+              <Plus className="w-4 h-4 mr-2" />
+              Nouveau Devis
             </Button>
           </Link>
-        </div>
+        </motion.div>
 
-        {/* Mobile Search & Filter */}
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher un devis..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-9"
-            />
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 px-3">
-                <Filter className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setStatusFilter('ALL')}>
-                Tous les statuts
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter('DRAFT')}>
-                Brouillons
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter('SENT')}>
-                Envoyés
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter('ACCEPTED')}>
-                Acceptés
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter('REJECTED')}>
-                Refusés
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter('EXPIRED')}>
-                Expirés
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
+          <Card className="apple-card border-l-4 border-l-primary">
+            <CardContent className="p-4 md:p-6">
+              <div className="flex flex-col md:flex-row gap-3 md:gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher par numéro, client, entreprise ou téléphone..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 rounded-xl"
+                  />
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="rounded-xl min-w-[180px] justify-start">
+                      <Filter className="w-4 h-4 mr-2" />
+                      {statusOptions.find(s => s.value === statusFilter)?.label}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[200px]">
+                    {statusOptions.map((option) => (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => setStatusFilter(option.value)}
+                        className="cursor-pointer"
+                      >
+                        {option.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-      {/* Desktop Header */}
-      <div className="hidden lg:block bg-card border-b border-border">
-        <div className="max-w-6xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Devis</h1>
-              <p className="text-muted-foreground mt-1">Gérez vos devis et propositions commerciales</p>
-            </div>
-            <Link href="/quotes/new">
-              <Button className="bg-primary hover:bg-primary/90">
-                <Plus className="mr-2 h-4 w-4" />
-                Nouveau Devis
-              </Button>
-            </Link>
-          </div>
-
-          {/* Desktop Search & Filter */}
-          <div className="flex gap-4">
-            <div className="flex-1 max-w-md relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher par numéro, client, téléphone..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filtrer par statut
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setStatusFilter('ALL')}>
-                  Tous les statuts
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('DRAFT')}>
-                  Brouillons
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('SENT')}>
-                  Envoyés
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('ACCEPTED')}>
-                  Acceptés
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('REJECTED')}>
-                  Refusés
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('EXPIRED')}>
-                  Expirés
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="max-w-6xl mx-auto p-4 lg:p-6">
         {filteredQuotes.length === 0 ? (
-          <Card>
-            <CardContent className="py-12">
-              <div className="text-center">
-                <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+          >
+            <Card className="apple-card">
+              <CardContent className="p-12 text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                  <FileText className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">
                   {searchTerm || statusFilter !== 'ALL' ? 'Aucun devis trouvé' : 'Aucun devis'}
                 </h3>
                 <p className="text-muted-foreground mb-6">
                   {searchTerm || statusFilter !== 'ALL' 
-                    ? 'Essayez de modifier vos critères de recherche' 
-                    : 'Commencez par créer votre premier devis'
-                  }
+                    ? 'Essayez de modifier vos filtres de recherche'
+                    : 'Commencez par créer votre premier devis'}
                 </p>
-                {!searchTerm && statusFilter === 'ALL' && (
-                  <Link href="/quotes/new">
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Créer un devis
-                    </Button>
-                  </Link>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                <Link href="/quotes/new">
+                  <Button className="shadow-lg shadow-primary/20 rounded-xl">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Créer un devis
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </motion.div>
         ) : (
-          <div className="space-y-3 lg:space-y-4">
-            {/* Mobile Quote Cards */}
-            <div className="lg:hidden space-y-3">
-              {filteredQuotes.map((quote) => {
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-3 md:gap-4">
+              {filteredQuotes.map((quote, index) => {
                 const statusConfig = getStatusConfig(quote.status)
                 const StatusIcon = statusConfig.icon
                 
                 return (
-                  <Card key={quote.id}>
-                    <CardContent className="p-4">
-                      {/* Quote Header */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <Link 
-                            href={`/quotes/${quote.id}`}
-                            className="font-semibold text-primary hover:text-primary/80 text-sm"
-                          >
-                            {quote.quoteNumber}
-                          </Link>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge className={`${statusConfig.color} text-xs border`}>
-                              <StatusIcon className="w-3 h-3 mr-1" />
-                              {statusConfig.label}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {quote.businessType === 'SERVICE' ? 'Service' : 'Produit'}
-                            </Badge>
-                          </div>
-                        </div>
-
-                        {/* Mobile Actions Menu */}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/quotes/${quote.id}`} className="flex items-center">
-                                <Eye className="mr-2 h-4 w-4" />
-                                Voir
+                  <motion.div
+                    key={quote.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                  >
+                    <Card className="apple-card hover:shadow-lg transition-all duration-300 border-l-4 border-l-primary">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <Link 
+                                href={`/quotes/${quote.id}`}
+                                className="font-semibold text-base hover:text-primary transition-colors line-clamp-1"
+                              >
+                                {quote.quoteNumber}
                               </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleDownload(quote.id, quote.quoteNumber)}
-                              disabled={downloadingQuoteId === quote.id}
-                            >
-                              <Download className="mr-2 h-4 w-4" />
-                              Télécharger
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/quotes/${quote.id}/edit`} className="flex items-center">
-                                <Edit className="mr-2 h-4 w-4" />
-                                Modifier
-                              </Link>
-                            </DropdownMenuItem>
-                            {isAdmin && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem 
-                                    onSelect={(e) => e.preventDefault()}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Supprimer
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Supprimer le devis <strong>{quote.quoteNumber}</strong> ?
-                                      <br />Cette action est irréversible.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDelete(quote.id, quote.quoteNumber)}
-                                      className="bg-destructive hover:bg-destructive/90"
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {formatDate(quote.createdAt)}
+                              </p>
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-[200px]">
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/quotes/${quote.id}`} className="cursor-pointer">
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    Voir le devis
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleDownload(quote.id, quote.quoteNumber)}
+                                  disabled={downloadingQuoteId === quote.id}
+                                  className="cursor-pointer"
+                                >
+                                  <Download className="w-4 h-4 mr-2" />
+                                  Télécharger PDF
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/quotes/${quote.id}/edit`} className="cursor-pointer">
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Modifier
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel className="text-xs">Changer le statut</DropdownMenuLabel>
+                                {availableStatusChanges.map((status) => {
+                                  const config = getStatusConfig(status)
+                                  const Icon = config.icon
+                                  return (
+                                    <DropdownMenuItem
+                                      key={status}
+                                      onClick={() => handleStatusChange(quote.id, status, quote.quoteNumber)}
+                                      disabled={updatingStatusId === quote.id || quote.status === status}
+                                      className="cursor-pointer"
                                     >
-                                      Supprimer
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                                      <Icon className="w-4 h-4 mr-2" />
+                                      {config.label}
+                                    </DropdownMenuItem>
+                                  )
+                                })}
+                                {isAdmin && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem 
+                                          onSelect={(e) => e.preventDefault()}
+                                          className="cursor-pointer text-destructive focus:text-destructive"
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          Supprimer
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent className="max-w-[95vw] sm:max-w-md">
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+                                          <AlertDialogDescription className="text-xs sm:text-sm">
+                                            Êtes-vous sûr de vouloir supprimer le devis <strong>{quote.quoteNumber}</strong> ?
+                                            <br />
+                                            Client: {quote.lead.firstName} {quote.lead.lastName}
+                                            <br />
+                                            Montant: {formatCurrency(quote.finalPrice)}
+                                            <br /><br />
+                                            <span className="text-destructive font-medium">
+                                              Cette action est irréversible.
+                                            </span>
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() => handleDelete(quote.id, quote.quoteNumber)}
+                                            className="bg-destructive hover:bg-destructive/90"
+                                            disabled={deletingQuoteId === quote.id}
+                                          >
+                                            {deletingQuoteId === quote.id ? 'Suppression...' : 'Supprimer'}
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+
+                          <Badge className={`${statusConfig.color} border text-xs`}>
+                            <StatusIcon className="w-3 h-3 mr-1" />
+                            {statusConfig.label}
+                          </Badge>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="w-8 h-8">
+                                <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10">
+                                  {quote.lead.firstName[0]}{quote.lead.lastName[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm line-clamp-1">
+                                  {quote.lead.firstName} {quote.lead.lastName}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <Badge variant="outline" className="text-xs h-5">
+                                    {quote.lead.leadType === 'PARTICULIER' ? 'Particulier' : 'Professionnel'}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-xs h-5">
+                                    {quote.businessType === 'SERVICE' ? 'Service' : 'Produit'}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {quote.lead.company && (
+                              <div className="text-xs text-muted-foreground ml-10 line-clamp-1">
+                                {quote.lead.company}
+                              </div>
                             )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                            
+                            <div className="text-xs text-muted-foreground ml-10">
+                              {quote.lead.phone}
+                            </div>
 
-                      {/* Client Info */}
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium text-sm text-foreground">
-                            {quote.lead.firstName} {quote.lead.lastName}
-                          </span>
-                        </div>
-                        
-                        {quote.lead.company && (
-                          <div className="text-xs text-muted-foreground ml-6">
-                            {quote.lead.company}
-                          </div>
-                        )}
-                        
-                        <div className="text-xs text-muted-foreground ml-6">
-                          {quote.lead.phone}
-                        </div>
-
-                        {/* Amount and Date */}
-                        <div className="flex items-center justify-between mt-3 pt-2 border-t border-border">
-                          <div>
-                            <div className="text-lg font-bold text-primary">
-                              {formatCurrency(quote.finalPrice)}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              Expire le {formatDate(quote.expiresAt)}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-xs text-muted-foreground">
-                              Créé le
-                            </div>
-                            <div className="text-xs font-medium text-foreground">
-                              {formatDate(quote.createdAt)}
+                            <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                              <div>
+                                <div className="text-lg font-bold text-primary">
+                                  {formatCurrency(quote.finalPrice)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Expire le {formatDate(quote.expiresAt)}
+                                </div>
+                              </div>
+                              <Link href={`/quotes/${quote.id}`}>
+                                <Button size="sm" variant="outline" className="rounded-lg">
+                                  Voir
+                                </Button>
+                              </Link>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
                 )
               })}
             </div>
 
-            {/* Desktop Table */}
-            <div className="hidden lg:block">
-              <Card>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+              className="hidden lg:block"
+            >
+              <Card className="apple-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
+                    <FileText className="h-5 w-5 text-primary" />
                     Liste des Devis ({filteredQuotes.length})
                   </CardTitle>
                 </CardHeader>
@@ -551,26 +565,32 @@ export default function QuotesPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-3 px-4 font-medium text-foreground">Devis</th>
-                          <th className="text-left py-3 px-4 font-medium text-foreground">Client</th>
-                          <th className="text-left py-3 px-4 font-medium text-foreground">Type</th>
-                          <th className="text-left py-3 px-4 font-medium text-foreground">Montant</th>
-                          <th className="text-left py-3 px-4 font-medium text-foreground">Statut</th>
-                          <th className="text-right py-3 px-4 font-medium text-foreground">Actions</th>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-4 font-semibold text-sm">Devis</th>
+                          <th className="text-left py-3 px-4 font-semibold text-sm">Client</th>
+                          <th className="text-left py-3 px-4 font-semibold text-sm">Type</th>
+                          <th className="text-left py-3 px-4 font-semibold text-sm">Montant</th>
+                          <th className="text-left py-3 px-4 font-semibold text-sm">Statut</th>
+                          <th className="text-right py-3 px-4 font-semibold text-sm">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredQuotes.map((quote) => {
+                        {filteredQuotes.map((quote, index) => {
                           const statusConfig = getStatusConfig(quote.status)
                           const StatusIcon = statusConfig.icon
                           
                           return (
-                            <tr key={quote.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                            <motion.tr 
+                              key={quote.id}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ duration: 0.3, delay: index * 0.03 }}
+                              className="border-b hover:bg-muted/50 transition-colors"
+                            >
                               <td className="py-4 px-4">
                                 <Link 
                                   href={`/quotes/${quote.id}`}
-                                  className="font-medium text-primary hover:text-primary/80"
+                                  className="font-semibold text-primary hover:text-primary/80 transition-colors"
                                 >
                                   {quote.quoteNumber}
                                 </Link>
@@ -579,28 +599,37 @@ export default function QuotesPage() {
                                 </div>
                               </td>
                               <td className="py-4 px-4">
-                                <div className="font-medium text-foreground">
-                                  {quote.lead.firstName} {quote.lead.lastName}
-                                </div>
-                                {quote.lead.company && (
-                                  <div className="text-sm text-muted-foreground">
-                                    {quote.lead.company}
+                                <div className="flex items-center gap-2">
+                                  <Avatar className="w-8 h-8">
+                                    <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/10">
+                                      {quote.lead.firstName[0]}{quote.lead.lastName[0]}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <div className="font-medium">
+                                      {quote.lead.firstName} {quote.lead.lastName}
+                                    </div>
+                                    {quote.lead.company && (
+                                      <div className="text-sm text-muted-foreground line-clamp-1">
+                                        {quote.lead.company}
+                                      </div>
+                                    )}
+                                    <div className="text-sm text-muted-foreground">
+                                      {quote.lead.phone}
+                                    </div>
                                   </div>
-                                )}
-                                <div className="text-sm text-muted-foreground">
-                                  {quote.lead.phone}
                                 </div>
-                                <Badge variant="outline" className="text-xs mt-1">
+                                <Badge variant="outline" className="text-xs mt-2">
                                   {quote.lead.leadType === 'PARTICULIER' ? 'Particulier' : 'Professionnel'}
                                 </Badge>
                               </td>
                               <td className="py-4 px-4">
-                                <Badge variant="outline">
+                                <Badge variant="outline" className="rounded-lg">
                                   {quote.businessType === 'SERVICE' ? 'Service' : 'Produit'}
                                 </Badge>
                               </td>
                               <td className="py-4 px-4">
-                                <div className="font-semibold text-primary">
+                                <div className="font-bold text-primary text-lg">
                                   {formatCurrency(quote.finalPrice)}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
@@ -608,21 +637,45 @@ export default function QuotesPage() {
                                 </div>
                               </td>
                               <td className="py-4 px-4">
-                                <Badge className={`${statusConfig.color} border`}>
-                                  <StatusIcon className="w-4 h-4 mr-1" />
-                                  {statusConfig.label}
-                                </Badge>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button className={`${statusConfig.color} border px-3 py-1.5 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer`}>
+                                      <StatusIcon className="w-4 h-4" />
+                                      {statusConfig.label}
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="start" className="w-[180px]">
+                                    <DropdownMenuLabel className="text-xs">Changer le statut</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    {availableStatusChanges.map((status) => {
+                                      const config = getStatusConfig(status)
+                                      const Icon = config.icon
+                                      return (
+                                        <DropdownMenuItem
+                                          key={status}
+                                          onClick={() => handleStatusChange(quote.id, status, quote.quoteNumber)}
+                                          disabled={updatingStatusId === quote.id || quote.status === status}
+                                          className="cursor-pointer"
+                                        >
+                                          <Icon className="w-4 h-4 mr-2" />
+                                          {config.label}
+                                        </DropdownMenuItem>
+                                      )
+                                    })}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </td>
                               <td className="py-4 px-4">
-                                <div className="flex items-center justify-end gap-2">
+                                <div className="flex items-center justify-end gap-1">
                                   <Link href={`/quotes/${quote.id}`}>
-                                    <Button variant="ghost" size="sm" title="Voir le devis">
+                                    <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-primary/10" title="Voir le devis">
                                       <Eye className="h-4 w-4" />
                                     </Button>
                                   </Link>
                                   <Button
                                     variant="ghost"
                                     size="sm"
+                                    className="h-9 w-9 p-0 hover:bg-primary/10"
                                     onClick={() => handleDownload(quote.id, quote.quoteNumber)}
                                     disabled={downloadingQuoteId === quote.id}
                                     title="Télécharger le PDF"
@@ -630,7 +683,7 @@ export default function QuotesPage() {
                                     <Download className="h-4 w-4" />
                                   </Button>
                                   <Link href={`/quotes/${quote.id}/edit`}>
-                                    <Button variant="ghost" size="sm" title="Modifier le devis">
+                                    <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-primary/10" title="Modifier le devis">
                                       <Edit className="h-4 w-4" />
                                     </Button>
                                   </Link>
@@ -640,8 +693,8 @@ export default function QuotesPage() {
                                         <Button
                                           variant="ghost"
                                           size="sm"
+                                          className="h-9 w-9 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                                           title="Supprimer le devis"
-                                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                         >
                                           <Trash2 className="h-4 w-4" />
                                         </Button>
@@ -676,7 +729,7 @@ export default function QuotesPage() {
                                   )}
                                 </div>
                               </td>
-                            </tr>
+                            </motion.tr>
                           )
                         })}
                       </tbody>
@@ -684,7 +737,7 @@ export default function QuotesPage() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            </motion.div>
           </div>
         )}
       </div>
