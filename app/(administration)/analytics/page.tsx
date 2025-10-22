@@ -102,15 +102,25 @@ export default function AnalyticsPage() {
   return (
     <div className="main-content space-y-6 animate-fade-in">
       {/* Page Header - Apple Style */}
-      <div className="page-header">
-        <h1 className="page-title">Analytics & Rapports</h1>
-        <p className="page-subtitle">
-          Analyse approfondie des performances de votre entreprise
-        </p>
+      <div className="page-header mb-6">
+        <div className="flex items-center gap-4">
+          {/* Big Icon - Matches title + subtitle height */}
+          <div className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-2xl flex items-center justify-center">
+            <BarChart3 className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
+          </div>
+          
+          {/* Title and Subtitle */}
+          <div>
+            <h1 className="page-title">Analytics & Rapports</h1>
+            <p className="page-subtitle">
+              Analyse approfondie des performances de votre entreprise
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Stats Cards - Apple Style with animations */}
-      <div className="responsive-grid">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {statsCards.map((stat, index) => {
           const Icon = stat.icon
           return (
@@ -121,18 +131,18 @@ export default function AnalyticsPage() {
               transition={{ delay: index * 0.1, type: 'spring', stiffness: 300 }}
             >
               <Card className="apple-card">
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   <div className="flex items-start justify-between">
-                    <div className="flex-1 space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">
+                    <div className="flex-1 space-y-2 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">
                         {stat.title}
                       </p>
-                      <p className="text-3xl font-bold text-foreground">
+                      <p className="text-xl sm:text-3xl font-bold text-foreground truncate">
                         {stat.value}
                       </p>
                     </div>
-                    <div className={`w-12 h-12 ${stat.bgColor} rounded-xl flex items-center justify-center`}>
-                      <Icon className={`w-6 h-6 ${stat.color}`} />
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 ${stat.bgColor} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                      <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${stat.color}`} />
                     </div>
                   </div>
                 </CardContent>
@@ -143,7 +153,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Charts Section - Apple Style */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {chartCards.map((chart, index) => {
           const Icon = chart.icon
           return (
@@ -154,25 +164,25 @@ export default function AnalyticsPage() {
               transition={{ delay: 0.4 + index * 0.1, type: 'spring', stiffness: 300 }}
             >
               <Card className="apple-card h-full">
-                <CardHeader>
+                <CardHeader className="p-4 sm:p-6">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
                       <Icon className="w-5 h-5 text-primary" />
                     </div>
-                    <div>
-                      <CardTitle className="text-base">{chart.title}</CardTitle>
-                      <p className="text-xs text-muted-foreground mt-1">
+                    <div className="min-w-0">
+                      <CardTitle className="text-sm sm:text-base truncate">{chart.title}</CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                         {chart.description}
                       </p>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="h-64 flex items-center justify-center">
+                <CardContent className="h-48 sm:h-64 flex items-center justify-center p-4">
                   <div className="text-center space-y-2">
-                    <div className="w-16 h-16 bg-muted rounded-full mx-auto flex items-center justify-center">
-                      <Icon className="w-8 h-8 text-muted-foreground/50" />
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted rounded-full mx-auto flex items-center justify-center">
+                      <Icon className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground/50" />
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Graphique à venir
                     </p>
                   </div>
@@ -185,19 +195,19 @@ export default function AnalyticsPage() {
 
       {/* Detailed Analytics Section */}
       <Card className="apple-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <BarChart3 className="w-5 h-5 text-primary" />
             Analyses Détaillées
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-6">
-          <div className="text-center py-12">
-            <div className="w-20 h-20 bg-muted rounded-full mx-auto flex items-center justify-center mb-4">
-              <BarChart3 className="w-10 h-10 text-muted-foreground/50" />
+        <CardContent className="p-4 sm:p-6">
+          <div className="text-center py-8 sm:py-12">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted rounded-full mx-auto flex items-center justify-center mb-4">
+              <BarChart3 className="w-8 h-8 sm:w-10 sm:h-10 text-muted-foreground/50" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">Tableaux de bord Power BI</h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
+            <h3 className="text-base sm:text-lg font-semibold mb-2">Tableaux de bord Power BI</h3>
+            <p className="text-sm sm:text-base text-muted-foreground max-w-md mx-auto px-4">
               Des visualisations interactives et des rapports détaillés seront bientôt disponibles 
               pour vous aider à prendre des décisions éclairées.
             </p>
