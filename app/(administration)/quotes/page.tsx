@@ -20,7 +20,8 @@ import {
   Search,
   Filter,
   MoreVertical,
-  Eye
+  Eye,
+  Loader2
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { QuoteStatus } from '@prisma/client'
@@ -271,13 +272,22 @@ export default function QuotesPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen p-4 md:p-6 flex items-center justify-center">
-        <WaveLoader isLoading={isLoading} />
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Chargement des devis...</p>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen p-4 md:p-6">
+      {downloadingQuoteId && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <WaveLoader isLoading={true} />
+        </div>
+      )}
+
       <div className="max-w-[95vw] md:max-w-[1400px] mx-auto space-y-4 md:space-y-6">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -285,11 +295,16 @@ export default function QuotesPage() {
           transition={{ duration: 0.4 }}
           className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4"
         >
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Devis</h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-1">
-              Gérez et suivez tous vos devis
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10">
+              <FileText className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Devis</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">
+                Gérez et suivez tous vos devis
+              </p>
+            </div>
           </div>
           <Link href="/quotes/new">
             <Button className="shadow-lg shadow-primary/20 rounded-xl w-full sm:w-auto">
@@ -680,7 +695,11 @@ export default function QuotesPage() {
                                     disabled={downloadingQuoteId === quote.id}
                                     title="Télécharger le PDF"
                                   >
-                                    <Download className="h-4 w-4" />
+                                    {downloadingQuoteId === quote.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Download className="h-4 w-4" />
+                                    )}
                                   </Button>
                                   <Link href={`/quotes/${quote.id}/edit`}>
                                     <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-primary/10" title="Modifier le devis">
