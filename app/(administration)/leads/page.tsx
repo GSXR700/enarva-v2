@@ -397,13 +397,12 @@ export default function LeadsPage() {
           </div>
           
           {/* Desktop Only Add Button - Pill Shaped */}
-          <Button 
-            onClick={() => setIsFormOpen(true)} 
-            className="hidden sm:flex items-center gap-2 rounded-full px-6 h-11 shadow-lg shadow-primary/20 font-medium"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Nouveau Lead</span>
-          </Button>
+          <Link href="/leads/new">
+            <Button className="hidden sm:flex items-center gap-2 rounded-full px-6 h-11 shadow-lg shadow-primary/20 font-medium">
+              <Plus className="w-5 h-5" />
+              <span>Nouveau Lead</span>
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -895,15 +894,14 @@ export default function LeadsPage() {
       )}
 
       {/* Floating Add Button - Mobile Only - FIXED */}
-      <div className="sm:hidden fixed bottom-6 right-6 z-50">
+      <Link href="/leads/new" className="sm:hidden fixed bottom-6 right-6 z-50">
         <Button 
-          onClick={() => setIsFormOpen(true)} 
           size="icon"
           className="h-16 w-16 rounded-full shadow-2xl shadow-primary/30 p-0"
         >
           <Plus className="w-7 h-7" />
         </Button>
-      </div>
+      </Link>
 
       {/* Create Lead Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
