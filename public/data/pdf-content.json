@@ -1,317 +1,495 @@
 {
   "serviceTypes": {
-    "FIN_DE_CHANTIER": {
-      "label": "Nettoyage Fin de chantier",
+    "GRAND_MENAGE": {
+      "label": "Grand Ménage",
       "prestationsIncluses": [
-        "Nettoyage et dépoussiérage complet des surfaces",
-        "Élimination des résidus de chantier",
-        "Nettoyage approfondi des sanitaires et cuisine",
-        "Traitement des vitres et menuiseries",
-        "Entretien adapté des sols selon leur nature"
+        "Dépoussiérage approfondi toutes surfaces (murs, plafonds, meubles)",
+        "Nettoyage complet des vitres, encadrements et volets",
+        "Désinfection et détartrage cuisine (intérieur/extérieur appareils, plans de travail, évier)",
+        "Désinfection et détartrage sanitaires (WC, douche/baignoire, lavabos, robinetterie)",
+        "Nettoyage des placards et dressings (intérieur/extérieur)",
+        "Lessivage des portes et plinthes",
+        "Traitement des sols adapté aux matériaux (aspiration, lavage, lustrage si applicable)"
       ],
       "equipementsUtilises": [
-        "2 Aspirateurs professionnels haute puissance",
-        "Monobrosse pour sols durs",
-        "Nettoyeur vapeur industriel",
-        "Matériel de nettoyage en hauteur"
+        "Aspirateur professionnel eau et poussière",
+        "Nettoyeur vapeur haute pression",
+        "Monobrosse (si nécessaire pour sols spécifiques)",
+        "Matériel complet pour vitrerie (raclettes, mouilleurs, perches)",
+        "Chariots de nettoyage équipés",
+        "Produits nettoyants, désinfectants et détartrants écologiques professionnels"
+      ],
+      "personnelSuggestions": {
+        "baseTeamSize": 2,
+        "perSquareMeter": 70
+      },
+      "dureeEstimee": "Variable selon surface et état (ex: 4-8 heures)"
+    },
+    "NETTOYAGE_FIN_CHANTIER": {
+      "label": "Nettoyage Fin de chantier",
+      "prestationsIncluses": [
+        "Évacuation des gravats fins et résidus de matériaux",
+        "Dépoussiérage et lessivage des murs et plafonds",
+        "Nettoyage des traces de colle, peinture, plâtre sur toutes surfaces",
+        "Nettoyage approfondi des vitres, menuiseries (intérieur/extérieur)",
+        "Désinfection complète des sanitaires et cuisine",
+        "Nettoyage des systèmes de ventilation (grilles)",
+        "Remise en état des sols (décapage léger si nécessaire, aspiration, lavage)"
+      ],
+      "equipementsUtilises": [
+        "Aspirateur industriel haute puissance",
+        "Monobrosse et/ou autolaveuse pour sols",
+        "Nettoyeur vapeur",
+        "Grattoirs spécifiques pour traces tenaces",
+        "Matériel de nettoyage en hauteur",
+        "Produits décapants légers, dégraissants et désinfectants professionnels"
       ],
       "personnelSuggestions": {
         "baseTeamSize": 2,
         "perSquareMeter": 50
-      }
+      },
+       "dureeEstimee": "Généralement 1 à 2 jours selon taille du chantier"
     },
-    "GRAND_MENAGE": {
-      "label": "Grand Ménage",
+     "ENTRETIEN_REGULIER": {
+      "label": "Entretien Régulier",
       "prestationsIncluses": [
-        "Dépoussiérage approfondi toutes surfaces",
-        "Nettoyage complet des vitres",
-        "Désinfection cuisine et sanitaires",
-        "Nettoyage des placards intérieurs",
-        "Traitement des sols adapté aux matériaux"
+        "Dépoussiérage des surfaces accessibles (mobilier, bureaux, objets)",
+        "Aspiration et/ou lavage des sols",
+        "Nettoyage et désinfection des sanitaires (WC, lavabos)",
+        "Nettoyage de la kitchenette/espace café (évier, micro-ondes extérieur)",
+        "Vidage des corbeilles",
+        "Nettoyage des traces sur portes et interrupteurs"
       ],
       "equipementsUtilises": [
-        "Aspirateur professionnel",
-        "Nettoyeur vapeur",
-        "Matériel de nettoyage vitres",
-        "Chariots de nettoyage complets"
-      ],
-      "personnelSuggestions": {
-        "baseTeamSize": 2,
-        "perSquareMeter": 70
-      }
-    },
-    "NETTOYAGE_PISCINE": {
-      "label": "Nettoyage de piscine",
-      "prestationsIncluses": [
-        "Nettoyage complet du bassin (parois et fond)",
-        "Nettoyage du système de filtration",
-        "Contrôle et ajustement du pH",
-        "Traitement anti-algues",
-        "Nettoyage de la ligne d'eau",
-        "Aspiration des débris",
-        "Vérification de l'équipement technique"
-      ],
-      "equipementsUtilises": [
-        "Robot nettoyeur de piscine professionnel",
-        "Kit de test de pH et chlore",
-        "Produits de traitement certifiés",
-        "Épuisette et brosse spécialisée",
-        "Aspirateur pour piscine"
+        "Aspirateur professionnel (silencieux si bureaux)",
+        "Chariot de ménage",
+        "Microfibres pour différentes surfaces",
+        "Produits nettoyants et désinfectants écologiques courants"
       ],
       "personnelSuggestions": {
         "baseTeamSize": 1,
         "perSquareMeter": 100
-      }
-    },
-    "NETTOYAGE_CANAPES": {
-      "label": "Nettoyage de canapés et textiles",
-      "prestationsIncluses": [
-        "Aspiration profonde du textile",
-        "Détachage ciblé des taches visibles",
-        "Nettoyage en profondeur à l'injection-extraction",
-        "Traitement anti-acariens et désodorisant",
-        "Séchage rapide professionnel",
-        "Protection textile post-nettoyage"
-      ],
-      "equipementsUtilises": [
-        "Machine EMILIO-RA Plus injection-extraction professionnelle",
-        "Produits détachants spécialisés par type de textile",
-        "Traitement anti-acariens hypoallergénique",
-        "Séchoir professionnel",
-        "Brosses spécifiques textiles délicats"
-      ],
-      "pricingType": "LINEAR_METER",
-      "pricePerLinearMeter": 120,
-      "personnelSuggestions": {
-        "baseTeamSize": 1,
-        "perSquareMeter": 999
-      }
-    },
-    "NETTOYAGE_FACADE": {
-      "label": "Nettoyage de façade",
-      "prestationsIncluses": [
-        "Nettoyage haute pression des murs extérieurs",
-        "Élimination des mousses et lichens",
-        "Nettoyage des vitres extérieures",
-        "Traitement anti-graffiti si nécessaire",
-        "Nettoyage des gouttières",
-        "Rinçage et finitions"
-      ],
-      "equipementsUtilises": [
-        "Nettoyeur haute pression professionnel",
-        "Nacelle ou échafaudage selon hauteur",
-        "Produits anti-mousse et anti-graffiti",
-        "Équipement de sécurité en hauteur",
-        "Système de récupération d'eau"
-      ],
-      "personnelSuggestions": {
-        "baseTeamSize": 2,
-        "perSquareMeter": 40
-      }
-    },
-    "NETTOYAGE_BUREAU": {
-      "label": "Nettoyage de bureaux",
-      "prestationsIncluses": [
-        "Dépoussiérage des postes de travail",
-        "Nettoyage et désinfection des sanitaires",
-        "Aspiration et lavage des sols",
-        "Vidage des corbeilles et tri sélectif",
-        "Nettoyage des vitres et surfaces vitrées",
-        "Désinfection des points de contact (poignées, interrupteurs)",
-        "Nettoyage des espaces communs"
-      ],
-      "equipementsUtilises": [
-        "Chariot de ménage professionnel",
-        "Aspirateur silencieux",
-        "Produits de nettoyage écologiques",
-        "Désinfectants certifiés",
-        "Matériel de nettoyage vitres"
-      ],
-      "personnelSuggestions": {
-        "baseTeamSize": 1,
-        "perSquareMeter": 80
-      }
-    },
-    "FOURNITURE_PRODUITS": {
-      "label": "Fourniture de produits",
-      "prestationsIncluses": [],
-      "equipementsUtilises": [],
-      "displayType": "PRODUCT_TABLE"
-    },
-    "NETTOYAGE_STANDARD": {
-      "label": "Nettoyage Standard",
-      "prestationsIncluses": [
-        "Dépoussiérage des surfaces",
-        "Nettoyage des sols",
-        "Nettoyage des sanitaires",
-        "Vidage des poubelles"
-      ],
-      "equipementsUtilises": [
-        "Aspirateur standard",
-        "Matériel de nettoyage basique",
-        "Produits d'entretien courants"
-      ],
-      "personnelSuggestions": {
-        "baseTeamSize": 1,
-        "perSquareMeter": 80
-      }
-    },
-    "NETTOYAGE_VITRES": {
-      "label": "Nettoyage de vitres",
-      "prestationsIncluses": [
-        "Nettoyage intérieur et extérieur des vitres",
-        "Nettoyage des cadres et rebords",
-        "Élimination des traces et calcaire",
-        "Finition sans traces"
-      ],
-      "equipementsUtilises": [
-        "Perches télescopiques",
-        "Raclettes professionnelles",
-        "Produits vitres écologiques"
-      ],
-      "personnelSuggestions": {
-        "baseTeamSize": 2,
-        "perSquareMeter": 100
-      }
-    },
-    "CRISTALLISATION_MARBRE": {
-      "label": "Cristallisation de marbre",
-      "prestationsIncluses": [
-        "Préparation et nettoyage du marbre",
-        "Ponçage diamant si nécessaire",
-        "Application du cristallisant",
-        "Lustrage haute brillance",
-        "Protection finale"
-      ],
-      "equipementsUtilises": [
-        "Monobrosse professionnelle",
-        "Disques de cristallisation",
-        "Produits cristallisants premium",
-        "Matériel de protection"
-      ],
-      "personnelSuggestions": {
-        "baseTeamSize": 2,
-        "perSquareMeter": 60
-      }
+      },
+       "dureeEstimee": "Selon fréquence et contrat (ex: 2 heures hebdomadaires)"
     },
     "NETTOYAGE_BUREAUX": {
       "label": "Nettoyage Bureaux",
       "prestationsIncluses": [
-        "Dépoussiérage des postes de travail",
-        "Aspiration sols et moquettes",
-        "Nettoyage des sanitaires",
-        "Vidage des corbeilles",
-        "Désinfection des points de contact"
+        "Dépoussiérage humide des postes de travail (bureaux, écrans, claviers si demandé)",
+        "Aspiration des sols (moquettes, tapis, sols durs)",
+        "Lavage des sols durs",
+        "Nettoyage et désinfection complets des sanitaires",
+        "Nettoyage de l'espace cuisine/détente",
+        "Vidage et remplacement des sacs poubelles",
+        "Désinfection des points de contact (poignées, interrupteurs, téléphones)"
       ],
       "equipementsUtilises": [
-        "Aspirateur silencieux",
-        "Chariots de nettoyage",
-        "Produits désinfectants certifiés"
+        "Aspirateur silencieux professionnel",
+        "Chariot de ménage compartimenté",
+        "Autolaveuse (pour grandes surfaces)",
+        "Produits désinfectants virucides (norme EN 14476)",
+        "Produits de nettoyage écologiques"
       ],
       "personnelSuggestions": {
         "baseTeamSize": 1,
-        "perSquareMeter": 70
-      }
+        "perSquareMeter": 80
+      },
+       "dureeEstimee": "Selon fréquence et surface (ex: Quotidien, Hebdomadaire)"
     },
-    "ENTRETIEN_REGULIER": {
-      "label": "Entretien Régulier",
+     "DESINFECTION_SANITAIRE": {
+      "label": "Désinfection Sanitaire Approfondie",
       "prestationsIncluses": [
-        "Maintien de la propreté générale",
-        "Entretien courant des sols",
-        "Nettoyage des sanitaires",
-        "Gestion des déchets"
+        "Nettoyage et détartrage complets (WC, urinoirs, lavabos, douches)",
+        "Désinfection de toutes les surfaces (murs carrelés, cloisons, portes)",
+        "Nettoyage et désinfection des sols",
+        "Traitement anti-odeurs",
+        "Remplacement des consommables (savon, papier)"
       ],
       "equipementsUtilises": [
-        "Matériel d'entretien standard",
-        "Produits écologiques"
+        "Nettoyeur vapeur haute température",
+        "Pulvérisateur pour désinfectant",
+        "Produits détartrants puissants",
+        "Désinfectants bactéricides, fongicides et virucides"
       ],
-      "personnelSuggestions": {
-        "baseTeamSize": 1,
-        "perSquareMeter": 100
-      }
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 50 },
+      "dureeEstimee": "Environ 1-3 heures selon taille"
+    },
+    "NETTOYAGE_CANAPES_MATELAS": {
+      "label": "Nettoyage Canapés & Matelas",
+      "prestationsIncluses": [
+        "Diagnostic du type de textile/cuir",
+        "Aspiration profonde anti-acariens",
+        "Pré-traitement des taches spécifiques",
+        "Nettoyage par injection-extraction avec produit adapté (textile)",
+        "Nettoyage et nutrition spécifique (cuir)",
+        "Traitement désodorisant et anti-acariens",
+        "Séchage partiel ou complet selon option"
+      ],
+      "equipementsUtilises": [
+        "Injecteur-extracteur professionnel (type Kärcher Puzzi)",
+        "Aspirateur puissant avec brosse adaptée",
+        "Produits détachants spécifiques (vin, café, encre...)",
+        "Nettoyants textiles ou cuir professionnels",
+        "Brosses douces spécifiques",
+        "Ventilateur de séchage (optionnel)"
+      ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 999 },
+      "dureeEstimee": "1-3 heures par canapé/matelas"
+    },
+    "NETTOYAGE_TAPIS_MOQUETTES": {
+      "label": "Nettoyage Tapis & Moquettes",
+      "prestationsIncluses": [
+        "Aspiration haute puissance",
+        "Traitement des taches tenaces",
+        "Shampouinage par injection-extraction (méthode principale)",
+        "Nettoyage à la monobrosse (si nécessaire pour moquettes très sales)",
+        "Nettoyage vapeur (pour certains types de tapis/taches)",
+        "Traitement anti-acariens et désodorisant"
+      ],
+      "equipementsUtilises": [
+        "Injecteur-extracteur",
+        "Monobrosse basse vitesse avec brosse moquette",
+        "Nettoyeur vapeur",
+        "Aspirateur bi-moteur",
+        "Produits shampoing moquette, détachants"
+      ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 30 },
+      "dureeEstimee": "Variable, env. 30-60 min par tapis moyen"
+    },
+    "NETTOYAGE_VITRES": {
+      "label": "Nettoyage de Vitres",
+      "prestationsIncluses": [
+        "Nettoyage des surfaces vitrées (intérieur/extérieur selon demande)",
+        "Nettoyage des encadrements et rebords de fenêtres",
+        "Dépoussiérage des rainures et joints",
+        "Élimination des traces (calcaire, doigts, pollution)",
+        "Finition sans traces à la raclette"
+      ],
+      "equipementsUtilises": [
+        "Mouilleur et raclettes professionnels (différentes tailles)",
+        "Perches télescopiques (pour hauteur)",
+        "Produit nettoyant vitres écologique",
+        "Microfibres spéciales vitres",
+        "Échelles/escabeaux sécurisés (si nécessaire)"
+      ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 100 },
+      "dureeEstimee": "Variable selon nombre et accessibilité"
+    },
+    "NETTOYAGE_FACADE": {
+      "label": "Nettoyage de Façade",
+      "prestationsIncluses": [
+        "Diagnostic du type de revêtement (crépi, pierre, bardage...)",
+        "Nettoyage haute ou basse pression adapté au support",
+        "Application de produit anti-mousse/algicide si nécessaire",
+        "Nettoyage des vitres extérieures de la façade",
+        "Rinçage complet",
+        "Protection hydrofuge (optionnel)"
+      ],
+      "equipementsUtilises": [
+        "Nettoyeur haute pression (thermique/électrique, pression réglable)",
+        "Nacelle élévatrice ou échafaudage (selon hauteur et accès)",
+        "Pulvérisateur pour produits de traitement",
+        "Produits nettoyants façade spécifiques, anti-mousse",
+        "Équipement de protection individuelle (harnais si nacelle)"
+      ],
+      "personnelSuggestions": { "baseTeamSize": 2, "perSquareMeter": 40 },
+      "dureeEstimee": "1 à plusieurs jours selon surface et état"
+    },
+    "CRISTALLISATION_MARBRE": {
+      "label": "Cristallisation de Marbre",
+      "prestationsIncluses": [
+        "Protection des zones adjacentes",
+        "Décapage du sol pour enlever anciennes cires/émulsions",
+        "Ponçage léger si nécessaire pour uniformiser",
+        "Application du produit cristallisant par pulvérisation",
+        "Passage de la monobrosse équipée de laine d'acier ou disque spécifique",
+        "Lustrage final pour haute brillance"
+      ],
+      "equipementsUtilises": [
+        "Monobrosse haute vitesse",
+        "Disques laine d'acier ou disques spécifiques cristallisation",
+        "Aspirateur à eau",
+        "Produit cristallisant liquide ou en poudre",
+        "Produit de décapage",
+        "Pulvérisateur"
+      ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 60 },
+      "dureeEstimee": "Variable, env. 1h pour 10-15m²"
+    },
+     "VITRIFICATION_PARQUET": {
+      "label": "Vitrification de Parquet",
+      "prestationsIncluses": [
+        "Protection des plinthes et murs",
+        "Ponçage du parquet en plusieurs passes (gros grain à fin grain)",
+        "Aspiration minutieuse des poussières",
+        "Application d'un fond dur (bouche-pores)",
+        "Application de 2 à 3 couches de vitrificateur (verniz)",
+        "Égrenage léger entre certaines couches"
+      ],
+      "equipementsUtilises": [
+        "Ponceuse à parquet (à bande ou rotative)",
+        "Bordeuse pour les finitions",
+        "Aspirateur industriel",
+        "Rouleaux et pinceaux spécifiques pour vitrificateur",
+        "Fond dur et vitrificateur (polyuréthane, phase aqueuse...)",
+        "Abrasifs de différents grains"
+      ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 40 },
+      "dureeEstimee": "2-4 jours (incluant séchage)"
+    },
+    "DECAPAGE_SOL": {
+      "label": "Décapage de Sol",
+      "prestationsIncluses": [
+        "Protection des zones adjacentes",
+        "Application d'un produit décapant adapté au revêtement et aux anciennes protections",
+        "Action mécanique avec monobrosse équipée d'un disque abrasif",
+        "Aspiration des résidus liquides",
+        "Rinçages multiples à l'eau claire",
+        "Neutralisation du pH si nécessaire",
+        "Séchage complet du sol"
+      ],
+      "equipementsUtilises": [
+        "Monobrosse basse vitesse",
+        "Disques abrasifs adaptés (noir, marron...)",
+        "Aspirateur à eau",
+        "Produit décapant puissant (alcalin, solvanté...)",
+        "Produit neutralisant (si nécessaire)",
+        "Matériel de protection (gants, lunettes)"
+      ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 50 },
+      "dureeEstimee": "Variable selon surface et couches à enlever"
+    },
+    "LUSTRAGE_MARBRE": {
+      "label": "Lustrage de Marbre",
+       "prestationsIncluses": [
+         "Nettoyage préalable du sol",
+         "Pulvérisation d'un produit d'entretien ou spray méthode",
+         "Passage de la monobrosse haute vitesse équipée d'un disque adapté (blanc, peau de porc)",
+         "Essuyage des résidus si nécessaire"
+       ],
+      "equipementsUtilises": [
+        "Monobrosse haute ou très haute vitesse",
+        "Disques de lustrage (blanc, rouge, spécial marbre)",
+        "Produit spray méthode ou d'entretien pour marbre",
+        "Pulvérisateur"
+      ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 100 },
+       "dureeEstimee": "Rapide, env. 1h pour 50-100m²"
+    },
+    "POLISSAGE_BETON": {
+      "label": "Polissage de Béton",
+      "prestationsIncluses": [
+        "Préparation de la surface (nettoyage, réparations mineures)",
+        "Ponçage avec disques diamantés à grains décroissants",
+        "Application d'un durcisseur/densifieur",
+        "Passages successifs de polissage jusqu'à la brillance souhaitée",
+        "Application d'un bouche-pores/protecteur final (optionnel)"
+      ],
+      "equipementsUtilises": [
+        "Surfaceuse/Polisseuse à béton (planétaire)",
+        "Disques diamantés métal et résine (différents grains)",
+        "Aspirateur industriel avec système anti-poussière",
+        "Durcisseur/densifieur silicate",
+        "Produit de protection hydrofuge/oléofuge"
+      ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 40 },
+       "dureeEstimee": "Variable, plusieurs jours possibles"
+    },
+     "RENOVATION_SOL": {
+      "label": "Rénovation de Sol",
+       "prestationsIncluses": [
+         "Diagnostic du type de sol et des besoins",
+         "Décapage ou ponçage selon le revêtement",
+         "Nettoyage en profondeur",
+         "Réparations mineures (joints, fissures légères)",
+         "Application d'une protection adaptée (cire, émulsion, vitrificateur...)",
+         "Lustrage si applicable"
+       ],
+       "equipementsUtilises": [
+         "Monobrosse (basse/haute vitesse)",
+         "Ponceuse (si parquet)",
+         "Aspirateur eau et poussière",
+         "Produits décapants, nettoyants, protecteurs spécifiques au sol"
+       ],
+       "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 50 },
+       "dureeEstimee": "1 à plusieurs jours"
+    },
+     "TRAITEMENT_ANTI_NUISIBLE": {
+      "label": "Traitement Anti-Nuisible",
+      "prestationsIncluses": [
+        "Inspection des lieux et identification des nuisibles (insectes, rongeurs)",
+        "Diagnostic des sources d'infestation",
+        "Mise en place de mesures de prévention (calfeutrage, conseils)",
+        "Application de traitements ciblés (gel, pulvérisation, appâts, pièges)",
+        "Suivi et contrôle post-traitement si nécessaire"
+      ],
+      "equipementsUtilises": [
+        "Pulvérisateur à pression",
+        "Nébulisateur (pour volumes importants)",
+        "Pistolet applicateur de gel",
+        "Boîtes d'appâtage sécurisées (rongeurs)",
+        "Insecticides et rodonticides professionnels homologués",
+        "Équipement de protection individuelle"
+      ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 150 },
+      "dureeEstimee": "1-4 heures par intervention"
+    },
+    "LAVAGE_VOITURE_DOMICILE": {
+      "label": "Lavage Voiture à Domicile",
+      "prestationsIncluses": [
+        "Prélavage carrosserie",
+        "Lavage manuel avec shampoing spécifique",
+        "Nettoyage des jantes et passages de roues",
+        "Séchage microfibre",
+        "Nettoyage des vitres (intérieur/extérieur)",
+        "Aspiration de l'habitacle et du coffre",
+        "Dépoussiérage et nettoyage des plastiques intérieurs"
+      ],
+      "equipementsUtilises": [
+        "Nettoyeur haute pression portable (si source d'eau/électricité disponible)",
+        "Système de lavage sans eau (si nécessaire)",
+        "Aspirateur portable",
+        "Gants de lavage, microfibres de séchage et finition",
+        "Shampoing auto pH neutre, nettoyant jantes, produit vitres, dressing plastiques"
+      ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 999 },
+      "dureeEstimee": "1.5 - 3 heures par véhicule"
+    },
+    "ENTRETIEN_JARDIN": {
+      "label": "Entretien de Jardin",
+       "prestationsIncluses": [
+         "Tonte de pelouse",
+         "Taille de haies et arbustes",
+         "Désherbage des massifs et allées",
+         "Ramassage des feuilles",
+         "Évacuation des déchets verts"
+       ],
+       "equipementsUtilises": [
+         "Tondeuse",
+         "Taille-haie",
+         "Débroussailleuse",
+         "Souffleur/Aspirateur de feuilles",
+         "Outils manuels (sécateur, binette...)",
+         "Sacs à déchets verts"
+       ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 200 },
+       "dureeEstimee": "Selon surface et tâches"
+    },
+    "ENTRETIEN_PISCINE": {
+      "label": "Entretien de Piscine",
+      "prestationsIncluses": [
+        "Nettoyage du bassin (parois, fond, ligne d'eau)",
+        "Analyse de l'eau (pH, chlore/sel, alcalinité, stabilisant)",
+        "Ajustement des paramètres chimiques",
+        "Nettoyage des skimmers et préfiltre de pompe",
+        "Contre-lavage (backwash) du filtre",
+        "Vérification du bon fonctionnement des équipements"
+      ],
+      "equipementsUtilises": [
+        "Robot nettoyeur ou aspirateur manuel",
+        "Épuisette de surface et de fond",
+        "Brosse parois",
+        "Kit d'analyse d'eau (bandelettes, gouttes, photomètre)",
+        "Produits chimiques (chlore choc/lent, pH+, pH-, sel, anti-algues...)"
+      ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 100 },
+      "dureeEstimee": "1 - 1.5 heure par visite"
+    },
+    "AUTRES": {
+       "label": "Autres Services sur Demande",
+       "prestationsIncluses": [
+         "Prestation définie selon le cahier des charges spécifique du client."
+       ],
+       "equipementsUtilises": [
+         "Équipement à déterminer selon la nature de la prestation."
+       ],
+      "personnelSuggestions": { "baseTeamSize": 1, "perSquareMeter": 100 },
+       "dureeEstimee": "À définir"
     }
   },
   "propertyTypes": {
-    "APARTMENT_SMALL": "petit appartement",
-    "APARTMENT_MEDIUM": "appartement",
-    "APARTMENT_LARGE": "grand appartement",
-    "APARTMENT_MULTI": "appartement multi-niveaux",
-    "VILLA_SMALL": "petite villa",
-    "VILLA_MEDIUM": "villa",
-    "VILLA_LARGE": "grande villa",
-    "PENTHOUSE": "penthouse",
-    "COMMERCIAL": "local commercial",
-    "STORE": "magasin",
-    "HOTEL_STANDARD": "hôtel",
-    "HOTEL_LUXURY": "hôtel de luxe",
-    "OFFICE": "bureau",
-    "RESIDENCE_B2B": "résidence",
-    "BUILDING": "immeuble",
-    "RESTAURANT": "restaurant",
-    "WAREHOUSE": "entrepôt",
-    "OTHER": "espace"
+    "APARTMENT_SMALL": "Petit Appartement (<60m²)",
+    "APARTMENT_MEDIUM": "Appartement Moyen (60-100m²)",
+    "APARTMENT_LARGE": "Grand Appartement (>100m²)",
+    "APARTMENT_MULTI": "Appartement Multi-niveaux/Duplex",
+    "VILLA_SMALL": "Petite Villa (<150m²)",
+    "VILLA_MEDIUM": "Villa Moyenne (150-300m²)",
+    "VILLA_LARGE": "Grande Villa (>300m²)",
+    "PENTHOUSE": "Penthouse",
+    "COMMERCIAL": "Local Commercial",
+    "STORE": "Magasin / Boutique",
+    "HOTEL_STANDARD": "Hôtel",
+    "HOTEL_LUXURY": "Hôtel de Luxe / Riad",
+    "OFFICE": "Bureau / Plateau de bureaux",
+    "RESIDENCE_B2B": "Résidence / Immeuble (Parties Communes)",
+    "BUILDING": "Immeuble Complet",
+    "RESTAURANT": "Restaurant / Café",
+    "WAREHOUSE": "Entrepôt / Local Industriel",
+    "OTHER": "Autre Type de Bien"
   },
   "paymentConditions": {
     "DEVIS_SERVICE_PARTICULIER": {
       "title": "Conditions de paiement :",
       "conditions": [
-        "Les règlements peuvent être effectués par virement bancaire, par chèque ou en espèces.",
-        "Un acompte de 30% est demandé à l'initiation du travail.",
-        "Le solde est à régler à la fin de l'intervention.",
-        "Devis valable 30 jours."
+        "Les règlements peuvent être effectués par virement bancaire ou en espèces.",
+        "Un acompte de 30% du montant total est exigible à la signature pour confirmer l'intervention.",
+        "Le solde est à régler immédiatement à la fin de la prestation.",
+        "Ce devis est valable 30 jours à compter de sa date d'émission."
       ]
     },
     "DEVIS_SERVICE_PRO": {
       "title": "Conditions de paiement :",
       "conditions": [
-        "Paiement à 30 jours fin de mois.",
-        "Un acompte de 40% est demandé à la signature du contrat.",
-        "Pénalités de retard : 3 fois le taux d'intérêt légal.",
-        "Devis valable 30 jours."
-      ]
-    },
-    "DEVIS_PRODUIT_PRO": {
-      "title": "Conditions de paiement :",
-      "conditions": [
-        "Paiement à 30 jours date de facture.",
-        "Franco de port à partir de 1000 DH.",
-        "Escompte de 2% pour paiement comptant."
-      ]
-    },
-    "FACTURE_SERVICE": {
-      "title": "Observations générales :",
-      "conditions": [
-        "Toute réclamation doit être signalée sous 24 heures.",
-        "La présente facture vaut titre exécutoire en cas de non-paiement.",
-        "Conservation obligatoire : 10 ans."
-      ]
-    },
-    "FACTURE_PRODUIT": {
-      "title": "Conditions générales :",
-      "conditions": [
-        "Marchandise livrée reste notre propriété jusqu'au paiement intégral.",
-        "Toute réclamation doit être faite dans les 48h suivant la livraison.",
-        "En cas de retard de paiement, application des pénalités légales."
+        "Paiement par virement bancaire à 30 jours date de facture.",
+        "Un acompte de 30% du montant total HT est exigible à la signature du devis pour début des travaux.",
+        "En cas de retard de paiement, des pénalités équivalentes à 3 fois le taux d'intérêt légal seront appliquées.",
+        "Ce devis est valable 30 jours."
       ]
     },
     "DEVIS_PRODUIT_PARTICULIER": {
       "title": "Conditions de paiement :",
       "conditions": [
-        "Paiement intégral à la commande.",
-        "Livraison après encaissement.",
-        "Retours acceptés sous 14 jours."
+        "Paiement intégral à la commande par virement ou espèces.",
+        "Livraison effectuée après réception du paiement complet.",
+        "Ce devis est valable 15 jours."
+      ]
+    },
+    "DEVIS_PRODUIT_PRO": {
+      "title": "Conditions de paiement :",
+      "conditions": [
+        "Paiement par virement bancaire à 30 jours date de facture.",
+        "Un acompte de 30% est exigible à la commande.",
+        "Franco de port à partir de [Montant] DH HT de commande.",
+        "Ce devis est valable 30 jours."
+      ]
+    },
+    "FACTURE_SERVICE": {
+      "title": "Observations générales :",
+      "conditions": [
+        "Toute réclamation concernant la prestation doit être signalée par écrit dans les 24 heures suivant l'intervention.",
+        "Facture payable à réception / selon conditions convenues.",
+        "En cas de non-paiement, la présente facture vaut titre exécutoire."
+      ]
+    },
+    "FACTURE_PRODUIT": {
+      "title": "Conditions générales :",
+      "conditions": [
+        "Les marchandises restent notre propriété jusqu'au paiement intégral (Loi n° 15-95 formant Code de commerce).",
+        "Toute réclamation doit être faite par écrit dans les 48 heures suivant la livraison.",
+        "Facture payable à réception / selon conditions convenues.",
+        "En cas de retard de paiement, application des pénalités légales en vigueur."
       ]
     }
   },
   "deliveryTimeframes": {
-    "STANDARD": "3-5 jours ouvrés",
-    "EXPRESS": "24-48 heures",
-    "URGENT": "Intervention sous 24h",
-    "CUSTOM": "À définir selon disponibilités",
+    "STANDARD": "Intervention sous 3-5 jours ouvrés",
+    "EXPRESS": "Intervention sous 24-48 heures",
+    "URGENT": "Intervention sous 24h (selon disponibilité)",
+    "CUSTOM": "Date à définir selon planning",
     "SCHEDULED": "Selon planning convenu"
   },
   "dynamicPhrases": {
-    "materialSpecific": {
+     "materialSpecific": {
       "marble": {
         "introduction": "Pour vos surfaces en marbre, nous utilisons des produits spécialisés garantissant brillance et protection.",
         "careNote": "Traitement adapté au marbre pour préserver sa noblesse et son éclat naturel."
@@ -346,39 +524,29 @@
       }
     },
     "serviceDescriptions": {
-      "FIN_DE_CHANTIER": {
-        "withMaterials": "Notre équipe interviendra avec une attention particulière aux matériaux présents sur votre chantier, utilisant des produits et techniques adaptés à chaque surface.",
-        "standard": "Nous effectuerons un nettoyage complet post-travaux pour vous livrer un espace impeccable et prêt à l'usage."
+       "FIN_DE_CHANTIER": {
+        "standard": "Nettoyage complet post-travaux pour un espace impeccable et prêt à l'usage."
       },
       "GRAND_MENAGE": {
-        "withMaterials": "Le grand ménage sera réalisé en tenant compte des spécificités de vos surfaces, avec des produits sélectionnés pour chaque type de matériau.",
-        "standard": "Notre intervention permettra de rafraîchir en profondeur l'ensemble de votre espace."
-      },
-      "NETTOYAGE_BUREAUX": {
-        "withMaterials": "L'entretien de vos bureaux sera optimisé selon les matériaux présents, garantissant propreté et durabilité.",
-        "standard": "Nous assurerons la propreté et l'hygiène de vos espaces de travail."
-      },
-      "CRISTALLISATION_MARBRE": {
-        "withMaterials": "La cristallisation sera complétée par l'entretien des autres surfaces présentes dans votre espace.",
-        "standard": "Vos surfaces en marbre retrouveront leur brillance d'origine grâce à notre expertise."
+        "standard": "Intervention de nettoyage approfondi pour rafraîchir l'ensemble de votre espace."
       }
     },
-    "closingStatements": {
-      "professional": "Nous restons à votre disposition pour tout complément d'information et nous engageons à respecter les délais convenus.",
-      "particular": "Nous sommes à votre écoute pour répondre à toutes vos questions et garantir votre satisfaction.",
-      "withMaterials": "Notre expertise dans le traitement de surfaces spécifiques vous garantit un résultat optimal et durable."
+     "closingStatements": {
+      "professional": "Nous restons à votre entière disposition pour toute question et nous engageons à réaliser cette prestation avec le plus grand soin.",
+      "particular": "N'hésitez pas à nous contacter si vous avez la moindre question. Votre satisfaction est notre priorité.",
+      "eco_quality": "En choisissant Enarva, vous optez pour une qualité premium et des solutions respectueuses de l'environnement."
     }
   },
   "qualityStatements": {
-    "general": "Nous nous engageons à fournir un service de qualité professionnelle avec garantie de satisfaction.",
-    "materials": "L'utilisation de produits adaptés à chaque matériau garantit un résultat optimal sans risque de détérioration.",
-    "eco": "Nos produits sont sélectionnés pour leur efficacité et leur respect de l'environnement.",
-    "team": "Notre équipe formée et expérimentée assure un travail soigné dans le respect de vos biens."
+    "general": "Enarva s'engage sur la qualité premium de ses prestations et la satisfaction de ses clients.",
+    "materials": "Nous utilisons des produits et techniques spécifiquement adaptés à chaque matériau pour un résultat optimal et durable.",
+    "eco": "Nous privilégions l'utilisation de produits de nettoyage professionnels certifiés écologiques, efficaces et respectueux de votre environnement.",
+    "team": "Notre personnel est formé, expérimenté et équipé pour assurer un travail soigné et efficace, dans le respect de vos biens."
   },
   "warrantyStatements": {
-    "service": "Garantie de reprise gratuite sous 48h en cas d'insatisfaction justifiée.",
-    "product": "Tous nos produits sont garantis conformes aux normes en vigueur.",
-    "marble": "Garantie brillance 6 mois pour la cristallisation du marbre.",
-    "parquet": "Protection garantie 12 mois pour la vitrification parquet."
+    "service": "Prestation garantie : intervention corrective gratuite sous 48h en cas de non-conformité justifiée.",
+    "product": "Les produits fournis sont garantis conformes aux normes en vigueur.",
+    "marble_cristallisation": "Garantie de brillance pour la cristallisation du marbre : 6 mois (sous conditions normales d'utilisation et d'entretien).",
+    "parquet_vitrification": "Garantie de protection pour la vitrification de parquet : 12 mois (sous conditions normales d'utilisation et d'entretien)."
   }
 }

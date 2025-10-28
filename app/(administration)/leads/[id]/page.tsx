@@ -54,7 +54,7 @@ type LeadWithRelations = Lead & {
   })[]
 }
 
-// Translation helper for ServiceType
+ // Translation helper for ServiceType
 const translateServiceType = (serviceType: ServiceType): string => {
   const translations: Record<ServiceType, string> = {
     GRAND_MENAGE: 'Grand Ménage',
@@ -75,7 +75,9 @@ const translateServiceType = (serviceType: ServiceType): string => {
     DECAPAGE_SOL: 'Décapage de Sol',
     LUSTRAGE_MARBRE: 'Lustrage de Marbre',
     POLISSAGE_BETON: 'Polissage de Béton',
-    NETTOYAGE_MOQUETTE_VAPEUR: 'Nettoyage Moquette à Vapeur',
+    RENOVATION_SOL: 'Rénovation de Sol',
+    TRAITEMENT_ANTI_NUISIBLE: 'Traitement Anti-Nuisible',
+    LAVAGE_VOITURE_DOMICILE: 'Lavage de Voiture à Domicile',
     AUTRES: 'Autres Services',
   }
   return translations[serviceType] || serviceType

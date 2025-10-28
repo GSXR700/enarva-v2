@@ -328,7 +328,6 @@ export default function NewLeadPage() {
                       <SelectItem value={ServiceType.DECAPAGE_SOL}>Décapage Sol</SelectItem>
                       <SelectItem value={ServiceType.LUSTRAGE_MARBRE}>Lustrage Marbre</SelectItem>
                       <SelectItem value={ServiceType.POLISSAGE_BETON}>Polissage Béton</SelectItem>
-                      <SelectItem value={ServiceType.NETTOYAGE_MOQUETTE_VAPEUR}>Moquette Vapeur</SelectItem>
                       <SelectItem value={ServiceType.AUTRES}>Autres Services</SelectItem>
                     </SelectContent>
                   </Select>

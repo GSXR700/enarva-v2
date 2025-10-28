@@ -1,4 +1,4 @@
-// app/(administration)/missions/validation/page.tsx - ADMIN VALIDATION INTERFACE
+// app/(administration)/missions/validation/page.tsx - CORRECTED
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -24,6 +24,7 @@ import { Mission, Lead, Task, User as PrismaUser } from '@prisma/client'
 import { formatDate, formatCurrency, translate } from '@/lib/utils'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { TableSkeleton } from '@/components/skeletons/TableSkeleton' // Import skeleton
 
 type TaskWithDetails = Task & {
   beforePhotos?: string[];
@@ -32,11 +33,12 @@ type TaskWithDetails = Task & {
   clientFeedback?: string;
 };
 
+// CORRECTED: teamLeader can be null
 type MissionForValidation = Mission & {
   lead: Lead;
-  teamLeader: PrismaUser;
+  teamLeader: PrismaUser | null; // <-- FIX: teamLeader is optional in schema
   tasks: TaskWithDetails[];
-  quote?: { finalPrice: number };
+  quote?: { finalPrice: number | null }; // Allow finalPrice to be null
 };
 
 export default function MissionValidationPage() {
@@ -48,18 +50,34 @@ export default function MissionValidationPage() {
   
   // Validation form data
   const [adminNotes, setAdminNotes] = useState('')
-  const [qualityScore, setQualityScore] = useState<number>(5)
+  const [qualityScore, setQualityScore] = useState<number>(8) // Default to a good score
   const [issuesFound, setIssuesFound] = useState('')
   const [correctionNeeded, setCorrectionNeeded] = useState(false)
 
   const fetchPendingMissions = useCallback(async () => {
+    setIsLoading(true); // Set loading true at the start of fetch
     try {
-      const response = await fetch('/api/missions?status=QUALITY_CHECK,CLIENT_VALIDATION')
-      if (!response.ok) throw new Error('Failed to fetch missions')
-      const data = await response.json()
-      setMissions(data)
-    } catch (error) {
-      toast.error('Impossible de charger les missions en attente')
+      // Fetch missions with status QUALITY_CHECK or CLIENT_VALIDATION
+      const response = await fetch('/api/missions?status=QUALITY_CHECK&status=CLIENT_VALIDATION')
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch missions');
+      }
+      const data = await response.json();
+      
+      // Ensure data is an array
+      if (Array.isArray(data.data)) {
+         setMissions(data.data); // Assuming API returns { data: [...] }
+      } else if (Array.isArray(data)) {
+         setMissions(data); // Fallback if API returns [...]
+      } else {
+         console.error("Fetched data is not an array:", data);
+         setMissions([]); // Set to empty array on invalid data
+      }
+
+    } catch (error: any) {
+      toast.error(`Impossible de charger les missions: ${error.message}`);
+      setMissions([]); // Set to empty array on error
     } finally {
       setIsLoading(false)
     }
@@ -79,19 +97,24 @@ export default function MissionValidationPage() {
           approved: true,
           adminNotes,
           qualityScore,
-          status: 'COMPLETED'
+          status: 'COMPLETED' // Set status to COMPLETED on approval
         })
       })
 
-      if (!response.ok) throw new Error('Failed to approve mission')
+      if (!response.ok) {
+         const errorData = await response.json();
+         throw new Error(errorData.message || 'Failed to approve mission');
+      }
       
       toast.success('Mission approuvée avec succès!')
       setSelectedMission(null)
       setAdminNotes('')
-      setQualityScore(5)
-      await fetchPendingMissions()
-    } catch (error) {
-      toast.error('Impossible d\'approuver la mission')
+      setQualityScore(8)
+      setIssuesFound('') // Clear issues field
+      setCorrectionNeeded(false) // Reset checkbox
+      await fetchPendingMissions() // Refresh list
+    } catch (error: any) {
+      toast.error(`Impossible d'approuver la mission: ${error.message}`)
     } finally {
       setIsValidating(false)
     }
@@ -99,7 +122,7 @@ export default function MissionValidationPage() {
 
   const rejectMission = async (missionId: string) => {
     if (!issuesFound.trim()) {
-      toast.error('Veuillez spécifier les problèmes identifiés')
+      toast.error('Veuillez spécifier les problèmes identifiés pour un rejet')
       return
     }
 
@@ -110,31 +133,39 @@ export default function MissionValidationPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           approved: false,
-          adminNotes,
+          adminNotes: adminNotes || 'Rejeté (voir problèmes)', // Ensure notes aren't empty
           qualityScore,
           issuesFound,
           correctionNeeded,
-          status: correctionNeeded ? 'IN_PROGRESS' : 'QUALITY_CHECK'
+          // If correction is needed, send back to IN_PROGRESS
+          // Otherwise, it stays in QUALITY_CHECK for review
+          status: correctionNeeded ? 'IN_PROGRESS' : 'QUALITY_CHECK' 
         })
       })
 
-      if (!response.ok) throw new Error('Failed to reject mission')
+      if (!response.ok) {
+         const errorData = await response.json();
+         throw new Error(errorData.message || 'Failed to reject mission');
+      }
       
       toast.success('Mission rejetée. Équipe notifiée.')
       setSelectedMission(null)
       setAdminNotes('')
       setIssuesFound('')
       setCorrectionNeeded(false)
-      await fetchPendingMissions()
-    } catch (error) {
-      toast.error('Impossible de rejeter la mission')
+      setQualityScore(8)
+      await fetchPendingMissions() // Refresh list
+    } catch (error: any) {
+      toast.error(`Impossible de rejeter la mission: ${error.message}`)
     } finally {
       setIsValidating(false)
     }
   }
 
   const getTaskCompletionStats = (mission: MissionForValidation) => {
-    const total = mission.tasks.length
+    const total = mission.tasks?.length || 0; // Handle missing tasks array
+    if (total === 0) return { total: 0, validated: 0, withPhotos: 0, clientApproved: 0 };
+    
     const validated = mission.tasks.filter(t => t.status === 'VALIDATED').length
     const withPhotos = mission.tasks.filter(t => 
       (t.beforePhotos && t.beforePhotos.length > 0) || 
@@ -146,7 +177,14 @@ export default function MissionValidationPage() {
   }
 
   if (isLoading) {
-    return <div className="main-content p-6">Chargement des missions en attente...</div>
+    return (
+        <div className="main-content p-6">
+            <TableSkeleton 
+                title="Validation des Missions"
+                description="Chargement des missions en attente de validation..."
+            />
+        </div>
+    )
   }
 
   return (
@@ -154,7 +192,7 @@ export default function MissionValidationPage() {
       <div>
         <h1 className="text-2xl md:text-3xl font-bold text-foreground">Validation des Missions</h1>
         <p className="text-muted-foreground mt-1">
-          Missions en attente de validation administrative
+          {missions.length} mission(s) en attente de validation administrative
         </p>
       </div>
 
@@ -171,8 +209,14 @@ export default function MissionValidationPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {missions.map((mission) => {
+            // Safety checks for mission object
+            if (!mission || !mission.lead) {
+                console.warn("Skipping rendering mission with missing data:", mission?.id);
+                return null; // Don't render card if essential data is missing
+            }
+            
             const stats = getTaskCompletionStats(mission)
-            const completionRate = Math.round((stats.validated / stats.total) * 100)
+            const completionRate = (stats.total > 0) ? Math.round((stats.validated / stats.total) * 100) : 0;
             
             return (
               <Card key={mission.id} className="thread-card hover:shadow-lg transition-all">
@@ -184,7 +228,7 @@ export default function MissionValidationPage() {
                         {mission.lead.firstName} {mission.lead.lastName}
                       </p>
                     </div>
-                    <Badge className={`px-2 py-1 ${
+                    <Badge className={`px-2 py-1 text-xs font-medium ${
                       mission.status === 'QUALITY_CHECK' ? 'bg-yellow-100 text-yellow-800' :
                       'bg-purple-100 text-purple-800'
                     }`}>
@@ -198,7 +242,8 @@ export default function MissionValidationPage() {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4 text-muted-foreground" />
-                      <span>Chef: {mission.teamLeader.name}</span>
+                      {/* CORRECTED: Use optional chaining and provide fallback */}
+                      <span>Chef: {mission.teamLeader?.name ?? 'Non assigné'}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-muted-foreground" />
@@ -208,7 +253,8 @@ export default function MissionValidationPage() {
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <span>{formatDate(mission.scheduledDate)}</span>
                     </div>
-                    {mission.quote && (
+                    {/* Corrected: Check quote and finalPrice existence */}
+                    {mission.quote && mission.quote.finalPrice != null && (
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-enarva-start">
                           {formatCurrency(Number(mission.quote.finalPrice))}
@@ -235,15 +281,16 @@ export default function MissionValidationPage() {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="flex items-center gap-1">
                       <Camera className="w-3 h-3" />
-                      <span>{stats.withPhotos} photos</span>
+                      <span>{stats.withPhotos} tâches avec photos</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <ThumbsUp className="w-3 h-3" />
-                      <span>{stats.clientApproved} approuvées</span>
+                      <span>{stats.clientApproved} approuvées client</span>
                     </div>
                   </div>
 
                   {/* Client Feedback */}
+                  {/* Cast to any to access fields not in official type (if they exist) */}
                   {(mission as any).clientRating && (
                     <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
                       <Star className="w-4 h-4 text-yellow-500" />
@@ -255,7 +302,14 @@ export default function MissionValidationPage() {
                   )}
 
                   <Button 
-                    onClick={() => setSelectedMission(mission)}
+                    onClick={() => {
+                        // Reset form fields when selecting a new mission
+                        setAdminNotes(mission.adminNotes || '');
+                        setQualityScore(mission.qualityScore || 8);
+                        setIssuesFound(mission.issuesFound || '');
+                        setCorrectionNeeded(mission.correctionRequired || false);
+                        setSelectedMission(mission);
+                    }}
                     className="w-full"
                     variant="outline"
                   >
@@ -290,10 +344,12 @@ export default function MissionValidationPage() {
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 gap-4 text-sm">
                   <div><strong>Client:</strong> {selectedMission.lead.firstName} {selectedMission.lead.lastName}</div>
-                  <div><strong>Chef d'équipe:</strong> {selectedMission.teamLeader.name}</div>
+                  {/* CORRECTED: Use optional chaining and provide fallback */}
+                  <div><strong>Chef d'équipe:</strong> {selectedMission.teamLeader?.name ?? 'Non assigné'}</div>
                   <div><strong>Date:</strong> {formatDate(selectedMission.scheduledDate)}</div>
                   <div><strong>Adresse:</strong> {selectedMission.address}</div>
-                  {selectedMission.quote && (
+                  {/* Corrected: Check quote and finalPrice existence */}
+                  {selectedMission.quote && selectedMission.quote.finalPrice != null && (
                     <div><strong>Montant:</strong> {formatCurrency(Number(selectedMission.quote.finalPrice))}</div>
                   )}
                 </CardContent>
@@ -302,71 +358,76 @@ export default function MissionValidationPage() {
               {/* Tasks Review */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Tâches Réalisées ({selectedMission.tasks.length})</CardTitle>
+                  <CardTitle>Tâches Réalisées ({selectedMission.tasks?.length || 0})</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {selectedMission.tasks.map((task, index) => (
-                    <div key={task.id} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium">
-                          {index + 1}. {task.title}
-                        </h4>
-                        <Badge className={`text-xs ${
-                          task.status === 'VALIDATED' ? 'bg-green-100 text-green-800' :
-                          task.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {translate(task.status)}
-                        </Badge>
-                      </div>
-                      
-                      <p className="text-xs text-muted-foreground mb-2">
-                        {translate(task.category)}
-                      </p>
-
-                      {task.notes && (
-                        <p className="text-sm mb-2">
-                          <strong>Notes:</strong> {task.notes}
-                        </p>
-                      )}
-
-                      {task.clientApproved && (
-                        <div className="flex items-center gap-2 text-sm text-green-600 mb-2">
-                          <ThumbsUp className="w-4 h-4" />
-                          <span>Approuvé par le client</span>
+                  {/* Corrected: Add safety check for tasks array */}
+                  {selectedMission.tasks && selectedMission.tasks.length > 0 ? (
+                    selectedMission.tasks.map((task, index) => (
+                      <div key={task.id} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-medium">
+                            {index + 1}. {task.title}
+                          </h4>
+                          <Badge className={`text-xs ${
+                            task.status === 'VALIDATED' ? 'bg-green-100 text-green-800' :
+                            task.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {translate(task.status)}
+                          </Badge>
                         </div>
-                      )}
-
-                      {task.clientFeedback && (
-                        <p className="text-sm mb-2">
-                          <strong>Feedback client:</strong> {task.clientFeedback}
+                        
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {translate(task.category)}
                         </p>
-                      )}
 
-                      <div className="flex gap-2">
-                        {(task.beforePhotos && task.beforePhotos.length > 0) && (
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => setSelectedTask(task)}
-                          >
-                            <Camera className="w-3 h-3 mr-1" />
-                            Photos avant ({task.beforePhotos.length})
-                          </Button>
+                        {task.notes && (
+                          <p className="text-sm mb-2">
+                            <strong>Notes:</strong> {task.notes}
+                          </p>
                         )}
-                        {(task.afterPhotos && task.afterPhotos.length > 0) && (
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => setSelectedTask(task)}
-                          >
-                            <Camera className="w-3 h-3 mr-1" />
-                            Photos après ({task.afterPhotos.length})
-                          </Button>
+
+                        {task.clientApproved && (
+                          <div className="flex items-center gap-2 text-sm text-green-600 mb-2">
+                            <ThumbsUp className="w-4 h-4" />
+                            <span>Approuvé par le client</span>
+                          </div>
                         )}
+
+                        {task.clientFeedback && (
+                          <p className="text-sm mb-2">
+                            <strong>Feedback client:</strong> {task.clientFeedback}
+                          </p>
+                        )}
+
+                        <div className="flex gap-2">
+                          {(task.beforePhotos && task.beforePhotos.length > 0) && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => setSelectedTask(task)}
+                            >
+                              <Camera className="w-3 h-3 mr-1" />
+                              Photos avant ({task.beforePhotos.length})
+                            </Button>
+                          )}
+                          {(task.afterPhotos && task.afterPhotos.length > 0) && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => setSelectedTask(task)}
+                            >
+                              <Camera className="w-3 h-3 mr-1" />
+                              Photos après ({task.afterPhotos.length})
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                     <p className="text-sm text-muted-foreground text-center">Aucune tâche n'a été trouvée pour cette mission.</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -384,7 +445,7 @@ export default function MissionValidationPage() {
                       min="1"
                       max="10"
                       value={qualityScore}
-                      onChange={(e) => setQualityScore(Number(e.target.value))}
+                      onChange={(e) => setQualityScore(Math.max(1, Math.min(10, Number(e.target.value))))} // Clamp value
                     />
                   </div>
 
@@ -411,13 +472,15 @@ export default function MissionValidationPage() {
                   </div>
 
                   <div className="flex items-center space-x-2">
+                    {/* Using basic input checkbox, replace with shadcn Checkbox if available */}
                     <input
                       type="checkbox"
                       id="correctionNeeded"
                       checked={correctionNeeded}
                       onChange={(e) => setCorrectionNeeded(e.target.checked)}
+                      className="form-checkbox h-4 w-4 text-primary"
                     />
-                    <Label htmlFor="correctionNeeded">Correction requise (retourner en cours)</Label>
+                    <Label htmlFor="correctionNeeded" className="mb-0">Correction requise (retourner en 'En cours')</Label>
                   </div>
 
                   <div className="flex gap-4 pt-4">
@@ -453,18 +516,20 @@ export default function MissionValidationPage() {
             <DialogHeader>
               <DialogTitle>Photos: {selectedTask.title}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto p-1"> {/* Added scroll */}
               {selectedTask.beforePhotos && selectedTask.beforePhotos.length > 0 && (
                 <div>
                   <h4 className="font-medium mb-2">Photos Avant</h4>
                   <div className="grid grid-cols-2 gap-2">
                     {selectedTask.beforePhotos.map((photo, index) => (
-                      <img
-                        key={index}
-                        src={photo}
-                        alt={`Avant ${index + 1}`}
-                        className="w-full h-40 object-cover rounded"
-                      />
+                      // Added Link to open image in new tab
+                      <a href={photo} target="_blank" rel="noopener noreferrer" key={`before-${index}`}>
+                        <img
+                          src={photo}
+                          alt={`Avant ${index + 1}`}
+                          className="w-full h-40 object-cover rounded"
+                        />
+                      </a>
                     ))}
                   </div>
                 </div>
@@ -474,16 +539,22 @@ export default function MissionValidationPage() {
                   <h4 className="font-medium mb-2">Photos Après</h4>
                   <div className="grid grid-cols-2 gap-2">
                     {selectedTask.afterPhotos.map((photo, index) => (
-                      <img
-                        key={index}
-                        src={photo}
-                        alt={`Après ${index + 1}`}
-                        className="w-full h-40 object-cover rounded"
-                      />
+                       <a href={photo} target="_blank" rel="noopener noreferrer" key={`after-${index}`}>
+                          <img
+                            key={index}
+                            src={photo}
+                            alt={`Après ${index + 1}`}
+                            className="w-full h-40 object-cover rounded"
+                          />
+                       </a>
                     ))}
                   </div>
                 </div>
               )}
+               {(!selectedTask.beforePhotos || selectedTask.beforePhotos.length === 0) &&
+                (!selectedTask.afterPhotos || selectedTask.afterPhotos.length === 0) && (
+                   <p className="text-muted-foreground text-center">Aucune photo disponible pour cette tâche.</p>
+               )}
             </div>
           </DialogContent>
         </Dialog>

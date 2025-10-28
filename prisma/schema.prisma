@@ -161,6 +161,12 @@ model Quote {
   finalPrice        Decimal
   purchaseOrderNumber String?
   orderedBy           String?
+
+  // --- Custom Service Details (Optional) ---
+  customPersonnelMobilise   String? @db.Text // Store custom text for personnel
+  customEquipementsProduits String? @db.Text // Store custom text for equipment/products
+  customPrestationsIncluses String? @db.Text // Store custom text for included services
+  customDelaiPrevu          String? @db.Text // Store custom text for timeframe
   
   // --- Relationships ---
   leadId            String
@@ -634,26 +640,39 @@ enum LeadCanal {
 }
 
 enum ServiceType {
-  GRAND_MENAGE                    // Grand Ménage
-  NETTOYAGE_FIN_CHANTIER         // Nettoyage de Fin-Chantier
-  NETTOYAGE_CANAPES_MATELAS      // Nettoyage des Canapés & Matelas
-  NETTOYAGE_TAPIS_MOQUETTES      // Nettoyage des Tapis & Moquettes
-  NETTOYAGE_VITRES               // Nettoyage des Vitres
-  TRAITEMENT_SOL                 // Traitement de Sol
-  NETTOYAGE_FOURS                // Nettoyage des Fours
-  ENTRETIEN_JARDIN               // Entretien de Jardin
-  ENTRETIEN_PISCINE              // Entretien de Piscine
-  NETTOYAGE_FACADE               // Nettoyage de Façade
-  DESINFECTION_SANITAIRE         // Désinfection Sanitaire
-  NETTOYAGE_BUREAUX              // Nettoyage de Bureaux
-  ENTRETIEN_REGULIER             // Entretien Régulier
-  CRISTALLISATION_MARBRE         // Cristallisation de Marbre
-  VITRIFICATION_PARQUET          // Vitrification de Parquet
-  DECAPAGE_SOL                   // Décapage de Sol
-  LUSTRAGE_MARBRE                // Lustrage de Marbre
-  POLISSAGE_BETON                // Polissage de Béton
-  NETTOYAGE_MOQUETTE_VAPEUR      // Nettoyage Moquette à Vapeur
-  AUTRES                         // Autres Services
+  // --- Services Généraux ---
+  GRAND_MENAGE                // Grand Ménage résidentiel/commercial
+  NETTOYAGE_FIN_CHANTIER      // Nettoyage après travaux
+  ENTRETIEN_REGULIER          // Nettoyage récurrent (bureaux, domiciles)
+  NETTOYAGE_BUREAUX           // Nettoyage spécifique pour bureaux
+  DESINFECTION_SANITAIRE      // Désinfection ciblée des sanitaires
+
+  // --- Nettoyage Spécifique Mobilier & Textiles ---
+  NETTOYAGE_CANAPES_MATELAS   // Nettoyage canapés, fauteuils, matelas (par mètre linéaire ou pièce)
+  NETTOYAGE_TAPIS_MOQUETTES   // Nettoyage tapis et moquettes (à domicile ou atelier)
+
+  // --- Nettoyage Vitres & Façades ---
+  NETTOYAGE_VITRES            // Nettoyage des vitres (intérieur/extérieur standard)
+  NETTOYAGE_FACADE            // Nettoyage de façades (tous matériaux: verre, pierre, PVC, etc.)
+
+  // --- Traitement des Sols ---
+  TRAITEMENT_SOL              // Terme générique pour traitement de sol
+  CRISTALLISATION_MARBRE      // Cristallisation spécifique du marbre
+  VITRIFICATION_PARQUET       // Vitrification / Protection des parquets
+  DECAPAGE_SOL                // Décapage de sols durs (avant rénovation ou traitement)
+  LUSTRAGE_MARBRE             // Lustrage et entretien courant du marbre
+  POLISSAGE_BETON             // Polissage de béton ciré ou industriel
+  RENOVATION_SOL              // Rénovation plus complète (ponçage léger, etc.)
+
+  // --- Services Spécialisés ---
+  TRAITEMENT_ANTI_NUISIBLE    // Désinsectisation, dératisation
+  LAVAGE_VOITURE_DOMICILE     // Nettoyage de véhicules à domicile
+  ENTRETIEN_JARDIN            // Services de jardinage
+  ENTRETIEN_PISCINE           // Nettoyage et entretien de piscines
+  NETTOYAGE_FOURS             // Nettoyage spécifique des fours professionnels/domestiques (DEPRECATED ou garder ?) - À clarifier si pertinent
+
+  // --- Autres ---
+  AUTRES                      // Pour tout service non listé explicitement
 }
 
 enum PropertyType {

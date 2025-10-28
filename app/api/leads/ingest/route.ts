@@ -241,7 +241,6 @@ function mapServiceToServiceType(service: string): ServiceType | null {
     'moquette': ServiceType.NETTOYAGE_TAPIS_MOQUETTES,
     'moquettes': ServiceType.NETTOYAGE_TAPIS_MOQUETTES,
     'tapis et moquettes': ServiceType.NETTOYAGE_TAPIS_MOQUETTES,
-    'nettoyage moquette vapeur': ServiceType.NETTOYAGE_MOQUETTE_VAPEUR,
     
     // Vitres
     'nettoyage de vitres': ServiceType.NETTOYAGE_VITRES,

@@ -360,7 +360,6 @@ export function LeadForm({ lead, onSuccess, onCancel, users = [] }: LeadFormProp
                       <SelectItem value={ServiceType.DECAPAGE_SOL}>Décapage de Sol</SelectItem>
                       <SelectItem value={ServiceType.LUSTRAGE_MARBRE}>Lustrage de Marbre</SelectItem>
                       <SelectItem value={ServiceType.POLISSAGE_BETON}>Polissage de Béton</SelectItem>
-                      <SelectItem value={ServiceType.NETTOYAGE_MOQUETTE_VAPEUR}>Nettoyage Moquette à Vapeur</SelectItem>
                       <SelectItem value={ServiceType.AUTRES}>Autres Services</SelectItem>
                     </SelectContent>
                   </Select>
