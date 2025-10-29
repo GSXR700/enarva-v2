@@ -75,7 +75,7 @@ export type QuotePDFData = {
 
 /**
  * Renders text, splitting sentences ending in a dot into separate bullet points,
- * and handling line breaks within each point.
+ * handling line breaks within each point with MINIMAL vertical spacing.
  */
 function renderBulletedText(doc: jsPDF, text: string | null | undefined, startX: number, startY: number, maxWidth: number): number {
   if (!text || text.trim() === '') {
@@ -83,33 +83,33 @@ function renderBulletedText(doc: jsPDF, text: string | null | undefined, startX:
   }
 
   let currentY = startY;
-  const lineSpacing = 13; // Line height for wrapped text
-  const pointSpacing = 5; // Extra space between distinct bullet points
+  // --- ESPACEMENT MINIMAL ---
+  const lineSpacing = 10; // Réduit au minimum (était 13, puis 11)
+  // const pointSpacing = 0; // On supprime l'espace additionnel entre les puces
+  // --- FIN AJUSTEMENTS ---
 
-  // Split the text into potential bullet points based on dots.
-  // We keep the dot temporarily to split correctly, then remove it.
   const points = text
-    .split('.') // Split by dot
-    .map(p => p.trim()) // Trim whitespace around each potential point
-    .filter(p => p.length > 0); // Remove empty strings resulting from multiple dots or end dot
+    .split('.') // Sépare par point
+    .map(p => p.trim()) // Nettoie les espaces
+    .filter(p => p.length > 0); // Enlève les éléments vides
 
   points.forEach((pointText) => {
-    // Wrap the text for this specific bullet point if it's too long
+    // Coupe le texte du point courant s'il est trop long
     const lines = doc.splitTextToSize(pointText, maxWidth);
 
     lines.forEach((line: string, index: number) => {
-      // Add bullet only to the first line of each point
-      const prefix = index === 0 ? '• ' : '  '; // Indent subsequent lines
+      // Ajoute la puce seulement sur la première ligne de chaque point
+      const prefix = index === 0 ? '• ' : '  '; // Indentation pour les lignes suivantes
       doc.text(prefix + line, startX, currentY);
-      currentY += lineSpacing;
+      currentY += lineSpacing; // Avance à la ligne suivante avec l'espacement MINIMAL
     });
 
-    // Add a little extra space after each full bullet point (after its last line)
-    currentY += pointSpacing;
+    // PAS d'espace supplémentaire ajouté entre les puces distinctes
+    // currentY += pointSpacing; // Supprimé
   });
 
-  // Adjust Y position: remove the last extra pointSpacing if points were added
-  return points.length > 0 ? currentY - pointSpacing : startY;
+  // Retourne la position Y finale après la dernière ligne écrite
+  return currentY;
 }
 
 
