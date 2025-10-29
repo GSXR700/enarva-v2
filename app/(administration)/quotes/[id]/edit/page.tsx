@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/Switch'
-import { ArrowLeft, FileText, Save, AlertCircle, Search, Plus, Package, X } from 'lucide-react'
+import { ArrowLeft, FileText, Save, AlertCircle, Search, Plus, Package, X, ChevronDown } from 'lucide-react' // AJOUT: ChevronDown
 import { formatCurrency } from '@/lib/utils'
 import { Quote, Lead, QuoteStatus, QuoteType, PropertyType, UrgencyLevel, QuoteBusinessType, ServiceType } from '@prisma/client'
 import { toast } from 'sonner'
@@ -139,6 +139,16 @@ export default function EditQuotePage() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  // --- NOUVEAUX ÉTATS ---
+  const [customDetails, setCustomDetails] = useState({
+    customPersonnelMobilise: '',
+    customEquipementsProduits: '',
+    customPrestationsIncluses: '',
+    customDelaiPrevu: ''
+  });
+  const [isCustomDetailsOpen, setIsCustomDetailsOpen] = useState(false);
+  // --- FIN NOUVEAUX ÉTATS ---
 
   const isB2BClient = useMemo(() => {
     if (quote?.lead) {
@@ -285,6 +295,20 @@ export default function EditQuotePage() {
         }
       }
 
+      // --- MODIFICATION: Charger les détails personnalisés ---
+      setCustomDetails({
+        customPersonnelMobilise: data.customPersonnelMobilise || '',
+        customEquipementsProduits: data.customEquipementsProduits || '',
+        customPrestationsIncluses: data.customPrestationsIncluses || '',
+        customDelaiPrevu: data.customDelaiPrevu || '',
+      });
+
+      // Ouvrir la section si elle contient déjà des données
+      if (data.customPersonnelMobilise || data.customEquipementsProduits || data.customPrestationsIncluses || data.customDelaiPrevu) {
+        setIsCustomDetailsOpen(true);
+      }
+      // --- FIN MODIFICATION ---
+
     } catch (error) {
       toast.error("Impossible de charger les données du devis.");
       router.push('/quotes');
@@ -342,6 +366,15 @@ export default function EditQuotePage() {
       })
     );
   };
+
+  // --- NOUVELLE FONCTION ---
+  const handleCustomDetailsChange = (field: keyof typeof customDetails, value: string) => {
+    setCustomDetails(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  // --- FIN NOUVELLE FONCTION ---
 
   const updateProduct = (id: string, field: keyof ProductItem, value: any) => {
     setProductItems(current =>
@@ -456,6 +489,14 @@ export default function EditQuotePage() {
         quotePayload.serviceType = quoteFields.serviceType || undefined;
         quotePayload.propertyType = quoteFields.propertyType || undefined;
         quotePayload.materials = hasMaterials ? selectedMaterials : null;
+
+        // --- MODIFICATION: Ajouter les champs personnalisés au payload ---
+        quotePayload.customPersonnelMobilise = customDetails.customPersonnelMobilise.trim() || null;
+        quotePayload.customEquipementsProduits = customDetails.customEquipementsProduits.trim() || null;
+        quotePayload.customPrestationsIncluses = customDetails.customPrestationsIncluses.trim() || null;
+        quotePayload.customDelaiPrevu = customDetails.customDelaiPrevu.trim() || null;
+        // --- FIN MODIFICATION ---
+
       } else {
         quotePayload.lineItems = productItems
           .filter(item => item.name.trim())
@@ -562,7 +603,6 @@ export default function EditQuotePage() {
       </div>
     );
   }
-
   return (
     <div className="min-h-screen bg-background transition-colors duration-300">
       <form onSubmit={handleSubmit}>
@@ -894,6 +934,89 @@ export default function EditQuotePage() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* --- NOUVEAU BLOC : Custom Service Details (Collapsible) --- */}
+              <Card className="transition-colors duration-300">
+                <CardHeader 
+                  className="cursor-pointer"
+                  onClick={() => setIsCustomDetailsOpen(!isCustomDetailsOpen)}
+                >
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">
+                      Détails Personnalisés du Service (PDF)
+                    </CardTitle>
+                    <ChevronDown 
+                      className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${
+                        isCustomDetailsOpen ? 'rotate-180' : ''
+                      }`} 
+                    />
+                  </div>
+                  <CardDescription className="text-sm">
+                    Ces champs seront imprimés sur le devis PDF.
+                  </CardDescription>
+                </CardHeader>
+
+                {isCustomDetailsOpen && (
+                  <CardContent className="space-y-4 animate-in fade-in-0 slide-in-from-top-4">
+                    <div>
+                      <Label htmlFor="customPersonnelMobilise" className="text-sm">
+                        Personnel Mobilisé
+                      </Label>
+                      <Textarea
+                        id="customPersonnelMobilise"
+                        placeholder="Ex: 1 Chef d'équipe et 4 agents qualifiés..."
+                        value={customDetails.customPersonnelMobilise}
+                        onChange={(e) => handleCustomDetailsChange('customPersonnelMobilise', e.target.value)}
+                        className="mt-1 bg-background border-input"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="customEquipementsProduits" className="text-sm">
+                        Équipements et Produits
+                      </Label>
+                      <Textarea
+                        id="customEquipementsProduits"
+                        placeholder="Ex: Monobrosse, Autolaveuse, produits écologiques..."
+                        value={customDetails.customEquipementsProduits}
+                        onChange={(e) => handleCustomDetailsChange('customEquipementsProduits', e.target.value)}
+                        className="mt-1 bg-background border-input"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="customPrestationsIncluses" className="text-sm">
+                        Prestations Incluses
+                      </Label>
+                      <Textarea
+                        id="customPrestationsIncluses"
+                        placeholder="Ex: Dépoussiérage, Lavage des vitres, Traitement des sols..."
+                        value={customDetails.customPrestationsIncluses}
+                        onChange={(e) => handleCustomDetailsChange('customPrestationsIncluses', e.target.value)}
+                        className="mt-1 bg-background border-input"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="customDelaiPrevu" className="text-sm">
+                        Délai Prévu
+                      </Label>
+                      <Textarea
+                        id="customDelaiPrevu"
+                        placeholder="Ex: 3 jours ouvrables après confirmation..."
+                        value={customDetails.customDelaiPrevu}
+                        onChange={(e) => handleCustomDetailsChange('customDelaiPrevu', e.target.value)}
+                        className="mt-1 bg-background border-input"
+                        rows={2}
+                      />
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+              {/* --- FIN NOUVEAU BLOC --- */}
 
               {/* Services Management */}
               <Card className="transition-colors duration-300">
