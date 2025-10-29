@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/Switch'
 import { ArrowLeft, FileText, Save, AlertCircle, Search, Plus, Package, X } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { Quote, Lead, QuoteStatus, QuoteType, PropertyType, UrgencyLevel, QuoteBusinessType } from '@prisma/client'
+import { Quote, Lead, QuoteStatus, QuoteType, PropertyType, UrgencyLevel, QuoteBusinessType, ServiceType } from '@prisma/client'
 import { toast } from 'sonner'
 import { TableSkeleton } from '@/components/skeletons/TableSkeleton'
 
@@ -51,6 +51,31 @@ const PREDEFINED_SERVICES = [
   'Entretien Régulier',
   'Cristallisation Marbre'
 ];
+
+const serviceLabels: Record<ServiceType, string> = {
+  GRAND_MENAGE: "Grand Ménage résidentiel / commercial",
+  NETTOYAGE_FIN_CHANTIER: "Nettoyage fin de chantier",
+  ENTRETIEN_REGULIER: "Entretien régulier (bureaux, domiciles)",
+  NETTOYAGE_BUREAUX: "Nettoyage de bureaux",
+  DESINFECTION_SANITAIRE: "Désinfection sanitaire",
+  NETTOYAGE_CANAPES_MATELAS: "Nettoyage canapés, fauteuils, matelas",
+  NETTOYAGE_TAPIS_MOQUETTES: "Nettoyage tapis et moquettes",
+  NETTOYAGE_VITRES: "Nettoyage des vitres",
+  NETTOYAGE_FACADE: "Nettoyage de façades",
+  TRAITEMENT_SOL: "Traitement de sols",
+  CRISTALLISATION_MARBRE: "Cristallisation du marbre",
+  VITRIFICATION_PARQUET: "Vitrification du parquet",
+  DECAPAGE_SOL: "Décapage de sol",
+  LUSTRAGE_MARBRE: "Lustrage de marbre",
+  POLISSAGE_BETON: "Polissage de béton",
+  RENOVATION_SOL: "Rénovation de sols",
+  TRAITEMENT_ANTI_NUISIBLE: "Traitement anti-nuisible",
+  LAVAGE_VOITURE_DOMICILE: "Lavage de voiture à domicile",
+  ENTRETIEN_JARDIN: "Entretien de jardin",
+  ENTRETIEN_PISCINE: "Entretien de piscine",
+  NETTOYAGE_FOURS: "Nettoyage de fours",
+  AUTRES: "Autres services",
+};
 
 export default function EditQuotePage() {
   const router = useRouter();
@@ -706,11 +731,9 @@ export default function EditQuotePage() {
                           <SelectValue placeholder="Sélectionner" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="FIN_DE_CHANTIER">Fin de chantier</SelectItem>
-                          <SelectItem value="GRAND_MENAGE">Grand Ménage</SelectItem>
-                          <SelectItem value="NETTOYAGE_STANDARD">Nettoyage Standard</SelectItem>
-                          <SelectItem value="NETTOYAGE_BUREAUX">Nettoyage Bureaux</SelectItem>
-                          <SelectItem value="ENTRETIEN_REGULIER">Entretien Régulier</SelectItem>
+                          {Object.entries(serviceLabels).map(([key, label]) => (
+                            <SelectItem key={key} value={key}>{label}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
