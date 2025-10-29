@@ -1,6 +1,6 @@
-# Enarva OS - CRM pour Entreprise de Nettoyage
+# Enarva OS - CRM pour Enarva
 
-Ce projet est un système CRM complet construit avec Next.js, TypeScript, Tailwind CSS, et Prisma pour l'entreprise de nettoyage Enarva.
+Ce projet est un système CRM complet construit avec Next.js, TypeScript, Tailwind CSS, et Prisma pour l'entreprise Enarva.
 
 ## Démarrage
 
