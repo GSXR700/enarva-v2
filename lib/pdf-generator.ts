@@ -74,20 +74,42 @@ export type QuotePDFData = {
 };
 
 /**
- * Renders text with bullet points, handling line breaks.
+ * Renders text, splitting sentences ending in a dot into separate bullet points,
+ * and handling line breaks within each point.
  */
 function renderBulletedText(doc: jsPDF, text: string | null | undefined, startX: number, startY: number, maxWidth: number): number {
   if (!text || text.trim() === '') {
     return startY; // Skip if empty
   }
-  const lines = doc.splitTextToSize(text, maxWidth);
+
   let currentY = startY;
-  lines.forEach((line: string, index: number) => {
-    const prefix = index === 0 ? '• ' : '  '; // Indent subsequent lines
-    doc.text(prefix + line, startX, currentY);
-    currentY += 13; // Line height
+  const lineSpacing = 13; // Line height for wrapped text
+  const pointSpacing = 5; // Extra space between distinct bullet points
+
+  // Split the text into potential bullet points based on dots.
+  // We keep the dot temporarily to split correctly, then remove it.
+  const points = text
+    .split('.') // Split by dot
+    .map(p => p.trim()) // Trim whitespace around each potential point
+    .filter(p => p.length > 0); // Remove empty strings resulting from multiple dots or end dot
+
+  points.forEach((pointText) => {
+    // Wrap the text for this specific bullet point if it's too long
+    const lines = doc.splitTextToSize(pointText, maxWidth);
+
+    lines.forEach((line: string, index: number) => {
+      // Add bullet only to the first line of each point
+      const prefix = index === 0 ? '• ' : '  '; // Indent subsequent lines
+      doc.text(prefix + line, startX, currentY);
+      currentY += lineSpacing;
+    });
+
+    // Add a little extra space after each full bullet point (after its last line)
+    currentY += pointSpacing;
   });
-  return currentY;
+
+  // Adjust Y position: remove the last extra pointSpacing if points were added
+  return points.length > 0 ? currentY - pointSpacing : startY;
 }
 
 
